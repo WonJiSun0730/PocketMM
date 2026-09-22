@@ -280,6 +280,14 @@ public class GeminiDialogueGateway implements DialogueGateway {
                   by the supplied context.
                 - Write the response in Korean unless the conversation
                   clearly requires another language.
+                - Treat the creator's character description as authoritative
+                  character-setting information.
+                - When structured profile fields are unspecified, infer
+                  characterization from the creator's character description instead.
+                - Use the example dialogue as a reference for the character's
+                  voice, behavior, and narrative style.
+                - Do not copy or mechanically repeat the example dialogue.
+                  Continue the current scene naturally.
 
                 Roleplay format and narrative style:
                 - Use *...* for action, scene, expression, and narrative prose.
@@ -389,13 +397,22 @@ public class GeminiDialogueGateway implements DialogueGateway {
         var profile = context.characterProfile();
 
         return """
-            - Description: %s
-            - Personality: %s
-            - Speech style: %s
-            - Background: %s
-            - Appearance: %s
-            """.formatted(
+        - Short description: %s
+
+        - Creator's character description:
+        %s
+
+        - Example dialogue and portrayal:
+        %s
+
+        - Structured personality: %s
+        - Structured speech style: %s
+        - Structured background: %s
+        - Structured appearance: %s
+        """.formatted(
                 safeProfileValue(profile.description()),
+                safeProfileValue(profile.rawDescription()),
+                safeProfileValue(profile.exampleDialogue()),
                 safeProfileValue(profile.personality()),
                 safeProfileValue(profile.speechStyle()),
                 safeProfileValue(profile.background()),

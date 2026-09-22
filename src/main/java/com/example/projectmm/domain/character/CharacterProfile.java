@@ -12,6 +12,10 @@ public class CharacterProfile {
     public CharacterProfile(
             Character character,
             String description,
+            String rawDescription,
+            String playGuide,
+            String intro,
+            String exampleDialogue,
             String personality,
             String speechStyle,
             String background,
@@ -19,6 +23,10 @@ public class CharacterProfile {
     ) {
         this.character = character;
         this.description = description;
+        this.rawDescription = rawDescription;
+        this.playGuide = playGuide;
+        this.intro = intro;
+        this.exampleDialogue = exampleDialogue;
         this.personality = personality;
         this.speechStyle = speechStyle;
         this.background = background;
@@ -42,6 +50,22 @@ public class CharacterProfile {
     private String description;
 
     @Lob
+    @Column(name = "raw_description", columnDefinition = "TEXT")
+    private String rawDescription;
+
+    @Lob
+    @Column(name = "play_guide", columnDefinition = "TEXT")
+    private String playGuide;
+
+    @Lob
+    @Column(columnDefinition = "TEXT")
+    private String intro;
+
+    @Lob
+    @Column(name = "example_dialogue", columnDefinition = "TEXT")
+    private String exampleDialogue;
+
+    @Lob
     @Column(columnDefinition = "TEXT")
     private String personality;
 
@@ -59,12 +83,20 @@ public class CharacterProfile {
 
     public void update(
             String description,
+            String rawDescription,
+            String playGuide,
+            String intro,
+            String exampleDialogue,
             String personality,
             String speechStyle,
             String background,
             String appearance
     ) {
         this.description = description;
+        this.rawDescription = rawDescription;
+        this.playGuide = playGuide;
+        this.intro = intro;
+        this.exampleDialogue = exampleDialogue;
         this.personality = personality;
         this.speechStyle = speechStyle;
         this.background = background;

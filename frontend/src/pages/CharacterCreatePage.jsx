@@ -1,0 +1,371 @@
+import { useState } from "react"
+import { ArrowLeft, ChevronDown, ChevronUp } from "lucide-react"
+
+import { Button } from "@/components/ui/button"
+import { Textarea } from "@/components/ui/textarea"
+
+export default function CharacterCreatePage({
+  onBack,
+  onCreated,
+}) {
+  const [name, setName] = useState("")
+  const [description, setDescription] = useState("")
+  const [rawDescription, setRawDescription] = useState("")
+  const [playGuide, setPlayGuide] = useState("")
+  const [intro, setIntro] = useState("")
+  const [exampleDialogue, setExampleDialogue] = useState("")
+
+  const [personality, setPersonality] = useState("")
+  const [speechStyle, setSpeechStyle] = useState("")
+  const [background, setBackground] = useState("")
+  const [appearance, setAppearance] = useState("")
+
+  const [showDetails, setShowDetails] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState("")
+
+  async function createCharacter() {
+    const trimmedName = name.trim()
+
+    if (!trimmedName || saving) {
+      return
+    }
+
+    setSaving(true)
+    setError("")
+
+    try {
+      const response = await fetch("/api/characters", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          description: description.trim() || null,
+          rawDescription: rawDescription.trim() || null,
+          playGuide: playGuide.trim() || null,
+          intro: intro.trim() || null,
+          exampleDialogue: exampleDialogue.trim() || null,
+          personality: personality.trim() || null,
+          speechStyle: speechStyle.trim() || null,
+          background: background.trim() || null,
+          appearance: appearance.trim() || null,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`캐릭터 생성 실패: ${response.status}`)
+      }
+
+      const character = await response.json()
+      onCreated(character)
+    } catch (error) {
+      console.error(error)
+      setError("캐릭터를 만들지 못했어요. 잠시 후 다시 시도해 주세요.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <main className="min-h-svh bg-background text-foreground">
+      <section className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-10">
+        <header className="mb-8">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onBack}
+            className="mb-5"
+            aria-label="캐릭터 목록으로 돌아가기"
+          >
+            <ArrowLeft className="size-5" />
+          </Button>
+
+          <p className="mb-2 text-sm text-muted-foreground">
+            PocketMM Creator
+          </p>
+
+          <h1 className="text-3xl font-semibold tracking-tight">
+            캐릭터 만들기
+          </h1>
+
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            형식에 맞출 필요 없이 캐릭터를 자유롭게 작성할 수 있어요.
+          </p>
+        </header>
+
+        <div className="space-y-8">
+          <section className="space-y-5 rounded-2xl border bg-card p-5 sm:p-6">
+            <div>
+              <h2 className="font-semibold">
+                기본 설정
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                캐릭터의 기본 정보를 작성하세요.
+              </p>
+            </div>
+
+            <Field
+              label="이름"
+              required
+              description="캐릭터의 이름"
+            >
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                maxLength={100}
+                placeholder="캐릭터 이름"
+                className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-ring"
+              />
+            </Field>
+
+            <Field
+              label="한줄 소개"
+              description="캐릭터 목록 등에 표시되는 짧은 소개"
+            >
+              <input
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder="이 캐릭터를 짧게 소개해 주세요."
+                className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-ring"
+              />
+            </Field>
+
+            <Field
+              label="캐릭터 설명"
+              description="성격, 말투, 외모, 과거, 관계, 특징 등 원하는 설정을 자유롭게 작성하세요."
+            >
+              <Textarea
+                value={rawDescription}
+                onChange={(event) =>
+                  setRawDescription(event.target.value)
+                }
+                placeholder="정해진 형식은 없어요. 캐릭터에 대해 AI가 알아야 할 설정을 자유롭게 작성하세요."
+                className="min-h-48 resize-y leading-6"
+              />
+            </Field>
+          </section>
+
+          <section className="space-y-5 rounded-2xl border bg-card p-5 sm:p-6">
+            <div>
+              <h2 className="font-semibold">
+                대화 설정
+              </h2>
+
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                캐릭터와의 이야기가 시작되는 장면과
+                대화 스타일을 설정하세요.
+              </p>
+            </div>
+
+            <Field
+              label="인트로"
+              description="새로운 이야기를 시작할 때 처음 보여줄 장면이에요."
+            >
+              <Textarea
+                value={intro}
+                onChange={(event) => setIntro(event.target.value)}
+                placeholder={`예시
+
+          *늦은 밤, 캐릭터는 창가에 기대어 밖을 바라보고 있었다.
+          문이 열리는 소리에 천천히 고개를 돌렸다.*
+
+          "왔어요?"`}
+                className="min-h-48 resize-y leading-6"
+              />
+            </Field>
+
+            <Field
+              label="예시 대화"
+              description="캐릭터가 어떻게 말하고 행동하는지 보여주는 예시예요."
+            >
+              <Textarea
+                value={exampleDialogue}
+                onChange={(event) => setExampleDialogue(event.target.value)}
+                placeholder={`예시
+
+          *잠시 생각하던 캐릭터가 고개를 기울였다.*
+
+          "그렇게 생각한 이유가 궁금하네요."
+
+          *재촉하지 않고 조용히 대답을 기다렸다.*`}
+                className="min-h-48 resize-y leading-6"
+              />
+            </Field>
+          </section>
+
+          <section className="space-y-5 rounded-2xl border bg-card p-5 sm:p-6">
+            <div>
+              <h2 className="font-semibold">
+                플레이 가이드
+              </h2>
+
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                플레이어에게 보여줄 안내를 자유롭게 작성하세요.
+                권장 설정, 상태 체계, 명령어나 단축어, 플레이 팁 등을
+                안내할 수 있어요.
+              </p>
+            </div>
+
+            <Textarea
+              value={playGuide}
+              onChange={(event) =>
+                setPlayGuide(event.target.value)
+              }
+              placeholder={`예시
+
+• 권장 설정
+• 상태 또는 시스템 안내
+• 사용할 수 있는 명령어
+• 플레이 팁`}
+              className="min-h-40 resize-y leading-6"
+            />
+          </section>
+
+          <section className="rounded-2xl border bg-card">
+            <button
+              type="button"
+              onClick={() => setShowDetails((current) => !current)}
+              className="flex w-full items-center justify-between gap-4 p-5 text-left sm:p-6"
+            >
+              <div>
+                <h2 className="font-semibold">
+                  상세 설정
+                </h2>
+
+                <p className="mt-1 text-sm text-muted-foreground">
+                  필요한 경우 구조화된 설정을 직접 작성할 수 있어요.
+                </p>
+              </div>
+
+              {showDetails ? (
+                <ChevronUp className="size-5 shrink-0 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="size-5 shrink-0 text-muted-foreground" />
+              )}
+            </button>
+
+            {showDetails && (
+              <div className="space-y-5 border-t p-5 sm:p-6">
+                <Field label="성격">
+                  <Textarea
+                    value={personality}
+                    onChange={(event) =>
+                      setPersonality(event.target.value)
+                    }
+                    placeholder="성격과 행동 성향"
+                    className="min-h-28 resize-y"
+                  />
+                </Field>
+
+                <Field label="말투">
+                  <Textarea
+                    value={speechStyle}
+                    onChange={(event) =>
+                      setSpeechStyle(event.target.value)
+                    }
+                    placeholder="말투, 어휘, 호칭, 말버릇 등"
+                    className="min-h-28 resize-y"
+                  />
+                </Field>
+
+                <Field label="배경">
+                  <Textarea
+                    value={background}
+                    onChange={(event) =>
+                      setBackground(event.target.value)
+                    }
+                    placeholder="과거사, 소속, 중요한 사건과 관계 등"
+                    className="min-h-32 resize-y"
+                  />
+                </Field>
+
+                <Field label="외모">
+                  <Textarea
+                    value={appearance}
+                    onChange={(event) =>
+                      setAppearance(event.target.value)
+                    }
+                    placeholder="외형적 특징"
+                    className="min-h-28 resize-y"
+                  />
+                </Field>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-2xl border bg-card p-5 sm:p-6">
+            <h2 className="font-semibold">
+              월드
+            </h2>
+
+            <p className="mt-1 text-sm text-muted-foreground">
+              현재는 월드를 지정하지 않고 캐릭터를 만들 수 있어요.
+            </p>
+
+            <div className="mt-4 rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+              지정하지 않음
+            </div>
+          </section>
+
+          {error && (
+            <p className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+
+          <div className="flex justify-end gap-3 pb-10">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={saving}
+              onClick={onBack}
+            >
+              취소
+            </Button>
+
+            <Button
+              type="button"
+              disabled={saving || !name.trim()}
+              onClick={createCharacter}
+            >
+              {saving ? "만드는 중..." : "캐릭터 만들기"}
+            </Button>
+          </div>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function Field({
+  label,
+  description,
+  required = false,
+  children,
+}) {
+  return (
+    <div>
+      <div className="mb-2">
+        <label className="text-sm font-medium">
+          {label}
+          {required && (
+            <span className="ml-1 text-destructive">
+              *
+            </span>
+          )}
+        </label>
+
+        {description && (
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {description}
+          </p>
+        )}
+      </div>
+
+      {children}
+    </div>
+  )
+}

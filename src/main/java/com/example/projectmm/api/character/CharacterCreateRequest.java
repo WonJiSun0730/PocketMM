@@ -10,6 +10,10 @@ public record CharacterCreateRequest(
         String name,
 
         String description,
+        String rawDescription,
+        String playGuide,
+        String intro,
+        String exampleDialogue,
         String personality,
         String speechStyle,
         String background,

@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from "react"
-import { Send } from "lucide-react"
+import { ArrowLeft, Send } from "lucide-react"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
-
-const CHARACTER_ID = 1
 
 function RpText({ text, isUser }) {
   const parts = text.split(/(\*[^*]+\*)/g)
@@ -42,7 +40,10 @@ function RpText({ text, isUser }) {
   )
 }
 
-export default function ChatPage() {
+export default function ChatPage({
+  character,
+  onBack,
+}) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(true)
@@ -61,7 +62,7 @@ export default function ChatPage() {
 
   async function loadMessages() {
     try {
-      const response = await fetch(`/api/chat/${CHARACTER_ID}/messages`)
+      const response = await fetch(`/api/chat/${character.id}/messages`)
 
       if (!response.ok) {
         throw new Error(`메시지 조회 실패: ${response.status}`)
@@ -98,7 +99,7 @@ export default function ChatPage() {
     setMessages((current) => [...current, pendingMessage])
 
     try {
-      const response = await fetch(`/api/chat/${CHARACTER_ID}`, {
+      const response = await fetch(`/api/chat/${character.id}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -142,14 +143,27 @@ export default function ChatPage() {
     <main className="flex h-svh bg-background text-foreground">
       <section className="mx-auto flex h-full w-full max-w-4xl flex-col border-x bg-card">
         <header className="flex h-16 shrink-0 items-center gap-3 border-b px-4 sm:px-6">
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onBack}
+            aria-label="캐릭터 목록으로 돌아가기"
+          >
+            <ArrowLeft className="size-4" />
+          </Button>
+
           <Avatar>
             <AvatarFallback className="bg-accent text-accent-foreground">
-              M
+              {character.name.slice(0, 1).toUpperCase()}
             </AvatarFallback>
           </Avatar>
 
           <div className="min-w-0">
-            <h1 className="font-medium leading-none">Millie</h1>
+            <h1 className="font-medium leading-none">
+              {character.name}
+            </h1>
             <p className="mt-1 text-xs text-muted-foreground">
               PocketMM
             </p>
@@ -183,10 +197,6 @@ export default function ChatPage() {
 
             {sending && (
               <div className="border-b border-border/70 py-7 sm:py-9">
-                <div className="mb-4 text-sm font-semibold text-foreground">
-                  Millie
-                </div>
-
                 <p className="animate-pulse text-sm italic text-muted-foreground">
                   장면을 이어가는 중...
                 </p>
@@ -203,7 +213,7 @@ export default function ChatPage() {
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Millie에게 메시지 보내기"
+              placeholder={`${character.name}에게 메시지 보내기`}
               disabled={sending}
               rows={1}
               className="max-h-36 min-h-11 resize-none text-base"

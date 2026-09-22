@@ -40,6 +40,10 @@ public class DevCharacterProfileRunner implements CommandLineRunner {
                         null,
                         null,
                         null,
+                        null,
+                        null,
+                        null,
+                        null,
                         null
                 )
         );

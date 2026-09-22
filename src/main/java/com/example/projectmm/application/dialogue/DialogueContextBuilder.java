@@ -60,6 +60,8 @@ public class DialogueContextBuilder {
                         ? null
                         : new DialogueCharacterProfile(
                         profile.getDescription(),
+                        profile.getRawDescription(),
+                        profile.getExampleDialogue(),
                         profile.getPersonality(),
                         profile.getSpeechStyle(),
                         profile.getBackground(),

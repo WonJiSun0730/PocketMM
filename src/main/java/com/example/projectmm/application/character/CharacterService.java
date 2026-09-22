@@ -40,6 +40,10 @@ public class CharacterService {
                         new CharacterProfile(
                                 character,
                                 request.description(),
+                                request.rawDescription(),
+                                request.playGuide(),
+                                request.intro(),
+                                request.exampleDialogue(),
                                 request.personality(),
                                 request.speechStyle(),
                                 request.background(),
@@ -56,15 +60,7 @@ public class CharacterService {
                 )
         );
 
-        return new CharacterResponse(
-                character.getId(),
-                character.getName(),
-                profile.getDescription(),
-                profile.getPersonality(),
-                profile.getSpeechStyle(),
-                profile.getBackground(),
-                profile.getAppearance()
-        );
+        return toResponse(character, profile);
     }
 
     @Transactional(readOnly = true)
@@ -116,6 +112,10 @@ public class CharacterService {
 
         profile.update(
                 request.description(),
+                request.rawDescription(),
+                request.playGuide(),
+                request.intro(),
+                request.exampleDialogue(),
                 request.personality(),
                 request.speechStyle(),
                 request.background(),
@@ -140,6 +140,10 @@ public class CharacterService {
                     null,
                     null,
                     null,
+                    null,
+                    null,
+                    null,
+                    null,
                     null
             );
         }
@@ -155,6 +159,10 @@ public class CharacterService {
                 character.getId(),
                 character.getName(),
                 profile.getDescription(),
+                profile.getRawDescription(),
+                profile.getPlayGuide(),
+                profile.getIntro(),
+                profile.getExampleDialogue(),
                 profile.getPersonality(),
                 profile.getSpeechStyle(),
                 profile.getBackground(),
