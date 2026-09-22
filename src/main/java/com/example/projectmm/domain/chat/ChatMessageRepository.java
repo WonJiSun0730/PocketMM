@@ -9,4 +9,11 @@ public interface ChatMessageRepository
 
     List<ChatMessage>
     findTop20ByCharacterIdOrderByCreatedAtDesc(Long characterId);
+
+    boolean existsByCharacterId(Long characterId);
+
+    List<ChatMessage>
+    findTop20ByConversationIdOrderByCreatedAtDesc(Long conversationId);
+
+    boolean existsByConversationId(Long conversationId);
 }

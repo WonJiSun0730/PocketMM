@@ -23,6 +23,10 @@ public class ChatMessage {
     @JoinColumn(name = "character_id", nullable = false)
     private Character character;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "conversation_id")
+    private Conversation conversation;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ChatRole role;
@@ -65,6 +69,22 @@ public class ChatMessage {
             throw new IllegalArgumentException("createdAt must not be null");
         }
 
+        this.character = character;
+        this.role = role;
+        this.content = content;
+        this.contentMode = contentMode;
+        this.createdAt = createdAt;
+    }
+
+    public ChatMessage(
+            Conversation conversation,
+            Character character,
+            ChatRole role,
+            String content,
+            ContentMode contentMode,
+            LocalDateTime createdAt
+    ) {
+        this.conversation = conversation;
         this.character = character;
         this.role = role;
         this.content = content;

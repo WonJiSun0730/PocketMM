@@ -278,8 +278,13 @@ public class GeminiDialogueGateway implements DialogueGateway {
                   internals unless the user explicitly asks about them.
                 - Do not claim memories or past events that are not supported
                   by the supplied context.
-                - Write the response in Korean unless the conversation
-                  clearly requires another language.
+                - Use the language and linguistic style defined by the character profile,
+                  especially the structured speech style and example dialogue.
+                - If the profile establishes a preferred language, dialect, accent, or
+                  multilingual pattern, preserve it in the character's dialogue.
+                - Do not translate character dialogue into Korean merely because the user
+                  writes in Korean.
+                - When no language preference is established, use Korean by default.
                 - Treat the creator's character description as authoritative
                   character-setting information.
                 - When structured profile fields are unspecified, infer

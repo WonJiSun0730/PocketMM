@@ -4,12 +4,14 @@ import com.example.projectmm.application.dialogue.DialogueContextBuilder;
 import com.example.projectmm.application.dialogue.DialogueGateway;
 import com.example.projectmm.application.policy.ContentMode;
 import com.example.projectmm.application.policy.ContentModePolicy;
+import com.example.projectmm.application.time.TimeInterpreter;
 import com.example.projectmm.domain.character.Character;
+import com.example.projectmm.domain.character.CharacterProfile;
+import com.example.projectmm.domain.character.CharacterProfileRepository;
 import com.example.projectmm.domain.character.CharacterRepository;
-import com.example.projectmm.domain.chat.ChatMessage;
-import com.example.projectmm.domain.chat.ChatMessageRepository;
-import com.example.projectmm.domain.chat.ChatRole;
+import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.dialogue.DialogueContext;
+import com.example.projectmm.domain.time.TimeChange;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -23,10 +25,13 @@ import java.util.List;
 public class ChatService {
 
     private final CharacterRepository characterRepository;
+    private final CharacterProfileRepository characterProfileRepository;
+    private final ConversationRepository conversationRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final DialogueContextBuilder dialogueContextBuilder;
     private final DialogueGateway dialogueGateway;
     private final ContentModePolicy contentModePolicy;
+    private final TimeInterpreter timeInterpreter;
 
     public ChatResponse chat(
             Long characterId,
@@ -51,6 +56,27 @@ public class ChatService {
                                 )
                         );
 
+        Conversation conversation =
+                conversationRepository
+                        .findTopByCharacterIdOrderByCreatedAtDesc(characterId)
+                        .orElseGet(() ->
+                                createConversation(character)
+                        );
+
+        TimeChange timeChange =
+                timeInterpreter.interpret(
+                        request.message(),
+                        conversation.getSimulatedAt()
+                );
+
+        if (timeChange.changed()) {
+            conversation.updateSimulatedAt(
+                    timeChange.newTime()
+            );
+
+            conversationRepository.save(conversation);
+        }
+
         ContentMode resolvedMode =
                 contentModePolicy.resolve(
                         request.contentMode()
@@ -59,6 +85,7 @@ public class ChatService {
         DialogueContext context =
                 dialogueContextBuilder.build(
                         characterId,
+                        conversation.getId(),
                         resolvedMode
                 );
 
@@ -73,6 +100,7 @@ public class ChatService {
 
         ChatMessage userMessage =
                 new ChatMessage(
+                        conversation,
                         character,
                         ChatRole.USER,
                         request.message(),
@@ -87,6 +115,7 @@ public class ChatService {
 
         ChatMessage characterMessage =
                 new ChatMessage(
+                        conversation,
                         character,
                         ChatRole.CHARACTER,
                         generatedMessage,
@@ -108,18 +137,51 @@ public class ChatService {
     public List<ChatHistoryResponse> getRecentMessages(
             Long characterId
     ) {
-        if (!characterRepository.existsById(characterId)) {
-            throw new IllegalArgumentException(
-                    "Character not found. characterId="
-                            + characterId
-            );
+        Character character =
+                characterRepository
+                        .findById(characterId)
+                        .orElseThrow(() ->
+                                new IllegalArgumentException(
+                                        "Character not found. characterId="
+                                                + characterId
+                                )
+                        );
+
+        Conversation conversation =
+                conversationRepository
+                        .findTopByCharacterIdOrderByCreatedAtDesc(characterId)
+                        .orElseGet(() ->
+                                createConversation(character)
+                        );
+
+        if (!chatMessageRepository.existsByConversationId(
+                conversation.getId()
+        )) {
+            characterProfileRepository
+                    .findByCharacterId(characterId)
+                    .map(CharacterProfile::getIntro)
+                    .filter(intro ->
+                            intro != null && !intro.isBlank()
+                    )
+                    .ifPresent(intro ->
+                            chatMessageRepository.save(
+                                    new ChatMessage(
+                                            conversation,
+                                            character,
+                                            ChatRole.CHARACTER,
+                                            intro,
+                                            ContentMode.NORMAL,
+                                            LocalDateTime.now()
+                                    )
+                            )
+                    );
         }
 
         List<ChatMessage> messages =
                 new ArrayList<>(
                         chatMessageRepository
-                                .findTop20ByCharacterIdOrderByCreatedAtDesc(
-                                        characterId
+                                .findTop20ByConversationIdOrderByCreatedAtDesc(
+                                        conversation.getId()
                                 )
                 );
 
@@ -136,5 +198,20 @@ public class ChatService {
                         )
                 )
                 .toList();
+    }
+
+    private Conversation createConversation(
+            Character character
+    ) {
+        LocalDateTime simulatedAt =
+                LocalDateTime.now();
+
+        Conversation conversation =
+                new Conversation(
+                        character,
+                        simulatedAt
+                );
+
+        return conversationRepository.save(conversation);
     }
 }

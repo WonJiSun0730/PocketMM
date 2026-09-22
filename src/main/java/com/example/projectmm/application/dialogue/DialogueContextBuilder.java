@@ -9,6 +9,8 @@ import com.example.projectmm.domain.character.CharacterState;
 import com.example.projectmm.domain.character.CharacterStateRepository;
 import com.example.projectmm.domain.chat.ChatMessage;
 import com.example.projectmm.domain.chat.ChatMessageRepository;
+import com.example.projectmm.domain.chat.Conversation;
+import com.example.projectmm.domain.chat.ConversationRepository;
 import com.example.projectmm.domain.dialogue.*;
 import com.example.projectmm.domain.memory.EffectiveMemory;
 import com.example.projectmm.domain.relationship.Relationship;
@@ -34,10 +36,12 @@ public class DialogueContextBuilder {
     private final MemoryRecallService memoryRecallService;
     private final RelationshipRepository relationshipRepository;
     private final ContentModePolicy contentModePolicy;
+    private final ConversationRepository conversationRepository;
 
     @Transactional(readOnly = true)
     public DialogueContext build(
             Long characterId,
+            Long conversationId,
             ContentMode requestedMode
     ) {
         CharacterState state =
@@ -47,6 +51,16 @@ public class DialogueContextBuilder {
                                 new IllegalArgumentException(
                                         "Character state not found. characterId="
                                                 + characterId
+                                )
+                        );
+
+        Conversation conversation =
+                conversationRepository
+                        .findById(conversationId)
+                        .orElseThrow(() ->
+                                new IllegalArgumentException(
+                                        "Conversation not found. conversationId="
+                                                + conversationId
                                 )
                         );
 
@@ -72,12 +86,12 @@ public class DialogueContextBuilder {
                 contentModePolicy.resolve(requestedMode);
 
         List<DialogueMessageContext> recentMessages =
-                buildRecentMessages(characterId);
+                buildRecentMessages(conversationId);
 
         List<DialogueMemoryContext> memories =
                 buildMemories(
                         characterId,
-                        state.getSimulatedAt()
+                        conversation.getSimulatedAt()
                 );
 
         List<DialogueRelationshipContext> relationships =
@@ -89,7 +103,7 @@ public class DialogueContextBuilder {
                 dialogueProfile,
                 state.getEnergy(),
                 state.getMood(),
-                state.getSimulatedAt(),
+                conversation.getSimulatedAt(),
                 resolvedMode,
                 recentMessages,
                 memories,
@@ -98,13 +112,13 @@ public class DialogueContextBuilder {
     }
 
     private List<DialogueMessageContext> buildRecentMessages(
-            Long characterId
+            Long conversationId
     ) {
         List<ChatMessage> messages =
                 new ArrayList<>(
                         chatMessageRepository
-                                .findTop20ByCharacterIdOrderByCreatedAtDesc(
-                                        characterId
+                                .findTop20ByConversationIdOrderByCreatedAtDesc(
+                                        conversationId
                                 )
                 );
 
