@@ -1,6 +1,7 @@
 package com.example.projectmm.application.simulation;
 
 import com.example.projectmm.domain.event.Event;
+import com.example.projectmm.domain.relationship.RelationshipDelta;
 import com.example.projectmm.domain.scene.Scene;
 import com.example.projectmm.domain.simulation.EventSource;
 import com.example.projectmm.domain.simulation.ResolvedEvent;
@@ -39,6 +40,8 @@ class ResolvedEventMapperTest {
                         "밀리는 잠시 자신의 감정을 돌아보았다.",
                         4,
                         new StateDelta(0, 5),
+                        null,
+                        RelationshipDelta.none(),
                         EventSource.AI
                 );
 

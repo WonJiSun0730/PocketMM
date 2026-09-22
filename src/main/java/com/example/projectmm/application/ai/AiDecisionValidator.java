@@ -54,6 +54,42 @@ public class AiDecisionValidator {
             );
         }
 
+        if (decision.relationshipDelta() == null) {
+            return ValidationResult.reject(
+                    "relationshipDelta must not be null"
+            );
+        }
+
+        if (Math.abs(decision.relationshipDelta().affinityChange()) > 10) {
+            return ValidationResult.reject(
+                    "affinityChange must be between -10 and 10"
+            );
+        }
+
+        if (Math.abs(decision.relationshipDelta().trustChange()) > 10) {
+            return ValidationResult.reject(
+                    "trustChange must be between -10 and 10"
+            );
+        }
+
+        if (Math.abs(decision.relationshipDelta().tensionChange()) > 10) {
+            return ValidationResult.reject(
+                    "tensionChange must be between -10 and 10"
+            );
+        }
+
+        boolean hasRelationshipChange =
+                decision.relationshipDelta().affinityChange() != 0
+                        || decision.relationshipDelta().trustChange() != 0
+                        || decision.relationshipDelta().tensionChange() != 0;
+
+        if (hasRelationshipChange
+                && decision.relationshipTargetCharacterId() == null) {
+            return ValidationResult.reject(
+                    "relationshipTargetCharacterId is required when relationship changes"
+            );
+        }
+
         return ValidationResult.accept();
     }
 }

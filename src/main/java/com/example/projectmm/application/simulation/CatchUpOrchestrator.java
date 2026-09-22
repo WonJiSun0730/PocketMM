@@ -6,6 +6,7 @@ import com.example.projectmm.application.ai.AiGateway;
 import com.example.projectmm.domain.ai.AiContext;
 import com.example.projectmm.domain.ai.AiDecision;
 import com.example.projectmm.domain.character.CharacterState;
+import com.example.projectmm.domain.relationship.RelationshipDelta;
 import com.example.projectmm.domain.simulation.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -94,6 +95,8 @@ public class CatchUpOrchestrator {
                                         decision.summary(),
                                         decision.importance(),
                                         decision.stateDelta(),
+                                        decision.relationshipTargetCharacterId(),
+                                        decision.relationshipDelta(),
                                         EventSource.AI
                                 )
                         );
@@ -124,6 +127,8 @@ public class CatchUpOrchestrator {
                                     candidate.summary(),
                                     candidate.importance(),
                                     candidate.stateDelta(),
+                                    null,
+                                    RelationshipDelta.none(),
                                     EventSource.RULE
                             )
                     );

@@ -3,6 +3,8 @@ package com.example.projectmm.infrastructure.ai;
 import com.example.projectmm.domain.ai.AiContext;
 import com.example.projectmm.domain.ai.AiDecision;
 import com.example.projectmm.domain.ai.AiMemoryContext;
+import com.example.projectmm.domain.ai.AiRelationshipContext;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -11,6 +13,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Tag("live")
 class GeminiAiGatewayTest {
 
     @Test
@@ -53,7 +56,15 @@ class GeminiAiGatewayTest {
                                         )
                                 )
                         ),
-                        List.of()
+                        List.of(
+                                new AiRelationshipContext(
+                                        2L,
+                                        "Marbas",
+                                        85,
+                                        90,
+                                        10
+                                )
+                        )
                 );
 
         AiDecision decision =
@@ -81,6 +92,21 @@ class GeminiAiGatewayTest {
                         + decision.stateDelta().moodChange()
         );
 
+        System.out.println(
+                "affinityChange = "
+                        + decision.relationshipDelta().affinityChange()
+        );
+
+        System.out.println(
+                "trustChange = "
+                        + decision.relationshipDelta().trustChange()
+        );
+
+        System.out.println(
+                "tensionChange = "
+                        + decision.relationshipDelta().tensionChange()
+        );
+
         assertThat(decision.eventType())
                 .isNotBlank();
 
@@ -92,5 +118,29 @@ class GeminiAiGatewayTest {
 
         assertThat(decision.stateDelta())
                 .isNotNull();
+
+        assertThat(decision.relationshipDelta())
+                .isNotNull();
+
+        assertThat(
+                Math.abs(
+                        decision.relationshipDelta()
+                                .affinityChange()
+                )
+        ).isLessThanOrEqualTo(10);
+
+        assertThat(
+                Math.abs(
+                        decision.relationshipDelta()
+                                .trustChange()
+                )
+        ).isLessThanOrEqualTo(10);
+
+        assertThat(
+                Math.abs(
+                        decision.relationshipDelta()
+                                .tensionChange()
+                )
+        ).isLessThanOrEqualTo(10);
     }
 }

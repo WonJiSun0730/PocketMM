@@ -3,6 +3,7 @@ package com.example.projectmm.infrastructure.ai;
 import com.example.projectmm.application.ai.AiGateway;
 import com.example.projectmm.domain.ai.AiContext;
 import com.example.projectmm.domain.ai.AiDecision;
+import com.example.projectmm.domain.relationship.RelationshipDelta;
 import com.example.projectmm.domain.simulation.StateDelta;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -70,6 +71,12 @@ public class GeminiAiGateway implements AiGateway {
                 new StateDelta(
                         decision.energyChange(),
                         decision.moodChange()
+                ),
+                decision.relationshipTargetCharacterId(),
+                new RelationshipDelta(
+                        decision.affinityChange(),
+                        decision.trustChange(),
+                        decision.tensionChange()
                 )
         );
     }
@@ -79,6 +86,9 @@ public class GeminiAiGateway implements AiGateway {
     ) {
         String memoryPrompt =
                 buildMemoryPrompt(context);
+
+        String relationshipPrompt =
+                buildRelationshipPrompt(context);
 
         String prompt = """
                 You are a simulation decision component for PocketMM.
@@ -91,14 +101,33 @@ public class GeminiAiGateway implements AiGateway {
                 Mood: %d
                 Simulation time: %s
                 
-                Relevant past memories: %s
-
+                Relevant past memories:
+                %s
+                
+                Current relationships:
+                %s
+                
                 Candidate event type: %s
                 Candidate summary: %s
 
                 Keep state changes conservative.
                 Energy and mood changes should normally remain between
                 -20 and 20.
+                
+                Relationship changes represent how this event affects
+                the character's relationship with the relevant person.
+                Affinity, trust, and tension changes should normally remain
+                between -10 and 10.
+                
+                When relationship changes are non-zero, set
+                relationshipTargetCharacterId to the ID of the affected person
+                from Current relationships.
+                
+                If no relationship is affected,
+                relationshipTargetCharacterId must be null.
+                
+                If the event does not meaningfully affect a relationship,
+                return 0 for all relationship changes.
                 """
                 .formatted(
                         context.characterName(),
@@ -106,6 +135,7 @@ public class GeminiAiGateway implements AiGateway {
                         context.mood(),
                         context.simulatedAt(),
                         memoryPrompt,
+                        relationshipPrompt,
                         context.eventType(),
                         context.eventSummary()
                 );
@@ -128,6 +158,21 @@ public class GeminiAiGateway implements AiGateway {
                                 ),
                                 "moodChange", Map.of(
                                         "type", "integer"
+                                ),
+                                "relationshipTargetCharacterId", Map.of(
+                                        "type", List.of(
+                                                "integer",
+                                                "null"
+                                        )
+                                ),
+                                "affinityChange", Map.of(
+                                        "type", "integer"
+                                ),
+                                "trustChange", Map.of(
+                                        "type", "integer"
+                                ),
+                                "tensionChange", Map.of(
+                                        "type", "integer"
                                 )
                         ),
                         "required", List.of(
@@ -135,7 +180,11 @@ public class GeminiAiGateway implements AiGateway {
                                 "summary",
                                 "importance",
                                 "energyChange",
-                                "moodChange"
+                                "moodChange",
+                                "relationshipTargetCharacterId",
+                                "affinityChange",
+                                "trustChange",
+                                "tensionChange"
                         )
                 );
 
@@ -176,6 +225,34 @@ public class GeminiAiGateway implements AiGateway {
                                 + memory.strength()
                                 + ", importance: "
                                 + memory.importance()
+                                + ")"
+                )
+                .collect(
+                        java.util.stream.Collectors.joining("\n")
+                );
+    }
+
+    private String buildRelationshipPrompt(
+            AiContext context
+    ) {
+        if (context.relationships() == null
+                || context.relationships().isEmpty()) {
+
+            return "No known relationships.";
+        }
+
+        return context.relationships().stream()
+                .map(relationship ->
+                        "- ID "
+                                + relationship.characterId()
+                                + ": "
+                                + relationship.characterName()
+                                + " (affinity: "
+                                + relationship.affinity()
+                                + ", trust: "
+                                + relationship.trust()
+                                + ", tension: "
+                                + relationship.tension()
                                 + ")"
                 )
                 .collect(

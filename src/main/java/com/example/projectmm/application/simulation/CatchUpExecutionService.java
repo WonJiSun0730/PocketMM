@@ -1,5 +1,6 @@
 package com.example.projectmm.application.simulation;
 
+import com.example.projectmm.application.relationship.RelationshipChangeService;
 import com.example.projectmm.domain.character.CharacterState;
 import com.example.projectmm.domain.event.Event;
 import com.example.projectmm.domain.scene.Scene;
@@ -18,6 +19,7 @@ public class CatchUpExecutionService {
     private final CatchUpOrchestrator catchUpOrchestrator;
     private final CatchUpSceneResolver catchUpSceneResolver;
     private final ResolvedEventPersistenceService persistenceService;
+    private final RelationshipChangeService relationshipChangeService;
 
     @Transactional
     public List<Event> execute(
@@ -29,6 +31,15 @@ public class CatchUpExecutionService {
                         state,
                         currentTime
                 );
+
+        result.resolvedEvents().forEach(
+                resolvedEvent ->
+                        relationshipChangeService.apply(
+                                state.getCharacter().getId(),
+                                resolvedEvent.relationshipTargetCharacterId(),
+                                resolvedEvent.relationshipDelta()
+                        )
+        );
 
         if (result.resolvedEvents().isEmpty()) {
             return List.of();

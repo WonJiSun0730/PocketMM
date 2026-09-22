@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 @Component
-@Profile("dev")
+@Profile("local")
 @Order(1)
 @RequiredArgsConstructor
 public class DevSeedRunner implements CommandLineRunner {
@@ -37,6 +37,10 @@ public class DevSeedRunner implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
+        if (characterRepository.existsByName("Millie")
+                || characterRepository.existsByName("Marbas")) {
+            return;
+        }
 
         Character millie =
                 characterRepository.save(new Character("Millie"));

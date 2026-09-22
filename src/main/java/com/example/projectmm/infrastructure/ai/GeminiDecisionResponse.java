@@ -5,6 +5,10 @@ public record GeminiDecisionResponse(
         String summary,
         int importance,
         int energyChange,
-        int moodChange
+        int moodChange,
+        Long relationshipTargetCharacterId,
+        int affinityChange,
+        int trustChange,
+        int tensionChange
 ) {
 }
