@@ -104,12 +104,20 @@ public class GeminiDialogueGateway implements DialogueGateway {
 
             } catch (HttpClientErrorException.TooManyRequests e) {
 
+                if (isDailyQuotaExhausted(e)) {
+                    System.out.println(
+                            "[Gemini] daily quota exhausted - fail fast"
+                    );
+
+                    throw e;
+                }
+
                 if (attempt == maxAttempts) {
                     throw e;
                 }
 
                 System.out.println(
-                        "[Gemini] 429 Too Many Requests - retrying"
+                        "[Gemini] transient 429 Too Many Requests - retrying"
                 );
 
                 waitBeforeRetry(attempt);
@@ -130,6 +138,20 @@ public class GeminiDialogueGateway implements DialogueGateway {
 
         throw new IllegalStateException(
                 "Gemini retry loop ended unexpectedly"
+        );
+    }
+
+    private boolean isDailyQuotaExhausted(
+            HttpClientErrorException.TooManyRequests e
+    ) {
+        String responseBody = e.getResponseBodyAsString();
+
+        if (responseBody == null || responseBody.isBlank()) {
+            return false;
+        }
+
+        return responseBody.contains(
+                "GenerateRequestsPerDayPerProjectPerModel"
         );
     }
 
@@ -211,6 +233,28 @@ public class GeminiDialogueGateway implements DialogueGateway {
             );
         }
 
+        String resolvedUserMessage =
+                """
+                %s
+
+                [SERVER-RESOLVED CURRENT SCENE STATE]
+                Authoritative current simulation time: %s
+
+                The simulation server has already interpreted and applied any time
+                progression expressed in the user message above.
+
+                The authoritative time above is the objective CURRENT time of the scene.
+                Do not calculate elapsed time again from the user's wording.
+                Do not infer the current clock time from previous messages.
+                If any earlier clock time conflicts with this state, this state overrides it.
+                Any clock, phone, monitor, narration, or dialogue that reveals the current
+                time must be consistent with this authoritative time.
+                """
+                        .formatted(
+                                userMessage,
+                                context.simulatedAt()
+                        );
+
         contents.add(
                 Map.of(
                         "role",
@@ -219,7 +263,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
                         List.of(
                                 Map.of(
                                         "text",
-                                        userMessage
+                                        resolvedUserMessage
                                 )
                         )
                 )
@@ -250,14 +294,41 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 a persistent character life and relationship simulation.
 
                 Character name: %s
-                
+
                 Character profile:
                 %s
 
                 Current state:
                 - Energy: %d
                 - Mood: %d
-                - Simulation time: %s
+                - Authoritative simulation time: %s
+
+                Simulation time rules:
+                - The authoritative simulation time above is the CURRENT time of the scene.
+                - Any time progression expressed in the latest user input has already
+                  been interpreted and applied by the simulation server before this
+                  dialogue generation.
+                - Do NOT apply, add, or calculate the latest user's time progression again.
+                - Do NOT independently advance or rewind the simulation time.
+                - If the character checks, states, reads, or refers to the current time,
+                  use the authoritative simulation time above.
+                - Never invent a different current clock time.
+                - The latest user message may still contain the original time expression.
+                  Treat that expression as already reflected in the authoritative
+                  simulation time, not as an instruction to advance time again.
+                - Conversation history may contain older clock times. Those are historical
+                  scene information and must not override the authoritative simulation time.
+                - The user's estimate of elapsed time may be inaccurate or approximate.
+                  The server has already resolved that uncertainty into the authoritative
+                  simulation time above.
+                - Therefore, never derive the current clock time from the user's estimate.
+                - If the user's estimate conflicts with the authoritative simulation time,
+                  the authoritative simulation time is always correct.
+                - When revealing the current time through a clock, phone, monitor, narration,
+                  or character dialogue, the revealed time must match the authoritative
+                  simulation time above.
+                - Do not create a narrative twist where less or more time actually passed
+                  than the authoritative simulation time indicates.
 
                 Relevant memories:
                 %s
@@ -362,6 +433,17 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 - The character may infer such things only when observable
                   evidence, established knowledge, relationship familiarity,
                   or relevant memories reasonably support the inference.
+                - Never invent observable cues (expressions, gaze, gestures, or
+                  tone) to justify knowledge of the user's private thoughts.
+                  Permission to supplement small user actions does not permit this.
+                - Respect explicit user descriptions such as "no change in expression"
+                  or "thought silently". Do not turn them into revealing cues or
+                  spoken words, even when the character profile or conversation
+                  history suggests a familiar pattern.
+                - Familiarity may support a tentative guess, but does not establish
+                  knowledge of the user's current private thoughts. Do not quote or
+                  closely paraphrase an unexpressed thought as something the character
+                  heard, perceived, or knows. Private narration alone is not evidence.
                 - When certainty is not justified, let the character notice
                   observable cues and react with uncertainty, curiosity, or
                   questions rather than stating the hidden cause as fact.

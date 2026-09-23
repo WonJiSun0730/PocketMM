@@ -6,6 +6,11 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 
+function formatElapsedMinutes(minutes) {
+  if (minutes == null) return "-"
+  return `${minutes > 0 ? "+" : ""}${minutes}m`
+}
+
 function RpText({ text, isUser }) {
   const parts = text.split(/(\*[^*]+\*)/g)
 
@@ -48,6 +53,7 @@ export default function ChatPage({
   const [input, setInput] = useState("")
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [debugInfo, setDebugInfo] = useState(null)
   const bottomRef = useRef(null)
 
   useEffect(() => {
@@ -114,7 +120,9 @@ export default function ChatPage({
         throw new Error(`메시지 전송 실패: ${response.status}`)
       }
 
-      await response.json()
+      const data = await response.json()
+
+      setDebugInfo(data.debug ?? null)
 
       // 서버가 USER + CHARACTER 메시지를 모두 저장하므로
       // 응답 성공 후 서버 기록을 다시 읽어 DB 상태와 화면을 맞춘다.
@@ -169,6 +177,49 @@ export default function ChatPage({
             </p>
           </div>
         </header>
+
+        {debugInfo && (
+          <div className="shrink-0 border-b bg-muted/40 px-4 py-2 font-mono text-[11px] text-muted-foreground sm:px-6">
+            <div className="mx-auto grid max-w-3xl grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+              <span>
+                SERVER: {debugInfo.serverTime ?? "-"}
+              </span>
+
+              <span>
+                AI CTX: {debugInfo.aiContextTime ?? "-"}
+              </span>
+
+              <span>
+                TIME: {debugInfo.interpreter ?? "-"}
+                {debugInfo.precision && ` · ${debugInfo.precision}`}
+              </span>
+
+              <span>
+                EXPECTED: {formatElapsedMinutes(debugInfo.expectedElapsedMinutes)}
+              </span>
+
+              <span>
+                SCALE: {debugInfo.durationScale ?? "-"}
+              </span>
+
+              <span>
+                APPLIED: {formatElapsedMinutes(debugInfo.appliedElapsedMinutes)}
+              </span>
+
+              <span>
+                PREV: {debugInfo.previousTime ?? "-"}
+              </span>
+
+              <span>
+                NEW: {debugInfo.newTime ?? "-"}
+              </span>
+
+              <span className="col-span-2 break-words sm:col-span-3">
+                SRC: {debugInfo.sourceExpression ?? "-"}
+              </span>
+            </div>
+          </div>
+        )}
 
         <ScrollArea className="min-h-0 flex-1">
           <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-4 pb-32 sm:p-6 sm:pb-36">

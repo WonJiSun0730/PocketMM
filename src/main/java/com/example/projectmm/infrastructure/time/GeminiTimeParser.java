@@ -5,6 +5,8 @@ import com.example.projectmm.domain.time.AiTimeParseResult;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -24,7 +26,7 @@ public class GeminiTimeParser implements AiTimeParser {
 
     public GeminiTimeParser(
             @Value("${gemini.api-key}") String apiKey,
-            @Value("${gemini.model}") String model,
+            @Value("${gemini.time-model}") String model,
             ObjectMapper objectMapper
     ) {
         this.apiKey = apiKey;
@@ -71,14 +73,51 @@ public class GeminiTimeParser implements AiTimeParser {
 
             return parseResponse(response);
 
-        } catch (Exception e) {
+        } catch (HttpClientErrorException.TooManyRequests e) {
+
+            if (isDailyQuotaExhausted(e)) {
+                System.out.println(
+                        "[GeminiTimeParser] daily quota exhausted - skipping AI time parsing"
+                );
+            } else {
+                System.out.println(
+                        "[GeminiTimeParser] rate limited - skipping AI time parsing"
+                );
+            }
+
+            return noMatch();
+
+        } catch (HttpServerErrorException.ServiceUnavailable e) {
+
             System.out.println(
-                    "[GeminiTimeParser] parse failed: "
+                    "[GeminiTimeParser] Gemini unavailable - skipping AI time parsing"
+            );
+
+            return noMatch();
+
+        } catch (Exception e) {
+
+            System.out.println(
+                    "[GeminiTimeParser] unexpected parse failure: "
                             + e.getMessage()
             );
 
             return noMatch();
         }
+    }
+
+    private boolean isDailyQuotaExhausted(
+            HttpClientErrorException.TooManyRequests e
+    ) {
+        String responseBody = e.getResponseBodyAsString();
+
+        if (responseBody == null || responseBody.isBlank()) {
+            return false;
+        }
+
+        return responseBody.contains(
+                "GenerateRequestsPerDayPerProjectPerModel"
+        );
     }
 
     private Map<String, Object> createRequest(
@@ -104,10 +143,17 @@ public class GeminiTimeParser implements AiTimeParser {
                   "type": "RELATIVE",
                   "amount": 2,
                   "unit": "HOUR",
+                  "precision": "APPROXIMATE",
+                  "durationScale": "UNSPECIFIED",
                   "dayPart": null,
                   "confidence": 0.95,
                   "sourceExpression": "두 시간 뒤"
                 }
+
+                Allowed precision values:
+                - EXACT
+                - APPROXIMATE
+                - AMBIGUOUS
 
                 Allowed type values:
                 - RELATIVE
@@ -138,9 +184,39 @@ public class GeminiTimeParser implements AiTimeParser {
                 - NEXT_DAY means the scene moves to the following day.
                 - SAME_DAY_PART means the scene moves forward to a later
                   part of the same day.
-                - If the expression is ambiguous, lower confidence.
+                - Confidence measures certainty that the CURRENT scene actually advances,
+                  not certainty about the number of elapsed minutes. Do not lower it
+                  merely because the elapsed duration is unquantified.
                 - If no actual time progression is established,
                   return matched=false and type=UNKNOWN.
+
+                Precision rules:
+                - EXACT means the narration establishes a specific elapsed duration
+                  as an objective fact.
+                - APPROXIMATE means a duration is given with uncertainty or approximation,
+                  such as "정도", "쯤", "가량", "것 같다", or similar wording.
+                - AMBIGUOUS means time clearly progressed but the elapsed duration
+                  cannot be reliably quantified.
+                - Distinguish objective narration from a character's subjective estimate.
+                - "정확히 한 시간이 지났다" should be EXACT.
+                - "한 시간 정도 지난 것 같다" should be APPROXIMATE.
+                - "한참 지났다" should be AMBIGUOUS.
+
+                Unquantified relative progression:
+                - For RELATIVE + AMBIGUOUS, return amount=null and unit=null.
+                  Never invent a numeric duration. The server chooses elapsed minutes.
+                - Classify durationScale from the user's wording and activity context:
+                  SHORT: a brief interval, e.g. "잠깐 기다렸다", "잠시 쉬었다".
+                  MEDIUM: a moderate interval, e.g. "얼마간 일했다".
+                  LONG: an extended interval, e.g. "한참 일했다",
+                    "열심히 일했다. 한참 시간이 흐른 뒤 시계를 확인했다".
+                  UNSPECIFIED: even the relative scale cannot be inferred reliably.
+                - Use UNSPECIFIED for other types or precisions.
+                - An explicit elapsed interval can have high confidence even with
+                  durationScale=UNSPECIFIED. Do not confuse missing scale with no progression.
+                - "나중에 한참 일해야겠다" is a plan: matched=false, type=UNKNOWN.
+                - "어제 한참 일했다" is a past reference: matched=false, type=UNKNOWN.
+                - "한참 기다린다면 피곤하겠지" is hypothetical: matched=false, type=UNKNOWN.
                 """
                 .formatted(
                         currentTime,
@@ -223,6 +299,11 @@ public class GeminiTimeParser implements AiTimeParser {
                             nullableText(result, "dayPart"),
                             null
                     ),
+                    parseEnum(
+                            AiTimeParseResult.TimePrecision.class,
+                            nullableText(result, "precision"),
+                            AiTimeParseResult.TimePrecision.AMBIGUOUS
+                    ),
                     nullableDouble(
                             result,
                             "confidence"
@@ -230,6 +311,11 @@ public class GeminiTimeParser implements AiTimeParser {
                     nullableText(
                             result,
                             "sourceExpression"
+                    ),
+                    parseEnum(
+                            AiTimeParseResult.DurationScale.class,
+                            nullableText(result, "durationScale"),
+                            AiTimeParseResult.DurationScale.UNSPECIFIED
                     )
             );
 
@@ -307,8 +393,10 @@ public class GeminiTimeParser implements AiTimeParser {
                 null,
                 null,
                 null,
+                AiTimeParseResult.TimePrecision.AMBIGUOUS,
                 0.0,
-                null
+                null,
+                AiTimeParseResult.DurationScale.UNSPECIFIED
         );
     }
 }

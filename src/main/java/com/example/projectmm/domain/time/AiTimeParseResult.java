@@ -6,9 +6,21 @@ public record AiTimeParseResult(
         Long amount,
         TimeUnit unit,
         DayPart dayPart,
+        TimePrecision precision,
         Double confidence,
-        String sourceExpression
+        String sourceExpression,
+        DurationScale durationScale
 ) {
+
+    public enum DurationScale {
+        SHORT, MEDIUM, LONG, UNSPECIFIED
+    }
+
+    public enum TimePrecision {
+        EXACT,
+        APPROXIMATE,
+        AMBIGUOUS
+    }
 
     public enum TimeType {
         RELATIVE,

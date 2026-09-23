@@ -9,6 +9,7 @@ public record ChatResponse(
         String characterName,
         String message,
         ContentMode contentMode,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        ChatDebugInfo debug
 ) {
 }

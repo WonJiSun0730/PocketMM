@@ -5,6 +5,7 @@ import com.example.projectmm.domain.time.TimeChange;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.Duration;
 
 @Component
 public class TimeChangeResolver {
@@ -16,11 +17,15 @@ public class TimeChangeResolver {
             LocalDateTime currentTime
     ) {
         if (result == null
-                || !result.matched()
-                || result.confidence() == null
-                || result.confidence() < MIN_CONFIDENCE) {
+                || !result.matched()) {
 
             return TimeChange.unchanged(currentTime);
+        }
+
+        Long expectedMinutes = expectedElapsedMinutes(result, currentTime);
+        if (result.confidence() == null || !Double.isFinite(result.confidence())
+                || result.confidence() < MIN_CONFIDENCE) {
+            return TimeChange.unchanged(currentTime, result.sourceExpression(), expectedMinutes);
         }
 
         LocalDateTime newTime =
@@ -39,37 +44,119 @@ public class TimeChangeResolver {
                 };
 
         if (newTime.equals(currentTime)) {
-            return TimeChange.unchanged(currentTime);
+            return TimeChange.unchanged(currentTime, result.sourceExpression(), expectedMinutes);
         }
 
         return TimeChange.changed(
                 currentTime,
                 newTime,
-                result.sourceExpression()
+                result.sourceExpression(),
+                expectedMinutes
         );
+    }
+
+    // Baseline before approximate variation or application guards.
+    private Long expectedElapsedMinutes(AiTimeParseResult result, LocalDateTime currentTime) {
+        if (result.type() == AiTimeParseResult.TimeType.RELATIVE
+                && result.precision() == AiTimeParseResult.TimePrecision.AMBIGUOUS) {
+            return null;
+        }
+        return switch (result.type()) {
+            case RELATIVE -> relativeMinutes(result);
+            case NEXT_DAY -> Duration.between(currentTime, resolveNextDay(result, currentTime)).toMinutes();
+            case SAME_DAY_PART -> result.dayPart() == null ? null
+                    : Duration.between(currentTime, applyDayPart(currentTime, result.dayPart())).toMinutes();
+            case UNKNOWN -> null;
+        };
+    }
+
+    private Long relativeMinutes(AiTimeParseResult result) {
+        if (result.amount() == null || result.amount() <= 0 || result.unit() == null) {
+            return null;
+        }
+        return switch (result.unit()) {
+            case MINUTE -> result.amount();
+            case HOUR -> result.amount() * 60;
+            case DAY -> result.amount() * 24 * 60;
+        };
     }
 
     private LocalDateTime resolveRelative(
             AiTimeParseResult result,
             LocalDateTime currentTime
     ) {
-        if (result.amount() == null
-                || result.amount() <= 0
-                || result.unit() == null) {
+        if (result.precision() == AiTimeParseResult.TimePrecision.AMBIGUOUS) {
+            return currentTime.plusMinutes(resolveAmbiguousMinutes(result, currentTime));
+        }
+
+        Long baseMinutes = relativeMinutes(result);
+        if (baseMinutes == null) {
 
             return currentTime;
         }
 
-        return switch (result.unit()) {
-            case MINUTE ->
-                    currentTime.plusMinutes(result.amount());
+        if (result.precision()
+                != AiTimeParseResult.TimePrecision.APPROXIMATE) {
 
-            case HOUR ->
-                    currentTime.plusHours(result.amount());
+            return currentTime.plusMinutes(baseMinutes);
+        }
 
-            case DAY ->
-                    currentTime.plusDays(result.amount());
-        };
+        long adjustedMinutes =
+                applyApproximateVariation(
+                        baseMinutes,
+                        result.sourceExpression(),
+                        currentTime
+                );
+
+        return currentTime.plusMinutes(adjustedMinutes);
+    }
+
+    // Initial server policy for unquantified elapsed time. The parser chooses
+    // a semantic scale only; even a supplied AI amount cannot override these bounds.
+    private long resolveAmbiguousMinutes(AiTimeParseResult result, LocalDateTime currentTime) {
+        if (result.durationScale() == null) {
+            return 0;
+        }
+        int minimum;
+        int maximum;
+        switch (result.durationScale()) {
+            case SHORT -> { minimum = 1; maximum = 5; }
+            case MEDIUM -> { minimum = 10; maximum = 30; }
+            case LONG -> { minimum = 30; maximum = 90; }
+            default -> { return 0; }
+        }
+        String seed = currentTime + "|" + result.durationScale() + "|"
+                + (result.sourceExpression() == null ? "" : result.sourceExpression());
+        return minimum + Math.floorMod(seed.hashCode(), maximum - minimum + 1);
+    }
+
+    private long applyApproximateVariation(
+            long baseMinutes,
+            String sourceExpression,
+            LocalDateTime currentTime
+    ) {
+        String seed =
+                currentTime
+                        + "|"
+                        + (sourceExpression == null
+                        ? ""
+                        : sourceExpression);
+
+        int bucket =
+                Math.floorMod(
+                        seed.hashCode(),
+                        101
+                );
+
+        // 0.75 ~ 1.50 배
+        double factor =
+                0.75
+                        + (bucket / 100.0) * 0.75;
+
+        long adjustedMinutes =
+                Math.round(baseMinutes * factor);
+
+        return Math.max(1, adjustedMinutes);
     }
 
     private LocalDateTime resolveNextDay(

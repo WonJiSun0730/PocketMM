@@ -70,9 +70,15 @@ public class ChatService {
                         conversation.getSimulatedAt()
                 );
 
-        if (timeInterpretation.matched()) {
-            TimeChange timeChange =
-                    timeInterpretation.timeChange();
+        LocalDateTime previousTime =
+                conversation.getSimulatedAt();
+
+        TimeChange timeChange =
+                timeInterpretation.matched()
+                        ? timeInterpretation.timeChange()
+                        : null;
+
+        if (timeChange != null) {
 
             if (timeChange.changed()) {
                 conversation.updateSimulatedAt(
@@ -93,6 +99,9 @@ public class ChatService {
                         conversation.getId(),
                         resolvedMode
                 );
+
+        LocalDateTime aiContextTime =
+                context.simulatedAt();
 
         String generatedMessage =
                 dialogueGateway.generate(
@@ -135,7 +144,19 @@ public class ChatService {
                 character.getName(),
                 generatedMessage,
                 resolvedMode,
-                characterMessageTime
+                characterMessageTime,
+                new ChatDebugInfo(
+                        conversation.getSimulatedAt(),
+                        aiContextTime,
+                        timeInterpretation.interpreter(),
+                        timeInterpretation.precision(),
+                        timeInterpretation.durationScale(),
+                        timeChange == null ? null : timeChange.expectedElapsedMinutes(),
+                        timeChange == null ? 0 : timeChange.appliedElapsedMinutes(),
+                        previousTime,
+                        conversation.getSimulatedAt(),
+                        timeChange == null ? null : timeChange.sourceExpression()
+                )
         );
     }
 

@@ -1,6 +1,7 @@
 package com.example.projectmm.application.time;
 
 import com.example.projectmm.domain.time.TimeChange;
+import com.example.projectmm.domain.time.AiTimeParseResult.TimePrecision;
 import com.example.projectmm.domain.time.TimeInterpretation;
 import org.springframework.stereotype.Component;
 
@@ -13,7 +14,19 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
 
     private static final Pattern RELATIVE_TIME_PATTERN =
             Pattern.compile(
-                    "([0-9]+|한|두|세|네|다섯|여섯|일곱|여덟|아홉|열|열한|열두)\\s*(분|시간|일)(?:이|가)?\\s*(?:뒤|후|지났)"
+                    "(?:한\\s*)?"
+                            + "([0-9]+|한|두|세|네|다섯|여섯|일곱|여덟|아홉|열|열한|열두)"
+                            + "\\s*(분|시간|일)"
+                            + "\\s*(?:정도|쯤|가량|은|는|이)?"
+                            + "\\s*(?:뒤|후|지났|지난|흘렀|흐른)"
+            );
+
+    private static final Pattern APPROXIMATE_TIME_PATTERN =
+            Pattern.compile(
+                    "(정도|쯤|가량|"
+                            + "것\\s*같|듯|"
+                            + "몇\\s*시간|"
+                            + "한참|얼마간|꽤\\s*오래)"
             );
 
     private static final Pattern NEXT_DAY_PATTERN =
@@ -27,6 +40,10 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
             LocalDateTime currentTime
     ) {
         if (userInput == null || userInput.isBlank()) {
+            return TimeInterpretation.noMatch();
+        }
+
+        if (APPROXIMATE_TIME_PATTERN.matcher(userInput).find()) {
             return TimeInterpretation.noMatch();
         }
 
@@ -65,6 +82,8 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
             }
 
             return TimeInterpretation.matched(
+                    TimeInterpretation.Interpreter.RULE,
+                    TimePrecision.EXACT,
                     TimeChange.changed(
                             currentTime,
                             newTime,
@@ -102,6 +121,8 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
                 };
 
         return TimeInterpretation.matched(
+                TimeInterpretation.Interpreter.RULE,
+                TimePrecision.EXACT,
                 TimeChange.changed(
                         currentTime,
                         newTime,

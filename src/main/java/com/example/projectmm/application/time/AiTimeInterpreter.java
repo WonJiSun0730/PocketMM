@@ -41,6 +41,15 @@ public class AiTimeInterpreter {
                         currentTime
                 );
 
-        return TimeInterpretation.matched(timeChange);
+        return TimeInterpretation.matched(
+                TimeInterpretation.Interpreter.AI,
+                parseResult.precision(),
+                parseResult.type() == AiTimeParseResult.TimeType.RELATIVE
+                        && parseResult.precision() == AiTimeParseResult.TimePrecision.AMBIGUOUS
+                        ? (parseResult.durationScale() == null
+                            ? AiTimeParseResult.DurationScale.UNSPECIFIED : parseResult.durationScale())
+                        : null,
+                timeChange
+        );
     }
 }

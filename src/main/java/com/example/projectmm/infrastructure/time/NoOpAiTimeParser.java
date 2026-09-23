@@ -22,8 +22,10 @@ public class NoOpAiTimeParser implements AiTimeParser {
                 null,
                 null,
                 null,
+                AiTimeParseResult.TimePrecision.AMBIGUOUS,
                 0.0,
-                null
+                null,
+                AiTimeParseResult.DurationScale.UNSPECIFIED
         );
     }
 }
