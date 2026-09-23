@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import PlayerProfilePicker from "@/components/PlayerProfilePicker"
+import CustomStatePanel from "@/components/CustomStatePanel"
 
 function formatElapsedMinutes(minutes) {
   if (minutes == null) return "-"
@@ -358,6 +359,8 @@ export default function ChatPage({
             {progress.lastReport.pauseReason && <p>{progress.lastReport.pauseReason}</p>}
           </details>}
         </div>}
+
+        <CustomStatePanel conversationId={session?.conversationId} />
 
         {debugInfo && (
           <div className="shrink-0 border-b bg-muted/40 px-4 py-2 font-mono text-[11px] text-muted-foreground sm:px-6">
