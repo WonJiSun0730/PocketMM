@@ -118,14 +118,16 @@ public class ChatService {
         LocalDateTime aiContextTime =
                 context.simulatedAt();
 
-        String generatedMessage =
-                dialogueGateway.generate(
+        var generatedTurn =
+                dialogueGateway.generateTurn(
                         context,
                         request.message()
                 );
 
-        ChatMessage userMessage = progressService.completeChat(characterId, conversation.getId(), token,
-                request.message(), generatedMessage, resolvedMode);
+        String generatedMessage = generatedTurn.reply();
+        var completed = progressService.completeChat(characterId, conversation.getId(), token,
+                request.message(), generatedTurn, resolvedMode);
+        ChatMessage userMessage = completed.source();
         LocalDateTime characterMessageTime = userMessage.getCreatedAt().plusNanos(1000);
 
         ChatMemoryResult memoryResult = chatMemoryService.remember(
@@ -150,7 +152,8 @@ public class ChatService {
                         timeChange == null ? null : timeChange.sourceExpression(),
                         memoryResult.status(),
                         memoryResult.saved(),
-                        context.memories().stream().map(DialogueMemoryContext::summary).toList()
+                        context.memories().stream().map(DialogueMemoryContext::summary).toList(),
+                        completed.stateUpdate()
                 )
         );
     }

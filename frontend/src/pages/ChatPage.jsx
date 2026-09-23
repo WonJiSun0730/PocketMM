@@ -348,6 +348,7 @@ export default function ChatPage({
             </Button>
             <span>재입장 시 부재 시간 반영 · 최대 3일 · 휴식 규칙</span>
           </div>
+          <p className="mt-2">현재 상태 · 에너지 {progress.energy} / 기분 {progress.mood}</p>
           {progress.pauseReason && <p role="status" className="mt-2">{progress.pauseReason} 재개하려면 OFF 후 다시 켜 주세요.</p>}
           {progress.lastReport && <details className="mt-2">
             <summary className="cursor-pointer">최근 자동 진행: {Math.floor(progress.lastReport.appliedSeconds / 60)}분</summary>
@@ -409,6 +410,15 @@ export default function ChatPage({
                   <p key={`saved-${index}`} className="mt-1">[저장] {memory}</p>
                 ))}
               </details>
+              {debugInfo.stateUpdate && <details className="col-span-2 max-h-36 overflow-y-auto break-words sm:col-span-3">
+                <summary className="cursor-pointer">
+                  STATE: {debugInfo.stateUpdate.status} · 에너지 {debugInfo.stateUpdate.previousEnergy} → {debugInfo.stateUpdate.energy}
+                  {" / "}기분 {debugInfo.stateUpdate.previousMood} → {debugInfo.stateUpdate.mood}
+                </summary>
+                {debugInfo.stateUpdate.energyEvidence && <p className="mt-1">에너지 근거: {debugInfo.stateUpdate.energyEvidence}</p>}
+                {debugInfo.stateUpdate.moodEvidence && <p className="mt-1">기분 근거: {debugInfo.stateUpdate.moodEvidence}</p>}
+                {debugInfo.stateUpdate.status === "REJECTED" && <p className="mt-1">상태 제안의 형식·범위·본문 근거가 맞지 않아 기존 상태를 유지했습니다.</p>}
+              </details>}
             </div>
           </div>
         )}

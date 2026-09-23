@@ -34,6 +34,16 @@ public class Conversation {
     private Integer energy;
     private Integer mood;
 
+    // 프로필을 공유해도 상태는 방마다 독립적이다. 기존 NPC 수치를 플레이어에게 이관하지 않는다.
+    private Integer playerEnergy;
+    private Integer playerMood;
+    public int getPlayerEnergy() { return playerEnergy == null ? 70 : playerEnergy; }
+    public int getPlayerMood() { return playerMood == null ? 70 : playerMood; }
+    public void applyPlayerState(int energy, int mood) {
+        playerEnergy = Math.clamp(energy, 0, 100);
+        playerMood = Math.clamp(mood, 0, 100);
+    }
+
     // 실제 접속 시각과 이야기 속 시각은 분리한다. 기존 방은 명시적으로 켜기 전까지 정지한다.
     private Boolean autoProgressEnabled;
     private LocalDateTime lastPresenceAt;
@@ -108,6 +118,8 @@ public class Conversation {
             LocalDateTime simulatedAt
     ) {
         this.character = character;
+        this.playerEnergy = 70;
+        this.playerMood = 70;
         this.createdAt = LocalDateTime.now();
         this.simulatedAt = simulatedAt;
     }

@@ -158,6 +158,67 @@ class ConversationProgressTest {
         service.endChat(id, room.getId(), operation.token());
     }
 
+    @Test void dialogueStateIsRoomScopedPersistsAndTriggersExistingRestRule() {
+        var room = fixture(false, 52, 70);
+        Long id = room.getCharacter().getId();
+        var other = Conversation.fresh(room.getCharacter(), story);
+        em.persist(other); em.flush();
+        var operation = service.beginChat(id, room.getId());
+        var turn = new com.example.projectmm.domain.dialogue.DialogueTurn("*무거운 서류를 옮겨 지쳤다.*",
+                new com.example.projectmm.domain.dialogue.DialogueStateChange(-6, 0, "무거운 서류를 옮겨 지쳤다", ""));
+        var saved = service.completeChat(id, room.getId(), operation.token(), "서류 정리를 마쳤네요.", turn, ContentMode.NORMAL);
+        assertThat(saved.stateUpdate().energy()).isEqualTo(46);
+        em.flush(); em.clear();
+        assertThat(service.current(id, room.getId()).energy()).isEqualTo(46);
+        assertThat(service.current(id, other.getId()).energy()).isEqualTo(70);
+        assertThat(em.createQuery("select s from CharacterState s where s.character.id = :id", CharacterState.class)
+                .setParameter("id", id).getSingleResult().getEnergy()).isEqualTo(52);
+        // 저장된 방 상태가 야간 캐치업의 입력으로 사용되어 실제 휴식이 이어져야 한다.
+        service.configure(id, room.getId(), true);
+        when(clock.now()).thenReturn(real.plusMinutes(2));
+        var resumed = service.resume(id, room.getId());
+        assertThat(resumed.energy()).isEqualTo(76);
+        assertThat(resumed.lastReport().actions()).contains("휴식");
+    }
+
+    @Test void stateAndMessageApplyOnceAndInvalidProposalOnlyRejectsState() {
+        var room = fixture(true, 70, 70);
+        Long id = room.getCharacter().getId();
+        var first = service.beginChat(id, room.getId());
+        var turn = new com.example.projectmm.domain.dialogue.DialogueTurn("*칭찬을 듣고 기뻐했다.*",
+                new com.example.projectmm.domain.dialogue.DialogueStateChange(0, 4, "", "칭찬을 듣고 기뻐했다"));
+        service.completeChat(id, room.getId(), first.token(), "잘했어요.", turn, ContentMode.NORMAL);
+        assertThatThrownBy(() -> service.completeChat(id, room.getId(), first.token(), "잘했어요.", turn, ContentMode.NORMAL))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThat(service.current(id, room.getId()).mood()).isEqualTo(74);
+        assertThat(messages.findTop20ByConversationIdOrderByCreatedAtDesc(room.getId())).hasSize(2);
+
+        var second = service.beginChat(id, room.getId());
+        var invalid = new com.example.projectmm.domain.dialogue.DialogueTurn("안녕하세요.",
+                new com.example.projectmm.domain.dialogue.DialogueStateChange(-99, 10, "", "없는 근거"));
+        var completed = service.completeChat(id, room.getId(), second.token(), "안녕", invalid, ContentMode.NORMAL);
+        assertThat(completed.stateUpdate().status()).isEqualTo("REJECTED");
+        assertThat(service.current(id, room.getId()).energy()).isEqualTo(70);
+        assertThat(service.current(id, room.getId()).mood()).isEqualTo(74);
+        assertThat(messages.findTop20ByConversationIdOrderByCreatedAtDesc(room.getId())).hasSize(4);
+    }
+
+    @Test void emptyReplyAndExpiredOperationCannotApplyState() {
+        var room = fixture(true, 70, 70);
+        Long id = room.getCharacter().getId();
+        var operation = service.beginChat(id, room.getId());
+        var change = new com.example.projectmm.domain.dialogue.DialogueStateChange(5, 0, "쉬었다", "");
+        assertThatThrownBy(() -> service.completeChat(id, room.getId(), operation.token(), "안녕",
+                new com.example.projectmm.domain.dialogue.DialogueTurn(" ", change), ContentMode.NORMAL))
+                .isInstanceOf(IllegalArgumentException.class);
+        when(clock.now()).thenReturn(real.plusMinutes(11));
+        assertThatThrownBy(() -> service.completeChat(id, room.getId(), operation.token(), "안녕",
+                new com.example.projectmm.domain.dialogue.DialogueTurn("*쉬었다.*", change), ContentMode.NORMAL))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThat(service.current(id, room.getId()).energy()).isEqualTo(70);
+        assertThat(messages.findTop20ByConversationIdOrderByCreatedAtDesc(room.getId())).isEmpty();
+    }
+
     @Test
     @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void simultaneousReconnectsCommitOneReportAndOneRest() throws Exception {

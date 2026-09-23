@@ -7,6 +7,8 @@ import com.example.projectmm.domain.character.CharacterStateRepository;
 import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.memory.Memory;
 import com.example.projectmm.domain.memory.MemoryRepository;
+import com.example.projectmm.domain.dialogue.DialogueTurn;
+import com.example.projectmm.domain.dialogue.DialogueStateChange;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -36,8 +38,10 @@ public class ConversationProgressService {
 
     public record Report(Long id, LocalDateTime from, LocalDateTime to, long elapsedSeconds,
                          long appliedSeconds, boolean capped, String pauseReason, String actions) {}
-    public record Status(boolean enabled, LocalDateTime simulatedAt, String pauseReason, Report lastReport) {}
+    public record Status(boolean enabled, LocalDateTime simulatedAt, String pauseReason, Report lastReport,
+                         int energy, int mood) {}
     public record ChatOperation(Conversation room, String token) {}
+    public record CompletedChat(ChatMessage source, ChatStateUpdate stateUpdate) {}
 
     @Transactional(readOnly = true)
     public Status current(Long characterId, Long roomId) {
@@ -131,13 +135,27 @@ public class ConversationProgressService {
     @Transactional
     public ChatMessage completeChat(Long characterId, Long roomId, String token,
             String userText, String reply, ContentMode mode) {
+        return completeChat(characterId, roomId, token, userText,
+                new DialogueTurn(reply, DialogueStateChange.none()), mode).source();
+    }
+
+    @Transactional
+    public CompletedChat completeChat(Long characterId, Long roomId, String token,
+            String userText, DialogueTurn turn, ContentMode mode) {
         var room = ownedOperation(characterId, roomId, token);
+        if (turn == null || turn.reply() == null || turn.reply().isBlank())
+            throw new IllegalArgumentException("대화 본문이 비어 있습니다.");
+        var baseline = states.findByCharacterId(characterId).orElseThrow();
+        var update = ChatStateUpdate.resolve(room.getEnergy() == null ? baseline.getEnergy() : room.getEnergy(),
+                room.getMood() == null ? baseline.getMood() : room.getMood(), turn.reply(), turn.stateChange());
+        // 메시지와 상태를 같이 커밋한다. 잘못된 제안은 상태만 유지하고 유효한 본문은 저장한다.
+        room.applyRoomState(update.energy(), update.mood(), room.getSimulatedAt());
         var now = clock.now();
         // 응답 저장과 처리 표시 해제를 묶어 재접속 처리가 응답 저장 중간에 끼어들지 않게 한다.
         var source = messages.save(new ChatMessage(room, room.getCharacter(), ChatRole.USER, userText, mode, now));
-        messages.save(new ChatMessage(room, room.getCharacter(), ChatRole.CHARACTER, reply, mode, now.plusNanos(1000)));
+        messages.save(new ChatMessage(room, room.getCharacter(), ChatRole.CHARACTER, turn.reply(), mode, now.plusNanos(1000)));
         room.endChat(token, now);
-        return source;
+        return new CompletedChat(source, update);
     }
 
     @Transactional
@@ -173,6 +191,9 @@ public class ConversationProgressService {
         var report = reports.findTopByConversationIdOrderByIdDesc(room.getId()).map(r -> new Report(
                 r.getId(), r.getFromTime(), r.getToTime(), r.getElapsedSeconds(), r.getAppliedSeconds(),
                 r.isCapped(), r.getPauseReason(), r.getActions())).orElse(null);
-        return new Status(room.autoProgressEnabled(), room.getSimulatedAt(), room.getProgressPauseReason(), report);
+        var baseline = states.findByCharacterId(room.getCharacter().getId()).orElseThrow();
+        return new Status(room.autoProgressEnabled(), room.getSimulatedAt(), room.getProgressPauseReason(), report,
+                room.getEnergy() == null ? baseline.getEnergy() : room.getEnergy(),
+                room.getMood() == null ? baseline.getMood() : room.getMood());
     }
 }

@@ -19,6 +19,7 @@ public record ChatDebugInfo(
         String sourceExpression,
         String memoryStatus,
         List<String> savedMemories,
-        List<String> recalledMemories
+        List<String> recalledMemories,
+        ChatStateUpdate stateUpdate
 ) {
 }
