@@ -12,6 +12,7 @@ import com.example.projectmm.domain.dialogue.*;
 import com.example.projectmm.domain.memory.EffectiveMemory;
 import com.example.projectmm.domain.relationship.Relationship;
 import com.example.projectmm.domain.relationship.RelationshipRepository;
+import com.example.projectmm.domain.state.CustomStateValueRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,7 @@ public class DialogueContextBuilder {
     private final ContentModePolicy contentModePolicy;
     private final ConversationRepository conversationRepository;
     private final CharacterExampleRepository characterExampleRepository;
+    private final CustomStateValueRepository customStateValueRepository;
 
     @Transactional(readOnly = true)
     public DialogueContext build(
@@ -123,8 +125,20 @@ public class DialogueContextBuilder {
                 memories,
                 relationships,
                 conversation.getPlayerProfile() == null ? null : new DialoguePlayerProfile(
-                        conversation.getPlayerProfile().getName(), conversation.getPlayerProfile().getDescription())
+                        conversation.getPlayerProfile().getName(), conversation.getPlayerProfile().getDescription()),
+                buildCustomStates(conversationId)
         );
+    }
+
+    private List<DialogueCustomState> buildCustomStates(Long conversationId) {
+        // 저장된 방별 확정값만 읽는다. 누락된 Value를 기본값으로 생성하거나 보충하지 않는다.
+        return customStateValueRepository.findByConversationIdOrderByIdAsc(conversationId).stream()
+                .map(value -> {
+                    var definition = value.getDefinition();
+                    return new DialogueCustomState(definition.getName(), value.getCurrentValue(),
+                            definition.getMinValue(), definition.getMaxValue(),
+                            definition.getUnit(), definition.getDescription());
+                }).toList();
     }
 
     private List<DialogueMessageContext> buildRecentMessages(
