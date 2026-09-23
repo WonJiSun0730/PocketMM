@@ -1,0 +1,178 @@
+package com.example.projectmm.application.chat;
+
+import com.example.projectmm.application.policy.ContentMode;
+import com.example.projectmm.application.simulation.*;
+import com.example.projectmm.domain.character.CharacterState;
+import com.example.projectmm.domain.character.CharacterStateRepository;
+import com.example.projectmm.domain.chat.*;
+import com.example.projectmm.domain.memory.Memory;
+import com.example.projectmm.domain.memory.MemoryRepository;
+import jakarta.persistence.EntityManager;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class ConversationProgressService {
+    private final ConversationRepository conversations;
+    private final ConversationCatchUpRepository reports;
+    private final CharacterStateRepository states;
+    private final ChatMessageRepository messages;
+    private final MemoryRepository memories;
+    private final CatchUpSimulationService simulation;
+    private final CatchUpSegmentService segments;
+    private final CatchUpEventCandidateService candidates;
+    private final EventCandidateValidator validator;
+    private final PresenceClock clock;
+    private final EntityManager em;
+
+    public record Report(Long id, LocalDateTime from, LocalDateTime to, long elapsedSeconds,
+                         long appliedSeconds, boolean capped, String pauseReason, String actions) {}
+    public record Status(boolean enabled, LocalDateTime simulatedAt, String pauseReason, Report lastReport) {}
+    public record ChatOperation(Conversation room, String token) {}
+
+    @Transactional(readOnly = true)
+    public Status current(Long characterId, Long roomId) {
+        var room = conversations.findById(roomId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!room.getCharacter().getId().equals(characterId)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return status(room);
+    }
+
+    @Transactional
+    public Status resume(Long characterId, Long roomId) {
+        var room = locked(characterId, roomId);
+        var now = clock.now();
+        requireIdle(room, now);
+        var previousPresence = room.getLastPresenceAt();
+        // 최초 접속과 꺼 둔 기간은 소급하지 않는다. 처리와 체크포인트를 한 트랜잭션으로 저장한다.
+        room.markPresent(now);
+        if (!room.autoProgressEnabled() || room.getPlayerProfile() == null
+                || room.getProgressPauseReason() != null || previousPresence == null) return status(room);
+        long seconds = Math.max(0, Duration.between(previousPresence, now).getSeconds());
+        if (seconds < 60) return status(room);
+
+        LocalDateTime from = room.getSimulatedAt();
+        // 실제 날짜로 덮어쓰지 않고 부재 시간만 이야기의 현재 시각에 더한다.
+        var interval = simulation.calculate(from, from.plusSeconds(seconds));
+        var baseline = states.findByCharacterId(characterId).orElseThrow();
+        // 공용 상태를 수정하지 않고 계산용 복사본에 기존 규칙을 적용한다.
+        var state = new CharacterState(room.getCharacter(),
+                room.getEnergy() == null ? baseline.getEnergy() : room.getEnergy(),
+                room.getMood() == null ? baseline.getMood() : room.getMood(), from);
+        var actions = new ArrayList<String>();
+        String pauseReason = null;
+        for (var segment : segments.createSegments(interval.from(), interval.to())) {
+            var proposed = candidates.generate(state, segment);
+            // 판단이 필요한 구간은 통째로 보류하여 유저의 선택과 관계 변화를 대신하지 않는다.
+            if (proposed.stream().anyMatch(c -> c.requiresAi() || !"REST".equals(c.eventType())
+                    || !validator.validate(c).valid())) {
+                pauseReason = "판단이 필요한 행동이 있어 자동 진행을 멈췄습니다. 대화로 장면을 이어가 주세요.";
+                break;
+            }
+            for (var candidate : proposed) {
+                state.apply(candidate.stateDelta());
+                String summary = room.getCharacter().getName() + " — 피로가 누적되어 휴식을 취했다.";
+                var source = messages.save(new ChatMessage(room, room.getCharacter(), ChatRole.CHARACTER,
+                        "*" + summary + "*", ContentMode.NORMAL, now));
+                memories.save(Memory.fromAutomaticAction(room, source, summary, candidate.importance(), candidate.occurredAt()));
+                actions.add(summary);
+            }
+            state.advanceSimulatedAt(segment.end());
+        }
+        room.applyRoomState(state.getEnergy(), state.getMood(), state.getSimulatedAt());
+        room.pauseProgress(pauseReason);
+        // 3일 상한 초과분과 보류 이후 시간은 다음 접속에서 다시 가산하지 않는다.
+        reports.save(new ConversationCatchUp(room, now, from, room.getSimulatedAt(), seconds,
+                interval.capped(), pauseReason, String.join("\n", actions)));
+        return status(room);
+    }
+
+    @Transactional
+    public Status configure(Long characterId, Long roomId, boolean enabled) {
+        var room = locked(characterId, roomId);
+        requireIdle(room, clock.now());
+        if (room.getPlayerProfile() == null) throw conflict("유저 프로필을 먼저 선택해 주세요.");
+        // 같은 설정의 재전송으로 미처리 구간이나 보류 상태를 지우지 않는다.
+        if (enabled != room.autoProgressEnabled()) room.configureAutoProgress(enabled, clock.now());
+        return status(room);
+    }
+
+    @Transactional
+    public void heartbeat(Long characterId, Long roomId) {
+        locked(characterId, roomId).markPresent(clock.now());
+    }
+
+    @Transactional
+    public ChatOperation beginChat(Long characterId, Long roomId) {
+        // 네트워크 복구 후 입장 요청보다 전송이 먼저 와도 부재 구간을 버리지 않는다.
+        // 같은 짧은 트랜잭션 안에서 재접속 처리 후 채팅 소유권을 잡는다.
+        resume(characterId, roomId);
+        var room = locked(characterId, roomId);
+        requireIdle(room, clock.now());
+        if (room.getPlayerProfile() == null) throw conflict("유저 프로필을 먼저 선택해 주세요.");
+        String token = UUID.randomUUID().toString();
+        room.beginChat(token, clock.now());
+        return new ChatOperation(room, token);
+    }
+
+    @Transactional
+    public void applyChatTime(Long characterId, Long roomId, String token, LocalDateTime at) {
+        ownedOperation(characterId, roomId, token).updateSimulatedAt(at);
+    }
+
+    @Transactional
+    public ChatMessage completeChat(Long characterId, Long roomId, String token,
+            String userText, String reply, ContentMode mode) {
+        var room = ownedOperation(characterId, roomId, token);
+        var now = clock.now();
+        // 응답 저장과 처리 표시 해제를 묶어 재접속 처리가 응답 저장 중간에 끼어들지 않게 한다.
+        var source = messages.save(new ChatMessage(room, room.getCharacter(), ChatRole.USER, userText, mode, now));
+        messages.save(new ChatMessage(room, room.getCharacter(), ChatRole.CHARACTER, reply, mode, now.plusNanos(1000)));
+        room.endChat(token, now);
+        return source;
+    }
+
+    @Transactional
+    public void endChat(Long characterId, Long roomId, String token) {
+        locked(characterId, roomId).endChat(token, clock.now());
+    }
+
+    private Conversation ownedOperation(Long characterId, Long roomId, String token) {
+        var room = locked(characterId, roomId);
+        if (!token.equals(room.getChatOperationId()) || !room.chatInProgress(clock.now()))
+            throw conflict("대화 처리 시간이 만료되었습니다. 다시 시도해 주세요.");
+        return room;
+    }
+
+    private Conversation locked(Long characterId, Long roomId) {
+        var room = conversations.lockForMemory(roomId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        // OSIV에서 먼저 조회한 객체도 잠금 획득 이후의 DB 값으로 갱신한다.
+        em.refresh(room);
+        if (!room.getCharacter().getId().equals(characterId)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return room;
+    }
+
+    private void requireIdle(Conversation room, LocalDateTime now) {
+        if (room.chatInProgress(now)) throw conflict("답변을 생성 중입니다. 잠시 후 다시 시도해 주세요.");
+    }
+
+    private ResponseStatusException conflict(String message) {
+        return new ResponseStatusException(HttpStatus.CONFLICT, message);
+    }
+
+    private Status status(Conversation room) {
+        var report = reports.findTopByConversationIdOrderByIdDesc(room.getId()).map(r -> new Report(
+                r.getId(), r.getFromTime(), r.getToTime(), r.getElapsedSeconds(), r.getAppliedSeconds(),
+                r.isCapped(), r.getPauseReason(), r.getActions())).orElse(null);
+        return new Status(room.autoProgressEnabled(), room.getSimulatedAt(), room.getProgressPauseReason(), report);
+    }
+}

@@ -5,6 +5,9 @@ import com.example.projectmm.application.dialogue.DialogueGateway;
 import com.example.projectmm.application.policy.ContentMode;
 import com.example.projectmm.application.policy.ContentModePolicy;
 import com.example.projectmm.application.time.TimeInterpreter;
+import com.example.projectmm.application.memory.ChatMemoryService;
+import com.example.projectmm.application.memory.ChatMemoryResult;
+import com.example.projectmm.domain.dialogue.DialogueMemoryContext;
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.character.CharacterProfile;
 import com.example.projectmm.domain.character.CharacterProfileRepository;
@@ -33,6 +36,8 @@ public class ChatService {
     private final DialogueGateway dialogueGateway;
     private final ContentModePolicy contentModePolicy;
     private final TimeInterpreter timeInterpreter;
+    private final ChatMemoryService chatMemoryService;
+    private final ConversationProgressService progressService;
 
     public ChatResponse chat(
             Long characterId,
@@ -59,11 +64,23 @@ public class ChatService {
 
         Conversation conversation =
                 conversationRepository
-                        .findTopByCharacterIdOrderByCreatedAtDesc(characterId)
+                        .findTopByCharacterIdOrderByCreatedAtDescIdDesc(characterId)
                         .orElseGet(() ->
                                 createConversation(character)
                         );
 
+        var operation = progressService.beginChat(characterId, conversation.getId());
+        conversation = operation.room();
+        try {
+            return generateReply(character, conversation, operation.token(), request);
+        } finally {
+            // 외부 AI 호출에는 DB 잠금을 유지하지 않으며 실패 시에도 처리 표시를 해제한다.
+            progressService.endChat(characterId, conversation.getId(), operation.token());
+        }
+    }
+
+    private ChatResponse generateReply(Character character, Conversation conversation, String token, ChatRequest request) {
+        Long characterId = character.getId();
         TimeInterpretation timeInterpretation =
                 timeInterpreter.interpret(
                         request.message(),
@@ -81,11 +98,8 @@ public class ChatService {
         if (timeChange != null) {
 
             if (timeChange.changed()) {
-                conversation.updateSimulatedAt(
-                        timeChange.newTime()
-                );
-
-                conversationRepository.save(conversation);
+                progressService.applyChatTime(characterId, conversation.getId(), token, timeChange.newTime());
+                conversation.updateSimulatedAt(timeChange.newTime());
             }
         }
         ContentMode resolvedMode =
@@ -97,7 +111,8 @@ public class ChatService {
                 dialogueContextBuilder.build(
                         characterId,
                         conversation.getId(),
-                        resolvedMode
+                        resolvedMode,
+                        request.message()
                 );
 
         LocalDateTime aiContextTime =
@@ -109,35 +124,12 @@ public class ChatService {
                         request.message()
                 );
 
-        LocalDateTime userMessageTime =
-                LocalDateTime.now();
+        ChatMessage userMessage = progressService.completeChat(characterId, conversation.getId(), token,
+                request.message(), generatedMessage, resolvedMode);
+        LocalDateTime characterMessageTime = userMessage.getCreatedAt().plusNanos(1000);
 
-        ChatMessage userMessage =
-                new ChatMessage(
-                        conversation,
-                        character,
-                        ChatRole.USER,
-                        request.message(),
-                        resolvedMode,
-                        userMessageTime
-                );
-
-        chatMessageRepository.save(userMessage);
-
-        LocalDateTime characterMessageTime =
-                LocalDateTime.now();
-
-        ChatMessage characterMessage =
-                new ChatMessage(
-                        conversation,
-                        character,
-                        ChatRole.CHARACTER,
-                        generatedMessage,
-                        resolvedMode,
-                        characterMessageTime
-                );
-
-        chatMessageRepository.save(characterMessage);
+        ChatMemoryResult memoryResult = chatMemoryService.remember(
+                conversation, userMessage, aiContextTime);
 
         return new ChatResponse(
                 character.getId(),
@@ -155,7 +147,10 @@ public class ChatService {
                         timeChange == null ? 0 : timeChange.appliedElapsedMinutes(),
                         previousTime,
                         conversation.getSimulatedAt(),
-                        timeChange == null ? null : timeChange.sourceExpression()
+                        timeChange == null ? null : timeChange.sourceExpression(),
+                        memoryResult.status(),
+                        memoryResult.saved(),
+                        context.memories().stream().map(DialogueMemoryContext::summary).toList()
                 )
         );
     }
@@ -175,7 +170,7 @@ public class ChatService {
 
         Conversation conversation =
                 conversationRepository
-                        .findTopByCharacterIdOrderByCreatedAtDesc(characterId)
+                        .findTopByCharacterIdOrderByCreatedAtDescIdDesc(characterId)
                         .orElseGet(() ->
                                 createConversation(character)
                         );

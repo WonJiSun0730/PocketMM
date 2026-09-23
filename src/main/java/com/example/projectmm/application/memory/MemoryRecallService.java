@@ -35,6 +35,8 @@ public class MemoryRecallService {
                         );
 
         return memories.stream()
+                // World simulation has no conversation context: never borrow another RP's memories.
+                .filter(memory -> memory.getConversation() == null)
                 .map(memory ->
                         prepareMemory(
                                 memory,
@@ -49,6 +51,29 @@ public class MemoryRecallService {
                                 EffectiveMemory::effectiveStrength
                         ).reversed()
                 )
+                .limit(limit)
+                .toList();
+    }
+
+    public List<EffectiveMemory> recallForConversation(Long characterId, Long conversationId,
+                                                       LocalDateTime currentTime, int limit, String query) {
+        return recallForConversation(characterId, conversationId, currentTime, limit, query, true);
+    }
+
+    public List<EffectiveMemory> recallForConversation(Long characterId, Long conversationId,
+                                                       LocalDateTime currentTime, int limit, String query,
+                                                       boolean includeSharedMemories) {
+        if (limit <= 0 || conversationId == null) return List.of();
+        return memoryRepository.findForConversation(characterId, conversationId).stream()
+                // 독립 시작 방에는 방 소속이 없는 과거 세계 사건 기억도 주입하지 않는다.
+                .filter(memory -> includeSharedMemories || memory.getConversation() != null)
+                .filter(memory -> !memory.getRememberedAt().isAfter(currentTime))
+                .map(memory -> prepareMemory(memory, currentTime))
+                .filter(memory -> memory.effectiveStrength() > 0)
+                .sorted(Comparator.<EffectiveMemory>comparingInt(
+                                memory -> MemoryRelevance.overlap(query, memory.summary())).reversed()
+                        .thenComparing(Comparator.comparingInt(EffectiveMemory::effectiveStrength).reversed())
+                        .thenComparing(EffectiveMemory::rememberedAt, Comparator.reverseOrder()))
                 .limit(limit)
                 .toList();
     }

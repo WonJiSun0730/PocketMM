@@ -15,6 +15,7 @@ public record DialogueContext(
         ContentMode contentMode,
         List<DialogueMessageContext> recentMessages,
         List<DialogueMemoryContext> memories,
-        List<DialogueRelationshipContext> relationships
+        List<DialogueRelationshipContext> relationships,
+        DialoguePlayerProfile playerProfile
 ) {
 }

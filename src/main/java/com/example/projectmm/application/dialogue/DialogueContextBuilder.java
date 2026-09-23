@@ -42,6 +42,16 @@ public class DialogueContextBuilder {
             Long conversationId,
             ContentMode requestedMode
     ) {
+        return build(characterId, conversationId, requestedMode, "");
+    }
+
+    @Transactional(readOnly = true)
+    public DialogueContext build(
+            Long characterId,
+            Long conversationId,
+            ContentMode requestedMode,
+            String currentMessage
+    ) {
         CharacterState state =
                 characterStateRepository
                         .findByCharacterId(characterId)
@@ -92,23 +102,28 @@ public class DialogueContextBuilder {
         List<DialogueMemoryContext> memories =
                 buildMemories(
                         characterId,
-                        conversation.getSimulatedAt()
+                        conversation.getId(),
+                        conversation.getSimulatedAt(),
+                        com.example.projectmm.application.memory.SpokenText.from(currentMessage),
+                        !conversation.isIndependentStart()
                 );
 
         List<DialogueRelationshipContext> relationships =
-                buildRelationships(characterId);
+                conversation.isIndependentStart() ? List.of() : buildRelationships(characterId);
 
         return new DialogueContext(
                 state.getCharacter().getId(),
                 state.getCharacter().getName(),
                 dialogueProfile,
-                state.getEnergy(),
-                state.getMood(),
+                conversation.getEnergy() != null ? conversation.getEnergy() : state.getEnergy(),
+                conversation.getMood() != null ? conversation.getMood() : state.getMood(),
                 conversation.getSimulatedAt(),
                 resolvedMode,
                 recentMessages,
                 memories,
-                relationships
+                relationships,
+                conversation.getPlayerProfile() == null ? null : new DialoguePlayerProfile(
+                        conversation.getPlayerProfile().getName(), conversation.getPlayerProfile().getDescription())
         );
     }
 
@@ -138,13 +153,19 @@ public class DialogueContextBuilder {
 
     private List<DialogueMemoryContext> buildMemories(
             Long characterId,
-            LocalDateTime currentTime
+            Long conversationId,
+            LocalDateTime currentTime,
+            String query,
+            boolean includeSharedMemories
     ) {
         List<EffectiveMemory> recalledMemories =
-                memoryRecallService.recall(
+                memoryRecallService.recallForConversation(
                         characterId,
+                        conversationId,
                         currentTime,
-                        MEMORY_LIMIT
+                        MEMORY_LIMIT,
+                        query,
+                        includeSharedMemories
                 );
 
         return recalledMemories.stream()

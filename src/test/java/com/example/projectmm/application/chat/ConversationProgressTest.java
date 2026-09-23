@@ -1,0 +1,214 @@
+package com.example.projectmm.application.chat;
+
+import com.example.projectmm.application.policy.ContentMode;
+import com.example.projectmm.application.simulation.*;
+import com.example.projectmm.domain.character.Character;
+import com.example.projectmm.domain.character.CharacterState;
+import com.example.projectmm.domain.chat.*;
+import com.example.projectmm.domain.memory.MemoryRepository;
+import com.example.projectmm.domain.player.PlayerProfile;
+import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+
+import java.time.LocalDateTime;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.when;
+
+@DataJpaTest(properties = {"spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.show-sql=false"}, showSql = false)
+@Import({ConversationProgressService.class, CatchUpSimulationService.class, CatchUpSegmentService.class,
+        CatchUpEventCandidateService.class, EventCandidateValidator.class})
+class ConversationProgressTest {
+    @Autowired EntityManager em;
+    @Autowired ConversationProgressService service;
+    @Autowired ConversationRepository rooms;
+    @Autowired ConversationCatchUpRepository reports;
+    @Autowired ChatMessageRepository messages;
+    @Autowired MemoryRepository memories;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
+    @MockitoBean PresenceClock clock;
+    private final LocalDateTime real = LocalDateTime.of(2026, 9, 23, 12, 0);
+    private final LocalDateTime story = LocalDateTime.of(2030, 1, 1, 23, 0);
+
+    @BeforeEach void time() { when(clock.now()).thenReturn(real); }
+
+    @Test void optInDoesNotBackfillAndResumeAddsAbsenceToStoryClockOnlyOnce() {
+        var room = fixture(true, 70, 70);
+        Long characterId = room.getCharacter().getId();
+        service.resume(characterId, room.getId());
+        when(clock.now()).thenReturn(real.plusDays(5));
+        assertThat(service.resume(characterId, room.getId()).simulatedAt()).isEqualTo(story);
+        service.configure(characterId, room.getId(), true);
+        when(clock.now()).thenReturn(real.plusDays(5).plusMinutes(2));
+        var applied = service.resume(characterId, room.getId());
+        assertThat(applied.simulatedAt()).isEqualTo(story.plusMinutes(2));
+        assertThat(applied.lastReport().appliedSeconds()).isEqualTo(120);
+        assertThat(service.resume(characterId, room.getId()).lastReport().id()).isEqualTo(applied.lastReport().id());
+        assertThat(reports.count()).isEqualTo(1);
+        em.flush(); em.clear();
+        assertThat(rooms.findById(room.getId()).orElseThrow().getSimulatedAt()).isEqualTo(story.plusMinutes(2));
+    }
+
+    @Test void visiblePresenceAndShortRefreshDoNotProgressAndClockRollbackDoesNotReplay() {
+        var room = fixture(true, 70, 70);
+        Long id = room.getCharacter().getId();
+        service.configure(id, room.getId(), true);
+        for (int i = 1; i <= 10; i++) {
+            when(clock.now()).thenReturn(real.plusSeconds(i * 30));
+            service.heartbeat(id, room.getId());
+        }
+        when(clock.now()).thenReturn(real.plusMinutes(5).plusSeconds(40));
+        assertThat(service.resume(id, room.getId()).lastReport()).isNull();
+        when(clock.now()).thenReturn(real.minusDays(1));
+        assertThat(service.resume(id, room.getId()).simulatedAt()).isEqualTo(story);
+        when(clock.now()).thenReturn(real.plusMinutes(6).plusSeconds(40));
+        assertThat(service.resume(id, room.getId()).lastReport().appliedSeconds()).isEqualTo(60);
+    }
+
+    @Test void threeDayCapDiscardsBacklogAndDisabledPeriodIsNotReplayed() {
+        var room = fixture(true, 70, 70);
+        Long id = room.getCharacter().getId();
+        service.configure(id, room.getId(), true);
+        when(clock.now()).thenReturn(real.plusDays(10));
+        var first = service.resume(id, room.getId());
+        assertThat(first.lastReport().capped()).isTrue();
+        assertThat(first.simulatedAt()).isEqualTo(story.plusDays(3));
+        assertThat(service.resume(id, room.getId()).lastReport().id()).isEqualTo(first.lastReport().id());
+        service.configure(id, room.getId(), false);
+        when(clock.now()).thenReturn(real.plusDays(20));
+        service.configure(id, room.getId(), true);
+        assertThat(service.resume(id, room.getId()).simulatedAt()).isEqualTo(story.plusDays(3));
+    }
+
+    @Test void restPersistsOnlyInItsRoomAndSharedStateIsUntouched() {
+        var room = fixture(false, 20, 70);
+        var other = Conversation.fresh(room.getCharacter(), story);
+        em.persist(other); em.flush();
+        Long id = room.getCharacter().getId();
+        service.configure(id, room.getId(), true);
+        when(clock.now()).thenReturn(real.plusHours(1));
+        var result = service.resume(id, room.getId());
+        assertThat(result.lastReport().actions()).contains("휴식");
+        em.flush(); em.clear();
+        assertThat(rooms.findById(room.getId()).orElseThrow().getEnergy()).isEqualTo(50);
+        assertThat(rooms.findById(other.getId()).orElseThrow().getEnergy()).isEqualTo(70);
+        assertThat(em.createQuery("select s from CharacterState s where s.character.id = :id", CharacterState.class)
+                .setParameter("id", id).getSingleResult().getEnergy()).isEqualTo(20);
+        assertThat(messages.findTop20ByConversationIdOrderByCreatedAtDesc(room.getId())).hasSize(1);
+        assertThat(memories.findForConversation(id, room.getId())).hasSize(1);
+        assertThat(memories.findForConversation(id, other.getId())).isEmpty();
+        assertThat(service.resume(id, room.getId()).lastReport().id()).isEqualTo(result.lastReport().id());
+        assertThat(messages.findTop20ByConversationIdOrderByCreatedAtDesc(room.getId())).hasSize(1);
+    }
+
+    @Test void decisionRequiredPausesBeforeAnyActionAndDoesNotRepeatOnRefresh() {
+        var room = fixture(true, 20, 10);
+        Long id = room.getCharacter().getId();
+        service.configure(id, room.getId(), true);
+        when(clock.now()).thenReturn(real.plusHours(1));
+        var result = service.resume(id, room.getId());
+        assertThat(result.pauseReason()).isNotBlank();
+        assertThat(result.simulatedAt()).isEqualTo(story);
+        assertThat(result.lastReport().appliedSeconds()).isZero();
+        assertThat(messages.findTop20ByConversationIdOrderByCreatedAtDesc(room.getId())).isEmpty();
+        when(clock.now()).thenReturn(real.plusDays(1));
+        assertThat(service.resume(id, room.getId()).lastReport().id()).isEqualTo(result.lastReport().id());
+    }
+
+    @Test void chatOperationExcludesCatchUpAndExpiredReplyCannotOverwriteNewOperation() {
+        var room = fixture(true, 70, 70);
+        Long id = room.getCharacter().getId();
+        service.configure(id, room.getId(), true);
+        var operation = service.beginChat(id, room.getId());
+        assertThatThrownBy(() -> service.resume(id, room.getId()))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        when(clock.now()).thenReturn(real.plusMinutes(11));
+        var replacement = service.beginChat(id, room.getId());
+        assertThatThrownBy(() -> service.applyChatTime(id, room.getId(), operation.token(), story.plusDays(99)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        service.endChat(id, room.getId(), operation.token());
+        service.applyChatTime(id, room.getId(), replacement.token(), story.plusHours(1));
+        service.completeChat(id, room.getId(), replacement.token(), "안녕", "안녕하세요", ContentMode.NORMAL);
+        assertThat(service.resume(id, room.getId()).simulatedAt()).isEqualTo(story.plusHours(1));
+        assertThat(messages.findTop20ByConversationIdOrderByCreatedAtDesc(room.getId()))
+                .extracting(ChatMessage::getContent).containsExactly("안녕하세요", "안녕");
+    }
+
+    @Test void anotherCharacterCannotChangePresenceOrSetting() {
+        var room = fixture(true, 70, 70);
+        assertThatThrownBy(() -> service.configure(-1L, room.getId(), true))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThatThrownBy(() -> service.heartbeat(-1L, room.getId()))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+    }
+
+    @Test void sendingFirstAfterNetworkRecoveryStillAppliesMissingInterval() {
+        var room = fixture(true, 70, 70);
+        Long id = room.getCharacter().getId();
+        service.configure(id, room.getId(), true);
+        when(clock.now()).thenReturn(real.plusMinutes(4));
+        var operation = service.beginChat(id, room.getId());
+        assertThat(operation.room().getSimulatedAt()).isEqualTo(story.plusMinutes(4));
+        assertThat(service.current(id, room.getId()).lastReport().appliedSeconds()).isEqualTo(240);
+        service.endChat(id, room.getId(), operation.token());
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void simultaneousReconnectsCommitOneReportAndOneRest() throws Exception {
+        // 별도 커넥션의 실제 트랜잭션 두 개로 잠금과 체크포인트의 중복 방지를 검증한다.
+        var tx = new org.springframework.transaction.support.TransactionTemplate(transactions);
+        var room = tx.execute(status -> fixture(true, 20, 70));
+        Long id = room.getCharacter().getId();
+        service.configure(id, room.getId(), true);
+        when(clock.now()).thenReturn(real.plusMinutes(2));
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var ready = new java.util.concurrent.CountDownLatch(2);
+            var start = new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.Callable<ConversationProgressService.Status> reconnect = () -> {
+                ready.countDown();
+                if (!start.await(5, java.util.concurrent.TimeUnit.SECONDS)) throw new IllegalStateException("시작 대기 초과");
+                return service.resume(id, room.getId());
+            };
+            var first = executor.submit(reconnect);
+            var second = executor.submit(reconnect);
+            assertThat(ready.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            var firstReport = first.get(10, java.util.concurrent.TimeUnit.SECONDS).lastReport();
+            var secondReport = second.get(10, java.util.concurrent.TimeUnit.SECONDS).lastReport();
+            assertThat(firstReport.id()).isEqualTo(secondReport.id());
+            assertThat(rooms.findById(room.getId()).orElseThrow().getSimulatedAt()).isEqualTo(story.plusMinutes(2));
+            assertThat(messages.findTop20ByConversationIdOrderByCreatedAtDesc(room.getId())).hasSize(1);
+        } finally {
+            // 이 테스트만 커밋하므로 자신이 만든 데이터만 격리 DB에서 정리한다.
+            tx.executeWithoutResult(status -> {
+                em.createQuery("delete from ConversationCatchUp r where r.conversation.id = :id").setParameter("id", room.getId()).executeUpdate();
+                em.createQuery("delete from Memory m where m.conversation.id = :id").setParameter("id", room.getId()).executeUpdate();
+                em.createQuery("delete from ChatMessage m where m.conversation.id = :id").setParameter("id", room.getId()).executeUpdate();
+                em.remove(em.find(Conversation.class, room.getId()));
+                em.flush();
+                em.remove(em.find(PlayerProfile.class, room.getPlayerProfile().getId()));
+                em.createQuery("delete from CharacterState s where s.character.id = :id").setParameter("id", id).executeUpdate();
+                em.remove(em.find(Character.class, id));
+            });
+        }
+    }
+
+    private Conversation fixture(boolean independent, int energy, int mood) {
+        var character = new Character("자동 행동 QA");
+        em.persist(character);
+        em.persist(new CharacterState(character, energy, mood, story));
+        var profile = new PlayerProfile(1, "하린", "사서", null);
+        em.persist(profile);
+        var room = independent ? Conversation.fresh(character, story) : new Conversation(character, story);
+        if (independent) room.applyRoomState(energy, mood, story);
+        room.selectPlayerProfile(profile);
+        em.persist(room); em.flush();
+        return room;
+    }
+}

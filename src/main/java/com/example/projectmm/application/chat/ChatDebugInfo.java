@@ -4,6 +4,7 @@ import com.example.projectmm.domain.time.AiTimeParseResult.TimePrecision;
 import com.example.projectmm.domain.time.AiTimeParseResult.DurationScale;
 import com.example.projectmm.domain.time.TimeInterpretation.Interpreter;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record ChatDebugInfo(
         LocalDateTime serverTime,
@@ -15,6 +16,9 @@ public record ChatDebugInfo(
         long appliedElapsedMinutes,
         LocalDateTime previousTime,
         LocalDateTime newTime,
-        String sourceExpression
+        String sourceExpression,
+        String memoryStatus,
+        List<String> savedMemories,
+        List<String> recalledMemories
 ) {
 }

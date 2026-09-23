@@ -2,6 +2,8 @@ package com.example.projectmm.domain.memory;
 
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.event.Event;
+import com.example.projectmm.domain.chat.ChatMessage;
+import com.example.projectmm.domain.chat.Conversation;
 import jakarta.persistence.*;
 import lombok.Getter;
 
@@ -23,6 +25,17 @@ public class Memory {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "source_event_id")
     private Event sourceEvent;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "conversation_id")
+    private Conversation conversation;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_chat_message_id")
+    private ChatMessage sourceChatMessage;
+
+    @Column(length = 64, unique = true)
+    private String chatFingerprint;
 
     @Column(nullable = false, length = 500)
     private String summary;
@@ -73,5 +86,24 @@ public class Memory {
 
         this.summary = compressedSummary;
         this.detailLevel = MemoryDetailLevel.COMPRESSED;
+    }
+
+    public static Memory fromChat(Conversation conversation, ChatMessage source, String quote,
+                                  int importance, LocalDateTime at, String fingerprint) {
+        Memory memory = new Memory(conversation.getCharacter(), null,
+                "사용자가 캐릭터에게 말한 내용: \"" + quote + "\"", importance, importance * 10, at);
+        memory.conversation = conversation;
+        memory.sourceChatMessage = source;
+        memory.chatFingerprint = fingerprint;
+        return memory;
+    }
+
+    public static Memory fromAutomaticAction(Conversation room, ChatMessage source, String summary,
+                                              int importance, LocalDateTime at) {
+        // 행동은 발언으로 위장하지 않고 해당 방의 캐릭터 경험으로만 저장한다.
+        Memory memory = new Memory(room.getCharacter(), null, summary, importance, importance * 10, at);
+        memory.conversation = room;
+        memory.sourceChatMessage = source;
+        return memory;
     }
 }
