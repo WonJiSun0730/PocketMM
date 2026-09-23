@@ -31,8 +31,7 @@ public class ChatMessage {
     @Column(nullable = false, length = 20)
     private ChatRole role;
 
-    @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
     @Enumerated(EnumType.STRING)

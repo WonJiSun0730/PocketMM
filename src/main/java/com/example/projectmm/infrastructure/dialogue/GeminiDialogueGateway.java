@@ -417,7 +417,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
         """.formatted(
                 safeProfileValue(profile.description()),
                 safeProfileValue(profile.rawDescription()),
-                safeProfileValue(profile.exampleDialogue()),
+                buildExamplePrompt(profile.examples()),
                 safeProfileValue(profile.personality()),
                 safeProfileValue(profile.speechStyle()),
                 safeProfileValue(profile.background()),
@@ -431,6 +431,39 @@ public class GeminiDialogueGateway implements DialogueGateway {
         }
 
         return value.trim();
+    }
+
+    private String buildExamplePrompt(
+            List<String> examples
+    ) {
+        if (examples == null || examples.isEmpty()) {
+            return "(Not specified)";
+        }
+
+        StringBuilder builder = new StringBuilder();
+
+        for (int i = 0; i < examples.size(); i++) {
+            String example = examples.get(i);
+
+            if (example == null || example.isBlank()) {
+                continue;
+            }
+
+            if (!builder.isEmpty()) {
+                builder.append("\n\n");
+            }
+
+            builder.append("[Example ")
+                    .append(i + 1)
+                    .append("]\n")
+                    .append(example.trim());
+        }
+
+        if (builder.isEmpty()) {
+            return "(Not specified)";
+        }
+
+        return builder.toString();
     }
 
     private String buildMemoryPrompt(

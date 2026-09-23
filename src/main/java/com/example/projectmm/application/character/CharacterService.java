@@ -3,15 +3,13 @@ package com.example.projectmm.application.character;
 import com.example.projectmm.api.character.CharacterCreateRequest;
 import com.example.projectmm.api.character.CharacterResponse;
 import com.example.projectmm.api.character.CharacterUpdateRequest;
+import com.example.projectmm.domain.character.*;
 import com.example.projectmm.domain.character.Character;
-import com.example.projectmm.domain.character.CharacterProfile;
-import com.example.projectmm.domain.character.CharacterProfileRepository;
-import com.example.projectmm.domain.character.CharacterRepository;
-import com.example.projectmm.domain.character.CharacterState;
-import com.example.projectmm.domain.character.CharacterStateRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.example.projectmm.domain.character.CharacterExample;
+import com.example.projectmm.domain.character.CharacterExampleRepository;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -26,6 +24,7 @@ public class CharacterService {
     private final CharacterRepository characterRepository;
     private final CharacterProfileRepository characterProfileRepository;
     private final CharacterStateRepository characterStateRepository;
+    private final CharacterExampleRepository characterExampleRepository;
 
     @Transactional
     public CharacterResponse create(CharacterCreateRequest request) {
@@ -50,6 +49,11 @@ public class CharacterService {
                                 request.appearance()
                         )
                 );
+
+        saveExamples(
+                character,
+                request.examples()
+        );
 
         characterStateRepository.save(
                 new CharacterState(
@@ -122,6 +126,11 @@ public class CharacterService {
                 request.appearance()
         );
 
+        replaceExamples(
+                character,
+                request.examples()
+        );
+
         return toResponse(character, profile);
     }
 
@@ -136,15 +145,16 @@ public class CharacterService {
             return new CharacterResponse(
                     character.getId(),
                     character.getName(),
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null
+                    null, // description
+                    null, // rawDescription
+                    null, // playGuide
+                    null, // intro
+                    null, // examples
+                    null, // exampleDialogue
+                    null, // personality
+                    null, // speechStyle
+                    null, // background
+                    null  // appearance
             );
         }
 
@@ -162,11 +172,85 @@ public class CharacterService {
                 profile.getRawDescription(),
                 profile.getPlayGuide(),
                 profile.getIntro(),
+                getExamples(character.getId()),
                 profile.getExampleDialogue(),
                 profile.getPersonality(),
                 profile.getSpeechStyle(),
                 profile.getBackground(),
                 profile.getAppearance()
         );
+    }
+
+    private void saveExamples(
+            Character character,
+            List<String> examples
+    ) {
+        if (examples == null || examples.isEmpty()) {
+            return;
+        }
+
+        List<String> normalizedExamples =
+                examples.stream()
+                        .filter(example ->
+                                example != null
+                                        && !example.isBlank()
+                        )
+                        .map(String::trim)
+                        .toList();
+
+        if (normalizedExamples.size() > 10) {
+            throw new IllegalArgumentException(
+                    "Character examples must not exceed 10."
+            );
+        }
+
+        int totalLength =
+                normalizedExamples.stream()
+                        .mapToInt(String::length)
+                        .sum();
+
+        if (totalLength > 2000) {
+            throw new IllegalArgumentException(
+                    "Character examples must not exceed 2000 characters in total."
+            );
+        }
+
+        for (int i = 0; i < normalizedExamples.size(); i++) {
+            String content = normalizedExamples.get(i);
+
+            characterExampleRepository.save(
+                    new CharacterExample(
+                            character,
+                            content,
+                            i
+                    )
+            );
+        }
+    }
+
+    private void replaceExamples(
+            Character character,
+            List<String> examples
+    ) {
+        if (examples == null) {
+            return;
+        }
+
+        characterExampleRepository.deleteByCharacterId(
+                character.getId()
+        );
+
+        saveExamples(
+                character,
+                examples
+        );
+    }
+
+    private List<String> getExamples(Long characterId) {
+        return characterExampleRepository
+                .findByCharacterIdOrderBySortOrderAsc(characterId)
+                .stream()
+                .map(CharacterExample::getContent)
+                .toList();
     }
 }

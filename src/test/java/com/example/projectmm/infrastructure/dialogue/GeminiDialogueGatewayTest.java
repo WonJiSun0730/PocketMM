@@ -3,6 +3,8 @@ package com.example.projectmm.infrastructure.dialogue;
 import com.example.projectmm.application.dialogue.DialogueContextBuilder;
 import com.example.projectmm.application.dialogue.DialogueGateway;
 import com.example.projectmm.application.policy.ContentMode;
+import com.example.projectmm.domain.chat.Conversation;
+import com.example.projectmm.domain.chat.ConversationRepository;
 import com.example.projectmm.domain.dialogue.DialogueContext;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -21,14 +23,28 @@ class GeminiDialogueGatewayTest {
     @Autowired
     private DialogueGateway dialogueGateway;
 
+    @Autowired
+    private ConversationRepository conversationRepository;
+
     @Test
     void 실제_Gemini와_대화한다() {
 
         Long characterId = 1L;
 
+        Conversation conversation =
+                conversationRepository
+                        .findTopByCharacterIdOrderByCreatedAtDesc(characterId)
+                        .orElseThrow(() ->
+                                new IllegalStateException(
+                                        "Test conversation not found. characterId="
+                                                + characterId
+                                )
+                        );
+
         DialogueContext context =
                 dialogueContextBuilder.build(
                         characterId,
+                        conversation.getId(),
                         ContentMode.NORMAL
                 );
 

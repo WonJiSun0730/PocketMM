@@ -12,6 +12,7 @@ import com.example.projectmm.domain.character.CharacterRepository;
 import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.dialogue.DialogueContext;
 import com.example.projectmm.domain.time.TimeChange;
+import com.example.projectmm.domain.time.TimeInterpretation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -63,20 +64,24 @@ public class ChatService {
                                 createConversation(character)
                         );
 
-        TimeChange timeChange =
+        TimeInterpretation timeInterpretation =
                 timeInterpreter.interpret(
                         request.message(),
                         conversation.getSimulatedAt()
                 );
 
-        if (timeChange.changed()) {
-            conversation.updateSimulatedAt(
-                    timeChange.newTime()
-            );
+        if (timeInterpretation.matched()) {
+            TimeChange timeChange =
+                    timeInterpretation.timeChange();
 
-            conversationRepository.save(conversation);
+            if (timeChange.changed()) {
+                conversation.updateSimulatedAt(
+                        timeChange.newTime()
+                );
+
+                conversationRepository.save(conversation);
+            }
         }
-
         ContentMode resolvedMode =
                 contentModePolicy.resolve(
                         request.contentMode()

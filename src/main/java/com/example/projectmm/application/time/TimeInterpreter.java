@@ -1,12 +1,12 @@
 package com.example.projectmm.application.time;
 
-import com.example.projectmm.domain.time.TimeChange;
+import com.example.projectmm.domain.time.TimeInterpretation;
 
 import java.time.LocalDateTime;
 
 public interface TimeInterpreter {
 
-    TimeChange interpret(
+    TimeInterpretation interpret(
             String userInput,
             LocalDateTime currentTime
     );

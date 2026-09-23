@@ -1,6 +1,7 @@
 package com.example.projectmm.application.time;
 
 import com.example.projectmm.domain.time.TimeChange;
+import com.example.projectmm.domain.time.TimeInterpretation;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -21,12 +22,12 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
             );
 
     @Override
-    public TimeChange interpret(
+    public TimeInterpretation interpret(
             String userInput,
             LocalDateTime currentTime
     ) {
         if (userInput == null || userInput.isBlank()) {
-            return TimeChange.unchanged(currentTime);
+            return TimeInterpretation.noMatch();
         }
 
         Matcher nextDayMatcher =
@@ -63,10 +64,12 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
                         };
             }
 
-            return TimeChange.changed(
-                    currentTime,
-                    newTime,
-                    nextDayMatcher.group()
+            return TimeInterpretation.matched(
+                    TimeChange.changed(
+                            currentTime,
+                            newTime,
+                            nextDayMatcher.group()
+                    )
             );
         }
 
@@ -74,7 +77,7 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
                 RELATIVE_TIME_PATTERN.matcher(userInput);
 
         if (!matcher.find()) {
-            return TimeChange.unchanged(currentTime);
+            return TimeInterpretation.noMatch();
         }
 
         long amount =
@@ -98,10 +101,12 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
                             currentTime;
                 };
 
-        return TimeChange.changed(
-                currentTime,
-                newTime,
-                matcher.group()
+        return TimeInterpretation.matched(
+                TimeChange.changed(
+                        currentTime,
+                        newTime,
+                        matcher.group()
+                )
         );
     }
 

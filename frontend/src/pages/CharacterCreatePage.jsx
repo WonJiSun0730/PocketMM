@@ -13,7 +13,7 @@ export default function CharacterCreatePage({
   const [rawDescription, setRawDescription] = useState("")
   const [playGuide, setPlayGuide] = useState("")
   const [intro, setIntro] = useState("")
-  const [exampleDialogue, setExampleDialogue] = useState("")
+  const [examples, setExamples] = useState([""])
 
   const [personality, setPersonality] = useState("")
   const [speechStyle, setSpeechStyle] = useState("")
@@ -23,6 +23,50 @@ export default function CharacterCreatePage({
   const [showDetails, setShowDetails] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+
+  const totalExampleLength = examples.reduce(
+    (total, example) => total + example.length,
+    0
+  )
+
+  const remainingExampleLength = 2000 - totalExampleLength
+
+  function updateExample(index, value) {
+    setExamples((current) => {
+      const otherLength = current.reduce(
+        (total, example, currentIndex) =>
+          currentIndex === index
+            ? total
+            : total + example.length,
+        0
+      )
+
+      const availableLength = Math.max(
+        0,
+        2000 - otherLength
+      )
+
+      return current.map((example, currentIndex) =>
+        currentIndex === index
+          ? value.slice(0, availableLength)
+          : example
+      )
+    })
+  }
+
+  function addExample() {
+    if (examples.length >= 10) {
+      return
+    }
+
+    setExamples((current) => [...current, ""])
+  }
+
+  function removeExample(index) {
+    setExamples((current) =>
+      current.filter((_, currentIndex) => currentIndex !== index)
+    )
+  }
 
   async function createCharacter() {
     const trimmedName = name.trim()
@@ -46,7 +90,10 @@ export default function CharacterCreatePage({
           rawDescription: rawDescription.trim() || null,
           playGuide: playGuide.trim() || null,
           intro: intro.trim() || null,
-          exampleDialogue: exampleDialogue.trim() || null,
+          examples: examples
+            .map((example) => example.trim())
+            .filter(Boolean),
+          exampleDialogue: null,
           personality: personality.trim() || null,
           speechStyle: speechStyle.trim() || null,
           background: background.trim() || null,
@@ -179,20 +226,65 @@ export default function CharacterCreatePage({
 
             <Field
               label="예시 대화"
-              description="캐릭터가 어떻게 말하고 행동하는지 보여주는 예시예요."
+              description="여러 상황에서 캐릭터가 어떻게 말하고 행동하는지 보여주세요."
             >
-              <Textarea
-                value={exampleDialogue}
-                onChange={(event) => setExampleDialogue(event.target.value)}
-                placeholder={`예시
+              <div className="space-y-4">
+                {examples.map((example, index) => (
+                  <div
+                    key={index}
+                    className="rounded-xl border bg-background p-3"
+                  >
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        예시 {index + 1}
+                      </span>
 
-          *잠시 생각하던 캐릭터가 고개를 기울였다.*
+                      <div className="flex items-center gap-3">
+                        {examples.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeExample(index)}
+                            className="text-xs text-muted-foreground hover:text-destructive"
+                          >
+                            삭제
+                          </button>
+                        )}
+                      </div>
+                    </div>
 
-          "그렇게 생각한 이유가 궁금하네요."
+                    <Textarea
+                      value={example}
+                      onChange={(event) =>
+                        updateExample(index, event.target.value)
+                      }
+                      placeholder={`*잠시 생각하던 캐릭터가 고개를 기울였다.*
 
-          *재촉하지 않고 조용히 대답을 기다렸다.*`}
-                className="min-h-48 resize-y leading-6"
-              />
+            "그렇게 생각한 이유가 궁금하네요."
+
+            *재촉하지 않고 조용히 대답을 기다렸다.*`}
+                      className="min-h-40 resize-y leading-6"
+                    />
+                  </div>
+                ))}
+
+                <div className="flex items-center justify-between">
+                  <div className="text-xs text-muted-foreground">
+                    <span>{examples.length}/10개</span>
+                    <span className="ml-3">
+                      {totalExampleLength}/2000자
+                    </span>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={examples.length >= 10}
+                    onClick={addExample}
+                  >
+                    + 예시 추가
+                  </Button>
+                </div>
+                </div>
             </Field>
           </section>
 

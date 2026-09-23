@@ -3,10 +3,7 @@ package com.example.projectmm.application.dialogue;
 import com.example.projectmm.application.memory.MemoryRecallService;
 import com.example.projectmm.application.policy.ContentMode;
 import com.example.projectmm.application.policy.ContentModePolicy;
-import com.example.projectmm.domain.character.CharacterProfile;
-import com.example.projectmm.domain.character.CharacterProfileRepository;
-import com.example.projectmm.domain.character.CharacterState;
-import com.example.projectmm.domain.character.CharacterStateRepository;
+import com.example.projectmm.domain.character.*;
 import com.example.projectmm.domain.chat.ChatMessage;
 import com.example.projectmm.domain.chat.ChatMessageRepository;
 import com.example.projectmm.domain.chat.Conversation;
@@ -37,6 +34,7 @@ public class DialogueContextBuilder {
     private final RelationshipRepository relationshipRepository;
     private final ContentModePolicy contentModePolicy;
     private final ConversationRepository conversationRepository;
+    private final CharacterExampleRepository characterExampleRepository;
 
     @Transactional(readOnly = true)
     public DialogueContext build(
@@ -75,7 +73,10 @@ public class DialogueContextBuilder {
                         : new DialogueCharacterProfile(
                         profile.getDescription(),
                         profile.getRawDescription(),
-                        profile.getExampleDialogue(),
+                        buildExamples(
+                                characterId,
+                                profile.getExampleDialogue()
+                        ),
                         profile.getPersonality(),
                         profile.getSpeechStyle(),
                         profile.getBackground(),
@@ -180,5 +181,30 @@ public class DialogueContextBuilder {
                         )
                 )
                 .toList();
+    }
+
+    private List<String> buildExamples(
+            Long characterId,
+            String legacyExampleDialogue
+    ) {
+        List<String> examples =
+                characterExampleRepository
+                        .findByCharacterIdOrderBySortOrderAsc(characterId)
+                        .stream()
+                        .map(CharacterExample::getContent)
+                        .toList();
+
+        if (!examples.isEmpty()) {
+            return examples;
+        }
+
+        if (legacyExampleDialogue == null
+                || legacyExampleDialogue.isBlank()) {
+            return List.of();
+        }
+
+        return List.of(
+                legacyExampleDialogue.trim()
+        );
     }
 }
