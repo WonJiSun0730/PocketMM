@@ -473,6 +473,46 @@ class MemoryDecayPolicyTest {
                 .isFalse();
     }
 
+    @Test
+    void 재활성화_보호는_시간이_지나면_사라진다() {
+
+        LocalDateTime rememberedAt =
+                LocalDateTime.of(
+                        2026, 9, 1,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        rememberedAt,
+                        6,
+                        70
+                );
+
+        LocalDateTime reactivatedAt =
+                rememberedAt.plusDays(10);
+
+        memory.reactivate(reactivatedAt);
+
+        MemoryDecayResult protectedResult =
+                policy.calculate(
+                        memory,
+                        reactivatedAt
+                );
+
+        MemoryDecayResult expiredResult =
+                policy.calculate(
+                        memory,
+                        reactivatedAt.plusDays(31)
+                );
+
+        assertThat(protectedResult.compressionRequired())
+                .isFalse();
+
+        assertThat(expiredResult.compressionRequired())
+                .isTrue();
+    }
+
     private Memory createMemory(
             LocalDateTime rememberedAt,
             int importance,
