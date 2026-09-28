@@ -53,6 +53,9 @@ public class Memory {
     @Column(nullable = false)
     private int strength;
 
+    @Column(nullable = false)
+    private int narrativeAnchor;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private MemoryDetailLevel detailLevel;
@@ -74,14 +77,50 @@ public class Memory {
             int strength,
             LocalDateTime rememberedAt
     ) {
+        this(
+                character,
+                sourceEvent,
+                summary,
+                importance,
+                strength,
+                0,
+                rememberedAt
+        );
+    }
+
+    public Memory(
+            Character character,
+            Event sourceEvent,
+            String summary,
+            int importance,
+            int strength,
+            int narrativeAnchor,
+            LocalDateTime rememberedAt
+    ) {
         this.character = character;
         this.sourceEvent = sourceEvent;
         this.summary = summary;
         this.importance = importance;
         this.strength = strength;
+        this.narrativeAnchor =
+                clampNarrativeAnchor(
+                        narrativeAnchor
+                );
         this.detailLevel = MemoryDetailLevel.DETAILED;
         this.rememberedAt = rememberedAt;
         this.createdAt = LocalDateTime.now();
+    }
+
+    private int clampNarrativeAnchor(
+            int narrativeAnchor
+    ) {
+        return Math.max(
+                0,
+                Math.min(
+                        10,
+                        narrativeAnchor
+                )
+        );
     }
 
     public void compress(String compressedSummary) {

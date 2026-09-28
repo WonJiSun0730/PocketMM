@@ -47,6 +47,7 @@ public class MemoryCreationService {
                             event.getSummary(),
                             event.getImportance(),
                             decision.strength(),
+                            event.getNarrativeAnchor(),
                             event.getOccurredAt()
                     );
 

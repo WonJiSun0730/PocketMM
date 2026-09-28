@@ -18,12 +18,46 @@ public class Event { //세계에서 실제로 무슨 일이 일어났는가 - �
             String summary,
             int importance
     ) {
+        this(
+                scene,
+                occurredAt,
+                eventType,
+                summary,
+                importance,
+                0
+        );
+    }
+
+    public Event(
+            Scene scene,
+            LocalDateTime occurredAt,
+            String eventType,
+            String summary,
+            int importance,
+            int narrativeAnchor
+    ) {
         this.scene = scene;
         this.occurredAt = occurredAt;
         this.eventType = eventType;
         this.summary = summary;
         this.importance = importance;
+        this.narrativeAnchor =
+                clampNarrativeAnchor(
+                        narrativeAnchor
+                );
         this.createdAt = LocalDateTime.now();
+    }
+
+    private int clampNarrativeAnchor(
+            int narrativeAnchor
+    ) {
+        return Math.max(
+                0,
+                Math.min(
+                        10,
+                        narrativeAnchor
+                )
+        );
     }
 
     @Id
@@ -41,6 +75,9 @@ public class Event { //세계에서 실제로 무슨 일이 일어났는가 - �
 
     @Column(nullable = false)
     private int importance;                 //기억 후보/요약 등에 사용할 중요도
+
+    @Column(nullable = false)
+    private int narrativeAnchor;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;        //서버 데이터 기록 시간

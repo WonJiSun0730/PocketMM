@@ -116,6 +116,91 @@ class MemoryCreationServiceTest {
     }
 
     @Test
+    void 이벤트의_narrativeAnchor가_생성된_기억에_전달된다() {
+
+        MemoryRepository memoryRepository =
+                mock(MemoryRepository.class);
+
+        EventParticipantRepository eventParticipantRepository =
+                mock(EventParticipantRepository.class);
+
+        MemoryCreationService service =
+                new MemoryCreationService(
+                        new MemoryPolicy(),
+                        memoryRepository,
+                        eventParticipantRepository
+                );
+
+        Character millie =
+                new Character("Millie");
+
+        LocalDateTime occurredAt =
+                LocalDateTime.of(
+                        2026, 9, 28,
+                        22, 0
+                );
+
+        Scene scene =
+                new Scene(
+                        occurredAt,
+                        "핵심 사건",
+                        "DAILY"
+                );
+
+        Event event =
+                new Event(
+                        scene,
+                        occurredAt,
+                        "RELATIONSHIP",
+                        "두 사람의 관계를 바꾸는 중요한 사건이 발생했다.",
+                        7,
+                        8
+                );
+
+        EventParticipant participant =
+                new EventParticipant(
+                        event,
+                        millie,
+                        "ACTOR"
+                );
+
+        when(
+                eventParticipantRepository.findByEventId(
+                        event.getId()
+                )
+        ).thenReturn(
+                List.of(participant)
+        );
+
+        when(memoryRepository.save(any(Memory.class)))
+                .thenAnswer(
+                        invocation ->
+                                invocation.getArgument(0)
+                );
+
+        List<Memory> memories =
+                service.createFrom(event);
+
+        assertThat(memories)
+                .hasSize(1);
+
+        Memory memory =
+                memories.getFirst();
+
+        assertThat(memory.getNarrativeAnchor())
+                .isEqualTo(8);
+
+        assertThat(memory.getImportance())
+                .isEqualTo(7);
+
+        assertThat(memory.getStrength())
+                .isEqualTo(70);
+
+        assertThat(memory.getSourceEvent())
+                .isSameAs(event);
+    }
+
+    @Test
     void 중요도가_낮으면_기억도_참가자조회도_하지_않는다() {
 
         MemoryRepository memoryRepository =

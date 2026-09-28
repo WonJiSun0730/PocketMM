@@ -221,6 +221,117 @@ class MemoryDecayPolicyTest {
                 .isEqualTo(100);
     }
 
+    @Test
+    void narrativeAnchor가_없으면_기존_감쇠_정책을_그대로_사용한다() {
+
+        LocalDateTime rememberedAt =
+                LocalDateTime.of(
+                        2026, 9, 1,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        rememberedAt,
+                        6,
+                        70,
+                        0
+                );
+
+        MemoryDecayResult result =
+                policy.calculate(
+                        memory,
+                        rememberedAt.plusDays(30)
+                );
+
+        assertThat(result.effectiveStrength())
+                .isEqualTo(10);
+    }
+
+    @Test
+    void narrativeAnchor는_기억_강도의_최저선을_보장한다() {
+
+        LocalDateTime rememberedAt =
+                LocalDateTime.of(
+                        2026, 9, 1,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        rememberedAt,
+                        6,
+                        70,
+                        5
+                );
+
+        MemoryDecayResult result =
+                policy.calculate(
+                        memory,
+                        rememberedAt.plusDays(30)
+                );
+
+        assertThat(result.effectiveStrength())
+                .isEqualTo(50);
+    }
+
+    @Test
+    void narrativeAnchor가_10이면_자연_감쇠로_기억_강도가_100_아래로_내려가지_않는다() {
+
+        LocalDateTime rememberedAt =
+                LocalDateTime.of(
+                        2026, 9, 1,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        rememberedAt,
+                        9,
+                        100,
+                        10
+                );
+
+        MemoryDecayResult result =
+                policy.calculate(
+                        memory,
+                        rememberedAt.plusDays(365)
+                );
+
+        assertThat(result.effectiveStrength())
+                .isEqualTo(100);
+
+        assertThat(result.compressionRequired())
+                .isFalse();
+    }
+
+    @Test
+    void narrativeAnchor는_현재_기억_강도를_인위적으로_증가시키지_않는다() {
+
+        LocalDateTime rememberedAt =
+                LocalDateTime.of(
+                        2026, 9, 1,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        rememberedAt,
+                        5,
+                        40,
+                        8
+                );
+
+        MemoryDecayResult result =
+                policy.calculate(
+                        memory,
+                        rememberedAt
+                );
+
+        assertThat(result.effectiveStrength())
+                .isEqualTo(40);
+    }
+
     private Memory createMemory(
             LocalDateTime rememberedAt,
             int importance,
@@ -251,6 +362,42 @@ class MemoryDecayPolicyTest {
                 event.getSummary(),
                 importance,
                 strength,
+                rememberedAt
+        );
+    }
+
+    private Memory createMemory(
+            LocalDateTime rememberedAt,
+            int importance,
+            int strength,
+            int narrativeAnchor
+    ) {
+        Character character =
+                new Character("Millie");
+
+        Scene scene =
+                new Scene(
+                        rememberedAt,
+                        "기억 테스트",
+                        "DAILY"
+                );
+
+        Event event =
+                new Event(
+                        scene,
+                        rememberedAt,
+                        "INTERACTION",
+                        "기억할 사건",
+                        importance
+                );
+
+        return new Memory(
+                character,
+                event,
+                event.getSummary(),
+                importance,
+                strength,
+                narrativeAnchor,
                 rememberedAt
         );
     }

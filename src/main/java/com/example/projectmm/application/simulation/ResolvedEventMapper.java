@@ -17,7 +17,8 @@ public class ResolvedEventMapper {
                 resolvedEvent.occurredAt(),
                 resolvedEvent.eventType(),
                 resolvedEvent.summary(),
-                resolvedEvent.importance()
+                resolvedEvent.importance(),
+                resolvedEvent.narrativeAnchor()
         );
     }
 }

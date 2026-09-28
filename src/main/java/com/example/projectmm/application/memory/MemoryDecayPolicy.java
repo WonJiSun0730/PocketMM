@@ -33,10 +33,22 @@ public class MemoryDecayPolicy {
         long totalDecay =
                 elapsedDays * decayPerDay;
 
-        int effectiveStrength =
+        int decayedStrength =
                 (int) Math.max(
                         0,
                         memory.getStrength() - totalDecay
+                );
+
+        int anchorFloor =
+                Math.min(
+                        memory.getStrength(),
+                        memory.getNarrativeAnchor() * 10
+                );
+
+        int effectiveStrength =
+                Math.max(
+                        decayedStrength,
+                        anchorFloor
                 );
 
         boolean compressionRequired =
