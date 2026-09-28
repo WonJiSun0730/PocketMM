@@ -32,6 +32,15 @@ public class MemoryCompressionPersistenceService {
         var evidence = memories.findAllById(ids);
         // Reject the entire result rather than silently dropping missing evidence.
         if (evidence.size() != ids.size()) return false;
+        boolean directCycle = evidence.stream()
+                .anyMatch(item ->
+                        provenance.existsByMemoryIdAndEvidenceMemoryId(
+                                item.getId(),
+                                memoryId
+                        )
+                );
+
+        if (directCycle) return false;
         var existing = new HashSet<Long>();
         if (target != MemoryDetailLevel.SUMMARY) {
             provenance.findByMemoryIdAndTargetLevel(memoryId, target)

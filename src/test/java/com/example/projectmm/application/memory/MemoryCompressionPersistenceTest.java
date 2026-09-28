@@ -103,6 +103,41 @@ class MemoryCompressionPersistenceTest {
     }
 
     @Test
+    void directEvidenceCycleRejectsWholeCompression() {
+        var memory = seed(MemoryDetailLevel.SUMMARY);
+        var evidence = seed(MemoryDetailLevel.SUMMARY);
+
+        provenance.saveAndFlush(
+                new MemoryCompressionEvidence(
+                        evidence,
+                        MemoryDetailLevel.PATTERN,
+                        memory
+                )
+        );
+
+        stub(
+                List.of(evidence),
+                new MemoryCompressorOutput(
+                        "pattern",
+                        List.of(evidence.getId())
+                )
+        );
+
+        assertThat(
+                service.compressIfNeeded(
+                        memory,
+                        at.plusYears(2)
+                ).compressed()
+        ).isFalse();
+
+        assertUnchanged(memory, MemoryDetailLevel.SUMMARY);
+
+        assertThat(
+                rows(memory, MemoryDetailLevel.PATTERN)
+        ).isEmpty();
+    }
+
+    @Test
     void outputEvidenceGateStopsFallbackAndInsufficientSchema() {
         var evidence = seed(MemoryDetailLevel.DETAILED);
         var second = seed(MemoryDetailLevel.DETAILED);
