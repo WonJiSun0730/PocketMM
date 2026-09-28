@@ -44,14 +44,22 @@ public class ChatService {
             Long characterId,
             ChatRequest request
     ) {
-        if (request == null
-                || request.message() == null
-                || request.message().isBlank()) {
-
+        if (request == null) {
             throw new IllegalArgumentException(
-                    "message must not be blank"
+                    "request must not be null"
             );
         }
+
+        String message =
+                request.message() == null
+                        ? ""
+                        : request.message().trim();
+
+        request =
+                new ChatRequest(
+                        message,
+                        request.contentMode()
+                );
 
         Character character =
                 characterRepository
@@ -88,7 +96,9 @@ public class ChatService {
     private ChatResponse generateReply(Character character, Conversation conversation, String token, ChatRequest request) {
         Long characterId = character.getId();
         TimeInterpretation timeInterpretation =
-                timeInterpreter.interpret(
+                request.message().isBlank()
+                        ? TimeInterpretation.noMatch()
+                        : timeInterpreter.interpret(
                         request.message(),
                         conversation.getSimulatedAt()
                 );
@@ -133,11 +143,23 @@ public class ChatService {
         String generatedMessage = generatedTurn.reply();
         var completed = progressService.completeChat(characterId, conversation.getId(), token,
                 request.message(), generatedTurn, resolvedMode);
-        ChatMessage userMessage = completed.source();
-        LocalDateTime characterMessageTime = userMessage.getCreatedAt().plusNanos(1000);
+        ChatMessage userMessage =
+                completed.source();
 
-        ChatMemoryResult memoryResult = chatMemoryService.remember(
-                conversation, userMessage, aiContextTime);
+        LocalDateTime characterMessageTime =
+                userMessage == null
+                        ? LocalDateTime.now()
+                        : userMessage.getCreatedAt()
+                        .plusNanos(1000);
+
+        ChatMemoryResult memoryResult =
+                userMessage == null
+                        ? ChatMemoryResult.empty("SKIPPED")
+                        : chatMemoryService.remember(
+                        conversation,
+                        userMessage,
+                        aiContextTime
+                );
 
         return new ChatResponse(
                 character.getId(),

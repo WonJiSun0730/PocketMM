@@ -351,10 +351,41 @@ public class ConversationProgressService {
                 playerUpdate.mood()
         );
         var now = clock.now();
-        // 응답 저장과 처리 표시 해제를 묶어 재접속 처리가 응답 저장 중간에 끼어들지 않게 한다.
-        var source = messages.save(new ChatMessage(room, room.getCharacter(), ChatRole.USER, userText, mode, now));
-        messages.save(new ChatMessage(room, room.getCharacter(), ChatRole.CHARACTER, turn.reply(), mode, now.plusNanos(1000)));
+
+        ChatMessage source = null;
+
+// 사용자가 실제 내용을 입력한 경우에만 USER 메시지를 저장한다.
+// 빈 입력은 기존 장면의 계속 생성을 요청하는 신호이므로
+// 가짜 USER 메시지를 대화 이력에 남기지 않는다.
+        if (userText != null && !userText.isBlank()) {
+            source =
+                    messages.save(
+                            new ChatMessage(
+                                    room,
+                                    room.getCharacter(),
+                                    ChatRole.USER,
+                                    userText,
+                                    mode,
+                                    now
+                            )
+                    );
+        }
+
+        messages.save(
+                new ChatMessage(
+                        room,
+                        room.getCharacter(),
+                        ChatRole.CHARACTER,
+                        turn.reply(),
+                        mode,
+                        source == null
+                                ? now
+                                : now.plusNanos(1000)
+                )
+        );
+
         room.endChat(token, now);
+
         return new CompletedChat(
                 source,
                 update,

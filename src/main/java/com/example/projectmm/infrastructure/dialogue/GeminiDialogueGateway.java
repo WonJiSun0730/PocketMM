@@ -59,21 +59,24 @@ public class GeminiDialogueGateway implements DialogueGateway {
 
     @Override
     public DialogueTurn generateTurn(DialogueContext context, String userMessage) {
-        if (userMessage == null || userMessage.isBlank()) {
-            throw new IllegalArgumentException(
-                    "userMessage must not be blank"
-            );
-        }
+        String resolvedUserMessage =
+                userMessage == null
+                        ? ""
+                        : userMessage.trim();
 
         Map<String, Object> request =
                 createRequest(
                         context,
-                        userMessage
+                        resolvedUserMessage
                 );
 
         String response = callGeminiWithRetry(request);
 
-        return parseResponse(response, context, userMessage);
+        return parseResponse(
+                response,
+                context,
+                resolvedUserMessage
+        );
     }
 
     private String callGeminiWithRetry(
@@ -299,24 +302,47 @@ public class GeminiDialogueGateway implements DialogueGateway {
             );
         }
 
-        // 최신 입력 가까이에 관찰 경계를 다시 명시한다. 원문 지문은 유지하되 속마음을 들은 대사로 취급하지 않게 한다.
+        // 빈 입력은 사용자 발화가 아니라 현재 장면의 서사를 계속 진행하라는 신호다.
+        // 사용자 캐릭터의 행동·감정·결정을 대신 만들지 않고,
+        // 기존 이력과 현재 상태에서 NPC가 할 수 있는 다음 행동만 생성한다.
+        String latestInput =
+                userMessage.isBlank()
+                        ? """
+                [CONTINUE CURRENT SCENE — NO NEW USER ACTION]
+
+                The user supplied no new dialogue, action, thought, decision,
+                emotion, or event in this turn.
+
+                Continue the existing scene naturally from the conversation
+                history, memories, relationships, and current state.
+
+                Advance only what the controlled NPC can say, do, notice,
+                or initiate without deciding the user-controlled character's
+                actions, feelings, thoughts, choices, or outcomes for them.
+
+                Do not invent a user action merely to keep the scene moving.
+                Do not treat this continuation signal as dialogue spoken by
+                the user-controlled character.
+                """
+                        : userMessage;
+
         String resolvedUserMessage =
                 """
                 %s
-
+        
                 [SERVER-RESOLVED CURRENT SCENE STATE]
                 Authoritative current simulation time: %s
-
+        
                 The simulation server has already interpreted and applied any time
                 progression expressed in the user message above.
-
+        
                 The authoritative time above is the objective CURRENT time of the scene.
                 Do not calculate elapsed time again from the user's wording.
                 Do not infer the current clock time from previous messages.
                 If any earlier clock time conflicts with this state, this state overrides it.
                 Any clock, phone, monitor, narration, or dialogue that reveals the current
                 time must be consistent with this authoritative time.
-
+        
                 [RESPONSE BOUNDARIES — NOT PART OF THE SCENE]
                 Separate spoken words and observable actions from private thoughts in the
                 user input. A silent thought supplies no evidence to the character, even if
@@ -327,7 +353,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 Do not announce these checks, memory processing, or server state in the RP.
                 """
                         .formatted(
-                                userMessage,
+                                latestInput,
                                 context.simulatedAt()
                         );
 

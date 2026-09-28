@@ -159,8 +159,9 @@ export default function ChatPage({
 
   async function sendMessage() {
     const message = input.trim()
+    const isContinuation = !message
 
-    if (!message || sending || loading || pickerMode || !session?.playerProfile || operationRef.current) {
+    if (sending || loading || pickerMode || !session?.playerProfile || operationRef.current) {
       return
     }
 
@@ -168,16 +169,20 @@ export default function ChatPage({
     setSending(true)
     setInput("")
 
-    const pendingMessage = {
-      id: `pending-${Date.now()}`,
-      role: "USER",
-      message,
-      contentMode: "NORMAL",
-      createdAt: new Date().toISOString(),
-      pending: true,
-    }
+    const pendingMessage = isContinuation
+        ? null
+        : {
+          id: `pending-${Date.now()}`,
+          role: "USER",
+          message,
+          contentMode: "NORMAL",
+          createdAt: new Date().toISOString(),
+          pending: true,
+        }
 
-    setMessages((current) => [...current, pendingMessage])
+    if (pendingMessage) {
+      setMessages((current) => [...current, pendingMessage])
+    }
 
     try {
       const response = await fetch(`/api/chat/${character.id}`, {
@@ -205,9 +210,11 @@ export default function ChatPage({
     } catch (error) {
       console.error(error)
 
-      setMessages((current) =>
-        current.filter((item) => item.id !== pendingMessage.id)
-      )
+      if (pendingMessage) {
+        setMessages((current) =>
+            current.filter((item) => item.id !== pendingMessage.id)
+        )
+      }
 
       setInput(message)
     } finally {
@@ -482,7 +489,7 @@ export default function ChatPage({
               type="button"
               size="icon"
               className="size-11 shrink-0"
-              disabled={loading || sending || starting || !session?.playerProfile || !input.trim()}
+              disabled={loading || sending || starting || !session?.playerProfile}
               onClick={sendMessage}
               aria-label="메시지 보내기"
             >

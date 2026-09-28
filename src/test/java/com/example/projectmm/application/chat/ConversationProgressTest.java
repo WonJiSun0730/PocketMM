@@ -571,6 +571,61 @@ class ConversationProgressTest {
         );
     }
 
+    @Test
+    void continuationSavesOnlyCharacterMessageWithoutBlankUserMessage() {
+        var room = fixture(true, 70, 70);
+        Long characterId = room.getCharacter().getId();
+
+        var operation =
+                service.beginChat(
+                        characterId,
+                        room.getId()
+                );
+
+        var turn =
+                new com.example.projectmm.domain.dialogue.DialogueTurn(
+                        "*잠시 창밖을 바라보다가 다시 입을 열었다.*",
+                        com.example.projectmm.domain.dialogue.DialogueStateChange.none()
+                );
+
+        var completed =
+                service.completeChat(
+                        characterId,
+                        room.getId(),
+                        operation.token(),
+                        "",
+                        turn,
+                        ContentMode.NORMAL
+                );
+
+        assertThat(completed.source())
+                .isNull();
+
+        em.flush();
+        em.clear();
+
+        var savedMessages =
+                messages.findTop20ByConversationIdOrderByCreatedAtDesc(
+                        room.getId()
+                );
+
+        assertThat(savedMessages)
+                .hasSize(1);
+
+        assertThat(savedMessages.getFirst().getRole())
+                .isEqualTo(ChatRole.CHARACTER);
+
+        assertThat(savedMessages.getFirst().getContent())
+                .isEqualTo(
+                        "*잠시 창밖을 바라보다가 다시 입을 열었다.*"
+                );
+
+        assertThat(savedMessages)
+                .noneMatch(message ->
+                        message.getRole() == ChatRole.USER
+                );
+    }
+
     private Conversation fixture(boolean independent, int energy, int mood) {
         var character = new Character("자동 행동 QA");
         em.persist(character);
