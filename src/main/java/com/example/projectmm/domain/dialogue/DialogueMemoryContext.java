@@ -6,6 +6,11 @@ public record DialogueMemoryContext(
         String summary,
         int importance,
         int strength,
-        LocalDateTime rememberedAt
+        LocalDateTime rememberedAt,
+        String evidenceQuote,
+        com.example.projectmm.domain.memory.MemoryFact fact
 ) {
+    public DialogueMemoryContext(String summary, int importance, int strength, LocalDateTime rememberedAt) {
+        this(summary, importance, strength, rememberedAt, null, null);
+    }
 }

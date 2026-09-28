@@ -71,7 +71,7 @@ public class MemoryRecallService {
                 .map(memory -> prepareMemory(memory, currentTime))
                 .filter(memory -> memory.effectiveStrength() > 0)
                 .sorted(Comparator.<EffectiveMemory>comparingInt(
-                                memory -> MemoryRelevance.overlap(query, memory.summary())).reversed()
+                                memory -> relevance(query, memory)).reversed()
                         .thenComparing(Comparator.comparingInt(EffectiveMemory::effectiveStrength).reversed())
                         .thenComparing(EffectiveMemory::rememberedAt, Comparator.reverseOrder()))
                 .limit(limit)
@@ -103,7 +103,14 @@ public class MemoryRecallService {
                 memory.getImportance(),
                 decay.effectiveStrength(),
                 memory.getRememberedAt(),
-                decay.compressionRequired()
+                decay.compressionRequired(), memory.getEvidenceQuote(), memory.getFact()
         );
+    }
+
+    private int relevance(String query, EffectiveMemory memory) {
+        int score = MemoryRelevance.overlap(query, memory.summary());
+        // 구조화 필드는 원문에 이미 포함된다. 재가산하면 같은 발언도 신형 데이터만 우대하게 된다.
+        // 구조 유무와 무관하게 보존된 원문을 검색하고, 동점은 기존 강도·시각 순서를 따른다.
+        return Math.max(score, MemoryRelevance.overlap(query, memory.evidenceQuote()));
     }
 }

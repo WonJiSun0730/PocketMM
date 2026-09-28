@@ -71,12 +71,12 @@ class ChatMemoryTest {
 
     @Test
     void rejectsWrongSourceConversationAndLimitsCandidateCount() {
-        ChatMessage source = source("하나 둘 셋 넷");
+        ChatMessage source = source("하나. 둘. 셋. 넷.");
         assertThatThrownBy(() -> writer.save(conversation(2L), source, source.getContent(), List.of(), now))
                 .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(memories, conversations);
         when(conversations.lockForMemory(1L)).thenReturn(Optional.of(conversation));
-        var quotes = List.of("하나", "하나 둘", "하나 둘 셋", "하나 둘 셋 넷").stream()
+        var quotes = List.of("하나.", "둘.", "셋.", "넷.").stream()
                 .map(q -> new ChatMemoryCandidate(q, 5)).toList();
         assertThat(writer.save(conversation, source, source.getContent(), quotes, now).saved()).hasSize(3);
     }

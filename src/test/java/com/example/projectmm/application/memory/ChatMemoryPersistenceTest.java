@@ -221,4 +221,105 @@ class ChatMemoryPersistenceTest {
     private ChatMessage message(Conversation conversation, String text, LocalDateTime at) {
         return new ChatMessage(conversation, conversation.getCharacter(), ChatRole.USER, text, ContentMode.NORMAL, at);
     }
+
+    @Test
+    void structuredCaptureSurvivesDatabaseReloadAndReachesPromptAfterRecentHistoryExpires() {
+        var character = new Character("구조화 기억 QA");
+        em.persist(character);
+        em.persist(new CharacterState(character, 70, 70, now));
+        var room = Conversation.fresh(character, now);
+        var otherRoom = Conversation.fresh(character, now);
+        em.persist(room); em.persist(otherRoom);
+        String quote = "내 반려묘 이름은 감자야.";
+        var source = message(room, "*비밀은 속으로 생각했다.* " + quote, now.minusHours(1));
+        em.persist(source);
+        ChatMemoryExtractor fixture = speech -> {
+            assertThat(speech).isEqualTo(quote);
+            return List.of(new ChatMemoryCandidate(quote, 5,
+                    new MemoryFact(MemoryFact.Kind.RELATIONSHIP, "반려묘", "이름", "감자")));
+        };
+        var capture = new ChatMemoryService(fixture, writer);
+        assertThat(capture.remember(room, source, now).status()).isEqualTo("SAVED");
+        assertThat(capture.remember(room, source, now).status()).isEqualTo("NONE");
+        for (int i = 0; i < 22; i++) em.persist(message(room, "일상 대화 " + i, now.minusMinutes(20).plusSeconds(i)));
+        em.flush(); em.clear();
+        var stored = memories.findForConversation(character.getId(), room.getId()).getFirst();
+        assertThat(stored.getEvidenceQuote()).isEqualTo(quote);
+        assertThat(stored.getFact().getKind()).isEqualTo(MemoryFact.Kind.RELATIONSHIP);
+        assertThat(stored.getSourceChatMessage().getId()).isEqualTo(source.getId());
+        var context = contexts.build(character.getId(), room.getId(), ContentMode.NORMAL, "반려묘 이름은?");
+        assertThat(context.recentMessages()).noneMatch(m -> m.content().contains("감자"));
+        assertThat(context.memories().getFirst().fact().getValue()).isEqualTo("감자");
+        var gateway = new GeminiDialogueGateway("test", "test", new ObjectMapper());
+        Object request = ReflectionTestUtils.invokeMethod(gateway, "createRequest", context, "반려묘 이름은?");
+        String prompt = new ObjectMapper().valueToTree(request).path("systemInstruction").path("parts").path(0).path("text").asText();
+        assertThat(prompt).contains("User testimony (not verified fact)", "RELATIONSHIP", "반려묘", "감자", "evidenceQuote")
+                .doesNotContain("비밀은 속으로 생각했다");
+        assertThat(contexts.build(character.getId(), otherRoom.getId(), ContentMode.NORMAL).memories()).isEmpty();
+    }
+
+    @Test
+    void plansNegationAndLegacyNullFieldsRemainDistinctWithoutInventingFacts() {
+        var character = new Character("기억 호환 QA");
+        em.persist(character); em.persist(new CharacterState(character, 70, 70, now));
+        var room = Conversation.fresh(character, now); em.persist(room);
+        String quote = "나는 내일 부산에 갈 생각이야.";
+        var source = message(room, quote, now); em.persist(source);
+        writer.save(room, source, quote, List.of(new ChatMemoryCandidate(quote, 6,
+                new MemoryFact(MemoryFact.Kind.PLAN, "나는", "갈 생각이야", "내일 부산"))), now);
+        String negated = "나는 복숭아를 좋아하지 않아.";
+        var second = message(room, negated, now); em.persist(second);
+        writer.save(room, second, negated, List.of(new ChatMemoryCandidate(negated, 5,
+                new MemoryFact(MemoryFact.Kind.PREFERENCE, "나는", "좋아하지 않아", "복숭아"))), now);
+        var legacy = Memory.fromChat(room, source, "옛날 발언", 5, now, "legacy");
+        ReflectionTestUtils.setField(legacy, "evidenceQuote", null);
+        em.persist(legacy); em.flush(); em.clear();
+        var context = contexts.build(character.getId(), room.getId(), ContentMode.NORMAL, "부산 계획");
+        assertThat(context.memories()).hasSize(3);
+        assertThat(context.memories()).anySatisfy(m -> {
+            assertThat(m.fact()).isNotNull();
+            assertThat(m.fact().getKind()).isEqualTo(MemoryFact.Kind.PLAN);
+            assertThat(m.evidenceQuote()).isEqualTo(quote);
+        });
+        assertThat(context.memories()).anySatisfy(m -> {
+            assertThat(m.fact()).isNotNull();
+            assertThat(m.fact().getRelation()).isEqualTo("좋아하지 않아");
+        });
+        assertThat(context.memories()).anySatisfy(m -> {
+            assertThat(m.fact()).isNull(); assertThat(m.evidenceQuote()).isNull();
+            assertThat(m.summary()).contains("옛날 발언");
+        });
+    }
+
+    @Test void partiallyNullEmbeddedStructureFallsBackWithoutLosingMemory() {
+        var character = new Character("부분 null QA");
+        em.persist(character); em.persist(new CharacterState(character, 70, 70, now));
+        var room = Conversation.fresh(character, now); em.persist(room);
+        String quote = "내 반려묘 이름은 감자야.";
+        var source = message(room, quote, now); em.persist(source);
+        writer.save(room, source, quote, List.of(new ChatMemoryCandidate(quote, 5,
+                new MemoryFact(MemoryFact.Kind.RELATIONSHIP, "반려묘", "이름", "감자"))), now);
+        em.flush();
+        // 스키마 이행/구 데이터에 일부 필드만 있을 때도 안전하게 인용형으로 읽는다.
+        em.createNativeQuery("update memories set fact_relation = null where conversation_id = :room")
+                .setParameter("room", room.getId()).executeUpdate();
+        em.clear();
+        var context = contexts.build(character.getId(), room.getId(), ContentMode.NORMAL, "반려묘 이름");
+        assertThat(context.memories()).hasSize(1);
+        var memory = context.memories().getFirst();
+        assertThat(memory.fact()).isNotNull();
+        assertThat(memory.fact().groundedIn(memory.evidenceQuote())).isFalse();
+        var gateway = new GeminiDialogueGateway("test", "test", new ObjectMapper());
+        String prompt = ReflectionTestUtils.invokeMethod(gateway, "buildMemoryPrompt", context);
+        assertThat(prompt).contains(quote).doesNotContain("relation", "null");
+    }
+
+    @Test void contextRejectsRoomOwnedByDifferentCharacter() {
+        var first = new Character("첫 캐릭터"); var second = new Character("다른 캐릭터");
+        em.persist(first); em.persist(second);
+        em.persist(new CharacterState(first, 70, 70, now));
+        var foreignRoom = Conversation.fresh(second, now); em.persist(foreignRoom);
+        assertThatThrownBy(() -> contexts.build(first.getId(), foreignRoom.getId(), ContentMode.NORMAL))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("mismatch");
+    }
 }

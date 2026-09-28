@@ -12,7 +12,8 @@ import com.example.projectmm.domain.scene.Scene;
 import com.example.projectmm.domain.scene.SceneRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -20,9 +21,15 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
+// 개발용 MySQL이나 외부 서비스 없이 실제 JPA 저장 경로를 검증한다.
+@DataJpaTest(properties = {"spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.show-sql=false"}, showSql = false)
+@Import({MemoryCreationService.class, MemoryPolicy.class})
 @Transactional
 class MemoryPersistenceIntegrationTest {
+
+    @Autowired
+    private jakarta.persistence.EntityManager em;
 
     @Autowired
     private CharacterRepository characterRepository;
@@ -92,6 +99,9 @@ class MemoryPersistenceIntegrationTest {
         assertThat(created)
                 .hasSize(1);
 
+        // 1차 캐시의 객체가 아닌 실제 저장/재조회 결과를 검증한다.
+        em.flush();
+        em.clear();
         List<Memory> memories =
                 memoryRepository
                         .findByCharacterIdOrderByRememberedAtDesc(

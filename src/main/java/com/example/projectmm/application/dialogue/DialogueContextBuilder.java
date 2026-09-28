@@ -74,6 +74,10 @@ public class DialogueContextBuilder {
                                 )
                         );
 
+        // 다른 캐릭터의 방 이력/구조화 기억을 함께 전달하지 않는다.
+        if (!conversation.getCharacter().getId().equals(characterId))
+            throw new IllegalArgumentException("Conversation character mismatch");
+
         CharacterProfile profile =
                 characterProfileRepository
                         .findByCharacterId(characterId)
@@ -207,7 +211,7 @@ public class DialogueContextBuilder {
                                 memory.summary(),
                                 memory.importance(),
                                 memory.effectiveStrength(),
-                                memory.rememberedAt()
+                                memory.rememberedAt(), memory.evidenceQuote(), memory.fact()
                         )
                 )
                 .toList();

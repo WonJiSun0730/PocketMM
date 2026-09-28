@@ -37,6 +37,13 @@ public class Memory {
     @Column(length = 64, unique = true)
     private String chatFingerprint;
 
+    // 기존 행과 세계 사건 기억은 null을 유지한다. summary 압축과 별도로 원문 근거를 보존한다.
+    @Column(length = 400)
+    private String evidenceQuote;
+
+    @Embedded
+    private MemoryFact fact;
+
     @Column(nullable = false, length = 500)
     private String summary;
 
@@ -90,11 +97,19 @@ public class Memory {
 
     public static Memory fromChat(Conversation conversation, ChatMessage source, String quote,
                                   int importance, LocalDateTime at, String fingerprint) {
+        return fromChat(conversation, source, quote, importance, at, fingerprint, null);
+    }
+
+    public static Memory fromChat(Conversation conversation, ChatMessage source, String quote,
+                                  int importance, LocalDateTime at, String fingerprint, MemoryFact fact) {
+        if (fact != null && !fact.groundedIn(quote)) throw new IllegalArgumentException("Ungrounded memory structure");
         Memory memory = new Memory(conversation.getCharacter(), null,
                 "사용자가 캐릭터에게 말한 내용: \"" + quote + "\"", importance, importance * 10, at);
         memory.conversation = conversation;
         memory.sourceChatMessage = source;
         memory.chatFingerprint = fingerprint;
+        memory.evidenceQuote = quote;
+        memory.fact = fact;
         return memory;
     }
 
