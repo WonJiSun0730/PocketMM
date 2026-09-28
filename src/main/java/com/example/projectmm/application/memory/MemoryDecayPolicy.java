@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Component
 public class MemoryDecayPolicy {
 
-    private static final int COMPRESSION_THRESHOLD = 30;
+    private static final int COMPRESSION_THRESHOLD = 70;
 
     public MemoryDecayResult calculate(
             Memory memory,
@@ -21,6 +21,31 @@ public class MemoryDecayPolicy {
                         0,
                         Duration.between(
                                 memory.getRememberedAt(),
+                                currentTime
+                        ).toDays()
+                );
+
+        LocalDateTime lastAccessedAt =
+                memory.getLastAccessedAt() != null
+                        ? memory.getLastAccessedAt()
+                        : memory.getRememberedAt();
+
+        long unaccessedDays =
+                Math.max(
+                        0,
+                        Duration.between(
+                                lastAccessedAt,
+                                currentTime
+                        ).toDays()
+                );
+
+        Long daysSinceReactivation =
+                memory.getLastReactivatedAt() == null
+                        ? null
+                        : Math.max(
+                        0,
+                        Duration.between(
+                                memory.getLastReactivatedAt(),
                                 currentTime
                         ).toDays()
                 );
@@ -51,8 +76,17 @@ public class MemoryDecayPolicy {
                         anchorFloor
                 );
 
+        int compressionPressure =
+                calculateCompressionPressure(
+                        memory,
+                        decayedStrength,
+                        elapsedDays,
+                        unaccessedDays,
+                        daysSinceReactivation
+                );
+
         boolean compressionRequired =
-                decayedStrength <= COMPRESSION_THRESHOLD;
+                compressionPressure >= COMPRESSION_THRESHOLD;
 
         return new MemoryDecayResult(
                 memory.getStrength(),
@@ -60,6 +94,42 @@ public class MemoryDecayPolicy {
                 effectiveStrength,
                 compressionRequired
         );
+    }
+
+    private int calculateCompressionPressure(
+            Memory memory,
+            int decayedStrength,
+            long elapsedDays,
+            long unaccessedDays,
+            Long daysSinceReactivation
+    ) {
+        int pressure =
+                Math.max(
+                        0,
+                        100 - decayedStrength
+                );
+
+        pressure += (int) Math.min(
+                20,
+                unaccessedDays / 7
+        );
+
+        pressure += (int) Math.min(
+                10,
+                elapsedDays / 30
+        );
+
+        pressure -= memory.getNarrativeAnchor() * 2;
+
+        if (daysSinceReactivation != null) {
+            if (daysSinceReactivation <= 7) {
+                pressure -= 15;
+            } else if (daysSinceReactivation <= 30) {
+                pressure -= 5;
+            }
+        }
+
+        return Math.max(0, pressure);
     }
 
     private int calculateDecayPerDay(

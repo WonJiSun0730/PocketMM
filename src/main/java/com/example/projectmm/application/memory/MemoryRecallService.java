@@ -18,6 +18,7 @@ public class MemoryRecallService {
     private final MemoryCompressionService memoryCompressionService;
     private final CharacterStateRepository characterStateRepository;
     private final MemoryAccessStateRepository memoryAccessStateRepository;
+    private final MemoryLifecycleService memoryLifecycleService;
 
     public List<EffectiveMemory> recall(
             Long characterId,
@@ -37,7 +38,8 @@ public class MemoryRecallService {
                                 characterId
                         );
 
-        return memories.stream()
+        List<EffectiveMemory> recalled =
+                memories.stream()
                 // World simulation has no conversation context: never borrow another RP's memories.
                 .filter(memory -> memory.getConversation() == null)
                 .filter(memory ->
@@ -62,6 +64,15 @@ public class MemoryRecallService {
                 )
                 .limit(limit)
                 .toList();
+
+        memoryLifecycleService.markAccessed(
+                recalled.stream()
+                        .map(EffectiveMemory::memoryId)
+                        .toList(),
+                currentTime
+        );
+
+        return recalled;
     }
 
     public List<EffectiveMemory> recallForConversation(Long characterId, Long conversationId,
@@ -78,7 +89,8 @@ public class MemoryRecallService {
 
         int recallThreshold =
                 recallThreshold(characterId);
-        return memoryRepository.findForConversation(characterId, conversationId).stream()
+        List<EffectiveMemory> recalled =
+                memoryRepository.findForConversation(characterId, conversationId).stream()
                 // 독립 시작 방에는 방 소속이 없는 과거 세계 사건 기억도 주입하지 않는다.
                 .filter(memory -> includeSharedMemories || memory.getConversation() != null)
                 .filter(memory -> !memory.getRememberedAt().isAfter(currentTime))
@@ -98,6 +110,15 @@ public class MemoryRecallService {
                         .thenComparing(EffectiveMemory::rememberedAt, Comparator.reverseOrder()))
                 .limit(limit)
                 .toList();
+
+        memoryLifecycleService.markAccessed(
+                recalled.stream()
+                        .map(EffectiveMemory::memoryId)
+                        .toList(),
+                currentTime
+        );
+
+        return recalled;
     }
 
     private EffectiveMemory prepareMemory(

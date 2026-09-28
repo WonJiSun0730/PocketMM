@@ -29,11 +29,22 @@ import static org.assertj.core.api.Assertions.*;
 
 @DataJpaTest(properties = {"spring.datasource.driver-class-name=org.h2.Driver",
         "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.show-sql=false"}, showSql = false)
-@Import({ChatMemoryWriter.class, MemoryRecallService.class, MemoryDecayPolicy.class,
-        MemoryCompressionService.class, MemoryCompressionPersistenceService.class,
-        RuleBasedMemoryCompressor.class, MemoryPatternCandidateFinder.class,
-        DialogueContextBuilder.class, ContentModePolicy.class, ConversationStartService.class,
-        PlayerProfileService.class, ConversationPlayerService.class, CustomStateService.class})
+@Import({
+        ChatMemoryWriter.class,
+        MemoryRecallService.class,
+        MemoryLifecycleService.class,
+        MemoryDecayPolicy.class,
+        MemoryCompressionService.class,
+        MemoryCompressionPersistenceService.class,
+        RuleBasedMemoryCompressor.class,
+        MemoryPatternCandidateFinder.class,
+        DialogueContextBuilder.class,
+        ContentModePolicy.class,
+        ConversationStartService.class,
+        PlayerProfileService.class,
+        ConversationPlayerService.class,
+        CustomStateService.class
+})
 class ChatMemoryPersistenceTest {
     @Autowired EntityManager em;
     @Autowired ChatMemoryWriter writer;

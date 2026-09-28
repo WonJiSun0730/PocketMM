@@ -57,7 +57,8 @@ class StructuredMemoryTest {
                 new MemoryDecayPolicy(),
                 mock(MemoryCompressionService.class),
                 mock(CharacterStateRepository.class),
-                mock(MemoryAccessStateRepository.class)
+                mock(MemoryAccessStateRepository.class),
+                mock(MemoryLifecycleService.class)
         );
         var character = new Character("NPC");
         var room = new Conversation(character, at);
@@ -80,7 +81,8 @@ class StructuredMemoryTest {
                 new MemoryDecayPolicy(),
                 mock(MemoryCompressionService.class),
                 mock(CharacterStateRepository.class),
-                mock(MemoryAccessStateRepository.class)
+                mock(MemoryAccessStateRepository.class),
+                mock(MemoryLifecycleService.class)
         );
         var character = new Character("NPC");
         var room = new Conversation(character, at);

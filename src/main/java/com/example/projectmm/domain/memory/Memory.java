@@ -63,6 +63,12 @@ public class Memory {
     @Column(nullable = false)
     private LocalDateTime rememberedAt;
 
+    @Column
+    private LocalDateTime lastAccessedAt;
+
+    @Column
+    private LocalDateTime lastReactivatedAt;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -108,6 +114,8 @@ public class Memory {
                 );
         this.detailLevel = MemoryDetailLevel.DETAILED;
         this.rememberedAt = rememberedAt;
+        this.lastAccessedAt = rememberedAt;
+        this.lastReactivatedAt = null;
         this.createdAt = LocalDateTime.now();
     }
 
@@ -122,6 +130,29 @@ public class Memory {
                 )
         );
     }
+
+    public void markAccessed(LocalDateTime accessedAt) {
+        if (accessedAt == null) {
+            return;
+        }
+
+        if (lastAccessedAt == null || accessedAt.isAfter(lastAccessedAt)) {
+            this.lastAccessedAt = accessedAt;
+        }
+    }
+
+    public void reactivate(LocalDateTime reactivatedAt) {
+        if (reactivatedAt == null) {
+            return;
+        }
+
+        if (lastReactivatedAt == null || reactivatedAt.isAfter(lastReactivatedAt)) {
+            this.lastReactivatedAt = reactivatedAt;
+        }
+
+        markAccessed(reactivatedAt);
+    }
+
 
     public void compress(String compressedSummary) {
         if (compressedSummary == null || compressedSummary.isBlank()) {

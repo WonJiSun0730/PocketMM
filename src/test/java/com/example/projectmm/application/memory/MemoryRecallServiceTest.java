@@ -36,13 +36,17 @@ class MemoryRecallServiceTest {
     private final MemoryAccessStateRepository memoryAccessStateRepository =
             mock(MemoryAccessStateRepository.class);
 
+    private final MemoryLifecycleService memoryLifecycleService =
+            mock(MemoryLifecycleService.class);
+
     private final MemoryRecallService memoryRecallService =
             new MemoryRecallService(
                     memoryRepository,
                     memoryDecayPolicy,
                     memoryCompressionService,
                     characterStateRepository,
-                    memoryAccessStateRepository
+                    memoryAccessStateRepository,
+                    memoryLifecycleService
             );
 
     @Test

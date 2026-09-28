@@ -369,7 +369,109 @@ class MemoryDecayPolicyTest {
         );
     }
 
-    
+    @Test
+    void 오래_접근하지_않은_기억은_압축_압력이_증가한다() {
+
+        LocalDateTime rememberedAt =
+                LocalDateTime.of(
+                        2026, 9, 1,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        rememberedAt,
+                        6,
+                        70
+                );
+
+        MemoryDecayResult result =
+                policy.calculate(
+                        memory,
+                        rememberedAt.plusDays(30)
+                );
+
+        assertThat(result.compressionRequired())
+                .isTrue();
+    }
+
+    @Test
+    void 최근_재활성화된_기억은_즉시_압축하지_않는다() {
+
+        LocalDateTime rememberedAt =
+                LocalDateTime.of(
+                        2026, 9, 1,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        rememberedAt,
+                        5,
+                        50
+                );
+
+        LocalDateTime reactivatedAt =
+                rememberedAt.plusDays(10);
+
+        memory.reactivate(reactivatedAt);
+
+        MemoryDecayResult result =
+                policy.calculate(
+                        memory,
+                        reactivatedAt
+                );
+
+        assertThat(result.compressionRequired())
+                .isFalse();
+    }
+
+    @Test
+    void narrativeAnchor는_압축_압력을_낮춘다() {
+
+        LocalDateTime rememberedAt =
+                LocalDateTime.of(
+                        2026, 9, 1,
+                        12, 0
+                );
+
+        Memory ordinary =
+                createMemory(
+                        rememberedAt,
+                        6,
+                        70,
+                        0
+                );
+
+        Memory anchored =
+                createMemory(
+                        rememberedAt,
+                        6,
+                        70,
+                        10
+                );
+
+        LocalDateTime currentTime =
+                rememberedAt.plusDays(25);
+
+        MemoryDecayResult ordinaryResult =
+                policy.calculate(
+                        ordinary,
+                        currentTime
+                );
+
+        MemoryDecayResult anchoredResult =
+                policy.calculate(
+                        anchored,
+                        currentTime
+                );
+
+        assertThat(ordinaryResult.compressionRequired())
+                .isTrue();
+
+        assertThat(anchoredResult.compressionRequired())
+                .isFalse();
+    }
 
     private Memory createMemory(
             LocalDateTime rememberedAt,
