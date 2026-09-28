@@ -554,6 +554,86 @@ class MemoryRecallServiceTest {
     }
 
     @Test
+    void 상태_변화로_기억력이_낮아지면_기존에_회상되던_기억이_제외된다() {
+
+        Long characterId = 1L;
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 28,
+                        12, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        70,
+                        70,
+                        80,
+                        now
+                );
+
+        when(
+                characterStateRepository.findByCharacterId(
+                        characterId
+                )
+        ).thenReturn(
+                Optional.of(state)
+        );
+
+        Memory memory =
+                createMemory(
+                        "경계에 있는 기억",
+                        5,
+                        50,
+                        now
+                );
+
+        when(
+                memoryRepository
+                        .findByCharacterIdOrderByRememberedAtDesc(
+                                characterId
+                        )
+        ).thenReturn(
+                List.of(memory)
+        );
+
+        List<EffectiveMemory> before =
+                memoryRecallService.recall(
+                        characterId,
+                        now,
+                        10
+                );
+
+        assertThat(before)
+                .hasSize(1);
+
+        state.apply(
+                new com.example.projectmm.domain.simulation.StateDelta(
+                        0,
+                        0,
+                        -40
+                )
+        );
+
+        assertThat(state.getMemoryAbility())
+                .isEqualTo(40);
+
+        List<EffectiveMemory> after =
+                memoryRecallService.recall(
+                        characterId,
+                        now,
+                        10
+                );
+
+        assertThat(after)
+                .isEmpty();
+    }
+
+    @Test
     void 기억력_상태가_없으면_기존_회상_동작을_유지한다() {
 
         Long characterId = 1L;

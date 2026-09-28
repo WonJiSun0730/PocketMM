@@ -73,6 +73,11 @@ public class CharacterState {
         this.mood = clamp(
                 this.mood + delta.moodChange()
         );
+
+        this.memoryAbility = clamp(
+                this.memoryAbility
+                        + delta.memoryAbilityChange()
+        );
     }
 
     public void advanceSimulatedAt(LocalDateTime simulatedAt) {

@@ -54,6 +54,14 @@ public class AiDecisionValidator {
             );
         }
 
+        if (Math.abs(
+                decision.stateDelta().memoryAbilityChange()
+        ) > 20) {
+            return ValidationResult.reject(
+                    "memoryAbilityChange must be between -20 and 20"
+            );
+        }
+
         if (decision.relationshipDelta() == null) {
             return ValidationResult.reject(
                     "relationshipDelta must not be null"

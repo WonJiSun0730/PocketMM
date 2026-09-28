@@ -93,6 +93,12 @@ class GeminiAiGatewayTest {
         );
 
         System.out.println(
+                "memoryAbilityChange = "
+                        + decision.stateDelta()
+                        .memoryAbilityChange()
+        );
+
+        System.out.println(
                 "affinityChange = "
                         + decision.relationshipDelta().affinityChange()
         );
@@ -118,6 +124,13 @@ class GeminiAiGatewayTest {
 
         assertThat(decision.stateDelta())
                 .isNotNull();
+
+        assertThat(
+                Math.abs(
+                        decision.stateDelta()
+                                .memoryAbilityChange()
+                )
+        ).isLessThanOrEqualTo(20);
 
         assertThat(decision.relationshipDelta())
                 .isNotNull();

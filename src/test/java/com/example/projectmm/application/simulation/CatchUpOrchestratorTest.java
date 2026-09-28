@@ -170,6 +170,87 @@ class CatchUpOrchestratorTest {
     }
 
     @Test
+    void AI가_결정한_기억력_변화가_캐릭터_상태에_반영된다() {
+
+        AiGateway memoryChangingGateway =
+                context ->
+                        new com.example.projectmm.domain.ai.AiDecision(
+                                "REFLECTION",
+                                "기억을 떠올리는 능력에 변화가 생겼다.",
+                                5,
+                                new com.example.projectmm.domain.simulation.StateDelta(
+                                        0,
+                                        5,
+                                        -20
+                                ),
+                                null,
+                                com.example.projectmm.domain.relationship.RelationshipDelta.none()
+                        );
+
+        CatchUpOrchestrator memoryOrchestrator =
+                new CatchUpOrchestrator(
+                        new CatchUpSimulationService(),
+                        new CatchUpSegmentService(),
+                        new CatchUpEventCandidateService(),
+                        new EventCandidateValidator(),
+                        new AiContextBuilder(
+                                memoryRecallService,
+                                relationshipRepository
+                        ),
+                        memoryChangingGateway,
+                        new AiDecisionValidator()
+                );
+
+        LocalDateTime last =
+                LocalDateTime.of(
+                        2026, 9, 21,
+                        12, 0
+                );
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 21,
+                        13, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        80,
+                        10,
+                        80,
+                        last
+                );
+
+        CatchUpExecutionResult result =
+                memoryOrchestrator.execute(
+                        state,
+                        now
+                );
+
+        assertThat(result.resolvedEvents())
+                .hasSize(1);
+
+        ResolvedEvent resolved =
+                result.resolvedEvents()
+                        .getFirst();
+
+        assertThat(resolved.source())
+                .isEqualTo(EventSource.AI);
+
+        assertThat(
+                resolved.stateDelta()
+                        .memoryAbilityChange()
+        ).isEqualTo(-20);
+
+        assertThat(state.getMemoryAbility())
+                .isEqualTo(60);
+    }
+
+    @Test
     void AI_호출이_실패해도_CatchUp은_계속_진행된다() {
 
         AiGateway failingGateway =

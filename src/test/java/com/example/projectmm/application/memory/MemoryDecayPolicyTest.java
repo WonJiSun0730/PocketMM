@@ -166,6 +166,61 @@ class MemoryDecayPolicyTest {
                 .isEqualTo(45);
     }
 
+    @Test
+    void 상태_변화량이_캐릭터의_기억력에_누적_반영된다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 28,
+                        12, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        var state =
+                new com.example.projectmm.domain.character.CharacterState(
+                        character,
+                        70,
+                        70,
+                        80,
+                        now
+                );
+
+        state.apply(
+                new com.example.projectmm.domain.simulation.StateDelta(
+                        0,
+                        0,
+                        -30
+                )
+        );
+
+        assertThat(state.getMemoryAbility())
+                .isEqualTo(50);
+
+        state.apply(
+                new com.example.projectmm.domain.simulation.StateDelta(
+                        0,
+                        0,
+                        -80
+                )
+        );
+
+        assertThat(state.getMemoryAbility())
+                .isZero();
+
+        state.apply(
+                new com.example.projectmm.domain.simulation.StateDelta(
+                        0,
+                        0,
+                        150
+                )
+        );
+
+        assertThat(state.getMemoryAbility())
+                .isEqualTo(100);
+    }
+
     private Memory createMemory(
             LocalDateTime rememberedAt,
             int importance,

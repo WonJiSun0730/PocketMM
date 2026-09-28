@@ -134,6 +134,59 @@ class AiDecisionValidatorTest {
         assertThat(result.valid()).isTrue();
     }
 
+    @Test
+    void 기억력_변화량이_허용범위를_벗어나면_거부한다() {
+
+        AiDecision decision =
+                new AiDecision(
+                        "MEMORY_CHANGE",
+                        "기억력에 변화가 생겼다.",
+                        5,
+                        new StateDelta(
+                                0,
+                                0,
+                                -21
+                        ),
+                        null,
+                        RelationshipDelta.none()
+                );
+
+        ValidationResult result =
+                validator.validate(decision);
+
+        assertThat(result.valid())
+                .isFalse();
+
+        assertThat(result.reason())
+                .isEqualTo(
+                        "memoryAbilityChange must be between -20 and 20"
+                );
+    }
+
+    @Test
+    void 기억력_변화량이_허용범위_안이면_허용한다() {
+
+        AiDecision decision =
+                new AiDecision(
+                        "MEMORY_CHANGE",
+                        "기억력에 변화가 생겼다.",
+                        5,
+                        new StateDelta(
+                                0,
+                                0,
+                                -20
+                        ),
+                        null,
+                        RelationshipDelta.none()
+                );
+
+        ValidationResult result =
+                validator.validate(decision);
+
+        assertThat(result.valid())
+                .isTrue();
+    }
+
     private AiDecision createDecision(
             Long relationshipTargetCharacterId,
             RelationshipDelta relationshipDelta

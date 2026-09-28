@@ -6,6 +6,7 @@ public record GeminiDecisionResponse(
         int importance,
         int energyChange,
         int moodChange,
+        int memoryAbilityChange,
         Long relationshipTargetCharacterId,
         int affinityChange,
         int trustChange,

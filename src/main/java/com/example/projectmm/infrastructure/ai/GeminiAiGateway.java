@@ -70,7 +70,8 @@ public class GeminiAiGateway implements AiGateway {
                 decision.importance(),
                 new StateDelta(
                         decision.energyChange(),
-                        decision.moodChange()
+                        decision.moodChange(),
+                        decision.memoryAbilityChange()
                 ),
                 decision.relationshipTargetCharacterId(),
                 new RelationshipDelta(
@@ -111,8 +112,14 @@ public class GeminiAiGateway implements AiGateway {
                 Candidate summary: %s
 
                 Keep state changes conservative.
-                Energy and mood changes should normally remain between
-                -20 and 20.
+                Energy, mood, and memory ability changes should normally
+                remain between -20 and 20.
+                
+                Memory ability represents the character's current ability
+                to recall existing memories.
+                Use 0 unless the event plausibly changes that ability.
+                Do not decrease memory ability merely because time passed
+                or because a memory itself became weaker.
                 
                 Relationship changes represent how this event affects
                 the character's relationship with the relevant person.
@@ -159,6 +166,9 @@ public class GeminiAiGateway implements AiGateway {
                                 "moodChange", Map.of(
                                         "type", "integer"
                                 ),
+                                "memoryAbilityChange", Map.of(
+                                        "type", "integer"
+                                ),
                                 "relationshipTargetCharacterId", Map.of(
                                         "type", List.of(
                                                 "integer",
@@ -181,6 +191,7 @@ public class GeminiAiGateway implements AiGateway {
                                 "importance",
                                 "energyChange",
                                 "moodChange",
+                                "memoryAbilityChange",
                                 "relationshipTargetCharacterId",
                                 "affinityChange",
                                 "trustChange",
