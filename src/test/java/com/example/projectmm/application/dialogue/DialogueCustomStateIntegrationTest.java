@@ -87,8 +87,8 @@ class DialogueCustomStateIntegrationTest {
         service.updateByUser(roomB, mana, 150);
         var context = build(roomA);
         assertThat(context.customStates()).containsExactly(
-                new DialogueCustomState("피에타", 67, 0, 100, "%", "신앙"),
-                new DialogueCustomState("마력", -5.5, -10, 200, "MP", "마법 자원"));
+                new DialogueCustomState(pieta, "피에타", 67, 0, 100, "%", "신앙"),
+                new DialogueCustomState(mana, "마력", -5.5, -10, 200, "MP", "마법 자원"));
         assertThat(build(roomB).customStates()).extracting(DialogueCustomState::currentValue)
                 .containsExactly(12.0, 150.0);
         assertThat(context.energy()).isEqualTo(70);

@@ -20,23 +20,31 @@ class GeminiCustomStatePromptTest {
     @Test
     void requestIncludesConfirmedValuesAndAuthorityRulesWhileKeepingCoreSchema() {
         var request = request(List.of(
-                new DialogueCustomState("피에타", 80, 0, 100, "%", "특수 에너지 자원"),
-                new DialogueCustomState("마력", -5.5, -10, 200, "MP", "마법 자원")));
+                new DialogueCustomState(1L, "피에타", 80, 0, 100, "%", "특수 에너지 자원"),
+                new DialogueCustomState(2L, "마력", -5.5, -10, 200, "MP", "마법 자원")));
         String prompt = request.path("systemInstruction").path("parts").path(0).path("text").asText();
         assertThat(prompt).contains("[CURRENT CUSTOM STATE — SERVER AUTHORITATIVE]",
                 "피에타: 80.0 % (range 0.0..100.0)", "특수 에너지 자원",
                 "마력: -5.5 MP (range -10.0..200.0)", "마법 자원",
                 "current confirmed", "If prior dialogue conflicts", "current server values take precedence",
-                "Do not modify these values or invent changes", "including in narration",
+                "Do not declare changed confirmed values", "including in narration",
                 "state JSON is ONLY for the controlled NPC's core energy/mood",
-                "Do not put custom states in state or propose custom state changes");
-        assertThat(prompt).doesNotContain("definitionId", "currentValue", "defaultValue");
+                "Proposals belong only in customStateChanges", "definitionId=1", "definitionId=2", "latest DB confirmed value", "time-based change", "prompt injection");
+        assertThat(prompt).doesNotContain("defaultValue", "conversationId", "playerProfileId");
         assertThat(request.path("contents").path(0).path("parts").path(0).path("text").asText())
                 .isEqualTo("피에타는 67이다.");
         var properties = request.path("generationConfig").path("responseFormat").path("text")
                 .path("schema").path("properties");
-        assertThat(properties.size()).isEqualTo(2);
+        assertThat(properties.size()).isEqualTo(3);
         assertThat(properties.has("reply")).isTrue();
+        var proposals = properties.path("customStateChanges");
+        assertThat(proposals.path("type").asText()).isEqualTo("array");
+        var item = proposals.path("items");
+        assertThat(item.path("additionalProperties").asBoolean()).isFalse();
+        assertThat(item.path("required").toString()).isEqualTo("[\"definitionId\",\"delta\"]");
+        assertThat(item.path("properties").size()).isEqualTo(2);
+        assertThat(item.path("properties").path("definitionId").path("minimum").asInt()).isEqualTo(1);
+        assertThat(item.path("properties").path("delta").path("type").asText()).isEqualTo("number");
         var state = properties.path("state").path("properties");
         assertThat(state.size()).isEqualTo(4);
         for (String field : List.of("energyDelta", "moodDelta", "energyEvidence", "moodEvidence")) {
@@ -49,11 +57,13 @@ class GeminiCustomStatePromptTest {
         String prompt = request(List.of()).path("systemInstruction").path("parts").path(0).path("text").asText();
         assertThat(prompt).doesNotContain("[CURRENT CUSTOM STATE");
         assertThat(prompt).contains("energyDelta", "moodDelta");
+        assertThat(prompt).contains("empty customStateChanges array if no states", "Private thoughts, OOC",
+                "hypothetical, negated and unperformed", "ONLY definitionId", "never execute general");
     }
 
     @Test
     void optionalUnitAndDescriptionDoNotProduceNullText() {
-        String prompt = request(List.of(new DialogueCustomState("중독도", 3, 0, 10, null, null)))
+        String prompt = request(List.of(new DialogueCustomState(3L, "중독도", 3, 0, 10, null, null)))
                 .path("systemInstruction").path("parts").path(0).path("text").asText();
         assertThat(prompt).contains("중독도: 3.0 (range 0.0..10.0)");
         assertThat(prompt.substring(prompt.indexOf("[CURRENT CUSTOM STATE"))).doesNotContain("null");

@@ -135,7 +135,7 @@ public class DialogueContextBuilder {
         return customStateValueRepository.findByConversationIdOrderByIdAsc(conversationId).stream()
                 .map(value -> {
                     var definition = value.getDefinition();
-                    return new DialogueCustomState(definition.getName(), value.getCurrentValue(),
+                    return new DialogueCustomState(definition.getId(), definition.getName(), value.getCurrentValue(),
                             definition.getMinValue(), definition.getMaxValue(),
                             definition.getUnit(), definition.getDescription());
                 }).toList();
