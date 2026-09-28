@@ -6,6 +6,7 @@ public record GeminiDecisionResponse(
         String eventType,
         String summary,
         int importance,
+        Integer narrativeAnchor,
         int energyChange,
         int moodChange,
         int memoryAbilityChange,
@@ -15,4 +16,10 @@ public record GeminiDecisionResponse(
         int tensionChange,
         JsonNode memoryAccessChange
 ) {
+
+    public int resolvedNarrativeAnchor() {
+        return narrativeAnchor == null
+                ? 0
+                : narrativeAnchor;
+    }
 }

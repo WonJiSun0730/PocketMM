@@ -321,4 +321,84 @@ class CatchUpOrchestratorTest {
         assertThat(state.getSimulatedAt())
                 .isEqualTo(currentTime);
     }
+
+    @Test
+    void AI가_결정한_narrativeAnchor가_ResolvedEvent에_전달된다() {
+
+        AiGateway anchorGateway =
+                context ->
+                        new com.example.projectmm.domain.ai.AiDecision(
+                                "RELATIONSHIP_MILESTONE",
+                                "장기적으로 기억되어야 할 중요한 약속을 나눴다.",
+                                6,
+                                9,
+                                new com.example.projectmm.domain.simulation.StateDelta(
+                                        0,
+                                        5,
+                                        0
+                                ),
+                                null,
+                                com.example.projectmm.domain.relationship.RelationshipDelta.none(),
+                                null
+                        );
+
+        CatchUpOrchestrator anchorOrchestrator =
+                new CatchUpOrchestrator(
+                        new CatchUpSimulationService(),
+                        new CatchUpSegmentService(),
+                        new CatchUpEventCandidateService(),
+                        new EventCandidateValidator(),
+                        new AiContextBuilder(
+                                memoryRecallService,
+                                relationshipRepository
+                        ),
+                        anchorGateway,
+                        new AiDecisionValidator()
+                );
+
+        LocalDateTime last =
+                LocalDateTime.of(
+                        2026, 9, 21,
+                        12, 0
+                );
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 21,
+                        13, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        80,
+                        10,
+                        last
+                );
+
+        CatchUpExecutionResult result =
+                anchorOrchestrator.execute(
+                        state,
+                        now
+                );
+
+        assertThat(result.resolvedEvents())
+                .hasSize(1);
+
+        ResolvedEvent resolved =
+                result.resolvedEvents()
+                        .getFirst();
+
+        assertThat(resolved.source())
+                .isEqualTo(EventSource.AI);
+
+        assertThat(resolved.importance())
+                .isEqualTo(6);
+
+        assertThat(resolved.narrativeAnchor())
+                .isEqualTo(9);
+    }
 }

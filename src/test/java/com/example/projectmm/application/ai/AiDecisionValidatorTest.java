@@ -187,6 +187,55 @@ class AiDecisionValidatorTest {
                 .isTrue();
     }
 
+    @Test
+    void narrativeAnchor가_허용범위를_벗어나면_거부한다() {
+
+        AiDecision decision =
+                new AiDecision(
+                        "MEMORY_CHANGE",
+                        "장기 서사에 중요한 사건이 발생했다.",
+                        5,
+                        11,
+                        StateDelta.none(),
+                        null,
+                        RelationshipDelta.none(),
+                        null
+                );
+
+        ValidationResult result =
+                validator.validate(decision);
+
+        assertThat(result.valid())
+                .isFalse();
+
+        assertThat(result.reason())
+                .isEqualTo(
+                        "narrativeAnchor must be between 0 and 10"
+                );
+    }
+
+    @Test
+    void narrativeAnchor가_허용범위_안이면_허용한다() {
+
+        AiDecision decision =
+                new AiDecision(
+                        "MEMORY_CHANGE",
+                        "장기 서사에 중요한 사건이 발생했다.",
+                        5,
+                        10,
+                        StateDelta.none(),
+                        null,
+                        RelationshipDelta.none(),
+                        null
+                );
+
+        ValidationResult result =
+                validator.validate(decision);
+
+        assertThat(result.valid())
+                .isTrue();
+    }
+
     private AiDecision createDecision(
             Long relationshipTargetCharacterId,
             RelationshipDelta relationshipDelta

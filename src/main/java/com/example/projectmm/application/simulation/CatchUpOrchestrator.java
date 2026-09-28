@@ -94,6 +94,7 @@ public class CatchUpOrchestrator {
                                         decision.eventType(),
                                         decision.summary(),
                                         decision.importance(),
+                                        decision.narrativeAnchor(),
                                         decision.stateDelta(),
                                         decision.relationshipTargetCharacterId(),
                                         decision.relationshipDelta(),

@@ -74,6 +74,7 @@ public class GeminiAiGateway implements AiGateway {
                 decision.eventType(),
                 decision.summary(),
                 decision.importance(),
+                decision.resolvedNarrativeAnchor(),
                 new StateDelta(
                         decision.energyChange(),
                         decision.moodChange(),
@@ -130,6 +131,25 @@ public class GeminiAiGateway implements AiGateway {
                 
                 Candidate event type: %s
                 Candidate summary: %s
+                
+                Narrative anchor represents how strongly this event should be
+                preserved for long-term narrative continuity.
+                
+                Judge narrativeAnchor independently from importance.
+                
+                Use this scale:
+                0 = no long-term narrative preservation needed.
+                1-3 = ordinary or temporary event; forgetting it would barely affect continuity.
+                4-6 = meaningful for future behavior or relationships.
+                7-8 = important relationship turning point, strong promise,
+                      major personal experience, or repeatedly referenced core event.
+                9-10 = identity-defining fact or event for the character,
+                       relationship, or world; forgetting it could break long-term continuity.
+                
+                Do not assign 9-10 merely because an event is emotionally intense.
+                A highly intense one-time event may have high importance but a lower
+                narrativeAnchor. A lasting relationship-defining event may have a high
+                narrativeAnchor independently of its immediate intensity.
 
                 Keep state changes conservative.
                 Energy, mood, and memory ability changes should normally
@@ -177,48 +197,86 @@ public class GeminiAiGateway implements AiGateway {
                         context.eventSummary()
                 );
 
-        Map<String, Object> schema =
-                Map.of(
-                        "type", "object",
-                        "properties", Map.of(
-                                "eventType", Map.of(
-                                        "type", "string"
-                                ),
-                                "summary", Map.of(
-                                        "type", "string"
-                                ),
-                                "importance", Map.of(
-                                        "type", "integer"
-                                ),
-                                "energyChange", Map.of(
-                                        "type", "integer"
-                                ),
-                                "moodChange", Map.of(
-                                        "type", "integer"
-                                ),
-                                "memoryAbilityChange", Map.of(
-                                        "type", "integer"
-                                ),
-                                "relationshipTargetCharacterId", Map.of(
-                                        "type", List.of(
-                                                "integer",
-                                                "null"
-                                        )
-                                ),
-                                "affinityChange", Map.of(
-                                        "type", "integer"
-                                ),
-                                "trustChange", Map.of(
-                                        "type", "integer"
-                                ),
-                                "tensionChange", Map.of(
-                                        "type", "integer"
+                Map<String, Object> schemaProperties =
+                        new LinkedHashMap<>();
+
+                schemaProperties.put(
+                        "eventType",
+                        Map.of("type", "string")
+                );
+
+                schemaProperties.put(
+                        "summary",
+                        Map.of("type", "string")
+                );
+
+                schemaProperties.put(
+                        "importance",
+                        Map.of("type", "integer")
+                );
+
+                schemaProperties.put(
+                        "narrativeAnchor",
+                        Map.of(
+                                "type", "integer",
+                                "minimum", 0,
+                                "maximum", 10
+                        )
+                );
+
+                schemaProperties.put(
+                        "energyChange",
+                        Map.of("type", "integer")
+                );
+
+                schemaProperties.put(
+                        "moodChange",
+                        Map.of("type", "integer")
+                );
+
+                schemaProperties.put(
+                        "memoryAbilityChange",
+                        Map.of("type", "integer")
+                );
+
+                schemaProperties.put(
+                        "relationshipTargetCharacterId",
+                        Map.of(
+                                "type",
+                                List.of(
+                                        "integer",
+                                        "null"
                                 )
-                        ),
-                        "required", List.of(
+                        )
+                );
+
+                schemaProperties.put(
+                        "affinityChange",
+                        Map.of("type", "integer")
+                );
+
+                schemaProperties.put(
+                        "trustChange",
+                        Map.of("type", "integer")
+                );
+
+                schemaProperties.put(
+                        "tensionChange",
+                        Map.of("type", "integer")
+                );
+
+                Map<String, Object> schema =
+                        new LinkedHashMap<>();
+
+                schema.put("type", "object");
+                schema.put("properties", schemaProperties);
+                schema.put(
+                        "required",
+                        List.of(
                                 "eventType",
                                 "summary",
                                 "importance",
+                                "narrativeAnchor",
                                 "energyChange",
                                 "moodChange",
                                 "memoryAbilityChange",

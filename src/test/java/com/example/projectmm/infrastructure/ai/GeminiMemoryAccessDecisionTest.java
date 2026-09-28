@@ -65,4 +65,65 @@ class GeminiMemoryAccessDecisionTest {
         assertThat(access.path("properties").size()).isEqualTo(3);
         assertThat(access.toString()).doesNotContain("characterId", "memoryId");
     }
+
+    @Test
+    void narrativeAnchor가_Gemini응답에서_AiDecision으로_전달된다() {
+
+        String body = """
+            {
+              "eventType":"RELATIONSHIP_MILESTONE",
+              "summary":"관계를 정의하는 중요한 약속을 나눴다.",
+              "importance":7,
+              "narrativeAnchor":9,
+              "energyChange":0,
+              "moodChange":5,
+              "memoryAbilityChange":0,
+              "relationshipTargetCharacterId":null,
+              "affinityChange":0,
+              "trustChange":0,
+              "tensionChange":0,
+              "memoryAccessChange":null
+            }
+            """;
+
+        String envelope =
+                mapper.writeValueAsString(
+                        Map.of(
+                                "candidates",
+                                List.of(
+                                        Map.of(
+                                                "content",
+                                                Map.of(
+                                                        "parts",
+                                                        List.of(
+                                                                Map.of(
+                                                                        "text",
+                                                                        body
+                                                                )
+                                                        )
+                                                )
+                                        )
+                                )
+                        )
+                );
+
+        GeminiDecisionResponse response =
+                ReflectionTestUtils.invokeMethod(
+                        gateway,
+                        "parseResponse",
+                        envelope
+                );
+
+        var decision =
+                gateway.toDecision(response);
+
+        assertThat(response.resolvedNarrativeAnchor())
+                .isEqualTo(9);
+
+        assertThat(decision.narrativeAnchor())
+                .isEqualTo(9);
+
+        assertThat(decision.importance())
+                .isEqualTo(7);
+    }
 }

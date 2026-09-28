@@ -43,6 +43,13 @@ public class AiDecisionValidator {
             );
         }
 
+        if (decision.narrativeAnchor() < 0
+                || decision.narrativeAnchor() > 10) {
+            return ValidationResult.reject(
+                    "narrativeAnchor must be between 0 and 10"
+            );
+        }
+
         if (decision.stateDelta() == null) {
             return ValidationResult.reject(
                     "stateDelta must not be null"
