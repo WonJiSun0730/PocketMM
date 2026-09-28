@@ -22,7 +22,8 @@ import static org.mockito.Mockito.when;
 @DataJpaTest(properties = {"spring.datasource.driver-class-name=org.h2.Driver",
         "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.show-sql=false"}, showSql = false)
 @Import({ConversationProgressService.class, CatchUpSimulationService.class, CatchUpSegmentService.class,
-        CatchUpEventCandidateService.class, EventCandidateValidator.class})
+        CatchUpEventCandidateService.class, EventCandidateValidator.class,
+        com.example.projectmm.application.state.CustomStateProposalService.class})
 class ConversationProgressTest {
     @Autowired EntityManager em;
     @Autowired ConversationProgressService service;

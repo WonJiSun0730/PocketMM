@@ -1,6 +1,7 @@
 package com.example.projectmm.application.chat;
 
 import com.example.projectmm.application.policy.ContentMode;
+import com.example.projectmm.application.state.CustomStateProposalService;
 import com.example.projectmm.application.simulation.*;
 import com.example.projectmm.domain.character.CharacterState;
 import com.example.projectmm.domain.character.CharacterStateRepository;
@@ -35,13 +36,15 @@ public class ConversationProgressService {
     private final EventCandidateValidator validator;
     private final PresenceClock clock;
     private final EntityManager em;
+    private final CustomStateProposalService customStateProposals;
 
     public record Report(Long id, LocalDateTime from, LocalDateTime to, long elapsedSeconds,
                          long appliedSeconds, boolean capped, String pauseReason, String actions) {}
     public record Status(boolean enabled, LocalDateTime simulatedAt, String pauseReason, Report lastReport,
                          int energy, int mood) {}
     public record ChatOperation(Conversation room, String token) {}
-    public record CompletedChat(ChatMessage source, ChatStateUpdate stateUpdate) {}
+    public record CompletedChat(ChatMessage source, ChatStateUpdate stateUpdate,
+                                CustomStateProposalService.ApplyStatus customStateStatus) {}
 
     @Transactional(readOnly = true)
     public Status current(Long characterId, Long roomId) {
@@ -145,6 +148,9 @@ public class ConversationProgressService {
         var room = ownedOperation(characterId, roomId, token);
         if (turn == null || turn.reply() == null || turn.reply().isBlank())
             throw new IllegalArgumentException("대화 본문이 비어 있습니다.");
+        // 별도 프록시의 MANDATORY 경로가 이 트랜잭션에 참여한다. 중복 room refresh 전에 NPC를 변경하지 않는다.
+        var customStatus = turn.customStateChanges().isEmpty() ? CustomStateProposalService.ApplyStatus.NONE
+                : customStateProposals.applyForChat(roomId, turn.customStateChanges());
         var baseline = states.findByCharacterId(characterId).orElseThrow();
         var update = ChatStateUpdate.resolve(room.getEnergy() == null ? baseline.getEnergy() : room.getEnergy(),
                 room.getMood() == null ? baseline.getMood() : room.getMood(), turn.reply(), turn.stateChange());
@@ -155,7 +161,7 @@ public class ConversationProgressService {
         var source = messages.save(new ChatMessage(room, room.getCharacter(), ChatRole.USER, userText, mode, now));
         messages.save(new ChatMessage(room, room.getCharacter(), ChatRole.CHARACTER, turn.reply(), mode, now.plusNanos(1000)));
         room.endChat(token, now);
-        return new CompletedChat(source, update);
+        return new CompletedChat(source, update, customStatus);
     }
 
     @Transactional
