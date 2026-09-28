@@ -18,6 +18,12 @@ public class ConversationPlayerService {
 
     public record Session(Long conversationId, PlayerProfileResponse playerProfile) {}
 
+    public record CoreState(
+            Long conversationId,
+            int energy,
+            int mood
+    ) {}
+
     @Transactional(readOnly = true)
     public Session current(Long characterId) {
         var room = conversations.findTopByCharacterIdOrderByCreatedAtDescIdDesc(characterId)
@@ -40,7 +46,55 @@ public class ConversationPlayerService {
         return response(room);
     }
 
+    @Transactional(readOnly = true)
+    public CoreState currentCoreState(
+            Long characterId,
+            Long conversationId
+    ) {
+        var room = conversations.findById(conversationId)
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND)
+                );
+
+        if (!room.getCharacter().getId().equals(characterId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+
+        return new CoreState(
+                room.getId(),
+                room.getPlayerEnergy(),
+                room.getPlayerMood()
+        );
+    }
+
+    @Transactional
+    public CoreState updateCoreState(
+            Long characterId,
+            Long conversationId,
+            int energy,
+            int mood
+    ) {
+        var room = conversations.lockForMemory(conversationId)
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND)
+                );
+
+        if (!room.getCharacter().getId().equals(characterId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+
+        room.applyPlayerState(energy, mood);
+
+        return new CoreState(
+                room.getId(),
+                room.getPlayerEnergy(),
+                room.getPlayerMood()
+        );
+    }
+
     private Session response(Conversation room) {
         return new Session(room.getId(), room.getPlayerProfile() == null ? null : PlayerProfileResponse.from(room.getPlayerProfile()));
     }
+
+
 }

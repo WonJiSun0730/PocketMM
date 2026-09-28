@@ -121,4 +121,119 @@ class ConversationPlayerCustomStateTest {
 
         assertThat(values.count()).isEqualTo(2);
     }
+
+    @Test
+    void userCanCorrectPlayerCoreStateAndValuesAreClamped() {
+        var character = new Character("NPC");
+        em.persist(character);
+
+        var room = new Conversation(
+                character,
+                LocalDateTime.of(2030, 1, 1, 12, 0)
+        );
+
+        em.persist(room);
+        em.flush();
+
+        var updated = playerService.updateCoreState(
+                character.getId(),
+                room.getId(),
+                82,
+                64
+        );
+
+        assertThat(updated.energy()).isEqualTo(82);
+        assertThat(updated.mood()).isEqualTo(64);
+
+        var current = playerService.currentCoreState(
+                character.getId(),
+                room.getId()
+        );
+
+        assertThat(current.energy()).isEqualTo(82);
+        assertThat(current.mood()).isEqualTo(64);
+
+        var clamped = playerService.updateCoreState(
+                character.getId(),
+                room.getId(),
+                150,
+                -20
+        );
+
+        assertThat(clamped.energy()).isEqualTo(100);
+        assertThat(clamped.mood()).isZero();
+
+        em.flush();
+        em.clear();
+
+        var saved = playerService.currentCoreState(
+                character.getId(),
+                room.getId()
+        );
+
+        assertThat(saved.energy()).isEqualTo(100);
+        assertThat(saved.mood()).isZero();
+    }
+
+    @Test
+    void playerCoreCorrectionIsRoomScopedAndRejectsWrongCharacter() {
+        var character = new Character("NPC");
+        var otherCharacter = new Character("OTHER");
+
+        em.persist(character);
+        em.persist(otherCharacter);
+
+        var firstRoom = new Conversation(
+                character,
+                LocalDateTime.of(2030, 1, 1, 12, 0)
+        );
+
+        var secondRoom = new Conversation(
+                character,
+                LocalDateTime.of(2030, 1, 2, 12, 0)
+        );
+
+        em.persist(firstRoom);
+        em.persist(secondRoom);
+        em.flush();
+
+        playerService.updateCoreState(
+                character.getId(),
+                firstRoom.getId(),
+                25,
+                40
+        );
+
+        assertThat(
+                playerService.currentCoreState(
+                        character.getId(),
+                        firstRoom.getId()
+                ).energy()
+        ).isEqualTo(25);
+
+        assertThat(
+                playerService.currentCoreState(
+                        character.getId(),
+                        secondRoom.getId()
+                ).energy()
+        ).isEqualTo(70);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                playerService.updateCoreState(
+                        otherCharacter.getId(),
+                        firstRoom.getId(),
+                        99,
+                        99
+                )
+        ).isInstanceOf(
+                org.springframework.web.server.ResponseStatusException.class
+        );
+
+        assertThat(
+                playerService.currentCoreState(
+                        character.getId(),
+                        firstRoom.getId()
+                ).energy()
+        ).isEqualTo(25);
+    }
 }

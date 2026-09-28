@@ -186,6 +186,56 @@ class ConversationProgressTest {
         ).isEqualTo(65);
     }
 
+    @Test
+    void playerStateProposalUsesLatestUserCorrectedValue() {
+        var room = fixture(true, 70, 70);
+        Long characterId = room.getCharacter().getId();
+
+        room.applyPlayerState(80, 70);
+        em.flush();
+
+        var operation = service.beginChat(
+                characterId,
+                room.getId()
+        );
+
+        var turn = new com.example.projectmm.domain.dialogue.DialogueTurn(
+                "많이 달렸군.",
+                com.example.projectmm.domain.dialogue.DialogueStateChange.none(),
+                new com.example.projectmm.domain.dialogue.DialoguePlayerStateChange(
+                        -5,
+                        0,
+                        "두 시간 동안 달렸다",
+                        ""
+                ),
+                java.util.List.of()
+        );
+
+        var completed = service.completeChat(
+                characterId,
+                room.getId(),
+                operation.token(),
+                "두 시간 동안 달렸다",
+                turn,
+                ContentMode.NORMAL
+        );
+
+        assertThat(completed.playerStateUpdate().status())
+                .isEqualTo("APPLIED");
+        assertThat(completed.playerStateUpdate().previousEnergy())
+                .isEqualTo(80);
+        assertThat(completed.playerStateUpdate().energy())
+                .isEqualTo(75);
+
+        em.flush();
+        em.clear();
+
+        var saved = rooms.findById(room.getId()).orElseThrow();
+
+        assertThat(saved.getPlayerEnergy()).isEqualTo(75);
+        assertThat(saved.getPlayerMood()).isEqualTo(70);
+    }
+
     @Test void optInDoesNotBackfillAndResumeAddsAbsenceToStoryClockOnlyOnce() {
         var room = fixture(true, 70, 70);
         Long characterId = room.getCharacter().getId();
@@ -421,4 +471,6 @@ class ConversationProgressTest {
         em.persist(room); em.flush();
         return room;
     }
+
+
 }
