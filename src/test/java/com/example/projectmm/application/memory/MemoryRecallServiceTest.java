@@ -210,6 +210,266 @@ class MemoryRecallServiceTest {
                 );
     }
 
+    @Test
+    void 구조화된_기억의_핵심값이_현재_질문과_관련되면_우선_회상한다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 28,
+                        12, 0
+                );
+
+        Memory relevant =
+                createStructuredMemory(
+                        "사용자가 좋아하는 음식을 이야기했다.",
+                        "나는 오리고기를 제일 좋아해",
+                        new com.example.projectmm.domain.memory.MemoryFact(
+                                com.example.projectmm.domain.memory.MemoryFact.Kind.PREFERENCE,
+                                "나",
+                                "좋아해",
+                                "오리고기"
+                        ),
+                        5,
+                        now.minusDays(3)
+                );
+
+        Memory strongerButIrrelevant =
+                createStructuredMemory(
+                        "사용자가 최근 여행 이야기를 했다.",
+                        "나는 제주도 여행이 정말 기억에 남아",
+                        new com.example.projectmm.domain.memory.MemoryFact(
+                                com.example.projectmm.domain.memory.MemoryFact.Kind.REPORTED_EVENT,
+                                "나",
+                                "기억에 남아",
+                                "제주도 여행"
+                        ),
+                        9,
+                        now.minusDays(1)
+                );
+
+        when(
+                memoryRepository.findForConversation(
+                        1L,
+                        10L
+                )
+        ).thenReturn(
+                List.of(
+                        strongerButIrrelevant,
+                        relevant
+                )
+        );
+
+        List<EffectiveMemory> result =
+                memoryRecallService.recallForConversation(
+                        1L,
+                        10L,
+                        now,
+                        2,
+                        "내가 좋아하는 음식 뭐였지?"
+                );
+
+        assertThat(result)
+                .hasSize(2);
+
+        assertThat(result.get(0).summary())
+                .contains("오리고기");
+    }
+
+    @Test
+    void 직접_키워드가_없어도_선호_질문에는_선호_기억을_우선_회상한다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 28,
+                        12, 0
+                );
+
+        Memory preference =
+                createStructuredMemory(
+                        "unused",
+                        "나는 오리고기를 제일 좋아해",
+                        new com.example.projectmm.domain.memory.MemoryFact(
+                                com.example.projectmm.domain.memory.MemoryFact.Kind.PREFERENCE,
+                                "나",
+                                "좋아해",
+                                "오리고기"
+                        ),
+                        5,
+                        now.minusDays(3)
+                );
+
+        Memory strongerButIrrelevant =
+                createStructuredMemory(
+                        "unused",
+                        "나는 제주도 여행이 정말 기억에 남아",
+                        new com.example.projectmm.domain.memory.MemoryFact(
+                                com.example.projectmm.domain.memory.MemoryFact.Kind.REPORTED_EVENT,
+                                "나",
+                                "기억에 남아",
+                                "제주도 여행"
+                        ),
+                        9,
+                        now.minusDays(1)
+                );
+
+        when(
+                memoryRepository.findForConversation(
+                        1L,
+                        10L
+                )
+        ).thenReturn(
+                List.of(
+                        strongerButIrrelevant,
+                        preference
+                )
+        );
+
+        List<EffectiveMemory> result =
+                memoryRecallService.recallForConversation(
+                        1L,
+                        10L,
+                        now,
+                        2,
+                        "내 음식 취향 기억나?"
+                );
+
+        assertThat(result)
+                .hasSize(2);
+
+        assertThat(result.get(0).summary())
+                .contains("오리고기");
+    }
+
+    @Test
+    void 사건_질문에는_더_강한_선호_기억보다_사건_기억을_우선_회상한다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 28,
+                        12, 0
+                );
+
+        Memory reportedEvent =
+                createStructuredMemory(
+                        "unused",
+                        "나는 제주도에서 지갑을 잃어버렸어",
+                        new com.example.projectmm.domain.memory.MemoryFact(
+                                com.example.projectmm.domain.memory.MemoryFact.Kind.REPORTED_EVENT,
+                                "나",
+                                "잃어버렸어",
+                                "지갑"
+                        ),
+                        5,
+                        now.minusDays(3)
+                );
+
+        Memory strongerPreference =
+                createStructuredMemory(
+                        "unused",
+                        "나는 오리고기를 제일 좋아해",
+                        new com.example.projectmm.domain.memory.MemoryFact(
+                                com.example.projectmm.domain.memory.MemoryFact.Kind.PREFERENCE,
+                                "나",
+                                "좋아해",
+                                "오리고기"
+                        ),
+                        9,
+                        now.minusDays(1)
+                );
+
+        when(
+                memoryRepository.findForConversation(
+                        1L,
+                        10L
+                )
+        ).thenReturn(
+                List.of(
+                        strongerPreference,
+                        reportedEvent
+                )
+        );
+
+        List<EffectiveMemory> result =
+                memoryRecallService.recallForConversation(
+                        1L,
+                        10L,
+                        now,
+                        2,
+                        "제주도에서 무슨 일이 있었지?"
+                );
+
+        assertThat(result)
+                .hasSize(2);
+
+        assertThat(result.get(0).summary())
+                .contains("지갑");
+    }
+
+    @Test
+    void 구체적인_키워드_일치는_일반적인_fact_kind_보너스에_묻히지_않는다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 28,
+                        12, 0
+                );
+
+        Memory duckPreference =
+                createStructuredMemory(
+                        "unused",
+                        "나는 오리고기를 제일 좋아해",
+                        new com.example.projectmm.domain.memory.MemoryFact(
+                                com.example.projectmm.domain.memory.MemoryFact.Kind.PREFERENCE,
+                                "나",
+                                "좋아해",
+                                "오리고기"
+                        ),
+                        5,
+                        now.minusDays(3)
+                );
+
+        Memory unrelatedEvent =
+                createStructuredMemory(
+                        "unused",
+                        "나는 제주도에서 지갑을 잃어버렸어",
+                        new com.example.projectmm.domain.memory.MemoryFact(
+                                com.example.projectmm.domain.memory.MemoryFact.Kind.REPORTED_EVENT,
+                                "나",
+                                "잃어버렸어",
+                                "지갑"
+                        ),
+                        9,
+                        now.minusDays(1)
+                );
+
+        when(
+                memoryRepository.findForConversation(
+                        1L,
+                        10L
+                )
+        ).thenReturn(
+                List.of(
+                        unrelatedEvent,
+                        duckPreference
+                )
+        );
+
+        List<EffectiveMemory> result =
+                memoryRecallService.recallForConversation(
+                        1L,
+                        10L,
+                        now,
+                        2,
+                        "오리고기 얘기했었지?"
+                );
+
+        assertThat(result)
+                .hasSize(2);
+
+        assertThat(result.get(0).summary())
+                .contains("오리고기");
+    }
+
     private Memory createMemory(
             String summary,
             int importance,
@@ -242,6 +502,43 @@ class MemoryRecallServiceTest {
                 importance,
                 strength,
                 rememberedAt
+        );
+    }
+
+    private Memory createStructuredMemory(
+            String summary,
+            String quote,
+            com.example.projectmm.domain.memory.MemoryFact fact,
+            int importance,
+            LocalDateTime rememberedAt
+    ) {
+        Character character =
+                new Character("Millie");
+
+        var conversation =
+                com.example.projectmm.domain.chat.Conversation.fresh(
+                        character,
+                        rememberedAt
+                );
+
+        var source =
+                new com.example.projectmm.domain.chat.ChatMessage(
+                        conversation,
+                        character,
+                        com.example.projectmm.domain.chat.ChatRole.USER,
+                        quote,
+                        com.example.projectmm.application.policy.ContentMode.NORMAL,
+                        rememberedAt
+                );
+
+        return Memory.fromChat(
+                conversation,
+                source,
+                quote,
+                importance,
+                rememberedAt,
+                "test-" + quote.hashCode(),
+                fact
         );
     }
 }
