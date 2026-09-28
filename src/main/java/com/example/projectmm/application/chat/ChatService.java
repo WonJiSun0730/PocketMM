@@ -153,7 +153,8 @@ public class ChatService {
                         memoryResult.status(),
                         memoryResult.saved(),
                         context.memories().stream().map(DialogueMemoryContext::summary).toList(),
-                        completed.stateUpdate()
+                        completed.stateUpdate(),
+                        completed.playerStateUpdate()
                 )
         );
     }

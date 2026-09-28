@@ -35,7 +35,8 @@ class GeminiCustomStatePromptTest {
                 .isEqualTo("피에타는 67이다.");
         var properties = request.path("generationConfig").path("responseFormat").path("text")
                 .path("schema").path("properties");
-        assertThat(properties.size()).isEqualTo(3);
+        assertThat(properties.size()).isEqualTo(4);
+        assertThat(properties.has("playerState")).isTrue();
         assertThat(properties.has("reply")).isTrue();
         var proposals = properties.path("customStateChanges");
         assertThat(proposals.path("type").asText()).isEqualTo("array");
@@ -70,9 +71,22 @@ class GeminiCustomStatePromptTest {
     }
 
     private JsonNode request(List<DialogueCustomState> states) {
-        var context = new DialogueContext(1L, "NPC", null, 70, 70, LocalDateTime.of(2030, 1, 1, 12, 0),
-                ContentMode.NORMAL, List.of(new DialogueMessageContext(ChatRole.CHARACTER, "피에타는 67이다.",
-                LocalDateTime.of(2030, 1, 1, 11, 0))), List.of(), List.of(), null, states);
+        var context = new DialogueContext(
+                1L, "NPC", null,
+                70, 70,
+                LocalDateTime.of(2030, 1, 1, 12, 0),
+                ContentMode.NORMAL,
+                List.of(new DialogueMessageContext(
+                        ChatRole.CHARACTER,
+                        "피에타는 67이다.",
+                        LocalDateTime.of(2030, 1, 1, 11, 0)
+                )),
+                List.of(),
+                List.of(),
+                null,
+                70, 70,
+                states
+        );
         Object request = ReflectionTestUtils.invokeMethod(gateway, "createRequest", context, "현재 상태는?");
         return mapper.readTree(mapper.writeValueAsString(request));
     }

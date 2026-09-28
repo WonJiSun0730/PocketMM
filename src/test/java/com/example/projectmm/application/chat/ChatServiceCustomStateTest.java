@@ -42,8 +42,16 @@ class ChatServiceCustomStateTest {
         ReflectionTestUtils.setField(character, "id", 1L);
         var room = Conversation.fresh(character, at);
         ReflectionTestUtils.setField(room, "id", 2L);
-        var context = new DialogueContext(1L, "NPC", null, 70, 70, at, ContentMode.NORMAL,
-                List.of(), List.of(), List.of(), null, List.of());
+        var context = new DialogueContext(
+                1L, "NPC", null,
+                70, 70,
+                at,
+                ContentMode.NORMAL,
+                List.of(), List.of(), List.of(),
+                null,
+                70, 70,
+                List.of()
+        );
         var turn = new DialogueTurn("안녕하세요", DialogueStateChange.none(),
                 List.of(new CustomStateChangeProposal(3L, -5.0)));
         var source = new ChatMessage(room, character, ChatRole.USER, "안녕", ContentMode.NORMAL, at);
@@ -55,9 +63,20 @@ class ChatServiceCustomStateTest {
         when(contexts.build(1L, 2L, ContentMode.NORMAL, "안녕")).thenReturn(context);
         when(gateway.generateTurn(context, "안녕")).thenReturn(turn);
         when(progress.completeChat(1L, 2L, "token", "안녕", turn, ContentMode.NORMAL))
-                .thenReturn(new ConversationProgressService.CompletedChat(source,
-                        ChatStateUpdate.resolve(70, 70, turn.reply(), turn.stateChange()),
-                        CustomStateProposalService.ApplyStatus.REJECTED));
+                .thenReturn(new ConversationProgressService.CompletedChat(
+                        source,
+                        ChatStateUpdate.resolve(
+                                70, 70,
+                                turn.reply(),
+                                turn.stateChange()
+                        ),
+                        PlayerStateUpdate.resolve(
+                                70, 70,
+                                "안녕",
+                                turn.playerStateChange()
+                        ),
+                        CustomStateProposalService.ApplyStatus.REJECTED
+                ));
         when(memories.remember(room, source, at)).thenReturn(ChatMemoryResult.empty("NONE"));
 
         assertThat(chat.chat(1L, new ChatRequest("안녕", ContentMode.NORMAL)).message()).isEqualTo("안녕하세요");

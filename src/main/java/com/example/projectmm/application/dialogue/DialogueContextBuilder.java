@@ -126,6 +126,8 @@ public class DialogueContextBuilder {
                 relationships,
                 conversation.getPlayerProfile() == null ? null : new DialoguePlayerProfile(
                         conversation.getPlayerProfile().getName(), conversation.getPlayerProfile().getDescription()),
+                conversation.getPlayerEnergy(),
+                conversation.getPlayerMood(),
                 buildCustomStates(conversation)
         );
     }

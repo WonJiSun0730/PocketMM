@@ -38,6 +38,154 @@ class ConversationProgressTest {
 
     @BeforeEach void time() { when(clock.now()).thenReturn(real); }
 
+    @Test
+    void playerStateAppliesFromExactUserEvidence() {
+        var room = fixture(true, 70, 70);
+        Long id = room.getCharacter().getId();
+
+        var operation = service.beginChat(id, room.getId());
+
+        String userText = "*두 시간 동안 달리고 나니 완전히 지쳤다.*";
+
+        var turn = new com.example.projectmm.domain.dialogue.DialogueTurn(
+                "*그 모습을 바라보았다.*",
+                com.example.projectmm.domain.dialogue.DialogueStateChange.none(),
+                new com.example.projectmm.domain.dialogue.DialoguePlayerStateChange(
+                        -6,
+                        0,
+                        "두 시간 동안 달리고 나니 완전히 지쳤다",
+                        ""
+                ),
+                java.util.List.of()
+        );
+
+        var completed = service.completeChat(
+                id,
+                room.getId(),
+                operation.token(),
+                userText,
+                turn,
+                ContentMode.NORMAL
+        );
+
+        assertThat(completed.playerStateUpdate().status())
+                .isEqualTo("APPLIED");
+        assertThat(completed.playerStateUpdate().previousEnergy())
+                .isEqualTo(70);
+        assertThat(completed.playerStateUpdate().energy())
+                .isEqualTo(64);
+
+        em.flush();
+        em.clear();
+
+        var saved = rooms.findById(room.getId()).orElseThrow();
+
+        assertThat(saved.getPlayerEnergy()).isEqualTo(64);
+        assertThat(saved.getPlayerMood()).isEqualTo(70);
+    }
+
+    @Test
+    void playerStateRejectsEvidenceInventedOnlyByAiReply() {
+        var room = fixture(true, 70, 70);
+        Long id = room.getCharacter().getId();
+
+        var operation = service.beginChat(id, room.getId());
+
+        var turn = new com.example.projectmm.domain.dialogue.DialogueTurn(
+                "*하린은 갑자기 몹시 지쳐 보였다.*",
+                com.example.projectmm.domain.dialogue.DialogueStateChange.none(),
+                new com.example.projectmm.domain.dialogue.DialoguePlayerStateChange(
+                        -8,
+                        0,
+                        "갑자기 몹시 지쳐 보였다",
+                        ""
+                ),
+                java.util.List.of()
+        );
+
+        var completed = service.completeChat(
+                id,
+                room.getId(),
+                operation.token(),
+                "안녕하세요.",
+                turn,
+                ContentMode.NORMAL
+        );
+
+        assertThat(completed.playerStateUpdate().status())
+                .isEqualTo("REJECTED");
+        assertThat(completed.playerStateUpdate().energy())
+                .isEqualTo(70);
+
+        em.flush();
+        em.clear();
+
+        assertThat(
+                rooms.findById(room.getId())
+                        .orElseThrow()
+                        .getPlayerEnergy()
+        ).isEqualTo(70);
+
+        assertThat(
+                messages.findTop20ByConversationIdOrderByCreatedAtDesc(
+                        room.getId()
+                )
+        ).hasSize(2);
+    }
+
+    @Test
+    void playerStateCannotApplyTwiceWithCompletedOperationToken() {
+        var room = fixture(true, 70, 70);
+        Long id = room.getCharacter().getId();
+
+        var operation = service.beginChat(id, room.getId());
+
+        String userText = "*한참 뛰어서 숨이 찼다.*";
+
+        var turn = new com.example.projectmm.domain.dialogue.DialogueTurn(
+                "*그 모습을 지켜보았다.*",
+                com.example.projectmm.domain.dialogue.DialogueStateChange.none(),
+                new com.example.projectmm.domain.dialogue.DialoguePlayerStateChange(
+                        -5,
+                        0,
+                        "한참 뛰어서 숨이 찼다",
+                        ""
+                ),
+                java.util.List.of()
+        );
+
+        service.completeChat(
+                id,
+                room.getId(),
+                operation.token(),
+                userText,
+                turn,
+                ContentMode.NORMAL
+        );
+
+        assertThatThrownBy(() ->
+                service.completeChat(
+                        id,
+                        room.getId(),
+                        operation.token(),
+                        userText,
+                        turn,
+                        ContentMode.NORMAL
+                )
+        ).isInstanceOf(
+                org.springframework.web.server.ResponseStatusException.class
+        );
+
+        em.flush();
+        em.clear();
+
+        assertThat(
+                rooms.findById(room.getId())
+                        .orElseThrow()
+                        .getPlayerEnergy()
+        ).isEqualTo(65);
+    }
+
     @Test void optInDoesNotBackfillAndResumeAddsAbsenceToStoryClockOnlyOnce() {
         var room = fixture(true, 70, 70);
         Long characterId = room.getCharacter().getId();

@@ -20,6 +20,7 @@ public record ChatDebugInfo(
         String memoryStatus,
         List<String> savedMemories,
         List<String> recalledMemories,
-        ChatStateUpdate stateUpdate
+        ChatStateUpdate stateUpdate,
+        PlayerStateUpdate playerStateUpdate
 ) {
 }

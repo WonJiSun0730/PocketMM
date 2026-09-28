@@ -49,8 +49,16 @@ class GeminiDialogueResponseTest {
     }
 
     @Test void requestAsksForSingleJsonResponseWithPrivateThoughtAndRepeatedComplaintBoundaries() {
-        var context = new DialogueContext(1L, "마르바스", null, 70, 70, LocalDateTime.of(2026, 9, 23, 12, 0),
-                ContentMode.NORMAL, List.of(), List.of(), List.of(), null, List.of());
+        var context = new DialogueContext(
+                1L, "마르바스", null,
+                70, 70,
+                LocalDateTime.of(2026, 9, 23, 12, 0),
+                ContentMode.NORMAL,
+                List.of(), List.of(), List.of(),
+                null,
+                70, 70,
+                List.of()
+        );
         Object request = ReflectionTestUtils.invokeMethod(gateway, "createRequest", context, "안녕하세요");
         String json = mapper.writeValueAsString(request);
         assertThat(json).contains("APPLICATION_JSON", "energyDelta", "moodEvidence", "habitual complaints",

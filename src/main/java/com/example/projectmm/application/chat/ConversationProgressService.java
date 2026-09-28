@@ -43,8 +43,12 @@ public class ConversationProgressService {
     public record Status(boolean enabled, LocalDateTime simulatedAt, String pauseReason, Report lastReport,
                          int energy, int mood) {}
     public record ChatOperation(Conversation room, String token) {}
-    public record CompletedChat(ChatMessage source, ChatStateUpdate stateUpdate,
-                                CustomStateProposalService.ApplyStatus customStateStatus) {}
+    public record CompletedChat(
+            ChatMessage source,
+            ChatStateUpdate stateUpdate,
+            PlayerStateUpdate playerStateUpdate,
+            CustomStateProposalService.ApplyStatus customStateStatus
+    ) {}
 
     @Transactional(readOnly = true)
     public Status current(Long characterId, Long roomId) {
@@ -152,16 +156,42 @@ public class ConversationProgressService {
         var customStatus = turn.customStateChanges().isEmpty() ? CustomStateProposalService.ApplyStatus.NONE
                 : customStateProposals.applyForChat(roomId, turn.customStateChanges());
         var baseline = states.findByCharacterId(characterId).orElseThrow();
-        var update = ChatStateUpdate.resolve(room.getEnergy() == null ? baseline.getEnergy() : room.getEnergy(),
-                room.getMood() == null ? baseline.getMood() : room.getMood(), turn.reply(), turn.stateChange());
-        // 메시지와 상태를 같이 커밋한다. 잘못된 제안은 상태만 유지하고 유효한 본문은 저장한다.
-        room.applyRoomState(update.energy(), update.mood(), room.getSimulatedAt());
+        var update = ChatStateUpdate.resolve(
+                room.getEnergy() == null ? baseline.getEnergy() : room.getEnergy(),
+                room.getMood() == null ? baseline.getMood() : room.getMood(),
+                turn.reply(),
+                turn.stateChange()
+        );
+
+        var playerUpdate = PlayerStateUpdate.resolve(
+                room.getPlayerEnergy(),
+                room.getPlayerMood(),
+                userText,
+                turn.playerStateChange()
+        );
+
+// NPC와 플레이어의 확정 상태를 같은 채팅 트랜잭션에서 반영한다.
+        room.applyRoomState(
+                update.energy(),
+                update.mood(),
+                room.getSimulatedAt()
+        );
+
+        room.applyPlayerState(
+                playerUpdate.energy(),
+                playerUpdate.mood()
+        );
         var now = clock.now();
         // 응답 저장과 처리 표시 해제를 묶어 재접속 처리가 응답 저장 중간에 끼어들지 않게 한다.
         var source = messages.save(new ChatMessage(room, room.getCharacter(), ChatRole.USER, userText, mode, now));
         messages.save(new ChatMessage(room, room.getCharacter(), ChatRole.CHARACTER, turn.reply(), mode, now.plusNanos(1000)));
         room.endChat(token, now);
-        return new CompletedChat(source, update, customStatus);
+        return new CompletedChat(
+                source,
+                update,
+                playerUpdate,
+                customStatus
+        );
     }
 
     @Transactional

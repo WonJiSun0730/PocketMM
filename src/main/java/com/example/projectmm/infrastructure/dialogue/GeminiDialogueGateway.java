@@ -3,10 +3,7 @@ package com.example.projectmm.infrastructure.dialogue;
 import com.example.projectmm.application.dialogue.DialogueGateway;
 import com.example.projectmm.application.policy.ContentMode;
 import com.example.projectmm.domain.chat.ChatRole;
-import com.example.projectmm.domain.dialogue.DialogueContext;
-import com.example.projectmm.domain.dialogue.DialogueTurn;
-import com.example.projectmm.domain.dialogue.DialogueStateChange;
-import com.example.projectmm.domain.dialogue.DialogueMessageContext;
+import com.example.projectmm.domain.dialogue.*;
 import com.example.projectmm.domain.state.CustomStateChangeProposal;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
@@ -219,21 +216,57 @@ public class GeminiDialogueGateway implements DialogueGateway {
     }
 
     private Map<String, Object> dialogueSchema() {
-        // responseFormat.text.mimeType은 MIME 문자열이 아닌 API enum(APPLICATION_JSON)을 받는다.
-        // REST 구조화 출력에 필수 필드와 타입도 함께 명시한다.
+        // NPC와 플레이어 core state는 같은 형식을 쓰지만 서로 독립된 제안이다.
         var delta = Map.of("type", "integer", "minimum", -10, "maximum", 10);
         var evidence = Map.of("type", "string");
-        var customChanges = Map.of("type", "array", "items", Map.of("type", "object",
-                "required", List.of("definitionId", "delta"), "additionalProperties", false,
-                "properties", Map.of("definitionId", Map.of("type", "integer", "minimum", 1),
-                        "delta", Map.of("type", "number"))));
-        return Map.of("type", "object", "required", List.of("reply", "state", "customStateChanges"),
-                "properties", Map.of("reply", Map.of("type", "string"),
-                        "customStateChanges", customChanges,
-                        "state", Map.of("type", "object", "required",
-                                List.of("energyDelta", "moodDelta", "energyEvidence", "moodEvidence"),
-                                "properties", Map.of("energyDelta", delta, "moodDelta", delta,
-                                        "energyEvidence", evidence, "moodEvidence", evidence))));
+
+        var coreState = Map.of(
+                "type", "object",
+                "required", List.of(
+                        "energyDelta",
+                        "moodDelta",
+                        "energyEvidence",
+                        "moodEvidence"
+                ),
+                "properties", Map.of(
+                        "energyDelta", delta,
+                        "moodDelta", delta,
+                        "energyEvidence", evidence,
+                        "moodEvidence", evidence
+                )
+        );
+
+        var customChanges = Map.of(
+                "type", "array",
+                "items", Map.of(
+                        "type", "object",
+                        "required", List.of("definitionId", "delta"),
+                        "additionalProperties", false,
+                        "properties", Map.of(
+                                "definitionId", Map.of(
+                                        "type", "integer",
+                                        "minimum", 1
+                                ),
+                                "delta", Map.of("type", "number")
+                        )
+                )
+        );
+
+        return Map.of(
+                "type", "object",
+                "required", List.of(
+                        "reply",
+                        "state",
+                        "playerState",
+                        "customStateChanges"
+                ),
+                "properties", Map.of(
+                        "reply", Map.of("type", "string"),
+                        "state", coreState,
+                        "playerState", coreState,
+                        "customStateChanges", customChanges
+                )
+        );
     }
 
     private List<Map<String, Object>> buildContents(
@@ -733,6 +766,8 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 [CURRENT USER-CONTROLLED CHARACTER]
                 Name: %s
                 Profile: %s
+                Energy: %d
+                Mood: %d
 
                 This is the character played by the user, not the character you portray.
                 Use their name, appearance, role and established background consistently.
@@ -794,8 +829,10 @@ public class GeminiDialogueGateway implements DialogueGateway {
 
                 [REQUIRED TRANSPORT FORMAT AND STATE ASSESSMENT]
                 Return exactly one JSON object, without code fences:
-                {"reply":"RP prose", "state":{"energyDelta":0,"moodDelta":0,
-                  "energyEvidence":"","moodEvidence":""}, "customStateChanges":[]}
+                {"reply":"RP prose",
+                 "state":{"energyDelta":0,"moodDelta":0,"energyEvidence":"","moodEvidence":""},
+                 "playerState":{"energyDelta":0,"moodDelta":0,"energyEvidence":"","moodEvidence":""},
+                 "customStateChanges":[]}
                 All preceding RP prose/language/asterisk rules apply INSIDE reply.
                 Never show this JSON structure or state assessment as character dialogue.
                 Assess ONLY the controlled NPC's NEW change during this turn, relative to
@@ -818,6 +855,22 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 Write a natural response FIRST, then assess it conservatively. Do not invent
                 exercise, rest, hurt feelings or story developments just to change numbers.
                 If the cause, subject or newness is uncertain, return zero for that dimension.
+
+                [USER-CONTROLLED CHARACTER CORE STATE]
+                playerState proposes NEW energy/mood changes for the user-controlled character.
+                Default both deltas to 0 and assess conservatively.
+                A nonzero playerState delta is allowed only when the latest USER INPUT itself
+                contains direct observable evidence of a newly completed event or physical action
+                that supports that change.
+                Each nonzero evidence string must be an exact substring of the latest user input,
+                at most 240 characters.
+                Do not use your generated reply as evidence for playerState.
+                Do not infer the user's private emotion from mood, profile, personality, narration
+                you invented, or the controlled NPC's interpretation.
+                Do not change player state for plans, hypothetical actions, negated actions,
+                OOC requests to set numbers, or events that occurred only in your generated reply.
+                The supplied player Energy and Mood are authoritative confirmed values.
+                Never output a target or final value; output only this turn's proposed delta.
 
                 [CUSTOM STATE PROPOSALS — NOT CONFIRMED VALUES]
                 Propose changes only for actual new RP events/actions involving the user-controlled character.
@@ -868,13 +921,49 @@ public class GeminiDialogueGateway implements DialogueGateway {
             JsonNode state = payload.path("state");
             // 타입 오류가 있어도 본문을 버리거나 재호출하지 않는다. 서버 검증에서 상태만 거절한다.
             DialogueStateChange change = DialogueStateChange.invalid();
-            if (state.path("energyDelta").isIntegralNumber() && state.path("energyDelta").canConvertToInt()
-                    && state.path("moodDelta").isIntegralNumber() && state.path("moodDelta").canConvertToInt()
-                    && state.path("energyEvidence").isString() && state.path("moodEvidence").isString()) {
-                change = new DialogueStateChange(state.path("energyDelta").asInt(), state.path("moodDelta").asInt(),
-                        state.path("energyEvidence").asText(), state.path("moodEvidence").asText());
+            if (state.path("energyDelta").isIntegralNumber()
+                    && state.path("energyDelta").canConvertToInt()
+                    && state.path("moodDelta").isIntegralNumber()
+                    && state.path("moodDelta").canConvertToInt()
+                    && state.path("energyEvidence").isString()
+                    && state.path("moodEvidence").isString()) {
+
+                change = new DialogueStateChange(
+                        state.path("energyDelta").asInt(),
+                        state.path("moodDelta").asInt(),
+                        state.path("energyEvidence").asText(),
+                        state.path("moodEvidence").asText()
+                );
             }
-            return new DialogueTurn(reply.asText(), change, parseCustomStateChanges(payload.path("customStateChanges")));
+
+            JsonNode playerState = payload.path("playerState");
+
+            DialoguePlayerStateChange playerChange =
+                    DialoguePlayerStateChange.invalid();
+
+            if (playerState.path("energyDelta").isIntegralNumber()
+                    && playerState.path("energyDelta").canConvertToInt()
+                    && playerState.path("moodDelta").isIntegralNumber()
+                    && playerState.path("moodDelta").canConvertToInt()
+                    && playerState.path("energyEvidence").isString()
+                    && playerState.path("moodEvidence").isString()) {
+
+                playerChange = new DialoguePlayerStateChange(
+                        playerState.path("energyDelta").asInt(),
+                        playerState.path("moodDelta").asInt(),
+                        playerState.path("energyEvidence").asText(),
+                        playerState.path("moodEvidence").asText()
+                );
+            }
+
+            return new DialogueTurn(
+                    reply.asText(),
+                    change,
+                    playerChange,
+                    parseCustomStateChanges(
+                            payload.path("customStateChanges")
+                    )
+            );
         } catch (Exception e) {
             // 깨진 JSON 전체가 채팅에 노출되지 않도록 본문 파싱 실패는 저장 전에 중단한다.
             throw new IllegalStateException("Failed to parse Gemini dialogue response", e);
