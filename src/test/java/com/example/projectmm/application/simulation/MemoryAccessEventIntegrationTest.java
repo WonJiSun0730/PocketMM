@@ -29,7 +29,8 @@ import static org.mockito.Mockito.when;
         "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.show-sql=false"}, showSql = false)
 @Import({CatchUpExecutionService.class, CatchUpOrchestrator.class, CatchUpSimulationService.class,
         CatchUpSegmentService.class, EventCandidateValidator.class, AiDecisionValidator.class,
-        RelationshipChangeService.class, MemoryAccessService.class, CatchUpSceneResolver.class,
+        RelationshipChangeService.class, MemoryAccessService.class, MemoryLifecycleService.class,
+        CatchUpSceneResolver.class,
         CatchUpSceneFactory.class, ResolvedEventPersistenceService.class, ResolvedEventMapper.class,
         MemoryCreationService.class, MemoryPolicy.class})
 class MemoryAccessEventIntegrationTest {

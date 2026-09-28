@@ -18,6 +18,7 @@ public class MemoryAccessService {
 
     private final MemoryRepository memoryRepository;
     private final MemoryAccessStateRepository memoryAccessStateRepository;
+    private final MemoryLifecycleService memoryLifecycleService;
 
     @Transactional
     public MemoryAccessState changeAccess(
@@ -63,13 +64,24 @@ public class MemoryAccessService {
                                 )
                         );
 
-        if (accessState.getAccessLevel()
-                != accessLevel) {
+        MemoryAccessLevel previousLevel =
+                accessState.getAccessLevel();
+
+        if (previousLevel != accessLevel) {
 
             accessState.changeAccessLevel(
                     accessLevel,
                     currentTime
             );
+
+            if (accessLevel == MemoryAccessLevel.EXPLICIT
+                    && previousLevel != MemoryAccessLevel.EXPLICIT) {
+
+                memoryLifecycleService.markAccessed(
+                        List.of(memoryId),
+                        currentTime
+                );
+            }
         }
 
         return memoryAccessStateRepository.save(

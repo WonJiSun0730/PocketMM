@@ -25,6 +25,7 @@ class MemoryAccessServiceTest {
     private MemoryRepository memoryRepository;
     private MemoryAccessStateRepository memoryAccessStateRepository;
     private MemoryAccessService memoryAccessService;
+    private MemoryLifecycleService memoryLifecycleService;
 
     @BeforeEach
     void setUp() {
@@ -34,10 +35,14 @@ class MemoryAccessServiceTest {
         memoryAccessStateRepository =
                 mock(MemoryAccessStateRepository.class);
 
+        memoryLifecycleService =
+                mock(MemoryLifecycleService.class);
+
         memoryAccessService =
                 new MemoryAccessService(
                         memoryRepository,
-                        memoryAccessStateRepository
+                        memoryAccessStateRepository,
+                        memoryLifecycleService
                 );
     }
 
@@ -167,6 +172,12 @@ class MemoryAccessServiceTest {
 
         assertThat(result.getUpdatedAt())
                 .isEqualTo(now);
+
+        verify(memoryLifecycleService)
+                .markAccessed(
+                        List.of(memoryId),
+                        now
+                );
     }
 
     @Test
