@@ -106,6 +106,66 @@ class MemoryDecayPolicyTest {
                 .isTrue();
     }
 
+    @Test
+    void 캐릭터의_기억력은_기본적으로_정상_상태다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 28,
+                        12, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        var state =
+                new com.example.projectmm.domain.character.CharacterState(
+                        character,
+                        70,
+                        70,
+                        now
+                );
+
+        assertThat(state.getMemoryAbility())
+                .isEqualTo(100);
+    }
+
+    @Test
+    void 캐릭터의_기억력은_0에서_100_사이로_제한된다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 28,
+                        12, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        var state =
+                new com.example.projectmm.domain.character.CharacterState(
+                        character,
+                        70,
+                        70,
+                        now
+                );
+
+        state.changeMemoryAbility(-30);
+
+        assertThat(state.getMemoryAbility())
+                .isZero();
+
+        state.changeMemoryAbility(150);
+
+        assertThat(state.getMemoryAbility())
+                .isEqualTo(100);
+
+        state.changeMemoryAbility(45);
+
+        assertThat(state.getMemoryAbility())
+                .isEqualTo(45);
+    }
+
     private Memory createMemory(
             LocalDateTime rememberedAt,
             int importance,

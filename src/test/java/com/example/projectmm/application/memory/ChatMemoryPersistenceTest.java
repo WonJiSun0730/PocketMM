@@ -314,6 +314,43 @@ class ChatMemoryPersistenceTest {
         assertThat(prompt).contains(quote).doesNotContain("relation", "null");
     }
 
+    @Test
+    void characterMemoryAbilityPersistsAndReloadsFromDatabase() {
+        Character character =
+                new Character("기억력 저장 QA");
+
+        em.persist(character);
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        70,
+                        70,
+                        40,
+                        now
+                );
+
+        em.persist(state);
+        em.flush();
+
+        Long stateId =
+                state.getId();
+
+        em.clear();
+
+        CharacterState reloaded =
+                em.find(
+                        CharacterState.class,
+                        stateId
+                );
+
+        assertThat(reloaded)
+                .isNotNull();
+
+        assertThat(reloaded.getMemoryAbility())
+                .isEqualTo(40);
+    }
+
     @Test void contextRejectsRoomOwnedByDifferentCharacter() {
         var first = new Character("첫 캐릭터"); var second = new Character("다른 캐릭터");
         em.persist(first); em.persist(second);

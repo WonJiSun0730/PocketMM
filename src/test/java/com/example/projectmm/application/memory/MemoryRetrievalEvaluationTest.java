@@ -2,6 +2,8 @@ package com.example.projectmm.application.memory;
 
 import com.example.projectmm.application.policy.ContentMode;
 import com.example.projectmm.domain.character.Character;
+import com.example.projectmm.domain.character.CharacterState;
+import com.example.projectmm.domain.character.CharacterStateRepository;
 import com.example.projectmm.domain.chat.ChatMessage;
 import com.example.projectmm.domain.chat.ChatRole;
 import com.example.projectmm.domain.chat.Conversation;
@@ -26,11 +28,15 @@ class MemoryRetrievalEvaluationTest {
     private final MemoryCompressionService memoryCompressionService =
             mock(MemoryCompressionService.class);
 
+    private final CharacterStateRepository characterStateRepository =
+            mock(CharacterStateRepository.class);
+
     private final MemoryRecallService memoryRecallService =
             new MemoryRecallService(
                     memoryRepository,
                     new MemoryDecayPolicy(),
-                    memoryCompressionService
+                    memoryCompressionService,
+                    characterStateRepository
             );
 
     private final LocalDateTime now =
@@ -384,6 +390,76 @@ class MemoryRetrievalEvaluationTest {
                 .anyMatch(
                         summary ->
                                 summary.contains("오리고기")
+                );
+    }
+
+    @Test
+    void 평가_기억력이_저하되면_약한_기억은_제외하고_강한_기억은_회상한다() {
+
+        Character character =
+                new Character("Millie");
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        70,
+                        70,
+                        40,
+                        now
+                );
+
+        when(
+                characterStateRepository.findByCharacterId(
+                        1L
+                )
+        ).thenReturn(
+                java.util.Optional.of(state)
+        );
+
+        Memory weakTarget =
+                memory(
+                        "나는 오리고기를 제일 좋아해",
+                        MemoryFact.Kind.PREFERENCE,
+                        "나",
+                        "좋아해",
+                        "오리고기",
+                        5,
+                        now.minusDays(10)
+                );
+
+        Memory strongMemory =
+                memory(
+                        "나는 제주도에서 지갑을 잃어버렸어",
+                        MemoryFact.Kind.REPORTED_EVENT,
+                        "나",
+                        "잃어버렸어",
+                        "지갑",
+                        9,
+                        now.minusDays(1)
+                );
+
+        stubMemories(
+                weakTarget,
+                strongMemory
+        );
+
+        List<EffectiveMemory> result =
+                recall(
+                        "내 음식 취향 기억나?"
+                );
+
+        assertThat(result)
+                .extracting(EffectiveMemory::summary)
+                .noneMatch(
+                        summary ->
+                                summary.contains("오리고기")
+                );
+
+        assertThat(result)
+                .extracting(EffectiveMemory::summary)
+                .anyMatch(
+                        summary ->
+                                summary.contains("지갑")
                 );
     }
 

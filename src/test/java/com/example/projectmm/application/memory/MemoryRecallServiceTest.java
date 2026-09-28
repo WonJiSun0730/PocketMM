@@ -1,6 +1,8 @@
 package com.example.projectmm.application.memory;
 
 import com.example.projectmm.domain.character.Character;
+import com.example.projectmm.domain.character.CharacterState;
+import com.example.projectmm.domain.character.CharacterStateRepository;
 import com.example.projectmm.domain.event.Event;
 import com.example.projectmm.domain.memory.EffectiveMemory;
 import com.example.projectmm.domain.memory.Memory;
@@ -10,6 +12,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -28,11 +31,15 @@ class MemoryRecallServiceTest {
     private final MemoryCompressionService memoryCompressionService =
             mock(MemoryCompressionService.class);
 
+    private final CharacterStateRepository characterStateRepository =
+            mock(CharacterStateRepository.class);
+
     private final MemoryRecallService memoryRecallService =
             new MemoryRecallService(
                     memoryRepository,
                     memoryDecayPolicy,
-                    memoryCompressionService
+                    memoryCompressionService,
+                    characterStateRepository
             );
 
     @Test
@@ -468,6 +475,135 @@ class MemoryRecallServiceTest {
 
         assertThat(result.get(0).summary())
                 .contains("오리고기");
+    }
+
+    @Test
+    void 기억력이_낮아지면_약한_기억은_회상하지_못하지만_강한_기억은_유지한다() {
+
+        Long characterId = 1L;
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 28,
+                        12, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        70,
+                        70,
+                        40,
+                        now
+                );
+
+        when(
+                characterStateRepository.findByCharacterId(
+                        characterId
+                )
+        ).thenReturn(
+                Optional.of(state)
+        );
+
+        Memory weakMemory =
+                createMemory(
+                        "약한 기억",
+                        5,
+                        50,
+                        now
+                );
+
+        Memory strongMemory =
+                createMemory(
+                        "강한 기억",
+                        9,
+                        90,
+                        now
+                );
+
+        when(
+                memoryRepository
+                        .findByCharacterIdOrderByRememberedAtDesc(
+                                characterId
+                        )
+        ).thenReturn(
+                List.of(
+                        weakMemory,
+                        strongMemory
+                )
+        );
+
+        List<EffectiveMemory> result =
+                memoryRecallService.recall(
+                        characterId,
+                        now,
+                        10
+                );
+
+        assertThat(result)
+                .hasSize(1);
+
+        assertThat(result.get(0).summary())
+                .isEqualTo("강한 기억");
+
+        assertThat(result.get(0).effectiveStrength())
+                .isEqualTo(90);
+    }
+
+    @Test
+    void 기억력_상태가_없으면_기존_회상_동작을_유지한다() {
+
+        Long characterId = 1L;
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 28,
+                        12, 0
+                );
+
+        when(
+                characterStateRepository.findByCharacterId(
+                        characterId
+                )
+        ).thenReturn(
+                Optional.empty()
+        );
+
+        Memory weakMemory =
+                createMemory(
+                        "약하지만 남아있는 기억",
+                        5,
+                        10,
+                        now
+                );
+
+        when(
+                memoryRepository
+                        .findByCharacterIdOrderByRememberedAtDesc(
+                                characterId
+                        )
+        ).thenReturn(
+                List.of(weakMemory)
+        );
+
+        List<EffectiveMemory> result =
+                memoryRecallService.recall(
+                        characterId,
+                        now,
+                        10
+                );
+
+        assertThat(result)
+                .hasSize(1);
+
+        assertThat(result.get(0).summary())
+                .isEqualTo("약하지만 남아있는 기억");
+
+        assertThat(result.get(0).effectiveStrength())
+                .isEqualTo(10);
     }
 
     private Memory createMemory(

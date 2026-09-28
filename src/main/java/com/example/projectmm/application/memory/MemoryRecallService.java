@@ -1,5 +1,6 @@
 package com.example.projectmm.application.memory;
 
+import com.example.projectmm.domain.character.CharacterStateRepository;
 import com.example.projectmm.domain.memory.EffectiveMemory;
 import com.example.projectmm.domain.memory.Memory;
 import com.example.projectmm.domain.memory.MemoryDecayResult;
@@ -18,6 +19,7 @@ public class MemoryRecallService {
     private final MemoryRepository memoryRepository;
     private final MemoryDecayPolicy memoryDecayPolicy;
     private final MemoryCompressionService memoryCompressionService;
+    private final CharacterStateRepository characterStateRepository;
 
     public List<EffectiveMemory> recall(
             Long characterId,
@@ -27,6 +29,9 @@ public class MemoryRecallService {
         if (limit <= 0) {
             return List.of();
         }
+
+        int recallThreshold =
+                recallThreshold(characterId);
 
         List<Memory> memories =
                 memoryRepository
@@ -44,7 +49,10 @@ public class MemoryRecallService {
                         )
                 )
                 .filter(memory ->
-                        memory.effectiveStrength() > 0
+                        recallable(
+                                memory,
+                                recallThreshold
+                        )
                 )
                 .sorted(
                         Comparator.comparingInt(
@@ -63,13 +71,23 @@ public class MemoryRecallService {
     public List<EffectiveMemory> recallForConversation(Long characterId, Long conversationId,
                                                        LocalDateTime currentTime, int limit, String query,
                                                        boolean includeSharedMemories) {
-        if (limit <= 0 || conversationId == null) return List.of();
+        if (limit <= 0 || conversationId == null) {
+            return List.of();
+        }
+
+        int recallThreshold =
+                recallThreshold(characterId);
         return memoryRepository.findForConversation(characterId, conversationId).stream()
                 // 독립 시작 방에는 방 소속이 없는 과거 세계 사건 기억도 주입하지 않는다.
                 .filter(memory -> includeSharedMemories || memory.getConversation() != null)
                 .filter(memory -> !memory.getRememberedAt().isAfter(currentTime))
                 .map(memory -> prepareMemory(memory, currentTime))
-                .filter(memory -> memory.effectiveStrength() > 0)
+                .filter(memory ->
+                        recallable(
+                                memory,
+                                recallThreshold
+                        )
+                )
                 .sorted(Comparator.<EffectiveMemory>comparingInt(
                                 memory -> relevance(query, memory)).reversed()
                         .thenComparing(Comparator.comparingInt(EffectiveMemory::effectiveStrength).reversed())
@@ -105,6 +123,28 @@ public class MemoryRecallService {
                 memory.getRememberedAt(),
                 decay.compressionRequired(), memory.getEvidenceQuote(), memory.getFact()
         );
+    }
+
+    private int recallThreshold(
+            Long characterId
+    ) {
+        int memoryAbility =
+                characterStateRepository
+                        .findByCharacterId(characterId)
+                        .map(state ->
+                                state.getMemoryAbility()
+                        )
+                        .orElse(100);
+
+        return 100 - memoryAbility;
+    }
+
+    private boolean recallable(
+            EffectiveMemory memory,
+            int threshold
+    ) {
+        return memory.effectiveStrength() > 0
+                && memory.effectiveStrength() >= threshold;
     }
 
     private int relevance(

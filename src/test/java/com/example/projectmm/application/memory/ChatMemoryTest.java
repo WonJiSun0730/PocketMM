@@ -2,6 +2,7 @@ package com.example.projectmm.application.memory;
 
 import com.example.projectmm.application.policy.ContentMode;
 import com.example.projectmm.domain.character.Character;
+import com.example.projectmm.domain.character.CharacterStateRepository;
 import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.memory.*;
 import org.junit.jupiter.api.Test;
@@ -98,7 +99,12 @@ class ChatMemoryTest {
 
     @Test
     void recallRanksRelatedOlderMemoryAboveUnrelatedStrongMemoryAndExcludesFutureAndFaded() {
-        var recall = new MemoryRecallService(memories, new MemoryDecayPolicy(), mock(MemoryCompressionService.class));
+        var recall = new MemoryRecallService(
+                memories,
+                new MemoryDecayPolicy(),
+                mock(MemoryCompressionService.class),
+                mock(CharacterStateRepository.class)
+        );
         Memory relevant = new Memory(character, null, "반려묘 이름은 감자", 5, 50, now.minusDays(2));
         Memory unrelated = new Memory(character, null, "세계 대전이 끝났다", 10, 100, now);
         Memory faded = new Memory(character, null, "반려묘 이름은 양파", 4, 40, now.minusDays(100));
@@ -112,7 +118,12 @@ class ChatMemoryTest {
 
     @Test
     void globalSimulationCannotRecallConversationMemories() {
-        var recall = new MemoryRecallService(memories, new MemoryDecayPolicy(), mock(MemoryCompressionService.class));
+        var recall = new MemoryRecallService(
+                memories,
+                new MemoryDecayPolicy(),
+                mock(MemoryCompressionService.class),
+                mock(CharacterStateRepository.class)
+        );
         Memory chat = Memory.fromChat(conversation, source("내 반려묘 이름은 감자야."), "내 반려묘 이름은 감자야.", 5, now, "key");
         when(memories.findByCharacterIdOrderByRememberedAtDesc(7L)).thenReturn(List.of(chat));
         assertThat(recall.recall(7L, now, 5)).isEmpty();

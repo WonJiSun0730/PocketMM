@@ -1,5 +1,6 @@
 package com.example.projectmm.application.memory;
 
+import com.example.projectmm.domain.character.CharacterStateRepository;
 import com.example.projectmm.domain.memory.*;
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.chat.*;
@@ -51,7 +52,12 @@ class StructuredMemoryTest {
 
     @Test void recallUsesStructuredSubjectEvenAfterSummaryCompressionAndKeepsLegacyFallback() {
         var repository = mock(MemoryRepository.class);
-        var recall = new MemoryRecallService(repository, new MemoryDecayPolicy(), mock(MemoryCompressionService.class));
+        var recall = new MemoryRecallService(
+                repository,
+                new MemoryDecayPolicy(),
+                mock(MemoryCompressionService.class),
+                mock(CharacterStateRepository.class)
+        );
         var character = new Character("NPC");
         var room = new Conversation(character, at);
         var structured = Memory.fromChat(room, null, "내 반려묘 이름은 감자야.", 5, at, "key",
@@ -68,7 +74,12 @@ class StructuredMemoryTest {
 
     @Test void structureDoesNotOutrankEquallyRelevantStrongerLegacyMemory() {
         var repository = mock(MemoryRepository.class);
-        var recall = new MemoryRecallService(repository, new MemoryDecayPolicy(), mock(MemoryCompressionService.class));
+        var recall = new MemoryRecallService(
+                repository,
+                new MemoryDecayPolicy(),
+                mock(MemoryCompressionService.class),
+                mock(CharacterStateRepository.class)
+        );
         var character = new Character("NPC");
         var room = new Conversation(character, at);
         var structured = Memory.fromChat(room, null, "내 반려묘 이름은 감자야.", 5, at, "key",

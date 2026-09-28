@@ -31,6 +31,9 @@ public class CharacterState {
     private int mood;
 
     @Column(nullable = false)
+    private int memoryAbility = 100;
+
+    @Column(nullable = false)
     private LocalDateTime simulatedAt;
 
     public CharacterState(
@@ -39,9 +42,26 @@ public class CharacterState {
             int mood,
             LocalDateTime simulatedAt
     ) {
+        this(
+                character,
+                energy,
+                mood,
+                100,
+                simulatedAt
+        );
+    }
+
+    public CharacterState(
+            Character character,
+            int energy,
+            int mood,
+            int memoryAbility,
+            LocalDateTime simulatedAt
+    ) {
         this.character = character;
-        this.energy = energy;
-        this.mood = mood;
+        this.energy = clamp(energy);
+        this.mood = clamp(mood);
+        this.memoryAbility = clamp(memoryAbility);
         this.simulatedAt = simulatedAt;
     }
 
@@ -57,6 +77,13 @@ public class CharacterState {
 
     public void advanceSimulatedAt(LocalDateTime simulatedAt) {
         this.simulatedAt = simulatedAt;
+    }
+
+    public void changeMemoryAbility(
+            int memoryAbility
+    ) {
+        this.memoryAbility =
+                clamp(memoryAbility);
     }
 
     private int clamp(int value) {
