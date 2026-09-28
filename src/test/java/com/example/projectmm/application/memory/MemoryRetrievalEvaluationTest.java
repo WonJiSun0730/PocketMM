@@ -7,10 +7,7 @@ import com.example.projectmm.domain.character.CharacterStateRepository;
 import com.example.projectmm.domain.chat.ChatMessage;
 import com.example.projectmm.domain.chat.ChatRole;
 import com.example.projectmm.domain.chat.Conversation;
-import com.example.projectmm.domain.memory.EffectiveMemory;
-import com.example.projectmm.domain.memory.Memory;
-import com.example.projectmm.domain.memory.MemoryFact;
-import com.example.projectmm.domain.memory.MemoryRepository;
+import com.example.projectmm.domain.memory.*;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
@@ -31,12 +28,16 @@ class MemoryRetrievalEvaluationTest {
     private final CharacterStateRepository characterStateRepository =
             mock(CharacterStateRepository.class);
 
+    private final MemoryAccessStateRepository memoryAccessStateRepository =
+            mock(MemoryAccessStateRepository.class);
+
     private final MemoryRecallService memoryRecallService =
             new MemoryRecallService(
                     memoryRepository,
                     new MemoryDecayPolicy(),
                     memoryCompressionService,
-                    characterStateRepository
+                    characterStateRepository,
+                    memoryAccessStateRepository
             );
 
     private final LocalDateTime now =

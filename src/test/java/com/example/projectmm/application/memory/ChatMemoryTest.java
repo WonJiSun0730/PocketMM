@@ -103,7 +103,8 @@ class ChatMemoryTest {
                 memories,
                 new MemoryDecayPolicy(),
                 mock(MemoryCompressionService.class),
-                mock(CharacterStateRepository.class)
+                mock(CharacterStateRepository.class),
+                mock(MemoryAccessStateRepository.class)
         );
         Memory relevant = new Memory(character, null, "반려묘 이름은 감자", 5, 50, now.minusDays(2));
         Memory unrelated = new Memory(character, null, "세계 대전이 끝났다", 10, 100, now);
@@ -122,7 +123,8 @@ class ChatMemoryTest {
                 memories,
                 new MemoryDecayPolicy(),
                 mock(MemoryCompressionService.class),
-                mock(CharacterStateRepository.class)
+                mock(CharacterStateRepository.class),
+                mock(MemoryAccessStateRepository.class)
         );
         Memory chat = Memory.fromChat(conversation, source("내 반려묘 이름은 감자야."), "내 반려묘 이름은 감자야.", 5, now, "key");
         when(memories.findByCharacterIdOrderByRememberedAtDesc(7L)).thenReturn(List.of(chat));

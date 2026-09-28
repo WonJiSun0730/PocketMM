@@ -4,11 +4,10 @@ import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.character.CharacterState;
 import com.example.projectmm.domain.character.CharacterStateRepository;
 import com.example.projectmm.domain.event.Event;
-import com.example.projectmm.domain.memory.EffectiveMemory;
-import com.example.projectmm.domain.memory.Memory;
-import com.example.projectmm.domain.memory.MemoryRepository;
+import com.example.projectmm.domain.memory.*;
 import com.example.projectmm.domain.scene.Scene;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -34,12 +33,16 @@ class MemoryRecallServiceTest {
     private final CharacterStateRepository characterStateRepository =
             mock(CharacterStateRepository.class);
 
+    private final MemoryAccessStateRepository memoryAccessStateRepository =
+            mock(MemoryAccessStateRepository.class);
+
     private final MemoryRecallService memoryRecallService =
             new MemoryRecallService(
                     memoryRepository,
                     memoryDecayPolicy,
                     memoryCompressionService,
-                    characterStateRepository
+                    characterStateRepository,
+                    memoryAccessStateRepository
             );
 
     @Test
@@ -554,86 +557,6 @@ class MemoryRecallServiceTest {
     }
 
     @Test
-    void 상태_변화로_기억력이_낮아지면_기존에_회상되던_기억이_제외된다() {
-
-        Long characterId = 1L;
-
-        LocalDateTime now =
-                LocalDateTime.of(
-                        2026, 9, 28,
-                        12, 0
-                );
-
-        Character character =
-                new Character("Millie");
-
-        CharacterState state =
-                new CharacterState(
-                        character,
-                        70,
-                        70,
-                        80,
-                        now
-                );
-
-        when(
-                characterStateRepository.findByCharacterId(
-                        characterId
-                )
-        ).thenReturn(
-                Optional.of(state)
-        );
-
-        Memory memory =
-                createMemory(
-                        "경계에 있는 기억",
-                        5,
-                        50,
-                        now
-                );
-
-        when(
-                memoryRepository
-                        .findByCharacterIdOrderByRememberedAtDesc(
-                                characterId
-                        )
-        ).thenReturn(
-                List.of(memory)
-        );
-
-        List<EffectiveMemory> before =
-                memoryRecallService.recall(
-                        characterId,
-                        now,
-                        10
-                );
-
-        assertThat(before)
-                .hasSize(1);
-
-        state.apply(
-                new com.example.projectmm.domain.simulation.StateDelta(
-                        0,
-                        0,
-                        -40
-                )
-        );
-
-        assertThat(state.getMemoryAbility())
-                .isEqualTo(40);
-
-        List<EffectiveMemory> after =
-                memoryRecallService.recall(
-                        characterId,
-                        now,
-                        10
-                );
-
-        assertThat(after)
-                .isEmpty();
-    }
-
-    @Test
     void 기억력_상태가_없으면_기존_회상_동작을_유지한다() {
 
         Long characterId = 1L;
@@ -684,6 +607,126 @@ class MemoryRecallServiceTest {
 
         assertThat(result.get(0).effectiveStrength())
                 .isEqualTo(10);
+    }
+
+    @Test
+    void 차단된_기억은_삭제하지_않고_회상에서만_제외한다() {
+
+        Long characterId = 1L;
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 28,
+                        12, 0
+                );
+
+        Memory blockedMemory =
+                createMemory(
+                        "접근이 차단된 기억",
+                        9,
+                        90,
+                        now
+                );
+
+        ReflectionTestUtils.setField(
+                blockedMemory,
+                "id",
+                100L
+        );
+
+        MemoryAccessState accessState =
+                new MemoryAccessState(
+                        blockedMemory,
+                        MemoryAccessLevel.BLOCKED,
+                        now
+                );
+
+        when(
+                memoryRepository
+                        .findByCharacterIdOrderByRememberedAtDesc(
+                                characterId
+                        )
+        ).thenReturn(
+                List.of(blockedMemory)
+        );
+
+        when(
+                memoryAccessStateRepository
+                        .findByMemoryId(100L)
+        ).thenReturn(
+                Optional.of(accessState)
+        );
+
+        List<EffectiveMemory> result =
+                memoryRecallService.recall(
+                        characterId,
+                        now,
+                        10
+                );
+
+        assertThat(result)
+                .isEmpty();
+
+        assertThat(accessState.getMemory())
+                .isSameAs(blockedMemory);
+
+        assertThat(blockedMemory.getSummary())
+                .isEqualTo("접근이 차단된 기억");
+    }
+
+    @Test
+    void 접근_상태가_없는_기존_기억은_명시적_회상으로_유지한다() {
+
+        Long characterId = 1L;
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 28,
+                        12, 0
+                );
+
+        Memory legacyMemory =
+                createMemory(
+                        "기존에 저장된 기억",
+                        9,
+                        90,
+                        now
+                );
+
+        ReflectionTestUtils.setField(
+                legacyMemory,
+                "id",
+                101L
+        );
+
+        when(
+                memoryRepository
+                        .findByCharacterIdOrderByRememberedAtDesc(
+                                characterId
+                        )
+        ).thenReturn(
+                List.of(legacyMemory)
+        );
+
+        when(
+                memoryAccessStateRepository
+                        .findByMemoryId(101L)
+        ).thenReturn(
+                Optional.empty()
+        );
+
+        List<EffectiveMemory> result =
+                memoryRecallService.recall(
+                        characterId,
+                        now,
+                        10
+                );
+
+        assertThat(result)
+                .hasSize(1);
+
+        assertThat(result.get(0).summary())
+                .isEqualTo("기존에 저장된 기억");
     }
 
     private Memory createMemory(

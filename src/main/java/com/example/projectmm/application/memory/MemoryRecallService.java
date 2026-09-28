@@ -1,10 +1,7 @@
 package com.example.projectmm.application.memory;
 
 import com.example.projectmm.domain.character.CharacterStateRepository;
-import com.example.projectmm.domain.memory.EffectiveMemory;
-import com.example.projectmm.domain.memory.Memory;
-import com.example.projectmm.domain.memory.MemoryDecayResult;
-import com.example.projectmm.domain.memory.MemoryRepository;
+import com.example.projectmm.domain.memory.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +17,7 @@ public class MemoryRecallService {
     private final MemoryDecayPolicy memoryDecayPolicy;
     private final MemoryCompressionService memoryCompressionService;
     private final CharacterStateRepository characterStateRepository;
+    private final MemoryAccessStateRepository memoryAccessStateRepository;
 
     public List<EffectiveMemory> recall(
             Long characterId,
@@ -42,6 +40,9 @@ public class MemoryRecallService {
         return memories.stream()
                 // World simulation has no conversation context: never borrow another RP's memories.
                 .filter(memory -> memory.getConversation() == null)
+                .filter(memory ->
+                        accessible(memory)
+                )
                 .map(memory ->
                         prepareMemory(
                                 memory,
@@ -81,6 +82,9 @@ public class MemoryRecallService {
                 // 독립 시작 방에는 방 소속이 없는 과거 세계 사건 기억도 주입하지 않는다.
                 .filter(memory -> includeSharedMemories || memory.getConversation() != null)
                 .filter(memory -> !memory.getRememberedAt().isAfter(currentTime))
+                .filter(memory ->
+                        accessible(memory)
+                )
                 .map(memory -> prepareMemory(memory, currentTime))
                 .filter(memory ->
                         recallable(
@@ -123,6 +127,29 @@ public class MemoryRecallService {
                 memory.getRememberedAt(),
                 decay.compressionRequired(), memory.getEvidenceQuote(), memory.getFact()
         );
+    }
+
+    private boolean accessible(
+            Memory memory
+    ) {
+        if (memory.getId() == null) {
+            return true;
+        }
+
+        MemoryAccessLevel accessLevel =
+                memoryAccessStateRepository
+                        .findByMemoryId(
+                                memory.getId()
+                        )
+                        .map(state ->
+                                state.getAccessLevel()
+                        )
+                        .orElse(
+                                MemoryAccessLevel.EXPLICIT
+                        );
+
+        return accessLevel
+                != MemoryAccessLevel.BLOCKED;
     }
 
     private int recallThreshold(
