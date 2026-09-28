@@ -13,6 +13,10 @@ public class MemoryCompressionPromptBuilder {
     private final MemoryAccessStateRepository accessStates;
 
     public Optional<String> build(Memory memory, MemoryDetailLevel target, List<Memory> related) {
+        return prepare(memory, target, related).map(MemoryCompressionPrompt::text);
+    }
+
+    public Optional<MemoryCompressionPrompt> prepare(Memory memory, MemoryDetailLevel target, List<Memory> related) {
         if (memory == null || target == null || !memory.getDetailLevel().canCompressFurther()
                 || memory.getDetailLevel().next() != target || !explicit(memory)) return Optional.empty();
 
@@ -64,7 +68,7 @@ public class MemoryCompressionPromptBuilder {
         prompt.append("Target: ").append(target).append('\n').append(semantics);
         append(prompt, "Current memory", memory);
         for (int i = 0; i < evidence.size(); i++) append(prompt, "Related evidence " + (i + 1), evidence.get(i));
-        return Optional.of(prompt.toString());
+        return Optional.of(new MemoryCompressionPrompt(prompt.toString(), evidence.stream().map(Memory::getId).toList()));
     }
 
     private boolean explicit(Memory memory) {

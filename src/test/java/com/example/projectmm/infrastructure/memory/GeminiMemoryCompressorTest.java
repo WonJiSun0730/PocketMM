@@ -31,7 +31,8 @@ class GeminiMemoryCompressorTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Target: SUMMARY")))
                 .andRespond(withSuccess(envelope("{\"summary\":\"핵심 사건\"}", "STOP"), MediaType.APPLICATION_JSON));
         var source = memory(1, "original");
-        assertThat(compressor.compress(source, MemoryDetailLevel.SUMMARY, List.of())).isEqualTo("핵심 사건");
+        assertThat(compressor.compress(source, MemoryDetailLevel.SUMMARY, List.of()))
+                .isEqualTo(new MemoryCompressorOutput("핵심 사건", List.of()));
         assertThat(source.getSummary()).isEqualTo("original");
         assertThat(source.getDetailLevel()).isEqualTo(MemoryDetailLevel.DETAILED);
         server.verify();
@@ -79,7 +80,7 @@ class GeminiMemoryCompressorTest {
             assertThat(app).hasSingleBean(MemoryCompressor.class);
             assertThat(app.getBean(MemoryCompressor.class)).isInstanceOf(RuleBasedMemoryCompressor.class);
             assertThat(app.getBean(MemoryCompressor.class).compress(memory(1, "unchanged"), MemoryDetailLevel.SUMMARY, List.of()))
-                    .isEqualTo("unchanged");
+                    .isEqualTo(new MemoryCompressorOutput("unchanged", List.of()));
         });
         context.withPropertyValues("spring.profiles.active=gemini").run(app -> {
             assertThat(app).hasSingleBean(MemoryCompressor.class);

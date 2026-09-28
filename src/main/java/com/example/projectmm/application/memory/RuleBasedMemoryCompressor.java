@@ -13,11 +13,12 @@ public class RuleBasedMemoryCompressor
         implements MemoryCompressor {
 
     @Override
-    public String compress(
+    public MemoryCompressorOutput compress(
             Memory memory,
             MemoryDetailLevel targetLevel,
             List<Memory> relatedMemories
     ) {
-        return memory.getSummary();
+        // This fallback does not consume related evidence; never claim candidate IDs as provenance.
+        return new MemoryCompressorOutput(memory.getSummary(), List.of());
     }
 }

@@ -62,13 +62,14 @@ public class MemoryCompressionService {
             );
         }
 
-        String compressedSummary =
+        MemoryCompressorOutput output =
                 memoryCompressor.compress(
                         memory,
                         targetLevel,
                         relatedMemories
                 );
 
+        String compressedSummary = output == null ? null : output.summary();
         if (compressedSummary == null || compressedSummary.isBlank() || compressedSummary.length() > 500) {
             return MemoryCompressionResult.skipped(memory.getSummary());
         }

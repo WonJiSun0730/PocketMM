@@ -19,7 +19,8 @@ class MemoryCompressionAbstentionTest {
         var at = LocalDateTime.of(2026, 1, 1, 12, 0);
         var memory = new Memory(new Character("NPC"), null, "original", 5, 100, 10, at);
         for (String output : new String[]{null, "", "x".repeat(501)}) {
-            when(compressor.compress(memory, MemoryDetailLevel.SUMMARY, List.of())).thenReturn(output);
+            when(compressor.compress(memory, MemoryDetailLevel.SUMMARY, List.of()))
+                    .thenReturn(output == null ? null : new MemoryCompressorOutput(output, List.of()));
             assertThat(service.compressIfNeeded(memory, at.plusYears(1)).compressed()).isFalse();
             assertThat(memory.getSummary()).isEqualTo("original");
             assertThat(memory.getDetailLevel()).isEqualTo(MemoryDetailLevel.DETAILED);

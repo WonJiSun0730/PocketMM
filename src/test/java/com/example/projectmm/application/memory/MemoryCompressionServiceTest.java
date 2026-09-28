@@ -52,9 +52,7 @@ class MemoryCompressionServiceTest {
                         MemoryDetailLevel.SUMMARY,
                         List.of()
                 )
-        ).thenReturn(
-                "과거에 중요한 대화를 나눈 기억."
-        );
+        ).thenReturn(new MemoryCompressorOutput("과거에 중요한 대화를 나눈 기억.", List.of()));
 
         MemoryCompressionResult result =
                 service.compressIfNeeded(
@@ -139,9 +137,7 @@ class MemoryCompressionServiceTest {
                         MemoryDetailLevel.SUMMARY,
                         List.of()
                 )
-        ).thenReturn(
-                "관계를 정의하는 중요한 사건."
-        );
+        ).thenReturn(new MemoryCompressorOutput("관계를 정의하는 중요한 사건.", List.of()));
 
         MemoryCompressionResult result =
                 service.compressIfNeeded(
@@ -219,9 +215,7 @@ class MemoryCompressionServiceTest {
                         MemoryDetailLevel.SUMMARY,
                         List.of()
                 )
-        ).thenReturn(
-                "함께 힘든 일을 겪었다."
-        );
+        ).thenReturn(new MemoryCompressorOutput("함께 힘든 일을 겪었다.", List.of()));
 
         when(
                 memoryCompressor.compress(
@@ -232,9 +226,7 @@ class MemoryCompressionServiceTest {
                                 relatedMemory2
                         )
                 )
-        ).thenReturn(
-                "힘든 상황에서 서로 돕는 일이 반복된다."
-        );
+        ).thenReturn(new MemoryCompressorOutput("힘든 상황에서 서로 돕는 일이 반복된다.", List.of()));
 
         when(
                 memoryCompressor.compress(
@@ -245,9 +237,7 @@ class MemoryCompressionServiceTest {
                                 relatedMemory2
                         )
                 )
-        ).thenReturn(
-                "의지할 수 있는 사람."
-        );
+        ).thenReturn(new MemoryCompressorOutput("의지할 수 있는 사람.", List.of()));
 
         service.compressIfNeeded(
                 memory,
@@ -353,9 +343,7 @@ class MemoryCompressionServiceTest {
                         MemoryDetailLevel.SUMMARY,
                         List.of()
                 )
-        ).thenReturn(
-                "함께 힘든 일을 겪었다."
-        );
+        ).thenReturn(new MemoryCompressorOutput("함께 힘든 일을 겪었다.", List.of()));
 
         service.compressIfNeeded(
                 memory,
@@ -425,9 +413,7 @@ class MemoryCompressionServiceTest {
                         MemoryDetailLevel.SUMMARY,
                         List.of()
                 )
-        ).thenReturn(
-                "함께 힘든 일을 겪었다."
-        );
+        ).thenReturn(new MemoryCompressorOutput("함께 힘든 일을 겪었다.", List.of()));
 
         when(
                 candidateFinder.findRelated(memory)
@@ -441,9 +427,7 @@ class MemoryCompressionServiceTest {
                         MemoryDetailLevel.PATTERN,
                         List.of(relatedMemory)
                 )
-        ).thenReturn(
-                "힘든 상황에서 서로 돕는 일이 반복된다."
-        );
+        ).thenReturn(new MemoryCompressorOutput("힘든 상황에서 서로 돕는 일이 반복된다.", List.of()));
 
         service.compressIfNeeded(
                 memory,
