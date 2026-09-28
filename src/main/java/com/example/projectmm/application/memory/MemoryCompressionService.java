@@ -69,6 +69,10 @@ public class MemoryCompressionService {
                         relatedMemories
                 );
 
+        if (compressedSummary == null || compressedSummary.isBlank() || compressedSummary.length() > 500) {
+            return MemoryCompressionResult.skipped(memory.getSummary());
+        }
+
         memory.compress(compressedSummary);
 
         return MemoryCompressionResult.compressed(
