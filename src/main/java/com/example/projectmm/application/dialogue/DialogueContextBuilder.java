@@ -206,15 +206,52 @@ public class DialogueContextBuilder {
                 );
 
         return recalledMemories.stream()
-                .map(memory ->
-                        new DialogueMemoryContext(
-                                memory.summary(),
-                                memory.importance(),
-                                memory.effectiveStrength(),
-                                memory.rememberedAt(), memory.evidenceQuote(), memory.fact()
-                        )
-                )
+                .map(this::toDialogueMemoryContext)
                 .toList();
+    }
+
+    private DialogueMemoryContext toDialogueMemoryContext(
+            EffectiveMemory memory
+    ) {
+        return switch (memory.accessLevel()) {
+
+            case EXPLICIT ->
+                    new DialogueMemoryContext(
+                            memory.summary(),
+                            memory.importance(),
+                            memory.effectiveStrength(),
+                            memory.rememberedAt(),
+                            memory.evidenceQuote(),
+                            memory.fact()
+                    );
+
+            case IMPLICIT ->
+                    new DialogueMemoryContext(
+                            "구체적인 이유나 사건은 기억나지 않지만, "
+                                    + "이 대상이나 상황에 익숙함을 느낀다.",
+                            memory.importance(),
+                            memory.effectiveStrength(),
+                            memory.rememberedAt(),
+                            null,
+                            null
+                    );
+
+            case RESIDUAL ->
+                    new DialogueMemoryContext(
+                            "관련된 구체적인 기억은 떠오르지 않지만, "
+                                    + "이유를 특정할 수 없는 감정적 잔향이 남아 있다.",
+                            memory.importance(),
+                            memory.effectiveStrength(),
+                            memory.rememberedAt(),
+                            null,
+                            null
+                    );
+
+            case BLOCKED ->
+                    throw new IllegalStateException(
+                            "BLOCKED memory must not reach dialogue context"
+                    );
+        };
     }
 
     private List<DialogueRelationshipContext> buildRelationships(

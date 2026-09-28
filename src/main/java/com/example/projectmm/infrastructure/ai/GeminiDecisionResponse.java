@@ -1,5 +1,7 @@
 package com.example.projectmm.infrastructure.ai;
 
+import tools.jackson.databind.JsonNode;
+
 public record GeminiDecisionResponse(
         String eventType,
         String summary,
@@ -10,6 +12,7 @@ public record GeminiDecisionResponse(
         Long relationshipTargetCharacterId,
         int affinityChange,
         int trustChange,
-        int tensionChange
+        int tensionChange,
+        JsonNode memoryAccessChange
 ) {
 }

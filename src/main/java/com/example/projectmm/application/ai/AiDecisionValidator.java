@@ -3,11 +3,18 @@ package com.example.projectmm.application.ai;
 import com.example.projectmm.domain.ai.AiDecision;
 import com.example.projectmm.domain.simulation.ValidationResult;
 import org.springframework.stereotype.Component;
+import com.example.projectmm.domain.memory.MemoryAccessLevel;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 
 @Component
 public class AiDecisionValidator {
 
     public ValidationResult validate(AiDecision decision) {
+        return validate(decision, null);
+    }
+
+    public ValidationResult validate(AiDecision decision, LocalDateTime occurredAt) {
 
         if (decision == null) {
             return ValidationResult.reject(
@@ -98,6 +105,32 @@ public class AiDecisionValidator {
             );
         }
 
+        var access = decision.memoryAccessChange();
+        if (access != null) {
+            if (occurredAt == null || access.accessLevel() == null) {
+                return ValidationResult.reject("Memory access requires event time and access level");
+            }
+            try {
+                MemoryAccessLevel.valueOf(access.accessLevel());
+            } catch (IllegalArgumentException ex) {
+                return ValidationResult.reject("Invalid memory access level");
+            }
+            if ("ALL".equals(access.scope())) {
+                if (access.since() != null) return ValidationResult.reject("ALL must not specify since");
+            } else if ("SINCE".equals(access.scope())) {
+                if (access.since() == null) return ValidationResult.reject("SINCE requires since");
+                try {
+                    var since = LocalDateTime.parse(access.since());
+                    if (since.getYear() < 1 || since.getYear() > 9999 || since.isAfter(occurredAt)) {
+                        return ValidationResult.reject("since must be a supported time no later than the event");
+                    }
+                } catch (DateTimeParseException ex) {
+                    return ValidationResult.reject("Invalid memory access since timestamp");
+                }
+            } else {
+                return ValidationResult.reject("Memory access scope must be ALL or SINCE");
+            }
+        }
         return ValidationResult.accept();
     }
 }

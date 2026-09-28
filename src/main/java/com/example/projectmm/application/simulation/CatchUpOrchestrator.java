@@ -74,7 +74,7 @@ public class CatchUpOrchestrator {
                                 aiGateway.decide(context);
 
                         ValidationResult validation =
-                                aiDecisionValidator.validate(decision);
+                                aiDecisionValidator.validate(decision, candidate.occurredAt());
 
                         if (!validation.valid()) {
                             log.warn(
@@ -97,7 +97,8 @@ public class CatchUpOrchestrator {
                                         decision.stateDelta(),
                                         decision.relationshipTargetCharacterId(),
                                         decision.relationshipDelta(),
-                                        EventSource.AI
+                                        EventSource.AI,
+                                        decision.memoryAccessChange()
                                 )
                         );
 
