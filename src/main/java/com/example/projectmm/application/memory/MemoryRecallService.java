@@ -125,31 +125,37 @@ public class MemoryRecallService {
                 memory.getImportance(),
                 decay.effectiveStrength(),
                 memory.getRememberedAt(),
-                decay.compressionRequired(), memory.getEvidenceQuote(), memory.getFact()
+                decay.compressionRequired(),
+                memory.getEvidenceQuote(),
+                memory.getFact(),
+                accessLevel(memory)
         );
     }
 
     private boolean accessible(
             Memory memory
     ) {
+        return accessLevel(memory)
+                != MemoryAccessLevel.BLOCKED;
+    }
+
+    private MemoryAccessLevel accessLevel(
+            Memory memory
+    ) {
         if (memory.getId() == null) {
-            return true;
+            return MemoryAccessLevel.EXPLICIT;
         }
 
-        MemoryAccessLevel accessLevel =
-                memoryAccessStateRepository
-                        .findByMemoryId(
-                                memory.getId()
-                        )
-                        .map(state ->
-                                state.getAccessLevel()
-                        )
-                        .orElse(
-                                MemoryAccessLevel.EXPLICIT
-                        );
-
-        return accessLevel
-                != MemoryAccessLevel.BLOCKED;
+        return memoryAccessStateRepository
+                .findByMemoryId(
+                        memory.getId()
+                )
+                .map(state ->
+                        state.getAccessLevel()
+                )
+                .orElse(
+                        MemoryAccessLevel.EXPLICIT
+                );
     }
 
     private int recallThreshold(

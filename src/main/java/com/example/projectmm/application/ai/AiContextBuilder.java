@@ -35,7 +35,7 @@ public class AiContextBuilder {
                 recalledMemories.stream()
                         .map(memory ->
                                 new AiMemoryContext(
-                                        memory.summary(),
+                                        memorySummary(memory),
                                         memory.importance(),
                                         memory.effectiveStrength(),
                                         memory.rememberedAt()
@@ -76,5 +76,27 @@ public class AiContextBuilder {
                 memoryContexts,
                 relationshipContexts
         );
+    }
+
+    private String memorySummary(
+            EffectiveMemory memory
+    ) {
+        return switch (memory.accessLevel()) {
+            case EXPLICIT ->
+                    memory.summary();
+
+            case IMPLICIT ->
+                    "구체적인 이유나 사건은 기억나지 않지만, "
+                            + "이 대상이나 상황에 익숙함을 느낀다.";
+
+            case RESIDUAL ->
+                    "관련된 구체적인 기억은 떠오르지 않지만, "
+                            + "이유를 특정할 수 없는 감정적 잔향이 남아 있다.";
+
+            case BLOCKED ->
+                    throw new IllegalStateException(
+                            "BLOCKED memory must not reach AI context"
+                    );
+        };
     }
 }

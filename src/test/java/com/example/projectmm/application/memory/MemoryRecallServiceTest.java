@@ -729,6 +729,134 @@ class MemoryRecallServiceTest {
                 .isEqualTo("기존에 저장된 기억");
     }
 
+    @Test
+    void 암묵적_접근_상태는_회상_결과에_전달된다() {
+
+        Long characterId = 1L;
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 28,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        "구체적인 사건 기억",
+                        9,
+                        90,
+                        now
+                );
+
+        ReflectionTestUtils.setField(
+                memory,
+                "id",
+                102L
+        );
+
+        MemoryAccessState accessState =
+                new MemoryAccessState(
+                        memory,
+                        MemoryAccessLevel.IMPLICIT,
+                        now
+                );
+
+        when(
+                memoryRepository
+                        .findByCharacterIdOrderByRememberedAtDesc(
+                                characterId
+                        )
+        ).thenReturn(
+                List.of(memory)
+        );
+
+        when(
+                memoryAccessStateRepository
+                        .findByMemoryId(102L)
+        ).thenReturn(
+                Optional.of(accessState)
+        );
+
+        List<EffectiveMemory> result =
+                memoryRecallService.recall(
+                        characterId,
+                        now,
+                        10
+                );
+
+        assertThat(result)
+                .hasSize(1);
+
+        assertThat(result.get(0).accessLevel())
+                .isEqualTo(
+                        MemoryAccessLevel.IMPLICIT
+                );
+    }
+
+    @Test
+    void 잔여_접근_상태는_회상_결과에_전달된다() {
+
+        Long characterId = 1L;
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 28,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        "강한 감정이 남은 사건",
+                        9,
+                        90,
+                        now
+                );
+
+        ReflectionTestUtils.setField(
+                memory,
+                "id",
+                103L
+        );
+
+        MemoryAccessState accessState =
+                new MemoryAccessState(
+                        memory,
+                        MemoryAccessLevel.RESIDUAL,
+                        now
+                );
+
+        when(
+                memoryRepository
+                        .findByCharacterIdOrderByRememberedAtDesc(
+                                characterId
+                        )
+        ).thenReturn(
+                List.of(memory)
+        );
+
+        when(
+                memoryAccessStateRepository
+                        .findByMemoryId(103L)
+        ).thenReturn(
+                Optional.of(accessState)
+        );
+
+        List<EffectiveMemory> result =
+                memoryRecallService.recall(
+                        characterId,
+                        now,
+                        10
+                );
+
+        assertThat(result)
+                .hasSize(1);
+
+        assertThat(result.get(0).accessLevel())
+                .isEqualTo(
+                        MemoryAccessLevel.RESIDUAL
+                );
+    }
+
     private Memory createMemory(
             String summary,
             int importance,

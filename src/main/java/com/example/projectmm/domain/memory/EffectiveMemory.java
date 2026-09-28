@@ -10,10 +10,51 @@ public record EffectiveMemory(
         LocalDateTime rememberedAt,
         boolean compressionRequired,
         String evidenceQuote,
-        MemoryFact fact
+        MemoryFact fact,
+        MemoryAccessLevel accessLevel
 ) {
-    public EffectiveMemory(Long memoryId, String summary, int importance, int effectiveStrength,
-                           LocalDateTime rememberedAt, boolean compressionRequired) {
-        this(memoryId, summary, importance, effectiveStrength, rememberedAt, compressionRequired, null, null);
+
+    public EffectiveMemory(
+            Long memoryId,
+            String summary,
+            int importance,
+            int effectiveStrength,
+            LocalDateTime rememberedAt,
+            boolean compressionRequired
+    ) {
+        this(
+                memoryId,
+                summary,
+                importance,
+                effectiveStrength,
+                rememberedAt,
+                compressionRequired,
+                null,
+                null,
+                MemoryAccessLevel.EXPLICIT
+        );
+    }
+
+    public EffectiveMemory(
+            Long memoryId,
+            String summary,
+            int importance,
+            int effectiveStrength,
+            LocalDateTime rememberedAt,
+            boolean compressionRequired,
+            String evidenceQuote,
+            MemoryFact fact
+    ) {
+        this(
+                memoryId,
+                summary,
+                importance,
+                effectiveStrength,
+                rememberedAt,
+                compressionRequired,
+                evidenceQuote,
+                fact,
+                MemoryAccessLevel.EXPLICIT
+        );
     }
 }
