@@ -44,10 +44,14 @@ class MemoryCompressionServiceTest {
                         50
                 );
 
-        when(memoryCompressor.compress(memory))
-                .thenReturn(
-                        "과거에 중요한 대화를 나눈 기억."
-                );
+        when(
+                memoryCompressor.compress(
+                        memory,
+                        MemoryDetailLevel.SUMMARY
+                )
+        ).thenReturn(
+                "과거에 중요한 대화를 나눈 기억."
+        );
 
         MemoryCompressionResult result =
                 service.compressIfNeeded(
@@ -69,7 +73,10 @@ class MemoryCompressionServiceTest {
                 );
 
         verify(memoryCompressor)
-                .compress(memory);
+                .compress(
+                        memory,
+                        MemoryDetailLevel.SUMMARY
+                );
     }
 
     @Test
@@ -122,10 +129,14 @@ class MemoryCompressionServiceTest {
                         10
                 );
 
-        when(memoryCompressor.compress(memory))
-                .thenReturn(
-                        "관계를 정의하는 중요한 사건."
-                );
+        when(
+                memoryCompressor.compress(
+                        memory,
+                        MemoryDetailLevel.SUMMARY
+                )
+        ).thenReturn(
+                "관계를 정의하는 중요한 사건."
+        );
 
         MemoryCompressionResult result =
                 service.compressIfNeeded(
@@ -159,7 +170,10 @@ class MemoryCompressionServiceTest {
                 .isEqualTo(100);
 
         verify(memoryCompressor)
-                .compress(memory);
+                .compress(
+                        memory,
+                        MemoryDetailLevel.SUMMARY
+                );
     }
 
     @Test
@@ -178,12 +192,32 @@ class MemoryCompressionServiceTest {
                         30
                 );
 
-        when(memoryCompressor.compress(memory))
-                .thenReturn(
-                        "요약 기억.",
-                        "반복되는 관계 패턴.",
-                        "의지할 수 있는 사람."
-                );
+        when(
+                memoryCompressor.compress(
+                        memory,
+                        MemoryDetailLevel.SUMMARY
+                )
+        ).thenReturn(
+                "함께 힘든 일을 겪었다."
+        );
+
+        when(
+                memoryCompressor.compress(
+                        memory,
+                        MemoryDetailLevel.PATTERN
+                )
+        ).thenReturn(
+                "힘든 상황에서 서로 돕는 일이 반복된다."
+        );
+
+        when(
+                memoryCompressor.compress(
+                        memory,
+                        MemoryDetailLevel.SCHEMA
+                )
+        ).thenReturn(
+                "의지할 수 있는 사람."
+        );
 
         service.compressIfNeeded(
                 memory,
@@ -234,8 +268,23 @@ class MemoryCompressionServiceTest {
                         MemoryDetailLevel.SCHEMA
                 );
 
-        verify(memoryCompressor, times(3))
-                .compress(memory);
+        verify(memoryCompressor)
+                .compress(
+                        memory,
+                        MemoryDetailLevel.SUMMARY
+                );
+
+        verify(memoryCompressor)
+                .compress(
+                        memory,
+                        MemoryDetailLevel.PATTERN
+                );
+
+        verify(memoryCompressor)
+                .compress(
+                        memory,
+                        MemoryDetailLevel.SCHEMA
+                );
     }
 
     private Memory createMemory(

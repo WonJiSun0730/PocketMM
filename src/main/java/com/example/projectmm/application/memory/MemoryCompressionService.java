@@ -40,8 +40,14 @@ public class MemoryCompressionService {
             );
         }
 
+        MemoryDetailLevel targetLevel =
+                memory.getDetailLevel().next();
+
         String compressedSummary =
-                memoryCompressor.compress(memory);
+                memoryCompressor.compress(
+                        memory,
+                        targetLevel
+                );
 
         memory.compress(compressedSummary);
 
