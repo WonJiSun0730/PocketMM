@@ -60,7 +60,7 @@ class MemoryCompressionServiceTest {
 
         assertThat(memory.getDetailLevel())
                 .isEqualTo(
-                        MemoryDetailLevel.COMPRESSED
+                        MemoryDetailLevel.SUMMARY
                 );
 
         assertThat(memory.getSummary())
@@ -106,43 +106,6 @@ class MemoryCompressionServiceTest {
     }
 
     @Test
-    void 이미_압축된_기억은_다시_압축하지_않는다() {
-
-        LocalDateTime rememberedAt =
-                LocalDateTime.of(
-                        2026, 9, 1,
-                        12, 0
-                );
-
-        Memory memory =
-                createMemory(
-                        rememberedAt,
-                        5,
-                        50
-                );
-
-        memory.compress(
-                "이미 압축된 기억."
-        );
-
-        MemoryCompressionResult result =
-                service.compressIfNeeded(
-                        memory,
-                        rememberedAt.plusDays(20)
-                );
-
-        assertThat(result.compressed())
-                .isFalse();
-
-        assertThat(memory.getSummary())
-                .isEqualTo(
-                        "이미 압축된 기억."
-                );
-
-        verifyNoInteractions(memoryCompressor);
-    }
-
-    @Test
     void narrativeAnchor가_높아도_자연감쇠되면_상세기억은_압축한다() {
 
         LocalDateTime rememberedAt =
@@ -175,7 +138,7 @@ class MemoryCompressionServiceTest {
 
         assertThat(memory.getDetailLevel())
                 .isEqualTo(
-                        MemoryDetailLevel.COMPRESSED
+                        MemoryDetailLevel.SUMMARY
                 );
 
         assertThat(memory.getSummary())
@@ -196,6 +159,82 @@ class MemoryCompressionServiceTest {
                 .isEqualTo(100);
 
         verify(memoryCompressor)
+                .compress(memory);
+    }
+
+    @Test
+    void 기억은_상세에서_요약_패턴_스키마_순서로_점진적으로_압축된다() {
+
+        LocalDateTime rememberedAt =
+                LocalDateTime.of(
+                        2026, 9, 1,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        rememberedAt,
+                        5,
+                        30
+                );
+
+        when(memoryCompressor.compress(memory))
+                .thenReturn(
+                        "요약 기억.",
+                        "반복되는 관계 패턴.",
+                        "의지할 수 있는 사람."
+                );
+
+        service.compressIfNeeded(
+                memory,
+                rememberedAt.plusDays(30)
+        );
+
+        assertThat(memory.getDetailLevel())
+                .isEqualTo(
+                        MemoryDetailLevel.SUMMARY
+                );
+
+        service.compressIfNeeded(
+                memory,
+                rememberedAt.plusDays(60)
+        );
+
+        assertThat(memory.getDetailLevel())
+                .isEqualTo(
+                        MemoryDetailLevel.PATTERN
+                );
+
+        service.compressIfNeeded(
+                memory,
+                rememberedAt.plusDays(90)
+        );
+
+        assertThat(memory.getDetailLevel())
+                .isEqualTo(
+                        MemoryDetailLevel.SCHEMA
+                );
+
+        assertThat(memory.getSummary())
+                .isEqualTo(
+                        "의지할 수 있는 사람."
+                );
+
+        MemoryCompressionResult result =
+                service.compressIfNeeded(
+                        memory,
+                        rememberedAt.plusDays(120)
+                );
+
+        assertThat(result.compressed())
+                .isFalse();
+
+        assertThat(memory.getDetailLevel())
+                .isEqualTo(
+                        MemoryDetailLevel.SCHEMA
+                );
+
+        verify(memoryCompressor, times(3))
                 .compress(memory);
     }
 

@@ -20,8 +20,8 @@ public class MemoryCompressionService {
             Memory memory,
             LocalDateTime currentTime
     ) {
-        if (memory.getDetailLevel()
-                == MemoryDetailLevel.COMPRESSED) {
+        if (!memory.getDetailLevel()
+                .canCompressFurther()) {
 
             return MemoryCompressionResult.skipped(
                     memory.getSummary()

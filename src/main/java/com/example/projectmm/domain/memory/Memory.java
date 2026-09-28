@@ -130,8 +130,12 @@ public class Memory {
             );
         }
 
+        if (!detailLevel.canCompressFurther()) {
+            return;
+        }
+
         this.summary = compressedSummary;
-        this.detailLevel = MemoryDetailLevel.COMPRESSED;
+        this.detailLevel = detailLevel.next();
     }
 
     public static Memory fromChat(Conversation conversation, ChatMessage source, String quote,
