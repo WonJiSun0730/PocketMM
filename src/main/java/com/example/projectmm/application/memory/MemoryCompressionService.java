@@ -8,13 +8,17 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class MemoryCompressionService {
+    private static final int MIN_PATTERN_RELATED_MEMORIES = 1;
+    private static final int MIN_SCHEMA_RELATED_MEMORIES = 2;
 
     private final MemoryDecayPolicy memoryDecayPolicy;
     private final MemoryCompressor memoryCompressor;
+    private final MemoryPatternCandidateFinder candidateFinder;
 
     public MemoryCompressionResult compressIfNeeded(
             Memory memory,
@@ -43,10 +47,26 @@ public class MemoryCompressionService {
         MemoryDetailLevel targetLevel =
                 memory.getDetailLevel().next();
 
+        List<Memory> relatedMemories =
+                relatedMemories(
+                        memory,
+                        targetLevel
+                );
+
+        if (!hasEnoughEvidence(
+                targetLevel,
+                relatedMemories
+        )) {
+            return MemoryCompressionResult.skipped(
+                    memory.getSummary()
+            );
+        }
+
         String compressedSummary =
                 memoryCompressor.compress(
                         memory,
-                        targetLevel
+                        targetLevel,
+                        relatedMemories
                 );
 
         memory.compress(compressedSummary);
@@ -56,4 +76,31 @@ public class MemoryCompressionService {
         );
     }
 
+    private List<Memory> relatedMemories(
+            Memory memory,
+            MemoryDetailLevel targetLevel
+    ) {
+        if (targetLevel == MemoryDetailLevel.SUMMARY) {
+            return List.of();
+        }
+
+        return candidateFinder.findRelated(memory);
+    }
+
+    private boolean hasEnoughEvidence(
+            MemoryDetailLevel targetLevel,
+            List<Memory> relatedMemories
+    ) {
+        return switch (targetLevel) {
+            case DETAILED, SUMMARY -> true;
+
+            case PATTERN ->
+                    relatedMemories.size()
+                            >= MIN_PATTERN_RELATED_MEMORIES;
+
+            case SCHEMA ->
+                    relatedMemories.size()
+                            >= MIN_SCHEMA_RELATED_MEMORIES;
+        };
+    }
 }

@@ -2,14 +2,12 @@ package com.example.projectmm.application.memory;
 
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.event.Event;
-import com.example.projectmm.domain.memory.Memory;
-import com.example.projectmm.domain.memory.MemoryCompressionResult;
-import com.example.projectmm.domain.memory.MemoryDecayResult;
-import com.example.projectmm.domain.memory.MemoryDetailLevel;
+import com.example.projectmm.domain.memory.*;
 import com.example.projectmm.domain.scene.Scene;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.*;
@@ -22,10 +20,14 @@ class MemoryCompressionServiceTest {
     private final MemoryCompressor memoryCompressor =
             mock(MemoryCompressor.class);
 
+    private final MemoryPatternCandidateFinder candidateFinder =
+            mock(MemoryPatternCandidateFinder.class);
+
     private final MemoryCompressionService service =
             new MemoryCompressionService(
                     memoryDecayPolicy,
-                    memoryCompressor
+                    memoryCompressor,
+                    candidateFinder
             );
 
     @Test
@@ -47,7 +49,8 @@ class MemoryCompressionServiceTest {
         when(
                 memoryCompressor.compress(
                         memory,
-                        MemoryDetailLevel.SUMMARY
+                        MemoryDetailLevel.SUMMARY,
+                        List.of()
                 )
         ).thenReturn(
                 "과거에 중요한 대화를 나눈 기억."
@@ -75,7 +78,8 @@ class MemoryCompressionServiceTest {
         verify(memoryCompressor)
                 .compress(
                         memory,
-                        MemoryDetailLevel.SUMMARY
+                        MemoryDetailLevel.SUMMARY,
+                        List.of()
                 );
     }
 
@@ -132,7 +136,8 @@ class MemoryCompressionServiceTest {
         when(
                 memoryCompressor.compress(
                         memory,
-                        MemoryDetailLevel.SUMMARY
+                        MemoryDetailLevel.SUMMARY,
+                        List.of()
                 )
         ).thenReturn(
                 "관계를 정의하는 중요한 사건."
@@ -172,7 +177,8 @@ class MemoryCompressionServiceTest {
         verify(memoryCompressor)
                 .compress(
                         memory,
-                        MemoryDetailLevel.SUMMARY
+                        MemoryDetailLevel.SUMMARY,
+                        List.of()
                 );
     }
 
@@ -192,10 +198,26 @@ class MemoryCompressionServiceTest {
                         30
                 );
 
+        Memory relatedMemory1 =
+                mock(Memory.class);
+
+        Memory relatedMemory2 =
+                mock(Memory.class);
+
+        when(
+                candidateFinder.findRelated(memory)
+        ).thenReturn(
+                List.of(
+                        relatedMemory1,
+                        relatedMemory2
+                )
+        );
+
         when(
                 memoryCompressor.compress(
                         memory,
-                        MemoryDetailLevel.SUMMARY
+                        MemoryDetailLevel.SUMMARY,
+                        List.of()
                 )
         ).thenReturn(
                 "함께 힘든 일을 겪었다."
@@ -204,7 +226,11 @@ class MemoryCompressionServiceTest {
         when(
                 memoryCompressor.compress(
                         memory,
-                        MemoryDetailLevel.PATTERN
+                        MemoryDetailLevel.PATTERN,
+                        List.of(
+                                relatedMemory1,
+                                relatedMemory2
+                        )
                 )
         ).thenReturn(
                 "힘든 상황에서 서로 돕는 일이 반복된다."
@@ -213,7 +239,11 @@ class MemoryCompressionServiceTest {
         when(
                 memoryCompressor.compress(
                         memory,
-                        MemoryDetailLevel.SCHEMA
+                        MemoryDetailLevel.SCHEMA,
+                        List.of(
+                                relatedMemory1,
+                                relatedMemory2
+                        )
                 )
         ).thenReturn(
                 "의지할 수 있는 사람."
@@ -271,19 +301,189 @@ class MemoryCompressionServiceTest {
         verify(memoryCompressor)
                 .compress(
                         memory,
+                        MemoryDetailLevel.SUMMARY,
+                        List.of()
+                );
+
+        verify(memoryCompressor)
+                .compress(
+                        memory,
+                        MemoryDetailLevel.PATTERN,
+                        List.of(
+                                relatedMemory1,
+                                relatedMemory2
+                        )
+                );
+
+        verify(memoryCompressor)
+                .compress(
+                        memory,
+                        MemoryDetailLevel.SCHEMA,
+                        List.of(
+                                relatedMemory1,
+                                relatedMemory2
+                        )
+                );
+
+        verify(
+                candidateFinder,
+                times(2)
+        ).findRelated(memory);
+    }
+
+    @Test
+    void 관련_기억이_없으면_요약에서_패턴으로_승격하지_않는다() {
+
+        LocalDateTime rememberedAt =
+                LocalDateTime.of(
+                        2026, 9, 1,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        rememberedAt,
+                        5,
+                        30
+                );
+
+        when(
+                memoryCompressor.compress(
+                        memory,
+                        MemoryDetailLevel.SUMMARY,
+                        List.of()
+                )
+        ).thenReturn(
+                "함께 힘든 일을 겪었다."
+        );
+
+        service.compressIfNeeded(
+                memory,
+                rememberedAt.plusDays(30)
+        );
+
+        assertThat(memory.getDetailLevel())
+                .isEqualTo(
                         MemoryDetailLevel.SUMMARY
                 );
 
-        verify(memoryCompressor)
+        when(
+                candidateFinder.findRelated(memory)
+        ).thenReturn(
+                List.of()
+        );
+
+        MemoryCompressionResult result =
+                service.compressIfNeeded(
+                        memory,
+                        rememberedAt.plusDays(60)
+                );
+
+        assertThat(result.compressed())
+                .isFalse();
+
+        assertThat(memory.getDetailLevel())
+                .isEqualTo(
+                        MemoryDetailLevel.SUMMARY
+                );
+
+        assertThat(memory.getSummary())
+                .isEqualTo(
+                        "함께 힘든 일을 겪었다."
+                );
+
+        verify(memoryCompressor, never())
                 .compress(
                         memory,
+                        MemoryDetailLevel.PATTERN,
+                        List.of()
+                );
+    }
+
+    @Test
+    void 관련_근거가_부족하면_패턴에서_스키마로_승격하지_않는다() {
+
+        LocalDateTime rememberedAt =
+                LocalDateTime.of(
+                        2026, 9, 1,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        rememberedAt,
+                        5,
+                        30
+                );
+
+        Memory relatedMemory =
+                mock(Memory.class);
+
+        when(
+                memoryCompressor.compress(
+                        memory,
+                        MemoryDetailLevel.SUMMARY,
+                        List.of()
+                )
+        ).thenReturn(
+                "함께 힘든 일을 겪었다."
+        );
+
+        when(
+                candidateFinder.findRelated(memory)
+        ).thenReturn(
+                List.of(relatedMemory)
+        );
+
+        when(
+                memoryCompressor.compress(
+                        memory,
+                        MemoryDetailLevel.PATTERN,
+                        List.of(relatedMemory)
+                )
+        ).thenReturn(
+                "힘든 상황에서 서로 돕는 일이 반복된다."
+        );
+
+        service.compressIfNeeded(
+                memory,
+                rememberedAt.plusDays(30)
+        );
+
+        service.compressIfNeeded(
+                memory,
+                rememberedAt.plusDays(60)
+        );
+
+        assertThat(memory.getDetailLevel())
+                .isEqualTo(
                         MemoryDetailLevel.PATTERN
                 );
 
-        verify(memoryCompressor)
+        MemoryCompressionResult result =
+                service.compressIfNeeded(
+                        memory,
+                        rememberedAt.plusDays(90)
+                );
+
+        assertThat(result.compressed())
+                .isFalse();
+
+        assertThat(memory.getDetailLevel())
+                .isEqualTo(
+                        MemoryDetailLevel.PATTERN
+                );
+
+        assertThat(memory.getSummary())
+                .isEqualTo(
+                        "힘든 상황에서 서로 돕는 일이 반복된다."
+                );
+
+        verify(memoryCompressor, never())
                 .compress(
                         memory,
-                        MemoryDetailLevel.SCHEMA
+                        MemoryDetailLevel.SCHEMA,
+                        List.of(relatedMemory)
                 );
     }
 
