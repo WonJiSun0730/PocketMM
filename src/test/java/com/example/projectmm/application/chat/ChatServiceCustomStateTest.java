@@ -57,7 +57,11 @@ class ChatServiceCustomStateTest {
         var source = new ChatMessage(room, character, ChatRole.USER, "안녕", ContentMode.NORMAL, at);
         when(characters.findById(1L)).thenReturn(Optional.of(character));
         when(rooms.findTopByCharacterIdOrderByCreatedAtDescIdDesc(1L)).thenReturn(Optional.of(room));
-        when(progress.beginChat(1L, 2L)).thenReturn(new ConversationProgressService.ChatOperation(room, "token"));
+        when(progress.beginChat(1L, 2L)).thenReturn(new ConversationProgressService.ChatOperation(
+                room,
+                "token",
+                NarrativeEntry.DIRECT
+        ));
         when(time.interpret("안녕", at)).thenReturn(TimeInterpretation.noMatch());
         when(policy.resolve(ContentMode.NORMAL)).thenReturn(ContentMode.NORMAL);
         when(contexts.build(1L, 2L, ContentMode.NORMAL, "안녕")).thenReturn(context);

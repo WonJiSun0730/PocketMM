@@ -42,7 +42,11 @@ public class ConversationProgressService {
                          long appliedSeconds, boolean capped, String pauseReason, String actions) {}
     public record Status(boolean enabled, LocalDateTime simulatedAt, String pauseReason, Report lastReport,
                          int energy, int mood) {}
-    public record ChatOperation(Conversation room, String token) {}
+    public record ChatOperation(
+            Conversation room,
+            String token,
+            NarrativeEntry entry
+    ) {}
     public record CompletedChat(
             ChatMessage source,
             ChatStateUpdate stateUpdate,
@@ -59,51 +63,176 @@ public class ConversationProgressService {
 
     @Transactional
     public Status resume(Long characterId, Long roomId) {
+        return resumeWithMode(characterId, roomId).status();
+    }
+
+    private ResumeResult resumeWithMode(
+            Long characterId,
+            Long roomId
+    ) {
         var room = locked(characterId, roomId);
         var now = clock.now();
+
         requireIdle(room, now);
+
         var previousPresence = room.getLastPresenceAt();
-        // 최초 접속과 꺼 둔 기간은 소급하지 않는다. 처리와 체크포인트를 한 트랜잭션으로 저장한다.
+
         room.markPresent(now);
-        if (!room.autoProgressEnabled() || room.getPlayerProfile() == null
-                || room.getProgressPauseReason() != null || previousPresence == null) return status(room);
-        long seconds = Math.max(0, Duration.between(previousPresence, now).getSeconds());
-        if (seconds < 60) return status(room);
+
+        if (!room.autoProgressEnabled()
+                || room.getPlayerProfile() == null
+                || room.getProgressPauseReason() != null
+                || previousPresence == null) {
+
+            return new ResumeResult(
+                    status(room),
+                    NarrativeEntry.DIRECT
+            );
+        }
+
+        long seconds =
+                Math.max(
+                        0,
+                        Duration.between(
+                                previousPresence,
+                                now
+                        ).getSeconds()
+                );
+
+        if (seconds < 60) {
+            return new ResumeResult(
+                    status(room),
+                    NarrativeEntry.DIRECT
+            );
+        }
 
         LocalDateTime from = room.getSimulatedAt();
-        // 실제 날짜로 덮어쓰지 않고 부재 시간만 이야기의 현재 시각에 더한다.
-        var interval = simulation.calculate(from, from.plusSeconds(seconds));
-        var baseline = states.findByCharacterId(characterId).orElseThrow();
-        // 공용 상태를 수정하지 않고 계산용 복사본에 기존 규칙을 적용한다.
-        var state = new CharacterState(room.getCharacter(),
-                room.getEnergy() == null ? baseline.getEnergy() : room.getEnergy(),
-                room.getMood() == null ? baseline.getMood() : room.getMood(), from);
+
+        // 실제 날짜로 덮어쓰지 않고
+        // 부재 시간만 이야기의 현재 시각에 더한다.
+        var interval =
+                simulation.calculate(
+                        from,
+                        from.plusSeconds(seconds)
+                );
+
+        var baseline =
+                states.findByCharacterId(characterId)
+                        .orElseThrow();
+
+        // 공용 상태를 수정하지 않고
+        // 계산용 복사본에 기존 규칙을 적용한다.
+        var state = new CharacterState(
+                room.getCharacter(),
+                room.getEnergy() == null
+                        ? baseline.getEnergy()
+                        : room.getEnergy(),
+                room.getMood() == null
+                        ? baseline.getMood()
+                        : room.getMood(),
+                from
+        );
+
         var actions = new ArrayList<String>();
+
         String pauseReason = null;
-        for (var segment : segments.createSegments(interval.from(), interval.to())) {
-            var proposed = candidates.generate(state, segment);
-            // 판단이 필요한 구간은 통째로 보류하여 유저의 선택과 관계 변화를 대신하지 않는다.
-            if (proposed.stream().anyMatch(c -> c.requiresAi() || !"REST".equals(c.eventType())
-                    || !validator.validate(c).valid())) {
-                pauseReason = "판단이 필요한 행동이 있어 자동 진행을 멈췄습니다. 대화로 장면을 이어가 주세요.";
+
+        for (var segment :
+                segments.createSegments(
+                        interval.from(),
+                        interval.to()
+                )) {
+
+            var proposed =
+                    candidates.generate(
+                            state,
+                            segment
+                    );
+
+            // 판단이 필요한 구간은 통째로 보류하여
+            // 유저의 선택과 관계 변화를 대신하지 않는다.
+            if (proposed.stream().anyMatch(c ->
+                    c.requiresAi()
+                            || !"REST".equals(c.eventType())
+                            || !validator.validate(c).valid()
+            )) {
+
+                pauseReason =
+                        "판단이 필요한 행동이 있어 자동 진행을 멈췄습니다. "
+                                + "대화로 장면을 이어가 주세요.";
+
                 break;
             }
+
             for (var candidate : proposed) {
-                state.apply(candidate.stateDelta());
-                String summary = room.getCharacter().getName() + " — 피로가 누적되어 휴식을 취했다.";
-                var source = messages.save(new ChatMessage(room, room.getCharacter(), ChatRole.CHARACTER,
-                        "*" + summary + "*", ContentMode.NORMAL, now));
-                memories.save(Memory.fromAutomaticAction(room, source, summary, candidate.importance(), candidate.occurredAt()));
+
+                state.apply(
+                        candidate.stateDelta()
+                );
+
+                String summary =
+                        room.getCharacter().getName()
+                                + " — 피로가 누적되어 휴식을 취했다.";
+
+                var source =
+                        messages.save(
+                                new ChatMessage(
+                                        room,
+                                        room.getCharacter(),
+                                        ChatRole.CHARACTER,
+                                        "*" + summary + "*",
+                                        ContentMode.NORMAL,
+                                        now
+                                )
+                        );
+
+                memories.save(
+                        Memory.fromAutomaticAction(
+                                room,
+                                source,
+                                summary,
+                                candidate.importance(),
+                                candidate.occurredAt()
+                        )
+                );
+
                 actions.add(summary);
             }
-            state.advanceSimulatedAt(segment.end());
+
+            state.advanceSimulatedAt(
+                    segment.end()
+            );
         }
-        room.applyRoomState(state.getEnergy(), state.getMood(), state.getSimulatedAt());
-        room.pauseProgress(pauseReason);
-        // 3일 상한 초과분과 보류 이후 시간은 다음 접속에서 다시 가산하지 않는다.
-        reports.save(new ConversationCatchUp(room, now, from, room.getSimulatedAt(), seconds,
-                interval.capped(), pauseReason, String.join("\n", actions)));
-        return status(room);
+
+        room.applyRoomState(
+                state.getEnergy(),
+                state.getMood(),
+                state.getSimulatedAt()
+        );
+
+        room.pauseProgress(
+                pauseReason
+        );
+
+        // 3일 상한 초과분과 보류 이후 시간은
+        // 다음 접속에서 다시 가산하지 않는다.
+        reports.save(
+                new ConversationCatchUp(
+                        room,
+                        now,
+                        from,
+                        room.getSimulatedAt(),
+                        seconds,
+                        interval.capped(),
+                        pauseReason,
+                        String.join("\n", actions)
+                )
+        );
+
+        return new ResumeResult(
+                status(room),
+                NarrativeEntry.AFTER_CATCH_UP
+        );
     }
 
     @Transactional
@@ -122,17 +251,57 @@ public class ConversationProgressService {
     }
 
     @Transactional
-    public ChatOperation beginChat(Long characterId, Long roomId) {
-        // 네트워크 복구 후 입장 요청보다 전송이 먼저 와도 부재 구간을 버리지 않는다.
-        // 같은 짧은 트랜잭션 안에서 재접속 처리 후 채팅 소유권을 잡는다.
-        resume(characterId, roomId);
-        var room = locked(characterId, roomId);
-        requireIdle(room, clock.now());
-        if (room.getPlayerProfile() == null) throw conflict("유저 프로필을 먼저 선택해 주세요.");
-        String token = UUID.randomUUID().toString();
-        room.beginChat(token, clock.now());
-        return new ChatOperation(room, token);
+    public ChatOperation beginChat(
+            Long characterId,
+            Long roomId
+    ) {
+        // 네트워크 복구 후 입장 요청보다 전송이 먼저 와도
+        // 부재 구간을 버리지 않는다.
+        //
+        // catch-up 실행 여부도 함께 받아
+        // 상위 narrative 계층이 실제 실행 경로를 알 수 있게 한다.
+        var resumed =
+                resumeWithMode(
+                        characterId,
+                        roomId
+                );
+
+        var room =
+                locked(
+                        characterId,
+                        roomId
+                );
+
+        requireIdle(
+                room,
+                clock.now()
+        );
+
+        if (room.getPlayerProfile() == null) {
+            throw conflict(
+                    "유저 프로필을 먼저 선택해 주세요."
+            );
+        }
+
+        String token =
+                UUID.randomUUID().toString();
+
+        room.beginChat(
+                token,
+                clock.now()
+        );
+
+        return new ChatOperation(
+                room,
+                token,
+                resumed.entry()
+        );
     }
+
+    private record ResumeResult(
+            Status status,
+            NarrativeEntry entry
+    ) {}
 
     @Transactional
     public void applyChatTime(Long characterId, Long roomId, String token, LocalDateTime at) {

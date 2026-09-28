@@ -38,6 +38,7 @@ public class ChatService {
     private final TimeInterpreter timeInterpreter;
     private final ChatMemoryService chatMemoryService;
     private final ConversationProgressService progressService;
+    private final NarrativeOrchestrator narrativeOrchestrator;
 
     public ChatResponse chat(
             Long characterId,
@@ -69,7 +70,12 @@ public class ChatService {
                                 createConversation(character)
                         );
 
-        var operation = progressService.beginChat(characterId, conversation.getId());
+        var operation =
+                narrativeOrchestrator.beginLiveDialogue(
+                        characterId,
+                        conversation.getId()
+                );
+
         conversation = operation.room();
         try {
             return generateReply(character, conversation, operation.token(), request);

@@ -459,6 +459,118 @@ class ConversationProgressTest {
         }
     }
 
+    @Test
+    void beginChatReportsLiveDialogueWhenCatchUpIsNotNeeded() {
+        var room = fixture(true, 70, 70);
+        Long characterId = room.getCharacter().getId();
+
+        var operation =
+                service.beginChat(
+                        characterId,
+                        room.getId()
+                );
+
+        assertThat(operation.entry())
+                .isEqualTo(NarrativeEntry.DIRECT);
+
+        service.endChat(
+                characterId,
+                room.getId(),
+                operation.token()
+        );
+    }
+
+    @Test
+    void beginChatReportsCatchUpWhenAbsenceWasActuallyProcessed() {
+        var room = fixture(true, 70, 70);
+        Long characterId = room.getCharacter().getId();
+
+        service.configure(
+                characterId,
+                room.getId(),
+                true
+        );
+
+        when(clock.now())
+                .thenReturn(real.plusMinutes(4));
+
+        var operation =
+                service.beginChat(
+                        characterId,
+                        room.getId()
+                );
+
+        assertThat(operation.entry())
+                .isEqualTo(NarrativeEntry.AFTER_CATCH_UP);
+
+        assertThat(operation.room().getSimulatedAt())
+                .isEqualTo(story.plusMinutes(4));
+
+        assertThat(
+                service.current(
+                        characterId,
+                        room.getId()
+                ).lastReport().appliedSeconds()
+        ).isEqualTo(240);
+
+        service.endChat(
+                characterId,
+                room.getId(),
+                operation.token()
+        );
+    }
+
+    @Test
+    void catchUpBeforeChatPersistsNarrativeContextForFollowingLiveDialogue() {
+        var room = fixture(true, 20, 70);
+        Long characterId = room.getCharacter().getId();
+
+        service.configure(
+                characterId,
+                room.getId(),
+                true
+        );
+
+        when(clock.now())
+                .thenReturn(real.plusHours(1));
+
+        var operation =
+                service.beginChat(
+                        characterId,
+                        room.getId()
+                );
+
+        assertThat(operation.entry())
+                .isEqualTo(NarrativeEntry.AFTER_CATCH_UP);
+
+        var savedMessages =
+                messages.findTop20ByConversationIdOrderByCreatedAtDesc(
+                        room.getId()
+                );
+
+        assertThat(savedMessages)
+                .hasSize(1);
+
+        assertThat(savedMessages.getFirst().getRole())
+                .isEqualTo(ChatRole.CHARACTER);
+
+        assertThat(savedMessages.getFirst().getContent())
+                .contains("휴식");
+
+        assertThat(
+                memories.findForConversation(
+                        characterId,
+                        room.getId()
+                )
+        ).hasSize(1);
+
+        service.endChat(
+                characterId,
+                room.getId(),
+                operation.token()
+        );
+    }
+
     private Conversation fixture(boolean independent, int energy, int mood) {
         var character = new Character("자동 행동 QA");
         em.persist(character);
