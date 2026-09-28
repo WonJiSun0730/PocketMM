@@ -32,6 +32,7 @@ public record DialoguePlayerStateChange(
                 && !evidence.isBlank()
                 && evidence.length() <= 240
                 && userText != null
-                && userText.contains(evidence);
+                && userText.contains(evidence)
+                && DialogueAgencyPolicy.supportsStateEvidence(userText, evidence);
     }
 }
