@@ -990,7 +990,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
     private boolean isPlainRp(String text) {
         // 일반 RP는 살리되 깨진 객체·배열·메타데이터를 원문 그대로 노출하지 않는다.
         if (text.isBlank() || text.startsWith("{") || text.startsWith("[") || text.startsWith("`")) return false;
-        if (text.matches("(?s).*\\\"(?:reply|state|energyDelta|moodDelta|energyEvidence|moodEvidence|customStateChanges|definitionId|delta)\\\"\\s*:.*")) return false;
+        if (text.matches("(?s).*\\\"(?:reply|state|playerState|energyDelta|moodDelta|energyEvidence|moodEvidence|customStateChanges|definitionId|delta)\\\"\\s*:.*")) return false;
         int first = text.codePointAt(0);
         return Character.isLetter(first) || first == '*' || first == '"' || first == '“' || first == '「';
     }

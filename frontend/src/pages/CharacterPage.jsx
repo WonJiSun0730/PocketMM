@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 export default function CharacterPage({
   onSelectCharacter,
   onCreateCharacter,
+  onEditCharacter,
 }) {
   const [characters, setCharacters] = useState([])
   const [loading, setLoading] = useState(true)
@@ -66,30 +67,43 @@ export default function CharacterPage({
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             {characters.map((character) => (
-              <button
+              <div
                 key={character.id}
-                type="button"
-                onClick={() => onSelectCharacter(character)}
-                className="flex items-center gap-4 rounded-xl border bg-card p-4 text-left transition-colors hover:bg-accent/50"
+                className="flex items-center gap-3 rounded-xl border bg-card p-4"
               >
-                <Avatar className="size-12">
-                  <AvatarFallback>
-                    {character.name.slice(0, 1).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <button
+                  type="button"
+                  onClick={() => onSelectCharacter(character)}
+                  className="flex min-w-0 flex-1 items-center gap-4 text-left"
+                >
+                  <Avatar className="size-12">
+                    <AvatarFallback>
+                      {character.name.slice(0, 1).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
 
-                <div className="min-w-0">
-                  <h2 className="truncate font-medium">
-                    {character.name}
-                  </h2>
+                  <div className="min-w-0">
+                    <h2 className="truncate font-medium">
+                      {character.name}
+                    </h2>
 
-                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                    {character.description ||
-                      character.personality ||
-                      "아직 프로필이 작성되지 않았어요."}
-                  </p>
-                </div>
-              </button>
+                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                      {character.description ||
+                        character.personality ||
+                        "아직 프로필이 작성되지 않았어요."}
+                    </p>
+                  </div>
+                </button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onEditCharacter(character)}
+                >
+                  수정
+                </Button>
+              </div>
             ))}
 
             {characters.length === 0 && (

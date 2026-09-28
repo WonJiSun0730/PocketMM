@@ -18,11 +18,31 @@ export default function App() {
     setPage("characters")
   }
 
+  function openEdit(character) {
+    setSelectedCharacter(character)
+    setPage("edit")
+  }
+
+  function finishEdit(character) {
+    setSelectedCharacter(character)
+    setPage("characters")
+  }
+
   if (page === "create") {
     return (
       <CharacterCreatePage
         onBack={openCharacters}
         onCreated={openChat}
+      />
+    )
+  }
+
+  if (page === "edit" && selectedCharacter) {
+    return (
+      <CharacterCreatePage
+        character={selectedCharacter}
+        onBack={openCharacters}
+        onUpdated={finishEdit}
       />
     )
   }
@@ -40,6 +60,7 @@ export default function App() {
     <CharacterPage
       onSelectCharacter={openChat}
       onCreateCharacter={() => setPage("create")}
+      onEditCharacter={openEdit}
     />
   )
 }

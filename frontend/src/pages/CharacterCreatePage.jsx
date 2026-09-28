@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ArrowLeft, ChevronDown, ChevronUp } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea"
 export default function CharacterCreatePage({
   onBack,
   onCreated,
+  character = null,
+  onUpdated,
 }) {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
@@ -23,6 +25,26 @@ export default function CharacterCreatePage({
   const [showDetails, setShowDetails] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
+  const editing = Boolean(character)
+
+  useEffect(() => {
+    if (!character) return
+
+    setName(character.name ?? "")
+    setDescription(character.description ?? "")
+    setRawDescription(character.rawDescription ?? "")
+    setPlayGuide(character.playGuide ?? "")
+    setIntro(character.intro ?? "")
+    setExamples(
+      character.examples?.length
+        ? character.examples
+        : [""]
+    )
+    setPersonality(character.personality ?? "")
+    setSpeechStyle(character.speechStyle ?? "")
+    setBackground(character.background ?? "")
+    setAppearance(character.appearance ?? "")
+  }, [character])
 
   const totalExampleLength = examples.reduce(
     (total, example) => total + example.length,
@@ -68,7 +90,7 @@ export default function CharacterCreatePage({
     )
   }
 
-  async function createCharacter() {
+  async function saveCharacter() {
     const trimmedName = name.trim()
 
     if (!trimmedName || saving) {
@@ -78,38 +100,62 @@ export default function CharacterCreatePage({
     setSaving(true)
     setError("")
 
+    const payload = {
+      description: description.trim() || null,
+      rawDescription: rawDescription.trim() || null,
+      playGuide: playGuide.trim() || null,
+      intro: intro.trim() || null,
+      examples: examples
+        .map((example) => example.trim())
+        .filter(Boolean),
+      exampleDialogue: null,
+      personality: personality.trim() || null,
+      speechStyle: speechStyle.trim() || null,
+      background: background.trim() || null,
+      appearance: appearance.trim() || null,
+    }
+
     try {
-      const response = await fetch("/api/characters", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: trimmedName,
-          description: description.trim() || null,
-          rawDescription: rawDescription.trim() || null,
-          playGuide: playGuide.trim() || null,
-          intro: intro.trim() || null,
-          examples: examples
-            .map((example) => example.trim())
-            .filter(Boolean),
-          exampleDialogue: null,
-          personality: personality.trim() || null,
-          speechStyle: speechStyle.trim() || null,
-          background: background.trim() || null,
-          appearance: appearance.trim() || null,
-        }),
-      })
+      const response = await fetch(
+        editing
+          ? `/api/characters/${character.id}/profile`
+          : "/api/characters",
+        {
+          method: editing ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(
+            editing
+              ? payload
+              : {
+                  name: trimmedName,
+                  ...payload,
+                }
+          ),
+        }
+      )
 
       if (!response.ok) {
-        throw new Error(`캐릭터 생성 실패: ${response.status}`)
+        throw new Error(
+          `캐릭터 ${editing ? "수정" : "생성"} 실패: ${response.status}`
+        )
       }
 
-      const character = await response.json()
-      onCreated(character)
+      const savedCharacter = await response.json()
+
+      if (editing) {
+        onUpdated(savedCharacter)
+      } else {
+        onCreated(savedCharacter)
+      }
     } catch (error) {
       console.error(error)
-      setError("캐릭터를 만들지 못했어요. 잠시 후 다시 시도해 주세요.")
+      setError(
+        editing
+          ? "캐릭터를 수정하지 못했어요. 잠시 후 다시 시도해 주세요."
+          : "캐릭터를 만들지 못했어요. 잠시 후 다시 시도해 주세요."
+      )
     } finally {
       setSaving(false)
     }
@@ -135,7 +181,7 @@ export default function CharacterCreatePage({
           </p>
 
           <h1 className="text-3xl font-semibold tracking-tight">
-            캐릭터 만들기
+            {editing ? "캐릭터 수정" : "캐릭터 만들기"}
           </h1>
 
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -161,6 +207,7 @@ export default function CharacterCreatePage({
             >
               <input
                 value={name}
+                disabled={editing}
                 onChange={(event) => setName(event.target.value)}
                 maxLength={100}
                 placeholder="캐릭터 이름"
@@ -421,9 +468,11 @@ export default function CharacterCreatePage({
             <Button
               type="button"
               disabled={saving || !name.trim()}
-              onClick={createCharacter}
+              onClick={saveCharacter}
             >
-              {saving ? "만드는 중..." : "캐릭터 만들기"}
+              {saving
+                ? (editing ? "저장 중..." : "만드는 중...")
+                : (editing ? "변경사항 저장" : "캐릭터 만들기")}
             </Button>
           </div>
         </div>

@@ -41,8 +41,16 @@ class GeminiDialogueResponseTest {
     }
 
     @Test void refusesTruncatedBlockedOrInvalidBodiesInsteadOfLeakingJson() {
-        for (String body : List.of("{", "{}", "{\"reply\":42}", "{\"reply\":\"  \"}",
-                "*응답*\n\"energyDelta\": 10", "```json\n{\"reply\":", "[잘린 배열"))
+        for (String body : List.of(
+                "{",
+                "{}",
+                "{\"reply\":42}",
+                "{\"reply\":\"  \"}",
+                "*응답*\n\"energyDelta\": 10",
+                "*응답*\n\"playerState\": {\"energyDelta\": -3}",
+                "```json\n{\"reply\":",
+                "[잘린 배열"
+        ))
             assertThatThrownBy(() -> gateway.parseResponse(envelope(body, "STOP"))).isInstanceOf(IllegalStateException.class);
         for (String finish : List.of("MAX_TOKENS", "SAFETY"))
             assertThatThrownBy(() -> gateway.parseResponse(envelope("{\"reply\":\"안녕\"}", finish))).isInstanceOf(IllegalStateException.class);

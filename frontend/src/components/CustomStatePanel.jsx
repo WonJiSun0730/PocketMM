@@ -1,13 +1,24 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 
-export default function CustomStatePanel({ conversationId }) {
-  if (!Number.isSafeInteger(conversationId) || conversationId <= 0) return null
-  // 방이 바뀌면 목록·입력·오류뿐 아니라 진행 중인 요청의 수명도 분리한다.
-  return <RoomCustomStatePanel key={conversationId} conversationId={conversationId} />
+export default function CustomStatePanel({ characterId, conversationId }) {
+  if (
+    !Number.isSafeInteger(characterId) ||
+    characterId <= 0 ||
+    !Number.isSafeInteger(conversationId) ||
+    conversationId <= 0
+  ) return null
+
+  return (
+    <RoomCustomStatePanel
+      key={`${characterId}-${conversationId}`}
+      characterId={characterId}
+      conversationId={conversationId}
+    />
+  )
 }
 
-function RoomCustomStatePanel({ conversationId }) {
+function RoomCustomStatePanel({ characterId, conversationId }) {
   const [states, setStates] = useState([])
   const [drafts, setDrafts] = useState({})
   const [loading, setLoading] = useState(true)
@@ -17,6 +28,9 @@ function RoomCustomStatePanel({ conversationId }) {
   const [errors, setErrors] = useState({})
   const [saved, setSaved] = useState({})
   const requestsRef = useRef(null)
+  const [coreState, setCoreState] = useState(null)
+  const [coreDraft, setCoreDraft] = useState({ energy: 70, mood: 70 })
+  const [coreSaving, setCoreSaving] = useState(false)
 
   useEffect(() => {
     const requests = { active: true, controllers: new Set(), pending: new Set() }
@@ -47,6 +61,42 @@ function RoomCustomStatePanel({ conversationId }) {
       for (const pending of requests.controllers) pending.abort()
     }
   }, [conversationId, retry])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadCoreState() {
+      try {
+        const response = await fetch(
+          `/api/characters/${characterId}/conversations/${conversationId}/player-state`
+        )
+
+        if (!response.ok) {
+          throw new Error(`기본 상태 조회 실패 (${response.status})`)
+        }
+
+        const data = await response.json()
+
+        if (cancelled) return
+
+        setCoreState(data)
+        setCoreDraft({
+          energy: data.energy,
+          mood: data.mood,
+        })
+      } catch (error) {
+        if (!cancelled) {
+          console.error(error)
+        }
+      }
+    }
+
+    loadCoreState()
+
+    return () => {
+      cancelled = true
+    }
+  }, [characterId, conversationId])
 
   async function save(event, state) {
     event.preventDefault()
@@ -93,10 +143,116 @@ function RoomCustomStatePanel({ conversationId }) {
     }
   }
 
+  async function saveCoreState(event) {
+    event.preventDefault()
+
+    const energy = Number(coreDraft.energy)
+    const mood = Number(coreDraft.mood)
+
+    if (
+      !Number.isFinite(energy) ||
+      !Number.isFinite(mood) ||
+      energy < 0 ||
+      energy > 100 ||
+      mood < 0 ||
+      mood > 100
+    ) {
+      return
+    }
+
+    setCoreSaving(true)
+
+    try {
+      const response = await fetch(
+        `/api/characters/${characterId}/conversations/${conversationId}/player-state`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ energy, mood }),
+        }
+      )
+
+      if (!response.ok) {
+        throw new Error(`기본 상태 저장 실패 (${response.status})`)
+      }
+
+      const snapshot = await response.json()
+
+      setCoreState(snapshot)
+      setCoreDraft({
+        energy: snapshot.energy,
+        mood: snapshot.mood,
+      })
+    } catch (error) {
+      console.error(error)
+    } finally {
+      setCoreSaving(false)
+    }
+  }
+
   return (
     <details className="shrink-0 border-b px-4 py-2 text-sm sm:px-6">
       <summary className="cursor-pointer font-medium">내 사용자 정의 상태</summary>
       <div className="mt-2 max-h-[30svh] space-y-3 overflow-y-auto pb-1">
+        {coreState && (
+          <form
+            onSubmit={saveCoreState}
+            className="space-y-2 rounded-lg border p-3"
+          >
+            <p className="font-medium">기본 상태</p>
+
+            <p className="text-xs text-muted-foreground">
+              현재 확정값: 에너지 {coreState.energy} · 기분 {coreState.mood}
+            </p>
+
+            <div className="grid grid-cols-2 gap-2">
+              <label className="space-y-1">
+                <span className="text-xs text-muted-foreground">에너지</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={coreDraft.energy}
+                  disabled={coreSaving}
+                  onChange={event =>
+                    setCoreDraft(current => ({
+                      ...current,
+                      energy: event.target.value,
+                    }))
+                  }
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:border-ring disabled:opacity-50"
+                />
+              </label>
+
+              <label className="space-y-1">
+                <span className="text-xs text-muted-foreground">기분</span>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={coreDraft.mood}
+                  disabled={coreSaving}
+                  onChange={event =>
+                    setCoreDraft(current => ({
+                      ...current,
+                      mood: event.target.value,
+                    }))
+                  }
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 outline-none focus-visible:border-ring disabled:opacity-50"
+                />
+              </label>
+            </div>
+
+            <Button
+              type="submit"
+              variant="outline"
+              size="sm"
+              disabled={coreSaving}
+            >
+              {coreSaving ? "저장 중..." : "기본 상태 저장"}
+            </Button>
+          </form>
+        )}
         {loading && <p role="status" className="text-muted-foreground">상태를 불러오는 중...</p>}
         {loadError && <div>
           <p role="alert" className="text-destructive">{loadError}</p>

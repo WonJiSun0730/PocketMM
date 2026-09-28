@@ -360,7 +360,10 @@ export default function ChatPage({
           </details>}
         </div>}
 
-        <CustomStatePanel conversationId={session?.conversationId} />
+        <CustomStatePanel
+          characterId={character.id}
+          conversationId={session?.conversationId}
+        />
 
         {debugInfo && (
           <div className="shrink-0 border-b bg-muted/40 px-4 py-2 font-mono text-[11px] text-muted-foreground sm:px-6">
