@@ -3,6 +3,7 @@ package com.example.projectmm.application.memory;
 import com.example.projectmm.application.dialogue.DialogueContextBuilder;
 import com.example.projectmm.application.chat.ConversationStartService;
 import com.example.projectmm.application.player.*;
+import com.example.projectmm.application.state.CustomStateService;
 import com.example.projectmm.infrastructure.dialogue.GeminiDialogueGateway;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -31,7 +32,7 @@ import static org.assertj.core.api.Assertions.*;
 @Import({ChatMemoryWriter.class, MemoryRecallService.class, MemoryDecayPolicy.class,
         MemoryCompressionService.class, RuleBasedMemoryCompressor.class,
         DialogueContextBuilder.class, ContentModePolicy.class, ConversationStartService.class,
-        PlayerProfileService.class, ConversationPlayerService.class})
+        PlayerProfileService.class, ConversationPlayerService.class, CustomStateService.class})
 class ChatMemoryPersistenceTest {
     @Autowired EntityManager em;
     @Autowired ChatMemoryWriter writer;

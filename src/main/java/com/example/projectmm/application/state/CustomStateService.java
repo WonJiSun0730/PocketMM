@@ -33,15 +33,46 @@ public class CustomStateService {
         }
     }
 
-    @Transactional(readOnly = true)
-    public List<CustomStateSnapshot> current(Long conversationId) {
-        if (!conversations.existsById(conversationId)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    @Transactional
+    public void initializeSelectedProfile(Conversation room) {
+        if (room == null || room.getId() == null) {
+            throw new IllegalArgumentException("Conversation is required.");
         }
-        return values.findByConversationIdOrderByIdAsc(conversationId).stream()
-                .map(CustomStateSnapshot::from).toList();
+
+        requireProfile(room);
+
+        for (var definition :
+                definitions.findByPlayerProfileIdOrderByIdAsc(
+                        room.getPlayerProfile().getId()
+                )) {
+
+            if (values.findByConversationIdAndDefinitionId(
+                    room.getId(),
+                    definition.getId()
+            ).isEmpty()) {
+                values.save(new CustomStateValue(room, definition));
+            }
+        }
     }
 
+    @Transactional(readOnly = true)
+    public List<CustomStateSnapshot> current(Long conversationId) {
+        var room = conversations.findById(conversationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        if (room.getPlayerProfile() == null) {
+            return List.of();
+        }
+
+        return values
+                .findByConversationIdAndDefinitionPlayerProfileIdOrderByIdAsc(
+                        conversationId,
+                        room.getPlayerProfile().getId()
+                )
+                .stream()
+                .map(CustomStateSnapshot::from)
+                .toList();
+    }
     @Transactional
     public CustomStateSnapshot updateByUser(Long conversationId, Long definitionId, double currentValue) {
         var room = locked(conversationId);

@@ -158,6 +158,44 @@ class CustomStateServiceTest {
         assertThat(values.count()).isZero();
     }
 
+    @Test
+    void currentReturnsOnlyValuesOwnedBySelectedProfile() {
+        service.initialize(roomA);
+        service.updateByUser(roomA, pieta, 67);
+
+        new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            var room = em.find(Conversation.class, roomA);
+
+            var otherProfile = em.createQuery(
+                            "select p from PlayerProfile p where p.name = :name",
+                            PlayerProfile.class
+                    )
+                    .setParameter("name", "Other")
+                    .getSingleResult();
+
+            room.selectPlayerProfile(otherProfile);
+
+            var foreign = em.find(CustomStateDefinition.class, foreignDefinition);
+            values.save(new com.example.projectmm.domain.state.CustomStateValue(room, foreign));
+        });
+
+        assertThat(service.current(roomA))
+                .containsExactly(
+                        new CustomStateSnapshot(
+                                foreignDefinition,
+                                "중독도",
+                                0,
+                                0,
+                                100,
+                                null,
+                                null
+                        )
+                );
+
+        assertThat(values.findByConversationIdAndDefinitionId(roomA, pieta))
+                .isPresent();
+    }
+
     private Long room(Character character, PlayerProfile profile) {
         var room = new Conversation(character, LocalDateTime.of(2030, 1, 1, 12, 0));
         room.selectPlayerProfile(profile);

@@ -9,4 +9,9 @@ public interface CustomStateValueRepository extends JpaRepository<CustomStateVal
     List<CustomStateValue> findByConversationIdOrderByIdAsc(Long conversationId);
 
     Optional<CustomStateValue> findByConversationIdAndDefinitionId(Long conversationId, Long definitionId);
+
+    List<CustomStateValue> findByConversationIdAndDefinitionPlayerProfileIdOrderByIdAsc(
+            Long conversationId,
+            Long playerProfileId
+    );
 }

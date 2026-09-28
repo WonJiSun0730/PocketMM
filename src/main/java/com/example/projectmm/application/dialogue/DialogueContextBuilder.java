@@ -126,19 +126,36 @@ public class DialogueContextBuilder {
                 relationships,
                 conversation.getPlayerProfile() == null ? null : new DialoguePlayerProfile(
                         conversation.getPlayerProfile().getName(), conversation.getPlayerProfile().getDescription()),
-                buildCustomStates(conversationId)
+                buildCustomStates(conversation)
         );
     }
 
-    private List<DialogueCustomState> buildCustomStates(Long conversationId) {
-        // 저장된 방별 확정값만 읽는다. 누락된 Value를 기본값으로 생성하거나 보충하지 않는다.
-        return customStateValueRepository.findByConversationIdOrderByIdAsc(conversationId).stream()
+    private List<DialogueCustomState> buildCustomStates(Conversation conversation) {
+        // 현재 선택된 플레이어 프로필의 저장된 확정값만 읽는다.
+        // 누락된 Value를 기본값으로 생성하거나 보충하지 않는다.
+        if (conversation.getPlayerProfile() == null) {
+            return List.of();
+        }
+
+        return customStateValueRepository
+                .findByConversationIdAndDefinitionPlayerProfileIdOrderByIdAsc(
+                        conversation.getId(),
+                        conversation.getPlayerProfile().getId()
+                )
+                .stream()
                 .map(value -> {
                     var definition = value.getDefinition();
-                    return new DialogueCustomState(definition.getId(), definition.getName(), value.getCurrentValue(),
-                            definition.getMinValue(), definition.getMaxValue(),
-                            definition.getUnit(), definition.getDescription());
-                }).toList();
+                    return new DialogueCustomState(
+                            definition.getId(),
+                            definition.getName(),
+                            value.getCurrentValue(),
+                            definition.getMinValue(),
+                            definition.getMaxValue(),
+                            definition.getUnit(),
+                            definition.getDescription()
+                    );
+                })
+                .toList();
     }
 
     private List<DialogueMessageContext> buildRecentMessages(
