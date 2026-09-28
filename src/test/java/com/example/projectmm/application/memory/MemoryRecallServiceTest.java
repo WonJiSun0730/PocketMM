@@ -857,6 +857,63 @@ class MemoryRecallServiceTest {
                 );
     }
 
+    @Test
+    void 자연감쇠로_압축대상이_되어도_narrativeAnchor가_높으면_회상은_유지한다() {
+
+        Long characterId = 1L;
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 28,
+                        12, 0
+                );
+
+        Memory anchoredMemory =
+                createMemory(
+                        "관계를 정의하는 오래된 기억",
+                        9,
+                        100,
+                        10,
+                        now.minusDays(365)
+                );
+
+        when(
+                memoryRepository
+                        .findByCharacterIdOrderByRememberedAtDesc(
+                                characterId
+                        )
+        ).thenReturn(
+                List.of(anchoredMemory)
+        );
+
+        List<EffectiveMemory> result =
+                memoryRecallService.recall(
+                        characterId,
+                        now,
+                        10
+                );
+
+        assertThat(result)
+                .hasSize(1);
+
+        assertThat(result.get(0).summary())
+                .isEqualTo(
+                        "관계를 정의하는 오래된 기억"
+                );
+
+        assertThat(result.get(0).effectiveStrength())
+                .isEqualTo(100);
+
+        assertThat(result.get(0).compressionRequired())
+                .isTrue();
+
+        verify(memoryCompressionService)
+                .compressIfNeeded(
+                        anchoredMemory,
+                        now
+                );
+    }
+
     private Memory createMemory(
             String summary,
             int importance,
@@ -888,6 +945,43 @@ class MemoryRecallServiceTest {
                 summary,
                 importance,
                 strength,
+                rememberedAt
+        );
+    }
+
+    private Memory createMemory(
+            String summary,
+            int importance,
+            int strength,
+            int narrativeAnchor,
+            LocalDateTime rememberedAt
+    ) {
+        Character character =
+                new Character("Millie");
+
+        Scene scene =
+                new Scene(
+                        rememberedAt,
+                        "기억 테스트",
+                        "DAILY"
+                );
+
+        Event event =
+                new Event(
+                        scene,
+                        rememberedAt,
+                        "INTERACTION",
+                        summary,
+                        importance
+                );
+
+        return new Memory(
+                character,
+                event,
+                summary,
+                importance,
+                strength,
+                narrativeAnchor,
                 rememberedAt
         );
     }

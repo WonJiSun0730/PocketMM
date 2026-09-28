@@ -276,7 +276,7 @@ class MemoryDecayPolicyTest {
     }
 
     @Test
-    void narrativeAnchor가_10이면_자연_감쇠로_기억_강도가_100_아래로_내려가지_않는다() {
+    void narrativeAnchor가_높아도_자연감쇠된_기억은_압축할_수_있다() {
 
         LocalDateTime rememberedAt =
                 LocalDateTime.of(
@@ -298,11 +298,14 @@ class MemoryDecayPolicyTest {
                         rememberedAt.plusDays(365)
                 );
 
+        assertThat(result.decayedStrength())
+                .isZero();
+
         assertThat(result.effectiveStrength())
                 .isEqualTo(100);
 
         assertThat(result.compressionRequired())
-                .isFalse();
+                .isTrue();
     }
 
     @Test
@@ -365,6 +368,8 @@ class MemoryDecayPolicyTest {
                 rememberedAt
         );
     }
+
+    
 
     private Memory createMemory(
             LocalDateTime rememberedAt,

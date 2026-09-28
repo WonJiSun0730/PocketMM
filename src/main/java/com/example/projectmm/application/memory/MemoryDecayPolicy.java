@@ -52,10 +52,11 @@ public class MemoryDecayPolicy {
                 );
 
         boolean compressionRequired =
-                effectiveStrength <= COMPRESSION_THRESHOLD;
+                decayedStrength <= COMPRESSION_THRESHOLD;
 
         return new MemoryDecayResult(
                 memory.getStrength(),
+                decayedStrength,
                 effectiveStrength,
                 compressionRequired
         );
