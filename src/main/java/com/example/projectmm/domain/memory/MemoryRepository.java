@@ -5,9 +5,16 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 
 public interface MemoryRepository
         extends JpaRepository<Memory, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select m from Memory m where m.id = :id")
+    Optional<Memory> lockForCompression(@Param("id") Long id);
 
     List<Memory> findByCharacterIdOrderByRememberedAtDesc(
             Long characterId

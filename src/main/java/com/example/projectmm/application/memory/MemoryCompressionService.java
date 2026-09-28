@@ -19,6 +19,7 @@ public class MemoryCompressionService {
     private final MemoryDecayPolicy memoryDecayPolicy;
     private final MemoryCompressor memoryCompressor;
     private final MemoryPatternCandidateFinder candidateFinder;
+    private final MemoryCompressionPersistenceService persistence;
 
     public MemoryCompressionResult compressIfNeeded(
             Memory memory,
@@ -74,6 +75,11 @@ public class MemoryCompressionService {
             return MemoryCompressionResult.skipped(memory.getSummary());
         }
 
+        int minimum = targetLevel == MemoryDetailLevel.SCHEMA ? 2 : targetLevel == MemoryDetailLevel.PATTERN ? 1 : 0;
+        if (output.evidenceMemoryIds().size() < minimum
+                || !persistence.apply(memory.getId(), memory.getDetailLevel(), memory.getSummary(), output)) {
+            return MemoryCompressionResult.skipped(memory.getSummary());
+        }
         memory.compress(compressedSummary);
 
         return MemoryCompressionResult.compressed(

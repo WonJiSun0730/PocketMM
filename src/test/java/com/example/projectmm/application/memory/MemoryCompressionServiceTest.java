@@ -23,11 +23,19 @@ class MemoryCompressionServiceTest {
     private final MemoryPatternCandidateFinder candidateFinder =
             mock(MemoryPatternCandidateFinder.class);
 
+    private final MemoryCompressionPersistenceService persistence = mock(MemoryCompressionPersistenceService.class);
+
+    @org.junit.jupiter.api.BeforeEach
+    void allowPersistence() {
+        when(persistence.apply(any(), any(), any(), any())).thenReturn(true);
+    }
+
     private final MemoryCompressionService service =
             new MemoryCompressionService(
                     memoryDecayPolicy,
                     memoryCompressor,
-                    candidateFinder
+                    candidateFinder,
+                    persistence
             );
 
     @Test
@@ -226,7 +234,7 @@ class MemoryCompressionServiceTest {
                                 relatedMemory2
                         )
                 )
-        ).thenReturn(new MemoryCompressorOutput("힘든 상황에서 서로 돕는 일이 반복된다.", List.of()));
+        ).thenReturn(new MemoryCompressorOutput("힘든 상황에서 서로 돕는 일이 반복된다.", List.of(2L)));
 
         when(
                 memoryCompressor.compress(
@@ -237,7 +245,7 @@ class MemoryCompressionServiceTest {
                                 relatedMemory2
                         )
                 )
-        ).thenReturn(new MemoryCompressorOutput("의지할 수 있는 사람.", List.of()));
+        ).thenReturn(new MemoryCompressorOutput("의지할 수 있는 사람.", List.of(2L, 3L)));
 
         service.compressIfNeeded(
                 memory,
@@ -427,7 +435,7 @@ class MemoryCompressionServiceTest {
                         MemoryDetailLevel.PATTERN,
                         List.of(relatedMemory)
                 )
-        ).thenReturn(new MemoryCompressorOutput("힘든 상황에서 서로 돕는 일이 반복된다.", List.of()));
+        ).thenReturn(new MemoryCompressorOutput("힘든 상황에서 서로 돕는 일이 반복된다.", List.of(2L)));
 
         service.compressIfNeeded(
                 memory,
