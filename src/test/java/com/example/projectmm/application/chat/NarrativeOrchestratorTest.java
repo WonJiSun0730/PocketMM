@@ -107,4 +107,55 @@ class NarrativeOrchestratorTest {
         assertThat(operation.entry())
                 .isEqualTo(NarrativeEntry.AFTER_CATCH_UP);
     }
+
+    @Test
+    void catchUp이후에도_대화실행계약을_그대로_보존한다() {
+        var progressService =
+                mock(ConversationProgressService.class);
+
+        var orchestrator =
+                new NarrativeOrchestrator(progressService);
+
+        var character =
+                new Character("테스트 캐릭터");
+
+        var room =
+                Conversation.fresh(
+                        character,
+                        LocalDateTime.of(
+                                2030,
+                                1,
+                                1,
+                                12,
+                                0
+                        )
+                );
+
+        when(progressService.beginChat(10L, 20L))
+                .thenReturn(
+                        new ConversationProgressService.ChatOperation(
+                                room,
+                                "catch-up-token",
+                                NarrativeEntry.AFTER_CATCH_UP
+                        )
+                );
+
+        var operation =
+                orchestrator.beginLiveDialogue(
+                        10L,
+                        20L
+                );
+
+        assertThat(operation.room())
+                .isSameAs(room);
+
+        assertThat(operation.token())
+                .isEqualTo("catch-up-token");
+
+        assertThat(operation.mode())
+                .isEqualTo(NarrativeMode.LIVE_DIALOGUE);
+
+        assertThat(operation.entry())
+                .isEqualTo(NarrativeEntry.AFTER_CATCH_UP);
+    }
 }

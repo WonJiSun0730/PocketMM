@@ -927,6 +927,87 @@ class ConversationProgressTest {
                 );
     }
 
+    @Test
+    void beginChat은_부재CatchUp이_없으면_DIRECT로_진입한다() {
+
+        var room =
+                fixture(
+                        true,
+                        70,
+                        70
+                );
+
+        Long characterId =
+                room.getCharacter().getId();
+
+        var operation =
+                service.beginChat(
+                        characterId,
+                        room.getId()
+                );
+
+        assertThat(operation.entry())
+                .isEqualTo(
+                        NarrativeEntry.DIRECT
+                );
+
+        assertThat(operation.room().getId())
+                .isEqualTo(room.getId());
+
+        assertThat(operation.token())
+                .isNotBlank();
+    }
+
+    @Test
+    void beginChat은_실제_부재CatchUp을_처리한뒤_AFTER_CATCH_UP으로_진입한다() {
+
+        var room =
+                fixture(
+                        true,
+                        70,
+                        70
+                );
+
+        Long characterId =
+                room.getCharacter().getId();
+
+        // 첫 접속으로 lastPresenceAt을 만든다.
+        service.resume(
+                characterId,
+                room.getId()
+        );
+
+        // 이후 자동 진행을 켠다.
+        service.configure(
+                characterId,
+                room.getId(),
+                true
+        );
+
+        // 실제 시간 기준 2분 부재.
+        when(clock.now())
+                .thenReturn(
+                        real.plusMinutes(2)
+                );
+
+        var operation =
+                service.beginChat(
+                        characterId,
+                        room.getId()
+                );
+
+        assertThat(operation.entry())
+                .isEqualTo(
+                        NarrativeEntry.AFTER_CATCH_UP
+                );
+
+        assertThat(operation.room().getId())
+                .isEqualTo(room.getId());
+
+        assertThat(operation.token())
+                .isNotBlank();
+    }
+
     private Conversation fixture(boolean independent, int energy, int mood) {
         var character = new Character("자동 행동 QA");
         em.persist(character);
