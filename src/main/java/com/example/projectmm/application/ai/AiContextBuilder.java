@@ -33,14 +33,7 @@ public class AiContextBuilder {
 
         List<AiMemoryContext> memoryContexts =
                 recalledMemories.stream()
-                        .map(memory ->
-                                new AiMemoryContext(
-                                        memorySummary(memory),
-                                        memory.importance(),
-                                        memory.effectiveStrength(),
-                                        memory.rememberedAt()
-                                )
-                        )
+                        .map(this::toMemoryContext)
                         .toList();
 
         List<Relationship> relationships =
@@ -76,6 +69,36 @@ public class AiContextBuilder {
                 memoryContexts,
                 relationshipContexts
         );
+    }
+
+    private AiMemoryContext toMemoryContext(
+            EffectiveMemory memory
+    ) {
+        return switch (memory.tier()) {
+            case HOT ->
+                    new AiMemoryContext(
+                            memorySummary(memory),
+                            memory.importance(),
+                            memory.effectiveStrength(),
+                            memory.rememberedAt()
+                    );
+
+            case WARM ->
+                    new AiMemoryContext(
+                            memorySummary(memory),
+                            memory.importance(),
+                            0,
+                            memory.rememberedAt()
+                    );
+
+            case COLD ->
+                    new AiMemoryContext(
+                            memorySummary(memory),
+                            0,
+                            0,
+                            memory.rememberedAt()
+                    );
+        };
     }
 
     private String memorySummary(

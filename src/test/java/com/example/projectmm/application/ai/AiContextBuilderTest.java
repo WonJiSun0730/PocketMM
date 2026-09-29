@@ -6,6 +6,7 @@ import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.character.CharacterState;
 import com.example.projectmm.domain.memory.EffectiveMemory;
 import com.example.projectmm.domain.memory.MemoryAccessLevel;
+import com.example.projectmm.domain.memory.MemoryTier;
 import com.example.projectmm.domain.relationship.RelationshipRepository;
 import com.example.projectmm.domain.simulation.EventCandidate;
 import com.example.projectmm.domain.simulation.StateDelta;
@@ -71,7 +72,11 @@ class AiContextBuilderTest {
                                 8,
                                 75,
                                 now.minusDays(5),
-                                false
+                                false,
+                                null,
+                                null,
+                                MemoryAccessLevel.EXPLICIT,
+                                MemoryTier.HOT
                         )
                 );
 
@@ -341,6 +346,465 @@ class AiContextBuilderTest {
                 .isInstanceOf(
                         IllegalStateException.class
                 )
+                .hasMessage(
+                        "BLOCKED memory must not reach AI context"
+                );
+    }
+
+    @Test
+    void HOT_기억은_AI_Context에_전체_메타정보를_유지한다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        12, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        80,
+                        20,
+                        now
+                );
+
+        EventCandidate candidate =
+                new EventCandidate(
+                        now,
+                        "TEST",
+                        "test",
+                        4,
+                        true,
+                        StateDelta.none()
+                );
+
+        EffectiveMemory memory =
+                new EffectiveMemory(
+                        1L,
+                        "최근의 중요한 기억",
+                        8,
+                        75,
+                        now.minusDays(1),
+                        false,
+                        null,
+                        null,
+                        MemoryAccessLevel.EXPLICIT,
+                        MemoryTier.HOT
+                );
+
+        when(
+                memoryRecallService.recall(
+                        character.getId(),
+                        now,
+                        5
+                )
+        ).thenReturn(List.of(memory));
+
+        when(
+                relationshipRepository.findByFromCharacterId(
+                        character.getId()
+                )
+        ).thenReturn(List.of());
+
+        AiContext context =
+                builder.build(
+                        state,
+                        candidate
+                );
+
+        assertThat(context.memories().getFirst().importance())
+                .isEqualTo(8);
+
+        assertThat(context.memories().getFirst().strength())
+                .isEqualTo(75);
+    }
+
+    @Test
+    void WARM_기억은_AI_Context에서_strength를_제거한다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        12, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        80,
+                        20,
+                        now
+                );
+
+        EventCandidate candidate =
+                new EventCandidate(
+                        now,
+                        "TEST",
+                        "test",
+                        4,
+                        true,
+                        StateDelta.none()
+                );
+
+        EffectiveMemory memory =
+                new EffectiveMemory(
+                        1L,
+                        "일반 장기 기억",
+                        6,
+                        55,
+                        now.minusDays(20),
+                        false,
+                        null,
+                        null,
+                        MemoryAccessLevel.EXPLICIT,
+                        MemoryTier.WARM
+                );
+
+        when(
+                memoryRecallService.recall(
+                        character.getId(),
+                        now,
+                        5
+                )
+        ).thenReturn(List.of(memory));
+
+        when(
+                relationshipRepository.findByFromCharacterId(
+                        character.getId()
+                )
+        ).thenReturn(List.of());
+
+        AiContext context =
+                builder.build(
+                        state,
+                        candidate
+                );
+
+        assertThat(context.memories().getFirst().summary())
+                .isEqualTo("일반 장기 기억");
+
+        assertThat(context.memories().getFirst().importance())
+                .isEqualTo(6);
+
+        assertThat(context.memories().getFirst().strength())
+                .isZero();
+    }
+
+    @Test
+    void COLD_기억은_AI_Context에_압축된_summary만_유지한다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        12, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        80,
+                        20,
+                        now
+                );
+
+        EventCandidate candidate =
+                new EventCandidate(
+                        now,
+                        "TEST",
+                        "test",
+                        4,
+                        true,
+                        StateDelta.none()
+                );
+
+        EffectiveMemory memory =
+                new EffectiveMemory(
+                        1L,
+                        "압축된 장기 패턴",
+                        9,
+                        90,
+                        now.minusDays(100),
+                        false,
+                        null,
+                        null,
+                        MemoryAccessLevel.EXPLICIT,
+                        MemoryTier.COLD
+                );
+
+        when(
+                memoryRecallService.recall(
+                        character.getId(),
+                        now,
+                        5
+                )
+        ).thenReturn(List.of(memory));
+
+        when(
+                relationshipRepository.findByFromCharacterId(
+                        character.getId()
+                )
+        ).thenReturn(List.of());
+
+        AiContext context =
+                builder.build(
+                        state,
+                        candidate
+                );
+
+        assertThat(context.memories().getFirst().summary())
+                .isEqualTo("압축된 장기 패턴");
+
+        assertThat(context.memories().getFirst().importance())
+                .isZero();
+
+        assertThat(context.memories().getFirst().strength())
+                .isZero();
+    }
+
+    @Test
+    void HOT이어도_IMPLICIT_기억은_원문을_AI_Context에_노출하지_않는다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        12, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        80,
+                        20,
+                        now
+                );
+
+        EventCandidate candidate =
+                new EventCandidate(
+                        now,
+                        "TEST",
+                        "test",
+                        4,
+                        true,
+                        StateDelta.none()
+                );
+
+        String secretSummary =
+                "절대로 그대로 노출되면 안 되는 구체적인 사건";
+
+        EffectiveMemory memory =
+                new EffectiveMemory(
+                        1L,
+                        secretSummary,
+                        9,
+                        90,
+                        now.minusDays(1),
+                        false,
+                        null,
+                        null,
+                        MemoryAccessLevel.IMPLICIT,
+                        MemoryTier.HOT
+                );
+
+        when(
+                memoryRecallService.recall(
+                        character.getId(),
+                        now,
+                        5
+                )
+        ).thenReturn(List.of(memory));
+
+        when(
+                relationshipRepository.findByFromCharacterId(
+                        character.getId()
+                )
+        ).thenReturn(List.of());
+
+        AiContext context =
+                builder.build(
+                        state,
+                        candidate
+                );
+
+        assertThat(context.memories())
+                .hasSize(1);
+
+        assertThat(
+                context.memories()
+                        .getFirst()
+                        .summary()
+        )
+                .doesNotContain(secretSummary)
+                .contains("익숙함");
+
+        assertThat(
+                context.memories()
+                        .getFirst()
+                        .strength()
+        ).isEqualTo(90);
+    }
+
+    @Test
+    void HOT이어도_RESIDUAL_기억은_원문을_AI_Context에_노출하지_않는다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        12, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        80,
+                        20,
+                        now
+                );
+
+        EventCandidate candidate =
+                new EventCandidate(
+                        now,
+                        "TEST",
+                        "test",
+                        4,
+                        true,
+                        StateDelta.none()
+                );
+
+        String secretSummary =
+                "구체적인 사건과 인물에 대한 실제 기억";
+
+        EffectiveMemory memory =
+                new EffectiveMemory(
+                        1L,
+                        secretSummary,
+                        9,
+                        90,
+                        now.minusDays(1),
+                        false,
+                        null,
+                        null,
+                        MemoryAccessLevel.RESIDUAL,
+                        MemoryTier.HOT
+                );
+
+        when(
+                memoryRecallService.recall(
+                        character.getId(),
+                        now,
+                        5
+                )
+        ).thenReturn(List.of(memory));
+
+        when(
+                relationshipRepository.findByFromCharacterId(
+                        character.getId()
+                )
+        ).thenReturn(List.of());
+
+        AiContext context =
+                builder.build(
+                        state,
+                        candidate
+                );
+
+        assertThat(context.memories())
+                .hasSize(1);
+
+        assertThat(
+                context.memories()
+                        .getFirst()
+                        .summary()
+        )
+                .doesNotContain(secretSummary)
+                .contains("감정적 잔향");
+
+        assertThat(
+                context.memories()
+                        .getFirst()
+                        .strength()
+        ).isEqualTo(90);
+    }
+
+    @Test
+    void COLD여도_BLOCKED_기억은_AI_Context에_진입할_수_없다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        12, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        80,
+                        20,
+                        now
+                );
+
+        EventCandidate candidate =
+                new EventCandidate(
+                        now,
+                        "TEST",
+                        "test",
+                        4,
+                        true,
+                        StateDelta.none()
+                );
+
+        EffectiveMemory memory =
+                new EffectiveMemory(
+                        1L,
+                        "차단된 기억의 실제 내용",
+                        9,
+                        90,
+                        now.minusDays(100),
+                        false,
+                        null,
+                        null,
+                        MemoryAccessLevel.BLOCKED,
+                        MemoryTier.COLD
+                );
+
+        when(
+                memoryRecallService.recall(
+                        character.getId(),
+                        now,
+                        5
+                )
+        ).thenReturn(List.of(memory));
+
+        when(
+                relationshipRepository.findByFromCharacterId(
+                        character.getId()
+                )
+        ).thenReturn(List.of());
+
+        assertThatThrownBy(
+                () -> builder.build(
+                        state,
+                        candidate
+                )
+        )
+                .isInstanceOf(IllegalStateException.class)
                 .hasMessage(
                         "BLOCKED memory must not reach AI context"
                 );

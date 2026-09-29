@@ -20,6 +20,28 @@ public class MemoryRecallService {
     private final MemoryAccessStateRepository memoryAccessStateRepository;
     private final MemoryLifecycleService memoryLifecycleService;
     private final MemoryProvenanceAccessPolicy provenanceAccess;
+    private final MemoryTierPolicy memoryTierPolicy;
+
+    public MemoryRecallService(
+            MemoryRepository memoryRepository,
+            MemoryDecayPolicy memoryDecayPolicy,
+            MemoryCompressionService memoryCompressionService,
+            CharacterStateRepository characterStateRepository,
+            MemoryAccessStateRepository memoryAccessStateRepository,
+            MemoryLifecycleService memoryLifecycleService,
+            MemoryProvenanceAccessPolicy provenanceAccess
+    ) {
+        this(
+                memoryRepository,
+                memoryDecayPolicy,
+                memoryCompressionService,
+                characterStateRepository,
+                memoryAccessStateRepository,
+                memoryLifecycleService,
+                provenanceAccess,
+                new MemoryTierPolicy()
+        );
+    }
 
     public List<EffectiveMemory> recall(
             Long characterId,
@@ -151,6 +173,12 @@ public class MemoryRecallService {
                         accessLevel
                 );
 
+        MemoryTier tier =
+                memoryTierPolicy.determine(
+                        memory,
+                        currentTime
+                );
+
         return new EffectiveMemory(
                 memory.getId(),
                 memory.getSummary(),
@@ -160,7 +188,8 @@ public class MemoryRecallService {
                 decay.compressionRequired(),
                 memory.getEvidenceQuote(),
                 memory.getFact(),
-                accessLevel
+                accessLevel,
+                tier
         );
     }
 

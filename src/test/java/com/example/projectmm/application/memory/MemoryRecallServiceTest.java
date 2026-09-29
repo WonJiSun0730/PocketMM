@@ -1047,6 +1047,123 @@ class MemoryRecallServiceTest {
                 );
     }
 
+    @Test
+    void 최근_기억은_HOT으로_회상한다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        "방금 생긴 기억",
+                        8,
+                        80,
+                        now.minusDays(1)
+                );
+
+        when(
+                memoryRepository
+                        .findByCharacterIdOrderByRememberedAtDesc(1L)
+        ).thenReturn(
+                List.of(memory)
+        );
+
+        List<EffectiveMemory> result =
+                memoryRecallService.recall(
+                        1L,
+                        now,
+                        10
+                );
+
+        assertThat(result)
+                .hasSize(1);
+
+        assertThat(result.get(0).tier())
+                .isEqualTo(MemoryTier.HOT);
+    }
+
+    @Test
+    void 오래된_상세_기억은_WARM으로_회상한다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        "오래된 상세 기억",
+                        9,
+                        100,
+                        now.minusDays(20)
+                );
+
+        when(
+                memoryRepository
+                        .findByCharacterIdOrderByRememberedAtDesc(1L)
+        ).thenReturn(
+                List.of(memory)
+        );
+
+        List<EffectiveMemory> result =
+                memoryRecallService.recall(
+                        1L,
+                        now,
+                        10
+                );
+
+        assertThat(result)
+                .hasSize(1);
+
+        assertThat(result.get(0).tier())
+                .isEqualTo(MemoryTier.WARM);
+    }
+
+    @Test
+    void 오래되고_압축된_기억은_COLD로_회상한다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        "원본 기억",
+                        9,
+                        100,
+                        now.minusDays(20)
+                );
+
+        memory.compress("요약 기억");
+        memory.compress("패턴 기억");
+
+        when(
+                memoryRepository
+                        .findByCharacterIdOrderByRememberedAtDesc(1L)
+        ).thenReturn(
+                List.of(memory)
+        );
+
+        List<EffectiveMemory> result =
+                memoryRecallService.recall(
+                        1L,
+                        now,
+                        10
+                );
+
+        assertThat(result)
+                .hasSize(1);
+
+        assertThat(result.get(0).tier())
+                .isEqualTo(MemoryTier.COLD);
+    }
+
     private Memory createMemory(
             String summary,
             int importance,
