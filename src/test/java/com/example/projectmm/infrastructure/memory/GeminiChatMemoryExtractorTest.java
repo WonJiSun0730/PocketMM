@@ -70,6 +70,43 @@ class GeminiChatMemoryExtractorTest {
         var fields = request.path("generationConfig").path("responseSchema").path("properties")
                 .path("memories").path("items").path("properties");
         assertThat(fields.has("fact")).isTrue();
+        assertThat(fields.has("semanticMemory"))
+                .isTrue();
+
+        var semanticFields =
+                fields.path("semanticMemory")
+                        .path("properties");
+
+        assertThat(semanticFields.has("type"))
+                .isTrue();
+
+        assertThat(semanticFields.has("subject"))
+                .isTrue();
+
+        assertThat(semanticFields.has("relation"))
+                .isTrue();
+
+        assertThat(semanticFields.has("object"))
+                .isTrue();
+
+        assertThat(semanticFields.has("polarity"))
+                .isTrue();
+
+        assertThat(semanticFields.has("temporality"))
+                .isTrue();
+
+        assertThat(semanticFields.has("certainty"))
+                .isTrue();
+
+        assertThat(
+                request.path("systemInstruction")
+                        .toString()
+        ).contains(
+                "UPPER_SNAKE_CASE",
+                "LITERAL:",
+                "Never translate a literal",
+                "internal search representation"
+        );
         assertThat(fields.path("fact").path("nullable").asBoolean()).isTrue();
         assertThat(request.path("systemInstruction").toString()).contains("VERBATIM", "PLAN", "USER TESTIMONY",
                 "private", "OOC", "exact substring", "Do not infer");
@@ -196,5 +233,94 @@ class GeminiChatMemoryExtractorTest {
         assertThat(
                 details.getFirst().text()
         ).isEqualTo("감자");
+    }
+
+    @Test
+    void parsesCanonicalSemanticMemory() {
+
+        String json = """
+        {
+          "memories": [{
+            "quote": "내 반려묘 이름은 감자야.",
+            "importance": 7,
+            "fact": {
+              "kind": "RELATIONSHIP",
+              "subject": "반려묘",
+              "relation": "이름",
+              "value": "감자"
+            },
+            "semanticMemory": {
+              "type": "RELATIONSHIP",
+              "subject": "SELF",
+              "relation": "PET_NAME",
+              "object": "LITERAL:감자",
+              "polarity": "NEUTRAL",
+              "temporality": "PRESENT",
+              "certainty": "CERTAIN"
+            },
+            "details": []
+          }]
+        }
+        """;
+
+        var memory =
+                extractor.parseResponse(
+                        response("STOP", json)
+                ).getFirst();
+
+        assertThat(memory.semanticMemory())
+                .isNotNull();
+
+        assertThat(memory.semanticMemory().getSubject())
+                .isEqualTo("SELF");
+
+        assertThat(memory.semanticMemory().getRelation())
+                .isEqualTo("PET_NAME");
+
+        assertThat(memory.semanticMemory().getObject())
+                .isEqualTo("LITERAL:감자");
+    }
+
+    @Test
+    void invalidSemanticMemoryFallsBackWithoutDroppingGroundedMemory() {
+
+        String json = """
+        {
+          "memories": [{
+            "quote": "내 반려묘 이름은 감자야.",
+            "importance": 7,
+            "fact": {
+              "kind": "RELATIONSHIP",
+              "subject": "반려묘",
+              "relation": "이름",
+              "value": "감자"
+            },
+            "semanticMemory": {
+              "type": "RELATIONSHIP",
+              "subject": "나",
+              "relation": "이름",
+              "object": "LITERAL:Potato",
+              "polarity": "NEUTRAL",
+              "temporality": "PRESENT",
+              "certainty": "CERTAIN"
+            },
+            "details": []
+          }]
+        }
+        """;
+
+        var memory =
+                extractor.parseResponse(
+                        response("STOP", json)
+                ).getFirst();
+
+        assertThat(memory.fact())
+                .isNotNull();
+
+        assertThat(memory.fact().getValue())
+                .isEqualTo("감자");
+
+        assertThat(memory.semanticMemory())
+                .isNull();
     }
 }

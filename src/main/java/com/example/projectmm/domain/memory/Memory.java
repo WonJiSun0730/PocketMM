@@ -44,6 +44,9 @@ public class Memory {
     @Embedded
     private MemoryFact fact;
 
+    @Embedded
+    private SemanticMemory semanticMemory;
+
     @Column(nullable = false, length = 500)
     private String summary;
 
@@ -167,6 +170,24 @@ public class Memory {
 
         this.summary = compressedSummary;
         this.detailLevel = detailLevel.next();
+    }
+
+    public void attachSemanticMemory(
+            SemanticMemory semanticMemory
+    ) {
+        if (semanticMemory == null) {
+            throw new IllegalArgumentException(
+                    "Semantic memory is required"
+            );
+        }
+
+        if (this.semanticMemory != null) {
+            throw new IllegalStateException(
+                    "Semantic memory is already attached"
+            );
+        }
+
+        this.semanticMemory = semanticMemory;
     }
 
     public static Memory fromChat(Conversation conversation, ChatMessage source, String quote,

@@ -5,6 +5,7 @@ import com.example.projectmm.application.memory.MemoryDetailCandidate;
 import com.example.projectmm.domain.memory.ChatMemoryCandidate;
 import com.example.projectmm.domain.memory.MemoryDetailSalience;
 import com.example.projectmm.domain.memory.MemoryFact;
+import com.example.projectmm.domain.memory.SemanticMemory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -79,6 +80,41 @@ public class GeminiChatMemoryExtractor implements ChatMemoryExtractor {
         REPORTED_EVENT, never independently verified knowledge. These are USER TESTIMONY only.
         If safe decomposition is impossible, use fact:null and retain only the complete quote.
 
+        Also add semanticMemory when the quote can be represented safely as canonical
+        structured meaning independent of the user's language.
+        
+        semanticMemory has:
+        type, subject, relation, object, polarity, temporality, certainty.
+        
+        type is IDENTITY, PREFERENCE, RELATIONSHIP, CONSTRAINT, PLAN, EVENT or EMOTION.
+        polarity is POSITIVE, NEGATIVE or NEUTRAL.
+        temporality is PAST, PRESENT, FUTURE or TIMELESS.
+        certainty is CERTAIN, UNCERTAIN or REPORTED.
+        
+        subject and relation MUST be language-independent symbolic identifiers written as
+        UPPER_SNAKE_CASE tokens, not translated prose or copied natural-language phrases.
+        Use stable semantic roles/concepts such as SELF, PET, PARTNER, NAME, LIKE, DISLIKE,
+        OWN, KNOW, PROMISE, GO_TO or MEET when they accurately represent the quote.
+        Do not invent a more specific concept than the quote supports.
+        
+        object must be either:
+        1. an UPPER_SNAKE_CASE semantic concept token when the meaning can be represented
+           without preserving source wording, or
+        2. LITERAL:<exact source substring> when exact wording, a proper name, title,
+           identifier or other source value must be preserved.
+        
+        LITERAL payloads MUST be exact nonempty substrings of the quote.
+        Never translate a literal. For example, the name 감자 must remain LITERAL:감자,
+        not POTATO.
+        
+        semanticMemory is an internal search representation, not independent evidence.
+        It MUST NOT add information absent from the quote, resolve ambiguous pronouns,
+        convert plans into completed events, remove negation, or upgrade reported or
+        uncertain information into certainty.
+        
+        If a safe canonical representation is not possible, use semanticMemory:null.
+        The original quote and fact remain the provenance source of truth.
+
         Also identify up to 5 concrete details inside each selected quote that matter to
         narrative continuity. Every detail.text MUST be an exact nonempty substring of that
         same quote. Never infer, paraphrase, translate, normalize, combine or invent details.
@@ -102,6 +138,56 @@ public class GeminiChatMemoryExtractor implements ChatMemoryExtractor {
                 "properties", Map.of("kind", Map.of("type", "STRING", "enum",
                         java.util.Arrays.stream(MemoryFact.Kind.values()).map(Enum::name).toList()),
                         "subject", text, "relation", text, "value", text));
+        var semanticSchema = Map.of(
+                "type", "OBJECT",
+                "nullable", true,
+                "required", List.of(
+                        "type",
+                        "subject",
+                        "relation",
+                        "object",
+                        "polarity",
+                        "temporality",
+                        "certainty"
+                ),
+                "properties", Map.of(
+                        "type", Map.of(
+                                "type", "STRING",
+                                "enum", java.util.Arrays.stream(
+                                                SemanticMemory.Type.values()
+                                        )
+                                        .map(Enum::name)
+                                        .toList()
+                        ),
+                        "subject", text,
+                        "relation", text,
+                        "object", text,
+                        "polarity", Map.of(
+                                "type", "STRING",
+                                "enum", java.util.Arrays.stream(
+                                                SemanticMemory.Polarity.values()
+                                        )
+                                        .map(Enum::name)
+                                        .toList()
+                        ),
+                        "temporality", Map.of(
+                                "type", "STRING",
+                                "enum", java.util.Arrays.stream(
+                                                SemanticMemory.Temporality.values()
+                                        )
+                                        .map(Enum::name)
+                                        .toList()
+                        ),
+                        "certainty", Map.of(
+                                "type", "STRING",
+                                "enum", java.util.Arrays.stream(
+                                                SemanticMemory.Certainty.values()
+                                        )
+                                        .map(Enum::name)
+                                        .toList()
+                        )
+                )
+        );
         var detailSchema = Map.of(
                 "type", "OBJECT",
                 "required", List.of(
@@ -139,6 +225,7 @@ public class GeminiChatMemoryExtractor implements ChatMemoryExtractor {
                                                 "quote",
                                                 "importance",
                                                 "fact",
+                                                "semanticMemory",
                                                 "details"
                                         ),
                                         "properties", Map.of(
@@ -149,6 +236,7 @@ public class GeminiChatMemoryExtractor implements ChatMemoryExtractor {
                                                         "maximum", 10
                                                 ),
                                                 "fact", factSchema,
+                                                "semanticMemory", semanticSchema,
                                                 "details", Map.of(
                                                         "type", "ARRAY",
                                                         "maxItems", 5,
@@ -198,6 +286,11 @@ public class GeminiChatMemoryExtractor implements ChatMemoryExtractor {
                 } catch (IllegalArgumentException invalidKind) { continue; }
                 if (!fact.groundedIn(quote)) continue;
             }
+            SemanticMemory semanticMemory =
+                    parseSemanticMemory(
+                            memory.path("semanticMemory"),
+                            quote
+                    );
             JsonNode detailNodes =
                     memory.path("details");
 
@@ -256,10 +349,117 @@ public class GeminiChatMemoryExtractor implements ChatMemoryExtractor {
                             quote,
                             memory.path("importance").asInt(),
                             fact,
+                            semanticMemory,
                             details
                     )
             );
         }
         return List.copyOf(result);
+    }
+
+    private SemanticMemory parseSemanticMemory(
+            JsonNode node,
+            String quote
+    ) {
+        if (node == null
+                || node.isMissingNode()
+                || node.isNull()) {
+            return null;
+        }
+
+        if (!node.isObject()
+                || node.size() != 7
+                || !node.path("type").isString()
+                || !node.path("subject").isString()
+                || !node.path("relation").isString()
+                || !node.path("object").isString()
+                || !node.path("polarity").isString()
+                || !node.path("temporality").isString()
+                || !node.path("certainty").isString()) {
+
+            return null;
+        }
+
+        String subject =
+                node.path("subject")
+                        .asText()
+                        .trim();
+
+        String relation =
+                node.path("relation")
+                        .asText()
+                        .trim();
+
+        String object =
+                node.path("object")
+                        .asText()
+                        .trim();
+
+        if (!isCanonicalToken(subject)
+                || !isCanonicalToken(relation)
+                || !isCanonicalObject(object, quote)) {
+
+            return null;
+        }
+
+        try {
+            return new SemanticMemory(
+                    SemanticMemory.Type.valueOf(
+                            node.path("type").asText()
+                    ),
+                    subject,
+                    relation,
+                    object,
+                    SemanticMemory.Polarity.valueOf(
+                            node.path("polarity").asText()
+                    ),
+                    SemanticMemory.Temporality.valueOf(
+                            node.path("temporality").asText()
+                    ),
+                    SemanticMemory.Certainty.valueOf(
+                            node.path("certainty").asText()
+                    )
+            );
+        } catch (IllegalArgumentException invalidSemanticMemory) {
+            return null;
+        }
+    }
+
+    private boolean isCanonicalToken(
+            String value
+    ) {
+        return value != null
+                && value.matches(
+                "[A-Z][A-Z0-9_]{0,119}"
+        );
+    }
+
+    private boolean isCanonicalObject(
+            String value,
+            String quote
+    ) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+
+        if (isCanonicalToken(value)) {
+            return true;
+        }
+
+        String prefix =
+                "LITERAL:";
+
+        if (!value.startsWith(prefix)) {
+            return false;
+        }
+
+        String literal =
+                value.substring(
+                        prefix.length()
+                );
+
+        return !literal.isBlank()
+                && literal.length() <= 300
+                && quote.contains(literal);
     }
 }

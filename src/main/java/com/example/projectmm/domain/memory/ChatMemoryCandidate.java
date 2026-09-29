@@ -8,6 +8,7 @@ public record ChatMemoryCandidate(
         String quote,
         int importance,
         MemoryFact fact,
+        SemanticMemory semanticMemory,
         List<MemoryDetailCandidate> details
 ) {
 
@@ -20,12 +21,28 @@ public record ChatMemoryCandidate(
     public ChatMemoryCandidate(
             String quote,
             int importance,
+            MemoryFact fact,
+            List<MemoryDetailCandidate> details
+    ) {
+        this(
+                quote,
+                importance,
+                fact,
+                null,
+                details
+        );
+    }
+
+    public ChatMemoryCandidate(
+            String quote,
+            int importance,
             MemoryFact fact
     ) {
         this(
                 quote,
                 importance,
                 fact,
+                null,
                 List.of()
         );
     }
@@ -37,6 +54,7 @@ public record ChatMemoryCandidate(
         this(
                 quote,
                 importance,
+                null,
                 null,
                 List.of()
         );

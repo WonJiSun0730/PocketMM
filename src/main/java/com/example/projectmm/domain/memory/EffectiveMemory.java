@@ -11,6 +11,7 @@ public record EffectiveMemory(
         boolean compressionRequired,
         String evidenceQuote,
         MemoryFact fact,
+        SemanticMemory semanticMemory,
         MemoryAccessLevel accessLevel,
         MemoryTier tier
 ) {
@@ -30,6 +31,7 @@ public record EffectiveMemory(
                 effectiveStrength,
                 rememberedAt,
                 compressionRequired,
+                null,
                 null,
                 null,
                 MemoryAccessLevel.EXPLICIT,
@@ -56,6 +58,7 @@ public record EffectiveMemory(
                 compressionRequired,
                 evidenceQuote,
                 fact,
+                null,
                 MemoryAccessLevel.EXPLICIT,
                 MemoryTier.WARM
         );
@@ -81,8 +84,36 @@ public record EffectiveMemory(
                 compressionRequired,
                 evidenceQuote,
                 fact,
+                null,
                 accessLevel,
                 MemoryTier.WARM
+        );
+    }
+
+    public EffectiveMemory(
+            Long memoryId,
+            String summary,
+            int importance,
+            int effectiveStrength,
+            LocalDateTime rememberedAt,
+            boolean compressionRequired,
+            String evidenceQuote,
+            MemoryFact fact,
+            MemoryAccessLevel accessLevel,
+            MemoryTier tier
+    ) {
+        this(
+                memoryId,
+                summary,
+                importance,
+                effectiveStrength,
+                rememberedAt,
+                compressionRequired,
+                evidenceQuote,
+                fact,
+                null,
+                accessLevel,
+                tier
         );
     }
 }

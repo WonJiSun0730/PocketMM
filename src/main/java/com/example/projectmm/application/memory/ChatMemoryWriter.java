@@ -75,7 +75,23 @@ public class ChatMemoryWriter {
             if (++accepted > 3) break;
             String key = fingerprint(conversation.getId(), quote);
             if (memories.existsByChatFingerprint(key)) continue;
-            Memory memory = Memory.fromChat(conversation, source, quote, candidate.importance(), at, key, candidate.fact());
+            Memory memory =
+                    Memory.fromChat(
+                            conversation,
+                            source,
+                            quote,
+                            candidate.importance(),
+                            at,
+                            key,
+                            candidate.fact()
+                    );
+
+            if (candidate.semanticMemory() != null) {
+                memory.attachSemanticMemory(
+                        candidate.semanticMemory()
+                );
+            }
+
             Memory persisted =
                     memories.save(memory);
 

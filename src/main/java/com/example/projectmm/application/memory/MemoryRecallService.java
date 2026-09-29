@@ -21,6 +21,7 @@ public class MemoryRecallService {
     private final MemoryLifecycleService memoryLifecycleService;
     private final MemoryProvenanceAccessPolicy provenanceAccess;
     private final MemoryTierPolicy memoryTierPolicy;
+    private final MemoryRetriever memoryRetriever;
 
     @Autowired
     public MemoryRecallService(
@@ -31,7 +32,8 @@ public class MemoryRecallService {
             MemoryAccessStateRepository memoryAccessStateRepository,
             MemoryLifecycleService memoryLifecycleService,
             MemoryProvenanceAccessPolicy provenanceAccess,
-            MemoryTierPolicy memoryTierPolicy
+            MemoryTierPolicy memoryTierPolicy,
+            MemoryRetriever memoryRetriever
     ) {
         this.memoryRepository = memoryRepository;
         this.memoryDecayPolicy = memoryDecayPolicy;
@@ -41,6 +43,7 @@ public class MemoryRecallService {
         this.memoryLifecycleService = memoryLifecycleService;
         this.provenanceAccess = provenanceAccess;
         this.memoryTierPolicy = memoryTierPolicy;
+        this.memoryRetriever = memoryRetriever;
     }
 
     public MemoryRecallService(
@@ -60,7 +63,8 @@ public class MemoryRecallService {
                 memoryAccessStateRepository,
                 memoryLifecycleService,
                 provenanceAccess,
-                new MemoryTierPolicy()
+                new MemoryTierPolicy(),
+                new MemoryRetrievalRanker()
         );
     }
 
@@ -137,24 +141,35 @@ public class MemoryRecallService {
                 .filter(memory -> includeSharedMemories || memory.getConversation() != null)
                 .filter(memory -> !memory.getRememberedAt().isAfter(currentTime)).toList();
         var restrictions = provenanceAccess.restrictions(memories.stream().map(Memory::getId).toList());
-        List<EffectiveMemory> recalled =
+        List<EffectiveMemory> candidates =
                 memories.stream()
-                .filter(memory ->
-                        accessLevel(memory, restrictions) != MemoryAccessLevel.BLOCKED
-                )
-                .map(memory -> prepareMemory(memory, currentTime, restrictions))
-                .filter(memory ->
-                        recallable(
-                                memory,
-                                recallThreshold
+                        .filter(memory ->
+                                accessLevel(
+                                        memory,
+                                        restrictions
+                                ) != MemoryAccessLevel.BLOCKED
                         )
-                )
-                .sorted(Comparator.<EffectiveMemory>comparingInt(
-                                memory -> relevance(query, memory)).reversed()
-                        .thenComparing(Comparator.comparingInt(EffectiveMemory::effectiveStrength).reversed())
-                        .thenComparing(EffectiveMemory::rememberedAt, Comparator.reverseOrder()))
-                .limit(limit)
-                .toList();
+                        .map(memory ->
+                                prepareMemory(
+                                        memory,
+                                        currentTime,
+                                        restrictions
+                                )
+                        )
+                        .filter(memory ->
+                                recallable(
+                                        memory,
+                                        recallThreshold
+                                )
+                        )
+                        .toList();
+
+        List<EffectiveMemory> recalled =
+                memoryRetriever.retrieve(
+                        query,
+                        candidates,
+                        limit
+                );
 
         memoryLifecycleService.markAccessed(
                 recalled.stream()
@@ -209,6 +224,7 @@ public class MemoryRecallService {
                 decay.compressionRequired(),
                 memory.getEvidenceQuote(),
                 memory.getFact(),
+                memory.getSemanticMemory(),
                 accessLevel,
                 tier
         );
@@ -262,33 +278,4 @@ public class MemoryRecallService {
                 && memory.effectiveStrength() >= threshold;
     }
 
-    private int relevance(
-            String query,
-            EffectiveMemory memory
-    ) {
-        int lexicalScore =
-                Math.max(
-                        MemoryRelevance.overlap(
-                                query,
-                                memory.summary()
-                        ),
-                        MemoryRelevance.overlap(
-                                query,
-                                memory.evidenceQuote()
-                        )
-                );
-
-        int structuredBonus =
-                MemoryRelevance.structuredBonus(
-                        query,
-                        memory.fact()
-                );
-
-        if (lexicalScore > 0) {
-            return applyAccessStrength(lexicalScore * 10, memory.accessLevel());
-        }
-
-        // 관련도 우선 정렬에서도 접근 감산이 무시되지 않도록 한다. 저장 강도는 변경하지 않는다.
-        return applyAccessStrength(structuredBonus, memory.accessLevel());
-    }
 }

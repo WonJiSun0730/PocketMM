@@ -47,6 +47,7 @@ import static org.assertj.core.api.Assertions.*;
         MemoryDetailService.class,
         ProtectedMemoryDetailPolicy.class,
         MemoryTierPolicy.class,
+        MemoryRetrievalRanker.class,
         MemoryProvenanceAccessPolicy.class
 })
 class ChatMemoryPersistenceTest {
@@ -472,5 +473,176 @@ class ChatMemoryPersistenceTest {
 
         assertThat(detail.mustPreserve())
                 .isTrue();
+    }
+
+    @Test
+    void semanticMemoryPersistsAndReloadsFromDatabase() {
+
+        Character character =
+                new Character("Semantic Memory QA");
+
+        em.persist(character);
+
+        Memory memory =
+                new Memory(
+                        character,
+                        null,
+                        "복숭아 선호 기억",
+                        6,
+                        70,
+                        now
+                );
+
+        memory.attachSemanticMemory(
+                new SemanticMemory(
+                        SemanticMemory.Type.PREFERENCE,
+                        "SELF",
+                        "LIKE",
+                        "PEACH",
+                        SemanticMemory.Polarity.POSITIVE,
+                        SemanticMemory.Temporality.TIMELESS,
+                        SemanticMemory.Certainty.CERTAIN
+                )
+        );
+
+        em.persist(memory);
+        em.flush();
+
+        Long memoryId =
+                memory.getId();
+
+        em.clear();
+
+        Memory reloaded =
+                em.find(
+                        Memory.class,
+                        memoryId
+                );
+
+        assertThat(reloaded)
+                .isNotNull();
+
+        assertThat(reloaded.getSemanticMemory())
+                .isNotNull();
+
+        assertThat(reloaded.getSemanticMemory().getType())
+                .isEqualTo(
+                        SemanticMemory.Type.PREFERENCE
+                );
+
+        assertThat(reloaded.getSemanticMemory().getSubject())
+                .isEqualTo("SELF");
+
+        assertThat(reloaded.getSemanticMemory().getRelation())
+                .isEqualTo("LIKE");
+
+        assertThat(reloaded.getSemanticMemory().getObject())
+                .isEqualTo("PEACH");
+
+        assertThat(reloaded.getSemanticMemory().getPolarity())
+                .isEqualTo(
+                        SemanticMemory.Polarity.POSITIVE
+                );
+
+        assertThat(reloaded.getSemanticMemory().getTemporality())
+                .isEqualTo(
+                        SemanticMemory.Temporality.TIMELESS
+                );
+
+        assertThat(reloaded.getSemanticMemory().getCertainty())
+                .isEqualTo(
+                        SemanticMemory.Certainty.CERTAIN
+                );
+    }
+
+    @Test
+    void chatMemoryWriterPersistsSemanticMemoryWhenProvided() {
+
+        Character character =
+                new Character("Semantic Writer QA");
+
+        em.persist(character);
+
+        Conversation conversation =
+                Conversation.fresh(
+                        character,
+                        now
+                );
+
+        em.persist(conversation);
+
+        String quote =
+                "나는 복숭아를 좋아해.";
+
+        ChatMessage source =
+                message(
+                        conversation,
+                        quote,
+                        now
+                );
+
+        em.persist(source);
+
+        ChatMemoryCandidate candidate =
+                new ChatMemoryCandidate(
+                        quote,
+                        5,
+                        new MemoryFact(
+                                MemoryFact.Kind.PREFERENCE,
+                                "나는",
+                                "좋아해",
+                                "복숭아"
+                        ),
+                        new SemanticMemory(
+                                SemanticMemory.Type.PREFERENCE,
+                                "SELF",
+                                "LIKE",
+                                "PEACH",
+                                SemanticMemory.Polarity.POSITIVE,
+                                SemanticMemory.Temporality.TIMELESS,
+                                SemanticMemory.Certainty.CERTAIN
+                        ),
+                        List.of()
+                );
+
+        writer.save(
+                conversation,
+                source,
+                quote,
+                List.of(candidate),
+                now
+        );
+
+        em.flush();
+        em.clear();
+
+        Memory stored =
+                memories.findForConversation(
+                        character.getId(),
+                        conversation.getId()
+                ).getFirst();
+
+        assertThat(stored.getFact())
+                .isNotNull();
+
+        assertThat(stored.getFact().getValue())
+                .isEqualTo("복숭아");
+
+        assertThat(stored.getSemanticMemory())
+                .isNotNull();
+
+        assertThat(stored.getSemanticMemory().getType())
+                .isEqualTo(
+                        SemanticMemory.Type.PREFERENCE
+                );
+
+        assertThat(stored.getSemanticMemory().getSubject())
+                .isEqualTo("SELF");
+
+        assertThat(stored.getSemanticMemory().getRelation())
+                .isEqualTo("LIKE");
+
+        assertThat(stored.getSemanticMemory().getObject())
+                .isEqualTo("PEACH");
     }
 }

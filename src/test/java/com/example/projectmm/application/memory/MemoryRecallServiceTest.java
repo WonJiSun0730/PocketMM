@@ -1048,6 +1048,78 @@ class MemoryRecallServiceTest {
     }
 
     @Test
+    void semanticMemory를_회상_결과에_그대로_전달한다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        "사용자의 반려묘 이름에 관한 기억",
+                        8,
+                        80,
+                        now.minusDays(1)
+                );
+
+        SemanticMemory semanticMemory =
+                new SemanticMemory(
+                        SemanticMemory.Type.RELATIONSHIP,
+                        "SELF",
+                        "PET_NAME",
+                        "LITERAL:감자",
+                        SemanticMemory.Polarity.NEUTRAL,
+                        SemanticMemory.Temporality.PRESENT,
+                        SemanticMemory.Certainty.CERTAIN
+                );
+
+        memory.attachSemanticMemory(
+                semanticMemory
+        );
+
+        when(
+                memoryRepository
+                        .findByCharacterIdOrderByRememberedAtDesc(
+                                1L
+                        )
+        ).thenReturn(
+                List.of(memory)
+        );
+
+        List<EffectiveMemory> result =
+                memoryRecallService.recall(
+                        1L,
+                        now,
+                        10
+                );
+
+        assertThat(result)
+                .hasSize(1);
+
+        assertThat(result.get(0).semanticMemory())
+                .isSameAs(semanticMemory);
+
+        assertThat(result.get(0)
+                .semanticMemory()
+                .getType())
+                .isEqualTo(
+                        SemanticMemory.Type.RELATIONSHIP
+                );
+
+        assertThat(result.get(0)
+                .semanticMemory()
+                .getRelation())
+                .isEqualTo("PET_NAME");
+
+        assertThat(result.get(0)
+                .semanticMemory()
+                .getObject())
+                .isEqualTo("LITERAL:감자");
+    }
+
+    @Test
     void 최근_기억은_HOT으로_회상한다() {
 
         LocalDateTime now =
