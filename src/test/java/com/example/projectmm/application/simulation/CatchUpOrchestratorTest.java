@@ -8,6 +8,7 @@ import com.example.projectmm.application.memory.MemoryRecallService;
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.character.CharacterState;
 import com.example.projectmm.domain.memory.MemoryDetailSalience;
+import com.example.projectmm.domain.relationship.RelationshipFactChange;
 import com.example.projectmm.domain.relationship.RelationshipRepository;
 import com.example.projectmm.domain.simulation.*;
 import com.example.projectmm.infrastructure.ai.MockAiGateway;
@@ -659,6 +660,83 @@ class CatchUpOrchestratorTest {
 
         assertThat(state.getMood())
                 .isEqualTo(13);
+    }
+
+    @Test
+    void AI가_존재하지_않는_관계_사실_대상을_선택하면_재시도한다() {
+
+        AtomicInteger attempts =
+                new AtomicInteger();
+
+        AiGateway relationshipFactGateway =
+                context -> {
+                    if (attempts.incrementAndGet() == 1) {
+                        return new com.example.projectmm.domain.ai.AiDecision(
+                                "RELATIONSHIP_MILESTONE",
+                                "존재하지 않는 대상을 배우자로 확정하려 했다.",
+                                8,
+                                8,
+                                StateDelta.none(),
+                                null,
+                                com.example.projectmm.domain.relationship.RelationshipDelta.none(),
+                                null,
+                                List.of(),
+                                new RelationshipFactChange(
+                                        999L,
+                                        "relationship_status",
+                                        "spouse"
+                                )
+                        );
+                    }
+
+                    return new com.example.projectmm.domain.ai.AiDecision(
+                            "VALID_AFTER_RETRY",
+                            "재시도에서는 관계 사실을 변경하지 않았다.",
+                            5,
+                            StateDelta.none(),
+                            null,
+                            com.example.projectmm.domain.relationship.RelationshipDelta.none()
+                    );
+                };
+
+        CatchUpOrchestrator relationshipFactOrchestrator =
+                createOrchestrator(
+                        relationshipFactGateway
+                );
+
+        CharacterState state =
+                createAiRequiredState();
+
+        CatchUpExecutionResult result =
+                relationshipFactOrchestrator.execute(
+                        state,
+                        LocalDateTime.of(
+                                2026,
+                                9,
+                                21,
+                                13,
+                                0
+                        )
+                );
+
+        assertThat(attempts.get())
+                .isEqualTo(2);
+
+        assertThat(result.resolvedEvents())
+                .hasSize(1);
+
+        ResolvedEvent resolved =
+                result.resolvedEvents()
+                        .getFirst();
+
+        assertThat(resolved.eventType())
+                .isEqualTo("VALID_AFTER_RETRY");
+
+        assertThat(resolved.source())
+                .isEqualTo(EventSource.AI);
+
+        assertThat(state.getMood())
+                .isEqualTo(10);
     }
 
     @Test

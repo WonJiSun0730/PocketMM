@@ -174,6 +174,87 @@ class GeminiDecisionParserTest {
                 .isEqualTo(2);
     }
 
+    @Test
+    void relationshipFactChange_object를_파싱한다() {
+
+        String decision = """
+            {
+              "eventType": "RELATIONSHIP_MILESTONE",
+              "summary": "두 사람이 서로를 배우자로 명확히 인정했다.",
+              "importance": 8,
+              "narrativeAnchor": 9,
+              "energyChange": 0,
+              "moodChange": 0,
+              "memoryAbilityChange": 0,
+              "relationshipTargetCharacterId": null,
+              "affinityChange": 0,
+              "trustChange": 0,
+              "tensionChange": 0,
+              "memoryAccessChange": null,
+              "memoryDetails": [],
+              "relationshipFactChange": {
+                "targetCharacterId": 2,
+                "relation": "relationship_status",
+                "value": "spouse"
+              }
+            }
+            """;
+
+        GeminiDecisionResponse result =
+                parser.parse(
+                        envelope(decision)
+                );
+
+        assertThat(result.relationshipFactChange())
+                .isNotNull();
+
+        assertThat(
+                result.relationshipFactChange()
+                        .targetCharacterId()
+        ).isEqualTo(2L);
+
+        assertThat(
+                result.relationshipFactChange()
+                        .relation()
+        ).isEqualTo("relationship_status");
+
+        assertThat(
+                result.relationshipFactChange()
+                        .value()
+        ).isEqualTo("spouse");
+    }
+
+    @Test
+    void relationshipFactChange_null을_파싱한다() {
+
+        String decision = """
+            {
+              "eventType": "REFLECTION",
+              "summary": "조용히 지난 일을 돌아보았다.",
+              "importance": 5,
+              "narrativeAnchor": 3,
+              "energyChange": 0,
+              "moodChange": 2,
+              "memoryAbilityChange": 0,
+              "relationshipTargetCharacterId": null,
+              "affinityChange": 0,
+              "trustChange": 0,
+              "tensionChange": 0,
+              "memoryAccessChange": null,
+              "memoryDetails": [],
+              "relationshipFactChange": null
+            }
+            """;
+
+        GeminiDecisionResponse result =
+                parser.parse(
+                        envelope(decision)
+                );
+
+        assertThat(result.relationshipFactChange())
+                .isNull();
+    }
+
     private String envelope(
             String decisionJson
     ) {

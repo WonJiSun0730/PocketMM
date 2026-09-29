@@ -356,6 +356,129 @@ class GeminiAiGatewaySchemaTest {
                 );
     }
 
+    @Test
+    void structured_output_schema가_relationshipFactChange를_nullable_필수값으로_요구한다() {
+
+        GeminiAiGateway gateway =
+                new GeminiAiGateway(
+                        "test-key",
+                        "test-model",
+                        new ObjectMapper()
+                );
+
+        AiContext context =
+                new AiContext(
+                        1L,
+                        "Millie",
+                        80,
+                        70,
+                        LocalDateTime.of(
+                                2026, 9, 29,
+                                21, 30
+                        ),
+                        "RELATIONSHIP_MILESTONE",
+                        "두 사람이 관계를 명확히 정립했다.",
+                        List.of(),
+                        List.of()
+                );
+
+        Map<String, Object> request =
+                gateway.createRequest(context);
+
+        Map<String, Object> generationConfig =
+                map(request.get("generationConfig"));
+
+        Map<String, Object> schema =
+                map(
+                        generationConfig.get(
+                                "responseJsonSchema"
+                        )
+                );
+
+        assertThat(
+                (List<String>) schema.get("required")
+        ).contains("relationshipFactChange");
+
+        Map<String, Object> properties =
+                map(schema.get("properties"));
+
+        Map<String, Object> factChange =
+                map(
+                        properties.get(
+                                "relationshipFactChange"
+                        )
+                );
+
+        assertThat(
+                (List<String>) factChange.get("type")
+        ).containsExactly(
+                "object",
+                "null"
+        );
+
+        assertThat(factChange.get("additionalProperties"))
+                .isEqualTo(false);
+
+        assertThat(
+                (List<String>) factChange.get("required")
+        ).containsExactlyInAnyOrder(
+                "targetCharacterId",
+                "relation",
+                "value"
+        );
+    }
+
+    @Test
+    void Gemini_relationshipFactChange를_AiDecision으로_변환한다() {
+
+        GeminiAiGateway gateway =
+                new GeminiAiGateway(
+                        "test-key",
+                        "test-model",
+                        new ObjectMapper()
+                );
+
+        GeminiDecisionResponse response =
+                new GeminiDecisionResponse(
+                        "RELATIONSHIP_MILESTONE",
+                        "두 사람이 서로를 배우자로 명확히 인정했다.",
+                        8,
+                        9,
+                        0,
+                        0,
+                        0,
+                        null,
+                        0,
+                        0,
+                        0,
+                        null,
+                        List.of(),
+                        new GeminiRelationshipFactChangeResponse(
+                                2L,
+                                "relationship_status",
+                                "spouse"
+                        )
+                );
+
+        var decision =
+                gateway.toDecision(response);
+
+        assertThat(
+                decision.relationshipFactChange()
+                        .targetCharacterId()
+        ).isEqualTo(2L);
+
+        assertThat(
+                decision.relationshipFactChange()
+                        .relation()
+        ).isEqualTo("relationship_status");
+
+        assertThat(
+                decision.relationshipFactChange()
+                        .value()
+        ).isEqualTo("spouse");
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> map(
             Object value

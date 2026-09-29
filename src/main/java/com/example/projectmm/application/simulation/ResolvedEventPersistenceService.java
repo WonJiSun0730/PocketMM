@@ -2,6 +2,8 @@ package com.example.projectmm.application.simulation;
 
 import com.example.projectmm.application.memory.MemoryCreationService;
 import com.example.projectmm.application.relationship.RelationshipChangeService;
+import com.example.projectmm.application.relationship.RelationshipFactService;
+import com.example.projectmm.domain.character.CharacterRepository;
 import com.example.projectmm.domain.event.Event;
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.event.EventParticipant;
@@ -24,6 +26,8 @@ public class ResolvedEventPersistenceService {
     private final EventParticipantRepository eventParticipantRepository;
     private final MemoryCreationService memoryCreationService;
     private final RelationshipChangeService relationshipChangeService;
+    private final RelationshipFactService relationshipFactService;
+    private final CharacterRepository characterRepository;
 
     public List<Event> saveAll(
             Scene scene,
@@ -65,6 +69,34 @@ public class ResolvedEventPersistenceService {
                     resolvedEvent.relationshipTargetCharacterId(),
                     resolvedEvent.relationshipDelta()
             );
+
+            var relationshipFactChange =
+                    resolvedEvent.relationshipFactChange();
+
+            if (relationshipFactChange != null
+                    && relationshipFactChange.hasChange()) {
+
+                Character targetCharacter =
+                        characterRepository
+                                .findById(
+                                        relationshipFactChange.targetCharacterId()
+                                )
+                                .orElseThrow(
+                                        () -> new IllegalStateException(
+                                                "Relationship fact target character not found: "
+                                                        + relationshipFactChange.targetCharacterId()
+                                        )
+                                );
+
+                relationshipFactService.establish(
+                        character,
+                        targetCharacter,
+                        relationshipFactChange.relation(),
+                        relationshipFactChange.value(),
+                        savedEvent,
+                        resolvedEvent.occurredAt()
+                );
+            }
 
             savedEvents.add(savedEvent);
         }

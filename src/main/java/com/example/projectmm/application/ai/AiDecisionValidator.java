@@ -1,6 +1,7 @@
 package com.example.projectmm.application.ai;
 
 import com.example.projectmm.domain.ai.AiDecision;
+import com.example.projectmm.domain.relationship.RelationshipFactChange;
 import com.example.projectmm.domain.simulation.ValidationResult;
 import org.springframework.stereotype.Component;
 import com.example.projectmm.domain.memory.MemoryAccessLevel;
@@ -110,6 +111,33 @@ public class AiDecisionValidator {
             return ValidationResult.reject(
                     "relationshipTargetCharacterId is required when relationship changes"
             );
+        }
+
+        RelationshipFactChange factChange =
+                decision.relationshipFactChange();
+
+        if (factChange != null
+                && factChange.hasChange()) {
+
+            if (factChange.targetCharacterId() == null) {
+                return ValidationResult.reject(
+                        "relationship fact targetCharacterId is required"
+                );
+            }
+
+            if (factChange.relation() == null
+                    || factChange.relation().isBlank()) {
+                return ValidationResult.reject(
+                        "relationship fact relation is required"
+                );
+            }
+
+            if (factChange.value() == null
+                    || factChange.value().isBlank()) {
+                return ValidationResult.reject(
+                        "relationship fact value is required"
+                );
+            }
         }
 
         var access = decision.memoryAccessChange();

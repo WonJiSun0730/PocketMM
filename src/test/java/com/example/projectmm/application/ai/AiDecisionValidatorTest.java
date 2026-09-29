@@ -2,9 +2,12 @@ package com.example.projectmm.application.ai;
 
 import com.example.projectmm.domain.ai.AiDecision;
 import com.example.projectmm.domain.relationship.RelationshipDelta;
+import com.example.projectmm.domain.relationship.RelationshipFactChange;
 import com.example.projectmm.domain.simulation.StateDelta;
 import com.example.projectmm.domain.simulation.ValidationResult;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -234,6 +237,126 @@ class AiDecisionValidatorTest {
 
         assertThat(result.valid())
                 .isTrue();
+    }
+
+    @Test
+    void 관계_사실_변경에_대상이_없으면_거부한다() {
+
+        AiDecision decision =
+                new AiDecision(
+                        "RELATIONSHIP_MILESTONE",
+                        "두 사람이 관계를 명확히 정립했다.",
+                        8,
+                        8,
+                        StateDelta.none(),
+                        null,
+                        RelationshipDelta.none(),
+                        null,
+                        List.of(),
+                        new RelationshipFactChange(
+                                null,
+                                "relationship_status",
+                                "spouse"
+                        )
+                );
+
+        ValidationResult result =
+                validator.validate(decision);
+
+        assertThat(result.valid()).isFalse();
+        assertThat(result.reason())
+                .isEqualTo(
+                        "relationship fact targetCharacterId is required"
+                );
+    }
+
+    @Test
+    void 관계_사실_변경에_relation이_없으면_거부한다() {
+
+        AiDecision decision =
+                new AiDecision(
+                        "RELATIONSHIP_MILESTONE",
+                        "두 사람이 관계를 명확히 정립했다.",
+                        8,
+                        8,
+                        StateDelta.none(),
+                        null,
+                        RelationshipDelta.none(),
+                        null,
+                        List.of(),
+                        new RelationshipFactChange(
+                                2L,
+                                null,
+                                "spouse"
+                        )
+                );
+
+        ValidationResult result =
+                validator.validate(decision);
+
+        assertThat(result.valid()).isFalse();
+        assertThat(result.reason())
+                .isEqualTo(
+                        "relationship fact relation is required"
+                );
+    }
+
+    @Test
+    void 관계_사실_변경에_value가_없으면_거부한다() {
+
+        AiDecision decision =
+                new AiDecision(
+                        "RELATIONSHIP_MILESTONE",
+                        "두 사람이 관계를 명확히 정립했다.",
+                        8,
+                        8,
+                        StateDelta.none(),
+                        null,
+                        RelationshipDelta.none(),
+                        null,
+                        List.of(),
+                        new RelationshipFactChange(
+                                2L,
+                                "relationship_status",
+                                null
+                        )
+                );
+
+        ValidationResult result =
+                validator.validate(decision);
+
+        assertThat(result.valid()).isFalse();
+        assertThat(result.reason())
+                .isEqualTo(
+                        "relationship fact value is required"
+                );
+    }
+
+    @Test
+    void 완전한_관계_사실_변경_제안은_허용한다() {
+
+        AiDecision decision =
+                new AiDecision(
+                        "RELATIONSHIP_MILESTONE",
+                        "두 사람이 관계를 명확히 정립했다.",
+                        8,
+                        8,
+                        StateDelta.none(),
+                        null,
+                        RelationshipDelta.none(),
+                        null,
+                        List.of(),
+                        new RelationshipFactChange(
+                                2L,
+                                "relationship_status",
+                                "spouse"
+                        )
+                );
+
+        ValidationResult result =
+                validator.validate(decision);
+
+        assertThat(result.valid()).isTrue();
     }
 
     private AiDecision createDecision(

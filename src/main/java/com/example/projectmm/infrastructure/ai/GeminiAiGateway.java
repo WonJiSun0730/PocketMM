@@ -6,6 +6,7 @@ import com.example.projectmm.domain.ai.AiContext;
 import com.example.projectmm.domain.ai.AiDecision;
 import com.example.projectmm.domain.memory.MemoryDetailSalience;
 import com.example.projectmm.domain.relationship.RelationshipDelta;
+import com.example.projectmm.domain.relationship.RelationshipFactChange;
 import com.example.projectmm.domain.simulation.StateDelta;
 import com.example.projectmm.domain.memory.MemoryAccessChange;
 import tools.jackson.databind.JsonNode;
@@ -99,7 +100,25 @@ public class GeminiAiGateway implements AiGateway {
                 memoryAccessChange(
                         decision.memoryAccessChange()
                 ),
-                memoryDetails
+                memoryDetails,
+                relationshipFactChange(decision)
+        );
+    }
+
+    private RelationshipFactChange relationshipFactChange(
+            GeminiDecisionResponse decision
+    ) {
+        GeminiRelationshipFactChangeResponse change =
+                decision.relationshipFactChange();
+
+        if (change == null) {
+            return RelationshipFactChange.none();
+        }
+
+        return new RelationshipFactChange(
+                change.targetCharacterId(),
+                change.relation(),
+                change.value()
         );
     }
 
@@ -301,6 +320,26 @@ public class GeminiAiGateway implements AiGateway {
                 or another clearly established relationship-changing event.
                 
                 Do not invent such an event merely to justify a relationship change.
+                
+                When and only when this event itself explicitly establishes or changes
+                a factual relationship state, set relationshipFactChange.
+                
+                relationshipFactChange must contain:
+                - targetCharacterId: the affected person's ID from Current relationships.
+                - relation: the factual relationship dimension being established or changed.
+                - value: the new confirmed factual value.
+                
+                relation and value are open narrative data. Do not restrict them to a
+                predefined relationship vocabulary.
+                
+                The final event summary must explicitly contain the narrative evidence
+                that establishes or changes this factual relationship.
+                
+                If this event does not explicitly establish or change a factual relationship,
+                relationshipFactChange must be null.
+                
+                Never populate relationshipFactChange merely because relationship scores
+                changed or because an existing confirmed relationship fact already exists.
                 """
                 .formatted(
                         context.characterName(),
@@ -446,6 +485,35 @@ public class GeminiAiGateway implements AiGateway {
                         )
                 );
 
+        schemaProperties.put(
+                "relationshipFactChange",
+                Map.of(
+                        "type", List.of(
+                                "object",
+                                "null"
+                        ),
+                        "additionalProperties", false,
+                        "properties", Map.of(
+                                "targetCharacterId", Map.of(
+                                        "type", "integer"
+                                ),
+                                "relation", Map.of(
+                                        "type", "string",
+                                        "minLength", 1
+                                ),
+                                "value", Map.of(
+                                        "type", "string",
+                                        "minLength", 1
+                                )
+                        ),
+                        "required", List.of(
+                                "targetCharacterId",
+                                "relation",
+                                "value"
+                        )
+                )
+        );
+
                 Map<String, Object> schema =
                         new LinkedHashMap<>();
 
@@ -465,7 +533,8 @@ public class GeminiAiGateway implements AiGateway {
                                 "affinityChange",
                                 "trustChange",
                                 "tensionChange",
-                                "memoryDetails"
+                                "memoryDetails",
+                                "relationshipFactChange"
                         )
                 );
 

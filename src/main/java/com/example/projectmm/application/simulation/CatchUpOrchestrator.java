@@ -278,25 +278,44 @@ public class CatchUpOrchestrator {
                         || delta.trustChange() != 0
                         || delta.tensionChange() != 0;
 
-        if (!hasRelationshipChange) {
-            return ValidationResult.accept();
+        if (hasRelationshipChange) {
+            Long targetCharacterId =
+                    decision.relationshipTargetCharacterId();
+
+            boolean relationshipExists =
+                    relationshipRepository
+                            .findByFromCharacterIdAndToCharacterId(
+                                    state.getCharacter().getId(),
+                                    targetCharacterId
+                            )
+                            .isPresent();
+
+            if (!relationshipExists) {
+                return ValidationResult.reject(
+                        "relationship target is not an existing relationship"
+                );
+            }
         }
 
-        Long targetCharacterId =
-                decision.relationshipTargetCharacterId();
+        var factChange =
+                decision.relationshipFactChange();
 
-        boolean relationshipExists =
-                relationshipRepository
-                        .findByFromCharacterIdAndToCharacterId(
-                                state.getCharacter().getId(),
-                                targetCharacterId
-                        )
-                        .isPresent();
+        if (factChange != null
+                && factChange.hasChange()) {
 
-        if (!relationshipExists) {
-            return ValidationResult.reject(
-                    "relationship target is not an existing relationship"
-            );
+            boolean relationshipExists =
+                    relationshipRepository
+                            .findByFromCharacterIdAndToCharacterId(
+                                    state.getCharacter().getId(),
+                                    factChange.targetCharacterId()
+                            )
+                            .isPresent();
+
+            if (!relationshipExists) {
+                return ValidationResult.reject(
+                        "relationship fact target is not an existing relationship"
+                );
+            }
         }
 
         return ValidationResult.accept();
@@ -322,7 +341,8 @@ public class CatchUpOrchestrator {
                         decision.relationshipDelta(),
                         EventSource.AI,
                         decision.memoryAccessChange(),
-                        decision.memoryDetails()
+                        decision.memoryDetails(),
+                        decision.relationshipFactChange()
                 )
         );
     }
