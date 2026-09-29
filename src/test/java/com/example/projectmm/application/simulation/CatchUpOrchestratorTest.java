@@ -7,13 +7,12 @@ import com.example.projectmm.application.memory.MemoryRecallService;
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.character.CharacterState;
 import com.example.projectmm.domain.relationship.RelationshipRepository;
-import com.example.projectmm.domain.simulation.CatchUpExecutionResult;
-import com.example.projectmm.domain.simulation.EventSource;
-import com.example.projectmm.domain.simulation.ResolvedEvent;
+import com.example.projectmm.domain.simulation.*;
 import com.example.projectmm.infrastructure.ai.MockAiGateway;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -310,7 +309,42 @@ class CatchUpOrchestratorTest {
                 .isTrue();
 
         assertThat(result.resolvedEvents())
-                .isEmpty();
+                .hasSize(1);
+
+        ResolvedEvent fallback =
+                result.resolvedEvents().getFirst();
+
+        assertThat(fallback.source())
+                .isEqualTo(EventSource.RULE);
+
+        assertThat(fallback.eventType())
+                .isEqualTo(
+                        result.candidates().getFirst().eventType()
+                );
+
+        assertThat(fallback.summary())
+                .isEqualTo(
+                        result.candidates().getFirst().summary()
+                );
+
+        assertThat(fallback.importance())
+                .isEqualTo(
+                        result.candidates().getFirst().importance()
+                );
+
+        assertThat(fallback.narrativeAnchor())
+                .isZero();
+
+        assertThat(fallback.relationshipTargetCharacterId())
+                .isNull();
+
+        assertThat(fallback.relationshipDelta())
+                .isEqualTo(
+                        com.example.projectmm.domain.relationship.RelationshipDelta.none()
+                );
+
+        assertThat(fallback.memoryAccessChange())
+                .isNull();
 
         assertThat(state.getEnergy())
                 .isEqualTo(80);
@@ -400,5 +434,219 @@ class CatchUpOrchestratorTest {
 
         assertThat(resolved.narrativeAnchor())
                 .isEqualTo(9);
+    }
+
+    @Test
+    void AI_첫_호출이_실패하면_한_번_재시도하고_성공한_결정을_적용한다() {
+
+        AtomicInteger attempts =
+                new AtomicInteger();
+
+        AiGateway retryGateway =
+                context -> {
+                    if (attempts.incrementAndGet() == 1) {
+                        throw new RuntimeException(
+                                "temporary failure"
+                        );
+                    }
+
+                    return new com.example.projectmm.domain.ai.AiDecision(
+                            "RETRY_SUCCESS",
+                            "재시도에서 정상적으로 생성된 사건",
+                            5,
+                            3,
+                            new StateDelta(
+                                    0,
+                                    4,
+                                    0
+                            ),
+                            null,
+                            com.example.projectmm.domain.relationship.RelationshipDelta.none(),
+                            null
+                    );
+                };
+
+        CatchUpOrchestrator retryOrchestrator =
+                createOrchestrator(retryGateway);
+
+        CharacterState state =
+                createAiRequiredState();
+
+        CatchUpExecutionResult result =
+                retryOrchestrator.execute(
+                        state,
+                        LocalDateTime.of(
+                                2026, 9, 21,
+                                13, 0
+                        )
+                );
+
+        assertThat(attempts.get())
+                .isEqualTo(2);
+
+        assertThat(result.resolvedEvents())
+                .hasSize(1);
+
+        assertThat(result.resolvedEvents().getFirst().source())
+                .isEqualTo(EventSource.AI);
+
+        assertThat(result.resolvedEvents().getFirst().eventType())
+                .isEqualTo("RETRY_SUCCESS");
+
+        assertThat(state.getMood())
+                .isEqualTo(14);
+    }
+
+    @Test
+    void AI_결정이_검증에_실패하면_한_번_재시도하고_정상_결정을_적용한다() {
+
+        AtomicInteger attempts =
+                new AtomicInteger();
+
+        AiGateway retryGateway =
+                context -> {
+                    if (attempts.incrementAndGet() == 1) {
+                        return new com.example.projectmm.domain.ai.AiDecision(
+                                "INVALID",
+                                "잘못된 첫 결정",
+                                999,
+                                new StateDelta(
+                                        0,
+                                        999,
+                                        0
+                                ),
+                                null,
+                                com.example.projectmm.domain.relationship.RelationshipDelta.none()
+                        );
+                    }
+
+                    return new com.example.projectmm.domain.ai.AiDecision(
+                            "VALID_AFTER_RETRY",
+                            "검증 실패 후 재생성된 정상 사건",
+                            5,
+                            new StateDelta(
+                                    0,
+                                    3,
+                                    0
+                            ),
+                            null,
+                            com.example.projectmm.domain.relationship.RelationshipDelta.none()
+                    );
+                };
+
+        CatchUpOrchestrator retryOrchestrator =
+                createOrchestrator(retryGateway);
+
+        CharacterState state =
+                createAiRequiredState();
+
+        CatchUpExecutionResult result =
+                retryOrchestrator.execute(
+                        state,
+                        LocalDateTime.of(
+                                2026, 9, 21,
+                                13, 0
+                        )
+                );
+
+        assertThat(attempts.get())
+                .isEqualTo(2);
+
+        assertThat(result.resolvedEvents())
+                .hasSize(1);
+
+        assertThat(result.resolvedEvents().getFirst().eventType())
+                .isEqualTo("VALID_AFTER_RETRY");
+
+        assertThat(result.resolvedEvents().getFirst().source())
+                .isEqualTo(EventSource.AI);
+
+        assertThat(state.getMood())
+                .isEqualTo(13);
+    }
+
+    @Test
+    void AI_호출이_두_번_모두_실패하면_safe_fallback을_적용한다() {
+
+        AtomicInteger attempts =
+                new AtomicInteger();
+
+        AiGateway failingGateway =
+                context -> {
+                    attempts.incrementAndGet();
+
+                    throw new RuntimeException(
+                            "AI unavailable"
+                    );
+                };
+
+        CatchUpOrchestrator retryOrchestrator =
+                createOrchestrator(failingGateway);
+
+        CharacterState state =
+                createAiRequiredState();
+
+        CatchUpExecutionResult result =
+                retryOrchestrator.execute(
+                        state,
+                        LocalDateTime.of(
+                                2026, 9, 21,
+                                13, 0
+                        )
+                );
+
+        assertThat(attempts.get())
+                .isEqualTo(2);
+
+        assertThat(result.resolvedEvents())
+                .hasSize(1);
+
+        ResolvedEvent fallback =
+                result.resolvedEvents().getFirst();
+
+        assertThat(fallback.source())
+                .isEqualTo(EventSource.RULE);
+
+        assertThat(fallback.narrativeAnchor())
+                .isZero();
+
+        assertThat(fallback.relationshipTargetCharacterId())
+                .isNull();
+
+        assertThat(fallback.memoryAccessChange())
+                .isNull();
+    }
+
+    private CatchUpOrchestrator createOrchestrator(
+            AiGateway gateway
+    ) {
+        return new CatchUpOrchestrator(
+                new CatchUpSimulationService(),
+                new CatchUpSegmentService(),
+                new CatchUpEventCandidateService(),
+                new EventCandidateValidator(),
+                new AiContextBuilder(
+                        memoryRecallService,
+                        relationshipRepository
+                ),
+                gateway,
+                new AiDecisionValidator()
+        );
+    }
+
+    private CharacterState createAiRequiredState() {
+
+        Character character =
+                new Character("Millie");
+
+        return new CharacterState(
+                character,
+                80,
+                10,
+                LocalDateTime.of(
+                        2026, 9, 21,
+                        12, 0
+                )
+        );
     }
 }

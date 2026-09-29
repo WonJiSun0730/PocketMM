@@ -63,54 +63,117 @@ public class CatchUpOrchestrator {
 
                 if (candidate.requiresAi()) {
 
-                    try {
-                        AiContext context =
-                                aiContextBuilder.build(
+                    AiDecision firstDecision =
+                            requestAiDecision(
+                                    state,
+                                    candidate,
+                                    "first"
+                            );
+
+                    if (firstDecision == null) {
+                        AiDecision retryDecision =
+                                requestAiDecision(
                                         state,
-                                        candidate
+                                        candidate,
+                                        "retry"
                                 );
 
-                        AiDecision decision =
-                                aiGateway.decide(context);
+                        if (retryDecision == null) {
+                            applyFallback(
+                                    state,
+                                    candidate,
+                                    resolvedEvents
+                            );
+                            continue;
+                        }
 
-                        ValidationResult validation =
-                                aiDecisionValidator.validate(decision, candidate.occurredAt());
+                        ValidationResult retryValidation =
+                                aiDecisionValidator.validate(
+                                        retryDecision,
+                                        candidate.occurredAt()
+                                );
 
-                        if (!validation.valid()) {
+                        if (!retryValidation.valid()) {
                             log.warn(
-                                    "AI decision rejected. characterId={}, reason={}",
+                                    "Retried AI decision rejected. characterId={}, reason={}",
                                     state.getCharacter().getId(),
-                                    validation.reason()
+                                    retryValidation.reason()
                             );
 
                             continue;
                         }
 
-                        state.apply(decision.stateDelta());
-
-                        resolvedEvents.add(
-                                new ResolvedEvent(
-                                        candidate.occurredAt(),
-                                        decision.eventType(),
-                                        decision.summary(),
-                                        decision.importance(),
-                                        decision.narrativeAnchor(),
-                                        decision.stateDelta(),
-                                        decision.relationshipTargetCharacterId(),
-                                        decision.relationshipDelta(),
-                                        EventSource.AI,
-                                        decision.memoryAccessChange()
-                                )
+                        applyAiDecision(
+                                state,
+                                candidate,
+                                retryDecision,
+                                resolvedEvents
                         );
 
-                    } catch (Exception e) {
-                        log.error(
-                                "AI decision failed. characterId={}, eventType={}",
-                                state.getCharacter().getId(),
-                                candidate.eventType(),
-                                e
-                        );
+                        continue;
                     }
+
+                    ValidationResult firstValidation =
+                            aiDecisionValidator.validate(
+                                    firstDecision,
+                                    candidate.occurredAt()
+                            );
+
+                    if (firstValidation.valid()) {
+                        applyAiDecision(
+                                state,
+                                candidate,
+                                firstDecision,
+                                resolvedEvents
+                        );
+
+                        continue;
+                    }
+
+                    log.warn(
+                            "AI decision rejected. Retrying once. characterId={}, reason={}",
+                            state.getCharacter().getId(),
+                            firstValidation.reason()
+                    );
+
+                    AiDecision retryDecision =
+                            requestAiDecision(
+                                    state,
+                                    candidate,
+                                    "retry"
+                            );
+
+                    if (retryDecision == null) {
+                        applyFallback(
+                                state,
+                                candidate,
+                                resolvedEvents
+                        );
+                        continue;
+                    }
+
+                    ValidationResult retryValidation =
+                            aiDecisionValidator.validate(
+                                    retryDecision,
+                                    candidate.occurredAt()
+                            );
+
+                    if (!retryValidation.valid()) {
+                        log.warn(
+                                "Retried AI decision rejected. characterId={}, reason={}",
+                                state.getCharacter().getId(),
+                                retryValidation.reason()
+                        );
+
+                        continue;
+                    }
+
+                    applyAiDecision(
+                            state,
+                            candidate,
+                            retryDecision,
+                            resolvedEvents
+                    );
 
                     continue;
                 }
@@ -147,6 +210,80 @@ public class CatchUpOrchestrator {
                 segments,
                 candidates,
                 resolvedEvents
+        );
+    }
+
+    private AiDecision requestAiDecision(
+            CharacterState state,
+            EventCandidate candidate,
+            String attempt
+    ) {
+        try {
+            AiContext context =
+                    aiContextBuilder.build(
+                            state,
+                            candidate
+                    );
+
+            return aiGateway.decide(context);
+
+        } catch (Exception e) {
+            log.error(
+                    "AI decision attempt failed. characterId={}, eventType={}, attempt={}",
+                    state.getCharacter().getId(),
+                    candidate.eventType(),
+                    attempt,
+                    e
+            );
+
+            return null;
+        }
+    }
+
+    private void applyAiDecision(
+            CharacterState state,
+            EventCandidate candidate,
+            AiDecision decision,
+            List<ResolvedEvent> resolvedEvents
+    ) {
+        state.apply(decision.stateDelta());
+
+        resolvedEvents.add(
+                new ResolvedEvent(
+                        candidate.occurredAt(),
+                        decision.eventType(),
+                        decision.summary(),
+                        decision.importance(),
+                        decision.narrativeAnchor(),
+                        decision.stateDelta(),
+                        decision.relationshipTargetCharacterId(),
+                        decision.relationshipDelta(),
+                        EventSource.AI,
+                        decision.memoryAccessChange()
+                )
+        );
+    }
+
+    private void applyFallback(
+            CharacterState state,
+            EventCandidate candidate,
+            List<ResolvedEvent> resolvedEvents
+    ) {
+        state.apply(candidate.stateDelta());
+
+        resolvedEvents.add(
+                new ResolvedEvent(
+                        candidate.occurredAt(),
+                        candidate.eventType(),
+                        candidate.summary(),
+                        candidate.importance(),
+                        0,
+                        candidate.stateDelta(),
+                        null,
+                        RelationshipDelta.none(),
+                        EventSource.RULE,
+                        null
+                )
         );
     }
 }
