@@ -1,9 +1,12 @@
 package com.example.projectmm.application.memory;
 
+import com.example.projectmm.infrastructure.memory.JpaMemoryEmbeddingStore;
+import com.example.projectmm.infrastructure.memory.MemoryEmbeddingJpaRepository;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import tools.jackson.databind.ObjectMapper;
 
 @Configuration
 public class MemoryRetrievalConfiguration {
@@ -20,8 +23,14 @@ public class MemoryRetrievalConfiguration {
     }
 
     @Bean
-    public MemoryEmbeddingStore memoryEmbeddingStore() {
-        return new InMemoryMemoryEmbeddingStore();
+    public MemoryEmbeddingStore memoryEmbeddingStore(
+            MemoryEmbeddingJpaRepository repository,
+            ObjectMapper objectMapper
+    ) {
+        return new JpaMemoryEmbeddingStore(
+                repository,
+                objectMapper
+        );
     }
 
     @Bean

@@ -1,9 +1,13 @@
 package com.example.projectmm.application.memory;
 
+import com.example.projectmm.infrastructure.memory.JpaMemoryEmbeddingStore;
+import com.example.projectmm.infrastructure.memory.MemoryEmbeddingJpaRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class MemoryRetrievalConfigurationTest {
 
@@ -11,9 +15,25 @@ class MemoryRetrievalConfigurationTest {
     void productionRetrievalBeansAreWired() {
 
         try (AnnotationConfigApplicationContext context =
-                     new AnnotationConfigApplicationContext(
-                             MemoryRetrievalConfiguration.class
-                     )) {
+                     new AnnotationConfigApplicationContext()) {
+
+            context.registerBean(
+                    MemoryEmbeddingJpaRepository.class,
+                    () -> mock(
+                            MemoryEmbeddingJpaRepository.class
+                    )
+            );
+
+            context.registerBean(
+                    ObjectMapper.class,
+                    () -> new ObjectMapper()
+            );
+
+            context.register(
+                    MemoryRetrievalConfiguration.class
+            );
+
+            context.refresh();
 
             MemoryRetriever memoryRetriever =
                     context.getBean(
@@ -52,7 +72,7 @@ class MemoryRetrievalConfigurationTest {
 
             assertThat(memoryEmbeddingStore)
                     .isInstanceOf(
-                            InMemoryMemoryEmbeddingStore.class
+                            JpaMemoryEmbeddingStore.class
                     );
 
             assertThat(cachedMemoryEmbeddingService)
