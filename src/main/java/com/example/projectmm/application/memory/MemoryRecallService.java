@@ -140,17 +140,45 @@ public class MemoryRecallService {
             );
         }
 
+        MemoryAccessLevel accessLevel =
+                accessLevel(memory);
+
+        int accessibleStrength =
+                applyAccessStrength(
+                        decay.effectiveStrength(),
+                        accessLevel
+                );
+
         return new EffectiveMemory(
                 memory.getId(),
                 memory.getSummary(),
                 memory.getImportance(),
-                decay.effectiveStrength(),
+                accessibleStrength,
                 memory.getRememberedAt(),
                 decay.compressionRequired(),
                 memory.getEvidenceQuote(),
                 memory.getFact(),
-                accessLevel(memory)
+                accessLevel
         );
+    }
+
+    private int applyAccessStrength(
+            int effectiveStrength,
+            MemoryAccessLevel accessLevel
+    ) {
+        return switch (accessLevel) {
+            case EXPLICIT ->
+                    effectiveStrength;
+
+            case IMPLICIT ->
+                    effectiveStrength * 60 / 100;
+
+            case RESIDUAL ->
+                    effectiveStrength * 30 / 100;
+
+            case BLOCKED ->
+                    0;
+        };
     }
 
     private boolean accessible(

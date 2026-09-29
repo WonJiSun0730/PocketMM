@@ -862,6 +862,134 @@ class MemoryRecallServiceTest {
     }
 
     @Test
+    void 접근_수준이_낮을수록_회상_강도가_감소한다() {
+
+        Long characterId = 1L;
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        12, 0
+                );
+
+        Memory explicitMemory =
+                createMemory(
+                        "명시적으로 떠오르는 기억",
+                        9,
+                        90,
+                        now
+                );
+
+        Memory implicitMemory =
+                createMemory(
+                        "희미하게 익숙한 기억",
+                        9,
+                        90,
+                        now
+                );
+
+        Memory residualMemory =
+                createMemory(
+                        "감정적 잔향만 남은 기억",
+                        9,
+                        90,
+                        now
+                );
+
+        ReflectionTestUtils.setField(
+                explicitMemory,
+                "id",
+                201L
+        );
+
+        ReflectionTestUtils.setField(
+                implicitMemory,
+                "id",
+                202L
+        );
+
+        ReflectionTestUtils.setField(
+                residualMemory,
+                "id",
+                203L
+        );
+
+        MemoryAccessState implicitState =
+                new MemoryAccessState(
+                        implicitMemory,
+                        MemoryAccessLevel.IMPLICIT,
+                        now
+                );
+
+        MemoryAccessState residualState =
+                new MemoryAccessState(
+                        residualMemory,
+                        MemoryAccessLevel.RESIDUAL,
+                        now
+                );
+
+        when(
+                memoryRepository
+                        .findByCharacterIdOrderByRememberedAtDesc(
+                                characterId
+                        )
+        ).thenReturn(
+                List.of(
+                        residualMemory,
+                        implicitMemory,
+                        explicitMemory
+                )
+        );
+
+        when(
+                memoryAccessStateRepository
+                        .findByMemoryId(201L)
+        ).thenReturn(
+                Optional.empty()
+        );
+
+        when(
+                memoryAccessStateRepository
+                        .findByMemoryId(202L)
+        ).thenReturn(
+                Optional.of(implicitState)
+        );
+
+        when(
+                memoryAccessStateRepository
+                        .findByMemoryId(203L)
+        ).thenReturn(
+                Optional.of(residualState)
+        );
+
+        List<EffectiveMemory> result =
+                memoryRecallService.recall(
+                        characterId,
+                        now,
+                        3
+                );
+
+        assertThat(result)
+                .extracting(
+                        EffectiveMemory::memoryId
+                )
+                .containsExactly(
+                        201L,
+                        202L,
+                        203L
+                );
+
+        assertThat(result.get(0).effectiveStrength())
+                .isEqualTo(90);
+
+        assertThat(result.get(1).effectiveStrength())
+                .isEqualTo(54);
+
+        assertThat(result.get(2).effectiveStrength())
+                .isEqualTo(27);
+    }
+
+    @Test
     void 자연감쇠로_압축대상이_되어도_narrativeAnchor가_높으면_회상은_유지한다() {
 
         Long characterId = 1L;
