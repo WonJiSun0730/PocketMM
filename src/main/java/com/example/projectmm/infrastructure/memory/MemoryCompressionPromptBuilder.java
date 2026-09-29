@@ -1,6 +1,7 @@
 package com.example.projectmm.infrastructure.memory;
 
 import com.example.projectmm.domain.memory.*;
+import com.example.projectmm.application.memory.MemoryProvenanceAccessPolicy;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -11,6 +12,7 @@ import java.util.*;
 public class MemoryCompressionPromptBuilder {
     private static final int MAX_RELATED = 8;
     private final MemoryAccessStateRepository accessStates;
+    private final MemoryProvenanceAccessPolicy provenanceAccess;
 
     public Optional<String> build(Memory memory, MemoryDetailLevel target, List<Memory> related) {
         return prepare(memory, target, related).map(MemoryCompressionPrompt::text);
@@ -20,6 +22,15 @@ public class MemoryCompressionPromptBuilder {
         if (memory == null || target == null || !memory.getDetailLevel().canCompressFurther()
                 || memory.getDetailLevel().next() != target || !explicit(memory)) return Optional.empty();
 
+        var roots = new ArrayList<Long>();
+        roots.add(memory.getId());
+        if (target != MemoryDetailLevel.SUMMARY && related != null) related.stream()
+                .filter(Objects::nonNull).filter(candidate -> sameScope(memory, candidate))
+                .map(Memory::getId).filter(Objects::nonNull).forEach(roots::add);
+        var restrictions = provenanceAccess.restrictions(roots);
+        if (restrictions.getOrDefault(memory.getId(), MemoryAccessLevel.EXPLICIT) != MemoryAccessLevel.EXPLICIT)
+            return Optional.empty();
+
         List<Memory> evidence = new ArrayList<>();
         Set<Long> seen = new HashSet<>();
         seen.add(memory.getId());
@@ -28,7 +39,8 @@ public class MemoryCompressionPromptBuilder {
                 if (candidate == null || candidate.getId() == null || !seen.add(candidate.getId())
                         || !sameScope(memory, candidate) || sameSource(memory, candidate)
                         || evidence.stream().anyMatch(item -> sameSource(item, candidate))
-                        || !explicit(candidate)) continue;
+                        || !explicit(candidate)
+                        || restrictions.getOrDefault(candidate.getId(), MemoryAccessLevel.EXPLICIT) != MemoryAccessLevel.EXPLICIT) continue;
                 evidence.add(candidate);
                 if (evidence.size() == MAX_RELATED) break;
             }

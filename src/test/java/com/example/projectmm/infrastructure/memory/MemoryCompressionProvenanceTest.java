@@ -21,7 +21,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 class MemoryCompressionProvenanceTest {
     private final MemoryAccessStateRepository access = mock(MemoryAccessStateRepository.class);
-    private final MemoryCompressionPromptBuilder prompts = new MemoryCompressionPromptBuilder(access);
+    private final MemoryCompressionPromptBuilder prompts = new MemoryCompressionPromptBuilder(access, mock(com.example.projectmm.application.memory.MemoryProvenanceAccessPolicy.class));
 
     @Test
     void successfulPatternReturnsOnlyFilteredPromptEvidence() {

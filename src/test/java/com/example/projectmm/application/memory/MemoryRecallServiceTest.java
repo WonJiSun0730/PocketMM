@@ -46,7 +46,8 @@ class MemoryRecallServiceTest {
                     memoryCompressionService,
                     characterStateRepository,
                     memoryAccessStateRepository,
-                    memoryLifecycleService
+                    memoryLifecycleService,
+                    mock(MemoryProvenanceAccessPolicy.class)
             );
 
     @Test

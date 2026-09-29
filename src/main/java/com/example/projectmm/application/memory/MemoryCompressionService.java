@@ -23,14 +23,17 @@ public class MemoryCompressionService {
     private final MemoryPatternCandidateFinder candidateFinder;
     private final MemoryCompressionPersistenceService persistence;
     private final MemoryAccessStateRepository accessStates;
+    private final MemoryProvenanceAccessPolicy provenanceAccess;
 
     public MemoryCompressionResult compressIfNeeded(
             Memory memory,
             LocalDateTime currentTime
     ) {
         // Recall 외 직접 호출도 포함해 접근 제한 기억의 원문을 compressor에 전달하지 않는다.
-        if (memory.getId() != null && accessStates.findByMemoryId(memory.getId())
-                .map(state -> state.getAccessLevel() != MemoryAccessLevel.EXPLICIT).orElse(false)) {
+        if (memory.getId() != null && (accessStates.findByMemoryId(memory.getId())
+                .map(state -> state.getAccessLevel() != MemoryAccessLevel.EXPLICIT).orElse(false)
+                || provenanceAccess.restrictions(List.of(memory.getId()))
+                .getOrDefault(memory.getId(), MemoryAccessLevel.EXPLICIT) != MemoryAccessLevel.EXPLICIT)) {
             return MemoryCompressionResult.skipped(memory.getSummary());
         }
         if (!memory.getDetailLevel()

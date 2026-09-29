@@ -19,4 +19,12 @@ public interface MemoryAccessStateRepository
     @Query("select s.memory.id from MemoryAccessState s where s.memory.id in :ids and s.accessLevel <> :level")
     List<Long> findMemoryIdsWithDifferentAccess(@Param("ids") Collection<Long> ids,
                                               @Param("level") MemoryAccessLevel level);
+
+    interface AccessEntry {
+        Long getMemoryId();
+        MemoryAccessLevel getAccessLevel();
+    }
+
+    @Query("select s.memory.id as memoryId, s.accessLevel as accessLevel from MemoryAccessState s where s.memory.id in :ids")
+    List<AccessEntry> findAccessEntries(@Param("ids") Collection<Long> ids);
 }

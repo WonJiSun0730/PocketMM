@@ -19,6 +19,7 @@ public class MemoryRecallService {
     private final CharacterStateRepository characterStateRepository;
     private final MemoryAccessStateRepository memoryAccessStateRepository;
     private final MemoryLifecycleService memoryLifecycleService;
+    private final MemoryProvenanceAccessPolicy provenanceAccess;
 
     public List<EffectiveMemory> recall(
             Long characterId,
@@ -36,19 +37,18 @@ public class MemoryRecallService {
                 memoryRepository
                         .findByCharacterIdOrderByRememberedAtDesc(
                                 characterId
-                        );
+                        ).stream().filter(memory -> memory.getConversation() == null).toList();
 
+        var restrictions = provenanceAccess.restrictions(memories.stream().map(Memory::getId).toList());
         List<EffectiveMemory> recalled =
                 memories.stream()
-                // World simulation has no conversation context: never borrow another RP's memories.
-                .filter(memory -> memory.getConversation() == null)
                 .filter(memory ->
-                        accessible(memory)
+                        accessLevel(memory, restrictions) != MemoryAccessLevel.BLOCKED
                 )
                 .map(memory ->
                         prepareMemory(
                                 memory,
-                                currentTime
+                                currentTime, restrictions
                         )
                 )
                 .filter(memory ->
@@ -89,15 +89,17 @@ public class MemoryRecallService {
 
         int recallThreshold =
                 recallThreshold(characterId);
-        List<EffectiveMemory> recalled =
-                memoryRepository.findForConversation(characterId, conversationId).stream()
-                // 독립 시작 방에는 방 소속이 없는 과거 세계 사건 기억도 주입하지 않는다.
+        // provenance 조회도 이번 방에서 실제 검토할 후보에 한정한다.
+        var memories = memoryRepository.findForConversation(characterId, conversationId).stream()
                 .filter(memory -> includeSharedMemories || memory.getConversation() != null)
-                .filter(memory -> !memory.getRememberedAt().isAfter(currentTime))
+                .filter(memory -> !memory.getRememberedAt().isAfter(currentTime)).toList();
+        var restrictions = provenanceAccess.restrictions(memories.stream().map(Memory::getId).toList());
+        List<EffectiveMemory> recalled =
+                memories.stream()
                 .filter(memory ->
-                        accessible(memory)
+                        accessLevel(memory, restrictions) != MemoryAccessLevel.BLOCKED
                 )
-                .map(memory -> prepareMemory(memory, currentTime))
+                .map(memory -> prepareMemory(memory, currentTime, restrictions))
                 .filter(memory ->
                         recallable(
                                 memory,
@@ -123,7 +125,7 @@ public class MemoryRecallService {
 
     private EffectiveMemory prepareMemory(
             Memory memory,
-            LocalDateTime currentTime
+            LocalDateTime currentTime, java.util.Map<Long, MemoryAccessLevel> restrictions
     ) {
         MemoryDecayResult decay =
                 memoryDecayPolicy.calculate(
@@ -141,7 +143,7 @@ public class MemoryRecallService {
         }
 
         MemoryAccessLevel accessLevel =
-                accessLevel(memory);
+                accessLevel(memory, restrictions);
 
         int accessibleStrength =
                 applyAccessStrength(
@@ -181,32 +183,13 @@ public class MemoryRecallService {
         };
     }
 
-    private boolean accessible(
-            Memory memory
-    ) {
-        return accessLevel(memory)
-                != MemoryAccessLevel.BLOCKED;
+    private MemoryAccessLevel accessLevel(Memory memory, java.util.Map<Long, MemoryAccessLevel> restrictions) {
+        if (memory.getId() == null) return MemoryAccessLevel.EXPLICIT;
+        var own = memoryAccessStateRepository.findByMemoryId(memory.getId())
+                .map(state -> state.getAccessLevel()).orElse(MemoryAccessLevel.EXPLICIT);
+        return MemoryProvenanceAccessPolicy.stricter(own,
+                restrictions.getOrDefault(memory.getId(), MemoryAccessLevel.EXPLICIT));
     }
-
-    private MemoryAccessLevel accessLevel(
-            Memory memory
-    ) {
-        if (memory.getId() == null) {
-            return MemoryAccessLevel.EXPLICIT;
-        }
-
-        return memoryAccessStateRepository
-                .findByMemoryId(
-                        memory.getId()
-                )
-                .map(state ->
-                        state.getAccessLevel()
-                )
-                .orElse(
-                        MemoryAccessLevel.EXPLICIT
-                );
-    }
-
     private int recallThreshold(
             Long characterId
     ) {

@@ -41,7 +41,8 @@ class MemoryRetrievalEvaluationTest {
                     memoryCompressionService,
                     characterStateRepository,
                     memoryAccessStateRepository,
-                    memoryLifecycleService
+                    memoryLifecycleService,
+                    mock(MemoryProvenanceAccessPolicy.class)
             );
 
     private final LocalDateTime now =

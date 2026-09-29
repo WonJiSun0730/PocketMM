@@ -20,7 +20,7 @@ import static com.example.projectmm.infrastructure.memory.MemoryCompressionPromp
 
 class GeminiMemoryCompressorTest {
     private final ObjectMapper mapper = new ObjectMapper();
-    private final MemoryCompressionPromptBuilder prompts = new MemoryCompressionPromptBuilder(mock(MemoryAccessStateRepository.class));
+    private final MemoryCompressionPromptBuilder prompts = new MemoryCompressionPromptBuilder(mock(MemoryAccessStateRepository.class), mock(com.example.projectmm.application.memory.MemoryProvenanceAccessPolicy.class));
 
     @Test
     void fakeHttpResponseProducesSummaryWithoutTouchingOriginal() {
@@ -74,6 +74,9 @@ class GeminiMemoryCompressorTest {
         var context = new ApplicationContextRunner()
                 .withBean(ObjectMapper.class, () -> mapper)
                 .withBean(MemoryAccessStateRepository.class, () -> mock(MemoryAccessStateRepository.class))
+                .withBean(com.example.projectmm.domain.memory.MemoryCompressionEvidenceRepository.class,
+                        () -> mock(com.example.projectmm.domain.memory.MemoryCompressionEvidenceRepository.class))
+                .withUserConfiguration(com.example.projectmm.application.memory.MemoryProvenanceAccessPolicy.class)
                 .withUserConfiguration(MemoryCompressionPromptBuilder.class, RuleBasedMemoryCompressor.class, GeminiMemoryCompressor.class)
                 .withPropertyValues("gemini.api-key=test");
         context.run(app -> {

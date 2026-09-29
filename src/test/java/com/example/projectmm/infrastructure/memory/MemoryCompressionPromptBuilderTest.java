@@ -18,7 +18,7 @@ import static org.mockito.Mockito.*;
 
 class MemoryCompressionPromptBuilderTest {
     private final MemoryAccessStateRepository access = mock(MemoryAccessStateRepository.class);
-    private final MemoryCompressionPromptBuilder builder = new MemoryCompressionPromptBuilder(access);
+    private final MemoryCompressionPromptBuilder builder = new MemoryCompressionPromptBuilder(access, mock(com.example.projectmm.application.memory.MemoryProvenanceAccessPolicy.class));
 
     @Test
     void summaryUsesOnlyOneMemoryAndPreservesContinuityInstructions() {

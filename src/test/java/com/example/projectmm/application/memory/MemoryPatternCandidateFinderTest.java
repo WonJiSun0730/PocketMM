@@ -17,7 +17,8 @@ class MemoryPatternCandidateFinderTest {
 
     private final MemoryPatternCandidateFinder finder =
             new MemoryPatternCandidateFinder(
-                    memoryRepository, mock(com.example.projectmm.domain.memory.MemoryAccessStateRepository.class)
+                    memoryRepository, mock(com.example.projectmm.domain.memory.MemoryAccessStateRepository.class),
+                    mock(MemoryProvenanceAccessPolicy.class)
             );
 
     @Test

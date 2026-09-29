@@ -23,18 +23,32 @@ import static org.mockito.Mockito.*;
 
 @DataJpaTest(properties = {"spring.datasource.driver-class-name=org.h2.Driver",
         "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.show-sql=false"}, showSql = false)
-@Import({MemoryCompressionService.class, MemoryCompressionPersistenceService.class, MemoryDecayPolicy.class})
+@Import({MemoryCompressionService.class, MemoryCompressionPersistenceService.class, MemoryDecayPolicy.class, MemoryProvenanceAccessPolicy.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class MemoryCompressionPersistenceTest {
     @Autowired MemoryCompressionService service;
     @Autowired MemoryCompressionPersistenceService persistence;
     @Autowired MemoryRepository memories;
+    @Autowired MemoryAccessStateRepository access;
     @Autowired EntityManager em;
     @Autowired PlatformTransactionManager transactions;
     @MockitoSpyBean MemoryCompressionEvidenceRepository provenance;
     @MockitoBean MemoryCompressor compressor;
     @MockitoBean MemoryPatternCandidateFinder candidates;
     private final LocalDateTime at = LocalDateTime.of(2026, 1, 1, 12, 0);
+
+    @Test
+    void accessChangedDuringCompressionRejectsPersistence() {
+        var memory = seed(MemoryDetailLevel.SUMMARY);
+        var evidence = seed(MemoryDetailLevel.DETAILED);
+        when(candidates.findRelated(any())).thenReturn(List.of(evidence));
+        when(compressor.compress(any(), any(), any())).thenAnswer(invocation -> {
+            access.saveAndFlush(new MemoryAccessState(evidence, MemoryAccessLevel.BLOCKED, at.plusYears(2)));
+            return new MemoryCompressorOutput("must not persist", List.of(evidence.getId()));
+        });
+        assertThat(service.compressIfNeeded(memory, at.plusYears(2)).compressed()).isFalse();
+        assertUnchanged(memory, MemoryDetailLevel.SUMMARY);
+    }
 
     @Test
     void summaryPersistsFromReadOnlyCallerWithoutProvenance() {
@@ -179,10 +193,14 @@ class MemoryCompressionPersistenceTest {
         assertUnchanged(memory, MemoryDetailLevel.SUMMARY);
     }
 
+    private Character fixtureCharacter;
     private Memory seed(MemoryDetailLevel level) {
         return new TransactionTemplate(transactions).execute(status -> {
-            var character = new Character("NPC");
-            em.persist(character);
+            if (fixtureCharacter == null) {
+                fixtureCharacter = new Character("NPC");
+                em.persist(fixtureCharacter);
+            }
+            var character = em.getReference(Character.class, fixtureCharacter.getId());
             var memory = new Memory(character, null, "original", 5, 50, 10, at);
             while (memory.getDetailLevel() != level) memory.compress("original");
             em.persist(memory);

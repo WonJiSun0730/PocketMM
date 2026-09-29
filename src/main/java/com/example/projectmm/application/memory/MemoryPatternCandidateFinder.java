@@ -17,6 +17,7 @@ public class MemoryPatternCandidateFinder {
 
     private final MemoryRepository memoryRepository;
     private final MemoryAccessStateRepository accessStates;
+    private final MemoryProvenanceAccessPolicy provenanceAccess;
     private static final int MIN_RELEVANCE_OVERLAP = 2;
 
     public List<Memory> findRelated(
@@ -48,6 +49,9 @@ public class MemoryPatternCandidateFinder {
         var ids = candidates.stream().map(Memory::getId).filter(Objects::nonNull).distinct().toList();
         if (ids.isEmpty()) return candidates;
         var restricted = new HashSet<>(accessStates.findMemoryIdsWithDifferentAccess(ids, MemoryAccessLevel.EXPLICIT));
+        provenanceAccess.restrictions(ids).forEach((id, level) -> {
+            if (level != MemoryAccessLevel.EXPLICIT) restricted.add(id);
+        });
         return candidates.stream().filter(candidate -> !restricted.contains(candidate.getId())).toList();
     }
 

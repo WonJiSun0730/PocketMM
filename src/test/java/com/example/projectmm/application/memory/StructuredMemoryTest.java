@@ -58,8 +58,9 @@ class StructuredMemoryTest {
                 mock(MemoryCompressionService.class),
                 mock(CharacterStateRepository.class),
                 mock(MemoryAccessStateRepository.class),
-                mock(MemoryLifecycleService.class)
-        );
+                mock(MemoryLifecycleService.class),
+                    mock(MemoryProvenanceAccessPolicy.class)
+            );
         var character = new Character("NPC");
         var room = new Conversation(character, at);
         var structured = Memory.fromChat(room, null, "내 반려묘 이름은 감자야.", 5, at, "key",
@@ -82,8 +83,9 @@ class StructuredMemoryTest {
                 mock(MemoryCompressionService.class),
                 mock(CharacterStateRepository.class),
                 mock(MemoryAccessStateRepository.class),
-                mock(MemoryLifecycleService.class)
-        );
+                mock(MemoryLifecycleService.class),
+                    mock(MemoryProvenanceAccessPolicy.class)
+            );
         var character = new Character("NPC");
         var room = new Conversation(character, at);
         var structured = Memory.fromChat(room, null, "내 반려묘 이름은 감자야.", 5, at, "key",

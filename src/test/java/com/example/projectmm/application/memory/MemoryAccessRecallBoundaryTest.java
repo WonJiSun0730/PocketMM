@@ -22,7 +22,7 @@ class MemoryAccessRecallBoundaryTest {
     private final MemoryCompressionService compression = mock(MemoryCompressionService.class);
     private final MemoryLifecycleService lifecycle = new MemoryLifecycleService(memories);
     private final MemoryRecallService recall = new MemoryRecallService(memories, new MemoryDecayPolicy(),
-            compression, states, access, lifecycle);
+            compression, states, access, lifecycle, mock(MemoryProvenanceAccessPolicy.class));
 
     private Memory memory(long id) {
         ReflectionTestUtils.setField(character, "id", 1L);
@@ -77,7 +77,7 @@ class MemoryAccessRecallBoundaryTest {
         var otherRoom = memory(4L);
         ReflectionTestUtils.setField(otherRoom, "conversation", Conversation.fresh(character, now));
         when(memories.findByCharacterIdOrderByRememberedAtDesc(1L)).thenReturn(List.of(current, allowed, blocked, otherRoom));
-        var finder = new MemoryPatternCandidateFinder(memories, access);
+        var finder = new MemoryPatternCandidateFinder(memories, access, mock(MemoryProvenanceAccessPolicy.class));
         when(access.findMemoryIdsWithDifferentAccess(List.of(2L, 3L), MemoryAccessLevel.EXPLICIT)).thenReturn(List.of(3L));
         assertThat(finder.findRelated(current)).containsExactly(allowed);
         verify(access).findMemoryIdsWithDifferentAccess(List.of(2L, 3L), MemoryAccessLevel.EXPLICIT);
@@ -106,7 +106,7 @@ class MemoryAccessRecallBoundaryTest {
         when(access.findMemoryIdsWithDifferentAccess(List.of(2L, 3L), MemoryAccessLevel.EXPLICIT)).thenReturn(List.of(3L));
         var compressor = mock(MemoryCompressor.class);
         var service = new MemoryCompressionService(new MemoryDecayPolicy(), compressor,
-                new MemoryPatternCandidateFinder(memories, access), mock(MemoryCompressionPersistenceService.class), access);
+                new MemoryPatternCandidateFinder(memories, access, mock(MemoryProvenanceAccessPolicy.class)), mock(MemoryCompressionPersistenceService.class), access, mock(MemoryProvenanceAccessPolicy.class));
         service.compressIfNeeded(source, now.plusYears(1));
         verify(compressor).compress(source, MemoryDetailLevel.PATTERN, List.of(sameRoom));
         verifyNoMoreInteractions(compressor);
@@ -122,7 +122,7 @@ class MemoryAccessRecallBoundaryTest {
         var compressor = mock(MemoryCompressor.class);
         var finder = mock(MemoryPatternCandidateFinder.class);
         var persistence = mock(MemoryCompressionPersistenceService.class);
-        var service = new MemoryCompressionService(new MemoryDecayPolicy(), compressor, finder, persistence, access);
+        var service = new MemoryCompressionService(new MemoryDecayPolicy(), compressor, finder, persistence, access, mock(MemoryProvenanceAccessPolicy.class));
         for (var level : List.of(MemoryAccessLevel.BLOCKED, MemoryAccessLevel.IMPLICIT, MemoryAccessLevel.RESIDUAL)) {
             when(access.findByMemoryId(1L)).thenReturn(Optional.of(new MemoryAccessState(source, level, now)));
             assertThat(service.compressIfNeeded(source, now.plusYears(1)).compressed()).isFalse();
