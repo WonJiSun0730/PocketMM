@@ -1,10 +1,12 @@
 package com.example.projectmm.application.ai;
 
+import com.example.projectmm.application.memory.MemoryReactivationContextService;
 import com.example.projectmm.application.memory.MemoryRecallService;
 import com.example.projectmm.domain.ai.AiContext;
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.character.CharacterState;
 import com.example.projectmm.domain.memory.EffectiveMemory;
+import com.example.projectmm.domain.memory.Memory;
 import com.example.projectmm.domain.memory.MemoryAccessLevel;
 import com.example.projectmm.domain.memory.MemoryTier;
 import com.example.projectmm.domain.relationship.RelationshipRepository;
@@ -19,6 +21,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 class AiContextBuilderTest {
 
@@ -28,10 +33,14 @@ class AiContextBuilderTest {
     private final RelationshipRepository relationshipRepository =
             mock(RelationshipRepository.class);
 
+    private final MemoryReactivationContextService reactivationContextService =
+            mock(MemoryReactivationContextService.class);
+
     private final AiContextBuilder builder =
             new AiContextBuilder(
                     memoryRecallService,
-                    relationshipRepository
+                    relationshipRepository,
+                    reactivationContextService
             );
 
     @Test
@@ -808,5 +817,276 @@ class AiContextBuilderTest {
                 .hasMessage(
                         "BLOCKED memory must not reach AI context"
                 );
+    }
+
+    @Test
+    void HOT_EXPLICIT_기억은_접근가능한_회상_근거를_summary에_확장한다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        14, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        80,
+                        20,
+                        now
+                );
+
+        EventCandidate candidate =
+                new EventCandidate(
+                        now,
+                        "TEST",
+                        "test",
+                        4,
+                        true,
+                        StateDelta.none()
+                );
+
+        EffectiveMemory memory =
+                new EffectiveMemory(
+                        1L,
+                        "비 오는 날에 대한 압축된 패턴",
+                        8,
+                        90,
+                        now.minusDays(1),
+                        false,
+                        null,
+                        null,
+                        MemoryAccessLevel.EXPLICIT,
+                        MemoryTier.HOT
+                );
+
+        Memory evidence1 =
+                mock(Memory.class);
+
+        Memory evidence2 =
+                mock(Memory.class);
+
+        when(evidence1.getSummary())
+                .thenReturn(
+                        "함께 비를 맞으며 돌아온 기억"
+                );
+
+        when(evidence2.getSummary())
+                .thenReturn(
+                        "우산을 건네준 기억"
+                );
+
+        when(
+                memoryRecallService.recall(
+                        character.getId(),
+                        now,
+                        5
+                )
+        ).thenReturn(
+                List.of(memory)
+        );
+
+        when(
+                relationshipRepository.findByFromCharacterId(
+                        character.getId()
+                )
+        ).thenReturn(List.of());
+
+        when(
+                reactivationContextService
+                        .accessibleEvidence(1L)
+        ).thenReturn(
+                List.of(
+                        evidence1,
+                        evidence2
+                )
+        );
+
+        AiContext context =
+                builder.build(
+                        state,
+                        candidate
+                );
+
+        assertThat(
+                context.memories()
+                        .getFirst()
+                        .summary()
+        )
+                .contains(
+                        "비 오는 날에 대한 압축된 패턴",
+                        "함께 비를 맞으며 돌아온 기억",
+                        "우산을 건네준 기억"
+                );
+
+        verify(
+                reactivationContextService
+        ).accessibleEvidence(1L);
+    }
+
+    @Test
+    void HOT_IMPLICIT_기억은_회상_근거를_조회하지_않는다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        14, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        80,
+                        20,
+                        now
+                );
+
+        EventCandidate candidate =
+                new EventCandidate(
+                        now,
+                        "TEST",
+                        "test",
+                        4,
+                        true,
+                        StateDelta.none()
+                );
+
+        String secretSummary =
+                "노출되면 안 되는 실제 기억";
+
+        EffectiveMemory memory =
+                new EffectiveMemory(
+                        1L,
+                        secretSummary,
+                        8,
+                        90,
+                        now.minusDays(1),
+                        false,
+                        null,
+                        null,
+                        MemoryAccessLevel.IMPLICIT,
+                        MemoryTier.HOT
+                );
+
+        when(
+                memoryRecallService.recall(
+                        character.getId(),
+                        now,
+                        5
+                )
+        ).thenReturn(
+                List.of(memory)
+        );
+
+        when(
+                relationshipRepository.findByFromCharacterId(
+                        character.getId()
+                )
+        ).thenReturn(List.of());
+
+        AiContext context =
+                builder.build(
+                        state,
+                        candidate
+                );
+
+        assertThat(
+                context.memories()
+                        .getFirst()
+                        .summary()
+        )
+                .doesNotContain(secretSummary)
+                .contains("익숙함");
+
+        verify(
+                reactivationContextService,
+                never()
+        ).accessibleEvidence(anyLong());
+    }
+
+    @Test
+    void WARM_EXPLICIT_기억은_회상_근거를_조회하지_않는다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        14, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        80,
+                        20,
+                        now
+                );
+
+        EventCandidate candidate =
+                new EventCandidate(
+                        now,
+                        "TEST",
+                        "test",
+                        4,
+                        true,
+                        StateDelta.none()
+                );
+
+        EffectiveMemory memory =
+                new EffectiveMemory(
+                        1L,
+                        "오래된 상세 기억",
+                        8,
+                        90,
+                        now.minusDays(20),
+                        false,
+                        null,
+                        null,
+                        MemoryAccessLevel.EXPLICIT,
+                        MemoryTier.WARM
+                );
+
+        when(
+                memoryRecallService.recall(
+                        character.getId(),
+                        now,
+                        5
+                )
+        ).thenReturn(
+                List.of(memory)
+        );
+
+        when(
+                relationshipRepository.findByFromCharacterId(
+                        character.getId()
+                )
+        ).thenReturn(List.of());
+
+        AiContext context =
+                builder.build(
+                        state,
+                        candidate
+                );
+
+        assertThat(
+                context.memories()
+                        .getFirst()
+                        .summary()
+        ).isEqualTo(
+                "오래된 상세 기억"
+        );
+
+        verify(
+                reactivationContextService,
+                never()
+        ).accessibleEvidence(anyLong());
     }
 }

@@ -28,4 +28,15 @@ public interface MemoryCompressionEvidenceRepository extends JpaRepository<Memor
             + "from MemoryCompressionEvidence e left join e.memory.conversation sc "
             + "left join e.evidenceMemory.conversation ec where e.memory.id in :ids")
     List<AccessEdge> findAccessEdges(@Param("ids") Collection<Long> ids);
+
+    @Query("""
+        select e
+        from MemoryCompressionEvidence e
+        join fetch e.evidenceMemory em
+        where e.memory.id = :memoryId
+        order by e.id desc
+        """)
+    List<MemoryCompressionEvidence> findForReactivation(
+            @Param("memoryId") Long memoryId
+    );
 }

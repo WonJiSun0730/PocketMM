@@ -1,11 +1,13 @@
 package com.example.projectmm.application.ai;
 
+import com.example.projectmm.application.memory.MemoryReactivationContextService;
 import com.example.projectmm.application.memory.MemoryRecallService;
 import com.example.projectmm.domain.ai.AiContext;
 import com.example.projectmm.domain.ai.AiMemoryContext;
 import com.example.projectmm.domain.ai.AiRelationshipContext;
 import com.example.projectmm.domain.character.CharacterState;
 import com.example.projectmm.domain.memory.EffectiveMemory;
+import com.example.projectmm.domain.memory.MemoryAccessLevel;
 import com.example.projectmm.domain.relationship.Relationship;
 import com.example.projectmm.domain.relationship.RelationshipRepository;
 import com.example.projectmm.domain.simulation.EventCandidate;
@@ -19,6 +21,19 @@ import java.util.List;
 public class AiContextBuilder {
     private final MemoryRecallService memoryRecallService;
     private final RelationshipRepository relationshipRepository;
+    private final MemoryReactivationContextService reactivationContextService;
+
+
+    public AiContextBuilder(
+            MemoryRecallService memoryRecallService,
+            RelationshipRepository relationshipRepository
+    ) {
+        this(
+                memoryRecallService,
+                relationshipRepository,
+                null
+        );
+    }
 
     public AiContext build(
             CharacterState state,
@@ -77,7 +92,7 @@ public class AiContextBuilder {
         return switch (memory.tier()) {
             case HOT ->
                     new AiMemoryContext(
-                            memorySummary(memory),
+                            hotMemorySummary(memory),
                             memory.importance(),
                             memory.effectiveStrength(),
                             memory.rememberedAt()
@@ -101,6 +116,45 @@ public class AiContextBuilder {
         };
     }
 
+    private String hotMemorySummary(
+            EffectiveMemory memory
+    ) {
+        String baseSummary =
+                memorySummary(memory);
+
+        if (memory.accessLevel()
+                != MemoryAccessLevel.EXPLICIT
+                || reactivationContextService == null) {
+            return baseSummary;
+        }
+
+        List<String> evidenceSummaries =
+                reactivationContextService
+                        .accessibleEvidence(
+                                memory.memoryId()
+                        )
+                        .stream()
+                        .map(item -> item.getSummary())
+                        .filter(summary ->
+                                summary != null
+                                        && !summary.isBlank()
+                        )
+                        .distinct()
+                        .limit(3)
+                        .toList();
+
+        if (evidenceSummaries.isEmpty()) {
+            return baseSummary;
+        }
+
+        return baseSummary
+                + "\n관련 회상 근거: "
+                + String.join(
+                " / ",
+                evidenceSummaries
+        );
+    }
+
     private String memorySummary(
             EffectiveMemory memory
     ) {
@@ -122,4 +176,5 @@ public class AiContextBuilder {
                     );
         };
     }
+
 }
