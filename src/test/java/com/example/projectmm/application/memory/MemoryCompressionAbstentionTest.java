@@ -16,7 +16,7 @@ class MemoryCompressionAbstentionTest {
         var compressor = mock(MemoryCompressor.class);
         var finder = mock(MemoryPatternCandidateFinder.class);
         var service = new MemoryCompressionService(new MemoryDecayPolicy(), compressor, finder,
-                mock(MemoryCompressionPersistenceService.class));
+                mock(MemoryCompressionPersistenceService.class), mock(MemoryAccessStateRepository.class));
         var at = LocalDateTime.of(2026, 1, 1, 12, 0);
         var memory = new Memory(new Character("NPC"), null, "original", 5, 100, 10, at);
         for (String output : new String[]{null, "", "x".repeat(501)}) {

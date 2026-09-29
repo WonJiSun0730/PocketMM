@@ -35,7 +35,7 @@ class MemoryCompressionServiceTest {
                     memoryDecayPolicy,
                     memoryCompressor,
                     candidateFinder,
-                    persistence
+                    persistence, mock(MemoryAccessStateRepository.class)
             );
 
     @Test

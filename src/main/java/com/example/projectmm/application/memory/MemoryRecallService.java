@@ -252,9 +252,10 @@ public class MemoryRecallService {
                 );
 
         if (lexicalScore > 0) {
-            return lexicalScore * 10;
+            return applyAccessStrength(lexicalScore * 10, memory.accessLevel());
         }
 
-        return structuredBonus;
+        // 관련도 우선 정렬에서도 접근 감산이 무시되지 않도록 한다. 저장 강도는 변경하지 않는다.
+        return applyAccessStrength(structuredBonus, memory.accessLevel());
     }
 }

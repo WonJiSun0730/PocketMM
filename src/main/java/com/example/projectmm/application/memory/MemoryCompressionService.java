@@ -1,6 +1,8 @@
 package com.example.projectmm.application.memory;
 
 import com.example.projectmm.domain.memory.Memory;
+import com.example.projectmm.domain.memory.MemoryAccessStateRepository;
+import com.example.projectmm.domain.memory.MemoryAccessLevel;
 import com.example.projectmm.domain.memory.MemoryCompressionResult;
 import com.example.projectmm.domain.memory.MemoryDecayResult;
 import com.example.projectmm.domain.memory.MemoryDetailLevel;
@@ -20,11 +22,17 @@ public class MemoryCompressionService {
     private final MemoryCompressor memoryCompressor;
     private final MemoryPatternCandidateFinder candidateFinder;
     private final MemoryCompressionPersistenceService persistence;
+    private final MemoryAccessStateRepository accessStates;
 
     public MemoryCompressionResult compressIfNeeded(
             Memory memory,
             LocalDateTime currentTime
     ) {
+        // Recall 외 직접 호출도 포함해 접근 제한 기억의 원문을 compressor에 전달하지 않는다.
+        if (memory.getId() != null && accessStates.findByMemoryId(memory.getId())
+                .map(state -> state.getAccessLevel() != MemoryAccessLevel.EXPLICIT).orElse(false)) {
+            return MemoryCompressionResult.skipped(memory.getSummary());
+        }
         if (!memory.getDetailLevel()
                 .canCompressFurther()) {
 
