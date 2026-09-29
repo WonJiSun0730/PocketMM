@@ -24,7 +24,7 @@ public class GeminiAiGateway implements AiGateway {
     private final String apiKey;
     private final String model;
     private final RestClient restClient;
-    private final ObjectMapper objectMapper;
+    private final GeminiDecisionParser decisionParser;
 
     public GeminiAiGateway(
             @Value("${gemini.api-key}") String apiKey,
@@ -33,7 +33,10 @@ public class GeminiAiGateway implements AiGateway {
     ) {
         this.apiKey = apiKey;
         this.model = model;
-        this.objectMapper = objectMapper;
+        this.decisionParser =
+                new GeminiDecisionParser(
+                        objectMapper
+                );
 
         this.restClient =
                 RestClient.builder()
@@ -64,7 +67,7 @@ public class GeminiAiGateway implements AiGateway {
                         .body(String.class);
 
         GeminiDecisionResponse decision =
-                parseResponse(response);
+                decisionParser.parse(response);
 
         return toDecision(decision);
     }
@@ -103,7 +106,7 @@ public class GeminiAiGateway implements AiGateway {
                 !node.has("since") || node.path("since").isNull() ? null : node.path("since").asText());
     }
 
-    private Map<String, Object> createRequest(
+    Map<String, Object> createRequest(
             AiContext context
     ) {
         String memoryPrompt =
@@ -212,7 +215,11 @@ public class GeminiAiGateway implements AiGateway {
 
                 schemaProperties.put(
                         "importance",
-                        Map.of("type", "integer")
+                        Map.of(
+                                "type", "integer",
+                                "minimum", 0,
+                                "maximum", 10
+                        )
                 );
 
                 schemaProperties.put(
@@ -226,17 +233,29 @@ public class GeminiAiGateway implements AiGateway {
 
                 schemaProperties.put(
                         "energyChange",
-                        Map.of("type", "integer")
+                        Map.of(
+                                "type", "integer",
+                                "minimum", -20,
+                                "maximum", 20
+                        )
                 );
 
                 schemaProperties.put(
                         "moodChange",
-                        Map.of("type", "integer")
+                        Map.of(
+                                "type", "integer",
+                                "minimum", -20,
+                                "maximum", 20
+                        )
                 );
 
                 schemaProperties.put(
                         "memoryAbilityChange",
-                        Map.of("type", "integer")
+                        Map.of(
+                                "type", "integer",
+                                "minimum", -20,
+                                "maximum", 20
+                        )
                 );
 
                 schemaProperties.put(
@@ -252,17 +271,29 @@ public class GeminiAiGateway implements AiGateway {
 
                 schemaProperties.put(
                         "affinityChange",
-                        Map.of("type", "integer")
+                        Map.of(
+                                "type", "integer",
+                                "minimum", -10,
+                                "maximum", 10
+                        )
                 );
 
                 schemaProperties.put(
                         "trustChange",
-                        Map.of("type", "integer")
+                        Map.of(
+                                "type", "integer",
+                                "minimum", -10,
+                                "maximum", 10
+                        )
                 );
 
                 schemaProperties.put(
                         "tensionChange",
-                        Map.of("type", "integer")
+                        Map.of(
+                                "type", "integer",
+                                "minimum", -10,
+                                "maximum", 10
+                        )
                 );
 
                 Map<String, Object> schema =
@@ -371,38 +402,4 @@ public class GeminiAiGateway implements AiGateway {
                 );
     }
 
-    private GeminiDecisionResponse parseResponse(
-            String response
-    ) {
-        try {
-            JsonNode root =
-                    objectMapper.readTree(response);
-
-            String json =
-                    root.path("candidates")
-                            .path(0)
-                            .path("content")
-                            .path("parts")
-                            .path(0)
-                            .path("text")
-                            .asText();
-
-            if (json.isBlank()) {
-                throw new IllegalStateException(
-                        "Gemini returned an empty response"
-                );
-            }
-
-            return objectMapper.readValue(
-                    json,
-                    GeminiDecisionResponse.class
-            );
-
-        } catch (Exception e) {
-            throw new IllegalStateException(
-                    "Failed to parse Gemini response",
-                    e
-            );
-        }
-    }
 }
