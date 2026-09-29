@@ -34,6 +34,11 @@ public class ResolvedEventPersistenceService {
             Character character,
             List<ResolvedEvent> resolvedEvents
     ) {
+        return saveAll(scene, character, resolvedEvents, null);
+    }
+
+    public List<Event> saveAll(Scene scene, Character character, List<ResolvedEvent> resolvedEvents,
+                               com.example.projectmm.domain.chat.Conversation room) {
         List<Event> savedEvents =
                 new ArrayList<>();
 
@@ -59,10 +64,11 @@ public class ResolvedEventPersistenceService {
                     participant
             );
 
-            memoryCreationService.createFrom(
+            if (room == null) memoryCreationService.createFrom(
                     savedEvent,
                     resolvedEvent.memoryDetails()
             );
+            else memoryCreationService.createFrom(savedEvent, resolvedEvent.memoryDetails(), room);
 
             relationshipChangeService.apply(
                     character.getId(),

@@ -14,6 +14,14 @@ import java.time.LocalDateTime;
 @Getter
 public class Memory {
 
+    public static Memory fromConversationEvent(Character participant, Conversation room, Event event, int strength) {
+        // Ownership follows the event participant; conversation identifies where the event occurred.
+        Memory memory = new Memory(participant, event, event.getSummary(), event.getImportance(),
+                strength, event.getNarrativeAnchor(), event.getOccurredAt());
+        memory.conversation = room;
+        return memory;
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

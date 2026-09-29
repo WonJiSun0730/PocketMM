@@ -35,9 +35,10 @@ class GeminiCustomStatePromptTest {
                 .isEqualTo("피에타는 67이다.");
         var properties = request.path("generationConfig").path("responseFormat").path("text")
                 .path("schema").path("properties");
-        assertThat(properties.size()).isEqualTo(5);
+        assertThat(properties.size()).isEqualTo(6);
         assertThat(properties.has("playerState")).isTrue();
         assertThat(properties.has("reply")).isTrue();
+        assertThat(properties.has("relationshipFactChange")).isTrue();
         var proposals = properties.path("customStateChanges");
         assertThat(proposals.path("type").asText()).isEqualTo("array");
         var item = proposals.path("items");

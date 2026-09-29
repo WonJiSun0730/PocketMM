@@ -14,7 +14,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
 @ActiveProfiles({"local", "gemini"})
-//@Tag("live")
+@Tag("live")
 class GeminiDialogueGatewayTest {
 
     @Autowired

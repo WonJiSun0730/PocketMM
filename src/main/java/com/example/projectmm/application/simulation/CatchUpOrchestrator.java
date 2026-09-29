@@ -6,6 +6,7 @@ import com.example.projectmm.application.ai.AiGateway;
 import com.example.projectmm.domain.ai.AiContext;
 import com.example.projectmm.domain.ai.AiDecision;
 import com.example.projectmm.domain.character.CharacterState;
+import com.example.projectmm.domain.chat.Conversation;
 import com.example.projectmm.domain.relationship.RelationshipDelta;
 import com.example.projectmm.domain.relationship.RelationshipRepository;
 import com.example.projectmm.domain.simulation.*;
@@ -47,6 +48,19 @@ public class CatchUpOrchestrator {
                         catchUp.to()
                 );
 
+        return executeSegments(state, catchUp, segments, null, null);
+    }
+
+    public CatchUpExecutionResult execute(CharacterState state, CatchUpSegment segment,
+                                          List<EventCandidate> prepared, Conversation room) {
+        var duration = java.time.Duration.between(segment.start(), segment.end());
+        return executeSegments(state, new CatchUpResult(segment.start(), segment.end(), duration, duration, false),
+                List.of(segment), prepared, room);
+    }
+
+    private CatchUpExecutionResult executeSegments(CharacterState state, CatchUpResult catchUp,
+            List<CatchUpSegment> segments, List<EventCandidate> prepared, Conversation room) {
+
         List<EventCandidate> candidates =
                 new ArrayList<>();
 
@@ -56,7 +70,7 @@ public class CatchUpOrchestrator {
         for (CatchUpSegment segment : segments) {
 
             List<EventCandidate> segmentCandidates =
-                    eventCandidateService.generate(
+                    prepared != null ? prepared : eventCandidateService.generate(
                             state,
                             segment
                     );
@@ -69,7 +83,7 @@ public class CatchUpOrchestrator {
                             requestAiDecision(
                                     state,
                                     candidate,
-                                    "first"
+                                    "first", room
                             );
 
                     if (firstDecision == null) {
@@ -77,7 +91,7 @@ public class CatchUpOrchestrator {
                                 requestAiDecision(
                                         state,
                                         candidate,
-                                        "retry"
+                                        "retry", room
                                 );
 
                         if (retryDecision == null) {
@@ -90,9 +104,9 @@ public class CatchUpOrchestrator {
                         }
 
                         ValidationResult retryValidation =
-                                aiDecisionValidator.validate(
+                                validateDecision(
                                         retryDecision,
-                                        candidate.occurredAt()
+                                        candidate.occurredAt(), room
                                 );
 
                         if (retryValidation.valid()) {
@@ -124,9 +138,9 @@ public class CatchUpOrchestrator {
                     }
 
                     ValidationResult firstValidation =
-                            aiDecisionValidator.validate(
+                            validateDecision(
                                     firstDecision,
-                                    candidate.occurredAt()
+                                    candidate.occurredAt(), room
                             );
 
                     if (firstValidation.valid()) {
@@ -158,7 +172,7 @@ public class CatchUpOrchestrator {
                             requestAiDecision(
                                     state,
                                     candidate,
-                                    "retry"
+                                    "retry", room
                             );
 
                     if (retryDecision == null) {
@@ -171,9 +185,9 @@ public class CatchUpOrchestrator {
                     }
 
                     ValidationResult retryValidation =
-                            aiDecisionValidator.validate(
+                            validateDecision(
                                     retryDecision,
-                                    candidate.occurredAt()
+                                    candidate.occurredAt(), room
                             );
 
                     if (retryValidation.valid()) {
@@ -242,14 +256,15 @@ public class CatchUpOrchestrator {
     private AiDecision requestAiDecision(
             CharacterState state,
             EventCandidate candidate,
-            String attempt
+            String attempt,
+            Conversation room
     ) {
         try {
             AiContext context =
-                    aiContextBuilder.build(
+                    room == null ? aiContextBuilder.build(
                             state,
                             candidate
-                    );
+                    ) : aiContextBuilder.build(state, candidate, room);
 
             return aiGateway.decide(context);
 
@@ -264,6 +279,15 @@ public class CatchUpOrchestrator {
 
             return null;
         }
+    }
+
+    private ValidationResult validateDecision(AiDecision decision, LocalDateTime at, Conversation room) {
+        var result = aiDecisionValidator.validate(decision, at);
+        // Conversation has no room-scoped memoryAbility. Do not silently lose or globally apply this delta.
+        if (result.valid() && room != null && decision.stateDelta().memoryAbilityChange() != 0) {
+            return ValidationResult.reject("room catch-up does not support memoryAbility changes");
+        }
+        return result;
     }
 
     private ValidationResult validateRelationshipTarget(

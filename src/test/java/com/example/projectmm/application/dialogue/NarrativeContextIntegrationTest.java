@@ -48,9 +48,12 @@ import static org.mockito.Mockito.when;
         EventCandidateValidator.class,
         CustomStateProposalService.class,
         DialogueContextBuilder.class,
-        ContentModePolicy.class
+        ContentModePolicy.class,
+        com.example.projectmm.application.relationship.RelationshipChangeService.class,
+        com.example.projectmm.application.relationship.RelationshipFactService.class
 })
 class NarrativeContextIntegrationTest {
+    @MockitoBean com.example.projectmm.application.simulation.CatchUpExecutionService execution;
 
     @Autowired
     EntityManager em;

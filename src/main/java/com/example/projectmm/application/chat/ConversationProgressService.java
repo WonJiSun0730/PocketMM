@@ -38,6 +38,7 @@ public class ConversationProgressService {
     private final CatchUpSegmentService segments;
     private final CatchUpEventCandidateService candidates;
     private final EventCandidateValidator validator;
+    private final CatchUpExecutionService catchUpExecution;
     private final PresenceClock clock;
     private final EntityManager em;
     private final CustomStateProposalService customStateProposals;
@@ -138,6 +139,7 @@ public class ConversationProgressService {
                 room.getMood() == null
                         ? baseline.getMood()
                         : room.getMood(),
+                baseline.getMemoryAbility(),
                 from
         );
 
@@ -157,12 +159,9 @@ public class ConversationProgressService {
                             segment
                     );
 
-            // 판단이 필요한 구간은 통째로 보류하여
-            // 유저의 선택과 관계 변화를 대신하지 않는다.
+            // 지원하지 않는 rule은 여전히 구간 전체를 보류한다. AI 판단은 기존 실행기에 맡긴다.
             if (proposed.stream().anyMatch(c ->
-                    c.requiresAi()
-                            || !"REST".equals(c.eventType())
-                            || !validator.validate(c).valid()
+                    !c.requiresAi() && (!"REST".equals(c.eventType()) || !validator.validate(c).valid())
             )) {
 
                 pauseReason =
@@ -170,6 +169,18 @@ public class ConversationProgressService {
                                 + "대화로 장면을 이어가 주세요.";
 
                 break;
+            }
+
+            if (proposed.stream().anyMatch(c -> c.requiresAi())) {
+                // 이 구간의 rule도 실행기가 한 번만 적용한다. 아래의 간이 적용 경로는 건너뛴다.
+                var events = catchUpExecution.execute(state, segment, proposed, room);
+                for (var event : events) {
+                    String summary = room.getCharacter().getName() + " — " + event.getSummary();
+                    messages.save(new ChatMessage(room, room.getCharacter(), ChatRole.CHARACTER,
+                            "*" + summary + "*", ContentMode.NORMAL, now));
+                    actions.add(summary);
+                }
+                continue;
             }
 
             for (var candidate : proposed) {

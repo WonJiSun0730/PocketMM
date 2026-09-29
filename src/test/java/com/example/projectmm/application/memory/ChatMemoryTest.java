@@ -5,6 +5,7 @@ import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.character.CharacterStateRepository;
 import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.memory.*;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -26,6 +27,12 @@ class ChatMemoryTest {
     private final MemoryRepository memories = mock(MemoryRepository.class);
     private final ConversationRepository conversations = mock(ConversationRepository.class);
     private final ChatMemoryWriter writer = new ChatMemoryWriter(memories, conversations);
+
+    @BeforeEach
+    void setUp() {
+        when(memories.save(any(Memory.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+    }
 
     @Test
     void privateNarrationAndOocAreNotExtractionInput() {

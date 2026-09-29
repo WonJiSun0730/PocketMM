@@ -32,7 +32,8 @@ import static org.mockito.Mockito.when;
         RelationshipChangeService.class, MemoryAccessService.class, MemoryLifecycleService.class,
         CatchUpSceneResolver.class,
         CatchUpSceneFactory.class, ResolvedEventPersistenceService.class, ResolvedEventMapper.class,
-        MemoryCreationService.class, MemoryPolicy.class})
+        MemoryCreationService.class, MemoryPolicy.class, MemoryDetailService.class,
+        com.example.projectmm.application.relationship.RelationshipFactService.class})
 class MemoryAccessEventIntegrationTest {
     @Autowired CatchUpExecutionService execution;
     @Autowired MemoryAccessStateRepository accessStates;

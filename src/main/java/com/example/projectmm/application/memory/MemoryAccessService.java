@@ -21,6 +21,21 @@ public class MemoryAccessService {
     private final MemoryLifecycleService memoryLifecycleService;
 
     @Transactional
+    public List<MemoryAccessState> changeAccessForConversation(Long characterId, Long roomId,
+            LocalDateTime since, MemoryAccessLevel level, LocalDateTime at) {
+        if (characterId == null || roomId == null || level == null || at == null)
+            throw new IllegalArgumentException("character, conversation, level and time are required");
+        var recovered = new java.util.ArrayList<Long>();
+        var results = memoryRepository.findForConversation(characterId, roomId).stream()
+                .filter(memory -> memory.getConversation() != null && roomId.equals(memory.getConversation().getId()))
+                .filter(memory -> !memory.getRememberedAt().isAfter(at))
+                .filter(memory -> since == null || !memory.getRememberedAt().isBefore(since))
+                .map(memory -> changeAccessForMemory(memory, level, at, recovered)).toList();
+        markRecoveredMemoriesAccessed(recovered, at);
+        return results;
+    }
+
+    @Transactional
     public MemoryAccessState changeAccess(
             Long memoryId,
             MemoryAccessLevel accessLevel,

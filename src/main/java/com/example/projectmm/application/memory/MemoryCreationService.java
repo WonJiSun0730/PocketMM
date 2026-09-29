@@ -60,6 +60,11 @@ public class MemoryCreationService {
             Event event,
             List<MemoryDetailCandidate> memoryDetails
     ) {
+        return createFrom(event, memoryDetails, null);
+    }
+
+    public List<Memory> createFrom(Event event, List<MemoryDetailCandidate> memoryDetails,
+                                  com.example.projectmm.domain.chat.Conversation room) {
         MemoryDecision decision =
                 memoryPolicy.evaluate(event);
 
@@ -78,7 +83,7 @@ public class MemoryCreationService {
         for (EventParticipant participant : participants) {
 
             Memory memory =
-                    new Memory(
+                    room != null ? Memory.fromConversationEvent(participant.getCharacter(), room, event, decision.strength()) : new Memory(
                             participant.getCharacter(),
                             event,
                             event.getSummary(),

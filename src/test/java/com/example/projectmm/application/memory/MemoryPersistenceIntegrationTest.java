@@ -24,7 +24,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 // 개발용 MySQL이나 외부 서비스 없이 실제 JPA 저장 경로를 검증한다.
 @DataJpaTest(properties = {"spring.datasource.driver-class-name=org.h2.Driver",
         "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.show-sql=false"}, showSql = false)
-@Import({MemoryCreationService.class, MemoryPolicy.class})
+@Import({
+        MemoryCreationService.class,
+        MemoryDetailService.class,
+        MemoryPolicy.class
+})
 @Transactional
 class MemoryPersistenceIntegrationTest {
 

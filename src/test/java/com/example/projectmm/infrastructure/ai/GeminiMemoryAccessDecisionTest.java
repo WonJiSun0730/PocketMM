@@ -16,6 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class GeminiMemoryAccessDecisionTest {
     private final ObjectMapper mapper = new ObjectMapper();
+    private final GeminiDecisionParser parser = new GeminiDecisionParser(mapper);
     private final GeminiAiGateway gateway = new GeminiAiGateway("unused", "unused", mapper);
     private final LocalDateTime at = LocalDateTime.of(2030, 1, 2, 12, 0);
     private final String legacyFields = "\"eventType\":\"X\",\"summary\":\"event\",\"importance\":5,"
@@ -32,7 +33,7 @@ class GeminiMemoryAccessDecisionTest {
                 """;
         String envelope = mapper.writeValueAsString(Map.of("candidates", List.of(Map.of("content",
                 Map.of("parts", List.of(Map.of("text", body)))))));
-        GeminiDecisionResponse response = ReflectionTestUtils.invokeMethod(gateway, "parseResponse", envelope);
+        GeminiDecisionResponse response = parser.parse(envelope);
         var decision = gateway.toDecision(response);
         assertThat(new AiDecisionValidator().validate(decision, at).valid()).isTrue();
         assertThat(decision.memoryAccessChange().scope()).isEqualTo("SINCE");
@@ -108,11 +109,7 @@ class GeminiMemoryAccessDecisionTest {
                 );
 
         GeminiDecisionResponse response =
-                ReflectionTestUtils.invokeMethod(
-                        gateway,
-                        "parseResponse",
-                        envelope
-                );
+                parser.parse(envelope);
 
         var decision =
                 gateway.toDecision(response);

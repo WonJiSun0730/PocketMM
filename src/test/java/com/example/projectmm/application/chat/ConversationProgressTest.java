@@ -40,6 +40,8 @@ class ConversationProgressTest {
     @Autowired MemoryRepository memories;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
     @MockitoBean PresenceClock clock;
+    @MockitoBean CatchUpExecutionService execution;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean CatchUpEventCandidateService candidateService;
     private final LocalDateTime real = LocalDateTime.of(2026, 9, 23, 12, 0);
     private final LocalDateTime story = LocalDateTime.of(2030, 1, 1, 23, 0);
 
@@ -312,7 +314,11 @@ class ConversationProgressTest {
         assertThat(messages.findTop20ByConversationIdOrderByCreatedAtDesc(room.getId())).hasSize(1);
     }
 
-    @Test void decisionRequiredPausesBeforeAnyActionAndDoesNotRepeatOnRefresh() {
+    @Test void unsupportedRulePausesBeforeAnyActionAndDoesNotRepeatOnRefresh() {
+        org.mockito.Mockito.doReturn(java.util.List.of(new com.example.projectmm.domain.simulation.EventCandidate(
+                story, "UNSUPPORTED", "needs user choice", 4, false,
+                com.example.projectmm.domain.simulation.StateDelta.none())))
+                .when(candidateService).generate(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
         var room = fixture(true, 20, 10);
         Long id = room.getCharacter().getId();
         service.configure(id, room.getId(), true);

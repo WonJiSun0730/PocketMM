@@ -19,6 +19,11 @@ public class CatchUpSceneResolver {
     private final SceneParticipantRepository sceneParticipantRepository;
     private final CatchUpSceneFactory catchUpSceneFactory;
 
+    // A room catch-up must not reuse an unrelated active world scene.
+    public Scene createForConversation(Character character, LocalDateTime startedAt) {
+        return catchUpSceneFactory.create(character, startedAt);
+    }
+
     public Scene resolveOrCreate(
             Character character,
             LocalDateTime startedAt

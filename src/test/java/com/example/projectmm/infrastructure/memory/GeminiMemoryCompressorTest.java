@@ -76,8 +76,17 @@ class GeminiMemoryCompressorTest {
                 .withBean(MemoryAccessStateRepository.class, () -> mock(MemoryAccessStateRepository.class))
                 .withBean(com.example.projectmm.domain.memory.MemoryCompressionEvidenceRepository.class,
                         () -> mock(com.example.projectmm.domain.memory.MemoryCompressionEvidenceRepository.class))
-                .withUserConfiguration(com.example.projectmm.application.memory.MemoryProvenanceAccessPolicy.class)
-                .withUserConfiguration(MemoryCompressionPromptBuilder.class, RuleBasedMemoryCompressor.class, GeminiMemoryCompressor.class)
+                .withBean(ProtectedMemoryDetailRepository.class,
+                        () -> mock(ProtectedMemoryDetailRepository.class))
+                .withUserConfiguration(
+                        com.example.projectmm.application.memory.MemoryProvenanceAccessPolicy.class,
+                        ProtectedMemoryDetailPolicy.class
+                )
+                .withUserConfiguration(
+                        MemoryCompressionPromptBuilder.class,
+                        RuleBasedMemoryCompressor.class,
+                        GeminiMemoryCompressor.class
+                )
                 .withPropertyValues("gemini.api-key=test");
         context.run(app -> {
             assertThat(app).hasSingleBean(MemoryCompressor.class);

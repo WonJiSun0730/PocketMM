@@ -4,7 +4,9 @@ import com.example.projectmm.application.memory.MemoryEmbeddingProvider;
 import com.example.projectmm.application.memory.MemoryRetrievalConfiguration;
 import com.example.projectmm.application.memory.MemoryRetriever;
 import com.example.projectmm.application.memory.HybridMemoryRetriever;
+import com.example.projectmm.infrastructure.memory.MemoryEmbeddingJpaRepository;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.core.env.ConfigurableEnvironment;
 import tools.jackson.databind.ObjectMapper;
@@ -32,6 +34,11 @@ class GeminiMemoryEmbeddingWiringTest {
             context.registerBean(
                     ObjectMapper.class,
                     () -> new ObjectMapper()
+            );
+
+            context.registerBean(
+                    MemoryEmbeddingJpaRepository.class,
+                    () -> Mockito.mock(MemoryEmbeddingJpaRepository.class)
             );
 
             context.register(

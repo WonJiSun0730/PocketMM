@@ -1,12 +1,14 @@
 package com.example.projectmm.application.simulation;
 
-import com.example.projectmm.application.relationship.RelationshipChangeService;
 import com.example.projectmm.application.memory.MemoryAccessService;
 import com.example.projectmm.domain.memory.MemoryAccessLevel;
 import com.example.projectmm.domain.character.CharacterState;
 import com.example.projectmm.domain.event.Event;
 import com.example.projectmm.domain.scene.Scene;
 import com.example.projectmm.domain.simulation.CatchUpExecutionResult;
+import com.example.projectmm.domain.simulation.CatchUpSegment;
+import com.example.projectmm.domain.simulation.EventCandidate;
+import com.example.projectmm.domain.chat.Conversation;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,7 +23,6 @@ public class CatchUpExecutionService {
     private final CatchUpOrchestrator catchUpOrchestrator;
     private final CatchUpSceneResolver catchUpSceneResolver;
     private final ResolvedEventPersistenceService persistenceService;
-    private final RelationshipChangeService relationshipChangeService;
     private final MemoryAccessService memoryAccessService;
 
     @Transactional
@@ -35,14 +36,18 @@ public class CatchUpExecutionService {
                         currentTime
                 );
 
-        result.resolvedEvents().forEach(
-                resolvedEvent ->
-                        relationshipChangeService.apply(
-                                state.getCharacter().getId(),
-                                resolvedEvent.relationshipTargetCharacterId(),
-                                resolvedEvent.relationshipDelta()
-                        )
-        );
+        return persist(state, result, null);
+    }
+
+    @Transactional
+    public List<Event> execute(CharacterState state, CatchUpSegment segment,
+                               List<EventCandidate> prepared, Conversation room) {
+        if (!state.getCharacter().getId().equals(room.getCharacter().getId()))
+            throw new IllegalArgumentException("catch-up character must match conversation");
+        return persist(state, catchUpOrchestrator.execute(state, segment, prepared, room), room);
+    }
+
+    private List<Event> persist(CharacterState state, CatchUpExecutionResult result, Conversation room) {
 
         if (result.resolvedEvents().isEmpty()) {
             return List.of();
@@ -53,7 +58,10 @@ public class CatchUpExecutionService {
             var change = event.memoryAccessChange();
             if (change == null) continue;
             var level = MemoryAccessLevel.valueOf(change.accessLevel());
-            if ("ALL".equals(change.scope())) {
+            if (room != null) {
+                memoryAccessService.changeAccessForConversation(state.getCharacter().getId(), room.getId(),
+                        "ALL".equals(change.scope()) ? null : LocalDateTime.parse(change.since()), level, event.occurredAt());
+            } else if ("ALL".equals(change.scope())) {
                 memoryAccessService.changeAccessForCharacter(state.getCharacter().getId(), level, event.occurredAt());
             } else {
                 memoryAccessService.changeAccessForCharacterSince(state.getCharacter().getId(),
@@ -62,11 +70,13 @@ public class CatchUpExecutionService {
         }
 
         Scene scene =
-                catchUpSceneResolver.resolveOrCreate(
+                room == null ? catchUpSceneResolver.resolveOrCreate(
                         state.getCharacter(),
                         result.catchUp().from()
-                );
+                ) : catchUpSceneResolver.createForConversation(state.getCharacter(), result.catchUp().from());
 
+        // Relationship deltas are applied exactly once by the persistence service.
+        if (room != null) return persistenceService.saveAll(scene, state.getCharacter(), result.resolvedEvents(), room);
         return persistenceService.saveAll(
                 scene,
                 state.getCharacter(),

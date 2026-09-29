@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 @Component
-@RequiredArgsConstructor
+@RequiredArgsConstructor(onConstructor_ = @org.springframework.beans.factory.annotation.Autowired)
 public class AiContextBuilder {
     private final MemoryRecallService memoryRecallService;
     private final RelationshipRepository relationshipRepository;
@@ -56,12 +56,18 @@ public class AiContextBuilder {
             CharacterState state,
             EventCandidate candidate
     ) {
+        return build(state, candidate, null);
+    }
+
+    public AiContext build(CharacterState state, EventCandidate candidate,
+                           com.example.projectmm.domain.chat.Conversation room) {
         List<EffectiveMemory> recalledMemories =
-                memoryRecallService.recall(
+                room == null ? memoryRecallService.recall(
                         state.getCharacter().getId(),
                         state.getSimulatedAt(),
                         5
-                );
+                ) : memoryRecallService.recallForConversation(state.getCharacter().getId(), room.getId(),
+                        state.getSimulatedAt(), 5, candidate.summary(), !room.isIndependentStart());
 
         List<AiMemoryContext> memoryContexts =
                 recalledMemories.stream()

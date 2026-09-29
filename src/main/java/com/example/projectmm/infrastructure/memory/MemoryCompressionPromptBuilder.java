@@ -4,17 +4,28 @@ import com.example.projectmm.application.memory.ProtectedMemoryDetailPolicy;
 import com.example.projectmm.domain.memory.*;
 import com.example.projectmm.application.memory.MemoryProvenanceAccessPolicy;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
 
 @Component
-@RequiredArgsConstructor
 public class MemoryCompressionPromptBuilder {
     private static final int MAX_RELATED = 8;
     private final MemoryAccessStateRepository accessStates;
     private final MemoryProvenanceAccessPolicy provenanceAccess;
     private final ProtectedMemoryDetailPolicy protectedDetailPolicy;
+
+    @Autowired
+    public MemoryCompressionPromptBuilder(
+            MemoryAccessStateRepository accessStates,
+            MemoryProvenanceAccessPolicy provenanceAccess,
+            ProtectedMemoryDetailPolicy protectedDetailPolicy
+    ) {
+        this.accessStates = accessStates;
+        this.provenanceAccess = provenanceAccess;
+        this.protectedDetailPolicy = protectedDetailPolicy;
+    }
 
     public MemoryCompressionPromptBuilder(
             MemoryAccessStateRepository accessStates,

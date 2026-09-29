@@ -32,9 +32,12 @@ import static org.mockito.Mockito.*;
         "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.show-sql=false"}, showSql = false)
 @Import({ConversationProgressService.class, CustomStateProposalService.class, CustomStateService.class,
         CatchUpSimulationService.class, CatchUpSegmentService.class, CatchUpEventCandidateService.class,
-        EventCandidateValidator.class})
+        EventCandidateValidator.class,
+        com.example.projectmm.application.relationship.RelationshipChangeService.class,
+        com.example.projectmm.application.relationship.RelationshipFactService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class CustomStateChatCompletionTest {
+    @MockitoBean CatchUpExecutionService execution;
     @Autowired ConversationProgressService progress;
     @Autowired CustomStateService custom;
     @Autowired CustomStateProposalService proposals;
