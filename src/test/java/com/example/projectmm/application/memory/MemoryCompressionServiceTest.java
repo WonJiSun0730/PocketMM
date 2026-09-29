@@ -25,6 +25,9 @@ class MemoryCompressionServiceTest {
 
     private final MemoryCompressionPersistenceService persistence = mock(MemoryCompressionPersistenceService.class);
 
+    private final ProtectedMemoryDetailPolicy protectedDetailPolicy =
+            mock(ProtectedMemoryDetailPolicy.class);
+
     @org.junit.jupiter.api.BeforeEach
     void allowPersistence() {
         when(persistence.apply(any(), any(), any(), any())).thenReturn(true);
@@ -478,6 +481,164 @@ class MemoryCompressionServiceTest {
                         MemoryDetailLevel.SCHEMA,
                         List.of(relatedMemory)
                 );
+    }
+
+    @Test
+    void 보호_디테일이_압축_summary에서_사라지면_persistence전에_압축을_거부한다() {
+
+        LocalDateTime rememberedAt =
+                LocalDateTime.of(
+                        2026, 9, 1,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        rememberedAt,
+                        5,
+                        50
+                );
+
+        MemoryCompressionService protectedService =
+                new MemoryCompressionService(
+                        memoryDecayPolicy,
+                        memoryCompressor,
+                        candidateFinder,
+                        persistence,
+                        mock(MemoryAccessStateRepository.class),
+                        mock(MemoryProvenanceAccessPolicy.class),
+                        protectedDetailPolicy
+                );
+
+        when(
+                memoryCompressor.compress(
+                        memory,
+                        MemoryDetailLevel.SUMMARY,
+                        List.of()
+                )
+        ).thenReturn(
+                new MemoryCompressorOutput(
+                        "중요한 대화를 나눈 기억.",
+                        List.of()
+                )
+        );
+
+        when(
+                protectedDetailPolicy
+                        .preservesProtectedDetails(
+                                memory.getId(),
+                                "중요한 대화를 나눈 기억."
+                        )
+        ).thenReturn(false);
+
+        MemoryCompressionResult result =
+                protectedService.compressIfNeeded(
+                        memory,
+                        rememberedAt.plusDays(10)
+                );
+
+        assertThat(result.compressed())
+                .isFalse();
+
+        assertThat(memory.getDetailLevel())
+                .isEqualTo(
+                        MemoryDetailLevel.DETAILED
+                );
+
+        assertThat(memory.getSummary())
+                .isEqualTo(
+                        "길고 자세한 원본 기억."
+                );
+
+        verify(
+                persistence,
+                never()
+        ).apply(
+                any(),
+                any(),
+                any(),
+                any()
+        );
+    }
+
+    @Test
+    void 보호_디테일이_압축_summary에_유지되면_정상적으로_압축한다() {
+
+        LocalDateTime rememberedAt =
+                LocalDateTime.of(
+                        2026, 9, 1,
+                        12, 0
+                );
+
+        Memory memory =
+                createMemory(
+                        rememberedAt,
+                        5,
+                        50
+                );
+
+        MemoryCompressionService protectedService =
+                new MemoryCompressionService(
+                        memoryDecayPolicy,
+                        memoryCompressor,
+                        candidateFinder,
+                        persistence,
+                        mock(MemoryAccessStateRepository.class),
+                        mock(MemoryProvenanceAccessPolicy.class),
+                        protectedDetailPolicy
+                );
+
+        String compressedSummary =
+                "왼손에 반지를 끼워줬던 중요한 기억.";
+
+        when(
+                memoryCompressor.compress(
+                        memory,
+                        MemoryDetailLevel.SUMMARY,
+                        List.of()
+                )
+        ).thenReturn(
+                new MemoryCompressorOutput(
+                        compressedSummary,
+                        List.of()
+                )
+        );
+
+        when(
+                protectedDetailPolicy
+                        .preservesProtectedDetails(
+                                memory.getId(),
+                                compressedSummary
+                        )
+        ).thenReturn(true);
+
+        MemoryCompressionResult result =
+                protectedService.compressIfNeeded(
+                        memory,
+                        rememberedAt.plusDays(10)
+                );
+
+        assertThat(result.compressed())
+                .isTrue();
+
+        assertThat(memory.getDetailLevel())
+                .isEqualTo(
+                        MemoryDetailLevel.SUMMARY
+                );
+
+        assertThat(memory.getSummary())
+                .isEqualTo(
+                        compressedSummary
+                );
+
+        verify(
+                persistence
+        ).apply(
+                eq(memory.getId()),
+                eq(MemoryDetailLevel.DETAILED),
+                eq("길고 자세한 원본 기억."),
+                any(MemoryCompressorOutput.class)
+        );
     }
 
     private Memory createMemory(

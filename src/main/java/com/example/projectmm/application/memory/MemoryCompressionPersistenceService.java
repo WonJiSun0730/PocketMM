@@ -16,6 +16,7 @@ public class MemoryCompressionPersistenceService {
     private final MemoryCompressionEvidenceRepository provenance;
     private final MemoryAccessStateRepository accessStates;
     private final MemoryProvenanceAccessPolicy provenanceAccess;
+    private final ProtectedMemoryDetailRepository protectedDetails;
 
     // Recall can run in a read-only transaction. Commit both changes in one independent write transaction.
     // No AI call is made here; callers synchronize their in-memory view only after this commit succeeds.
@@ -27,6 +28,22 @@ public class MemoryCompressionPersistenceService {
         var memory = memories.lockForCompression(memoryId).orElse(null);
         if (memory == null || memory.getDetailLevel() != expectedLevel
                 || !memory.getSummary().equals(expectedSummary) || !expectedLevel.canCompressFurther()) return false;
+
+        boolean losesProtectedDetail =
+                protectedDetails
+                        .findByMemoryIdOrderByIdAsc(memoryId)
+                        .stream()
+                        .filter(ProtectedMemoryDetail::mustPreserve)
+                        .anyMatch(detail ->
+                                !output.summary().contains(
+                                        detail.getDetailText()
+                                )
+                        );
+
+        if (losesProtectedDetail) {
+            return false;
+        }
+
         var target = expectedLevel.next();
         List<Long> ids = target == MemoryDetailLevel.SUMMARY ? List.of() : output.evidenceMemoryIds();
         int minimum = target == MemoryDetailLevel.SCHEMA ? 2 : target == MemoryDetailLevel.PATTERN ? 1 : 0;

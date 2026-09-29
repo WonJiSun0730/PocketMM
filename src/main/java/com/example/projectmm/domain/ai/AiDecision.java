@@ -1,8 +1,11 @@
 package com.example.projectmm.domain.ai;
 
+import com.example.projectmm.application.memory.MemoryDetailCandidate;
 import com.example.projectmm.domain.memory.MemoryAccessChange;
 import com.example.projectmm.domain.relationship.RelationshipDelta;
 import com.example.projectmm.domain.simulation.StateDelta;
+
+import java.util.List;
 
 public record AiDecision(
         String eventType,
@@ -12,8 +15,15 @@ public record AiDecision(
         StateDelta stateDelta,
         Long relationshipTargetCharacterId,
         RelationshipDelta relationshipDelta,
-        MemoryAccessChange memoryAccessChange
+        MemoryAccessChange memoryAccessChange,
+        List<MemoryDetailCandidate> memoryDetails
 ) {
+
+    public AiDecision {
+        memoryDetails = memoryDetails == null
+                ? List.of()
+                : List.copyOf(memoryDetails);
+    }
 
     public AiDecision(
             String eventType,
@@ -31,7 +41,8 @@ public record AiDecision(
                 stateDelta,
                 relationshipTargetCharacterId,
                 relationshipDelta,
-                null
+                null,
+                List.of()
         );
     }
 
@@ -52,7 +63,31 @@ public record AiDecision(
                 stateDelta,
                 relationshipTargetCharacterId,
                 relationshipDelta,
-                memoryAccessChange
+                memoryAccessChange,
+                List.of()
+        );
+    }
+
+    public AiDecision(
+            String eventType,
+            String summary,
+            int importance,
+            int narrativeAnchor,
+            StateDelta stateDelta,
+            Long relationshipTargetCharacterId,
+            RelationshipDelta relationshipDelta,
+            MemoryAccessChange memoryAccessChange
+    ) {
+        this(
+                eventType,
+                summary,
+                importance,
+                narrativeAnchor,
+                stateDelta,
+                relationshipTargetCharacterId,
+                relationshipDelta,
+                memoryAccessChange,
+                List.of()
         );
     }
 }

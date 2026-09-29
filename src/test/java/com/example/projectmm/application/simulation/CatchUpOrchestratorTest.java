@@ -3,15 +3,18 @@ package com.example.projectmm.application.simulation;
 import com.example.projectmm.application.ai.AiContextBuilder;
 import com.example.projectmm.application.ai.AiDecisionValidator;
 import com.example.projectmm.application.ai.AiGateway;
+import com.example.projectmm.application.memory.MemoryDetailCandidate;
 import com.example.projectmm.application.memory.MemoryRecallService;
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.character.CharacterState;
+import com.example.projectmm.domain.memory.MemoryDetailSalience;
 import com.example.projectmm.domain.relationship.RelationshipRepository;
 import com.example.projectmm.domain.simulation.*;
 import com.example.projectmm.infrastructure.ai.MockAiGateway;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -615,6 +618,84 @@ class CatchUpOrchestratorTest {
 
         assertThat(fallback.memoryAccessChange())
                 .isNull();
+
+        assertThat(fallback.memoryDetails())
+                .isEmpty();
+    }
+
+    @Test
+    void AI가_생성한_memoryDetails가_ResolvedEvent에_전달된다() {
+
+        AiGateway detailGateway =
+                context ->
+                        new com.example.projectmm.domain.ai.AiDecision(
+                                "RELATIONSHIP_MILESTONE",
+                                "마르바스와 붉은 반지를 교환하며 약속을 나눴다.",
+                                7,
+                                8,
+                                new StateDelta(
+                                        0,
+                                        5,
+                                        0
+                                ),
+                                null,
+                                com.example.projectmm.domain.relationship.RelationshipDelta.none(),
+                                null,
+                                List.of(
+                                        new MemoryDetailCandidate(
+                                                "붉은 반지",
+                                                MemoryDetailSalience.HIGH,
+                                                false
+                                        ),
+                                        new MemoryDetailCandidate(
+                                                "약속",
+                                                MemoryDetailSalience.CRITICAL,
+                                                true
+                                        )
+                                )
+                        );
+
+        CatchUpOrchestrator detailOrchestrator =
+                createOrchestrator(detailGateway);
+
+        CharacterState state =
+                createAiRequiredState();
+
+        CatchUpExecutionResult result =
+                detailOrchestrator.execute(
+                        state,
+                        LocalDateTime.of(
+                                2026, 9, 21,
+                                13, 0
+                        )
+                );
+
+        assertThat(result.resolvedEvents())
+                .hasSize(1);
+
+        ResolvedEvent resolved =
+                result.resolvedEvents().getFirst();
+
+        assertThat(resolved.source())
+                .isEqualTo(EventSource.AI);
+
+        assertThat(resolved.memoryDetails())
+                .hasSize(2);
+
+        assertThat(resolved.memoryDetails().get(0).text())
+                .isEqualTo("붉은 반지");
+
+        assertThat(resolved.memoryDetails().get(0).salience())
+                .isEqualTo(MemoryDetailSalience.HIGH);
+
+        assertThat(resolved.memoryDetails().get(1).text())
+                .isEqualTo("약속");
+
+        assertThat(resolved.memoryDetails().get(1).salience())
+                .isEqualTo(MemoryDetailSalience.CRITICAL);
+
+        assertThat(resolved.memoryDetails().get(1).protectedAnchor())
+                .isTrue();
     }
 
     private CatchUpOrchestrator createOrchestrator(

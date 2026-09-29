@@ -54,7 +54,8 @@ public class ResolvedEventPersistenceService {
             );
 
             memoryCreationService.createFrom(
-                    savedEvent
+                    savedEvent,
+                    resolvedEvent.memoryDetails()
             );
 
             savedEvents.add(savedEvent);

@@ -7,7 +7,7 @@ import com.example.projectmm.domain.chat.ConversationRepository;
 import com.example.projectmm.domain.memory.ChatMemoryCandidate;
 import com.example.projectmm.domain.memory.Memory;
 import com.example.projectmm.domain.memory.MemoryRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,10 +20,32 @@ import java.util.HexFormat;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class ChatMemoryWriter {
     private final MemoryRepository memories;
     private final ConversationRepository conversations;
+    private final MemoryDetailService memoryDetailService;
+
+    @Autowired
+    public ChatMemoryWriter(
+            MemoryRepository memories,
+            ConversationRepository conversations,
+            MemoryDetailService memoryDetailService
+    ) {
+        this.memories = memories;
+        this.conversations = conversations;
+        this.memoryDetailService = memoryDetailService;
+    }
+
+    public ChatMemoryWriter(
+            MemoryRepository memories,
+            ConversationRepository conversations
+    ) {
+        this(
+                memories,
+                conversations,
+                null
+        );
+    }
 
     @Transactional
     public ChatMemoryResult save(Conversation conversation, ChatMessage source, String spoken,
@@ -54,8 +76,19 @@ public class ChatMemoryWriter {
             String key = fingerprint(conversation.getId(), quote);
             if (memories.existsByChatFingerprint(key)) continue;
             Memory memory = Memory.fromChat(conversation, source, quote, candidate.importance(), at, key, candidate.fact());
-            memories.save(memory);
-            saved.add(memory.getSummary());
+            Memory persisted =
+                    memories.save(memory);
+
+            if (memoryDetailService != null) {
+                memoryDetailService.saveDetails(
+                        persisted,
+                        candidate.details()
+                );
+            }
+
+            saved.add(
+                    persisted.getSummary()
+            );
         }
         return new ChatMemoryResult(saved.isEmpty() ? "NONE" : "SAVED", List.copyOf(saved));
     }

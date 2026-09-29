@@ -7,21 +7,58 @@ import com.example.projectmm.domain.memory.Memory;
 import com.example.projectmm.domain.memory.MemoryDecision;
 import com.example.projectmm.domain.memory.MemoryRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class MemoryCreationService {
 
     private final MemoryPolicy memoryPolicy;
     private final MemoryRepository memoryRepository;
     private final EventParticipantRepository eventParticipantRepository;
+    private final MemoryDetailService memoryDetailService;
+
+    @Autowired
+    public MemoryCreationService(
+            MemoryPolicy memoryPolicy,
+            MemoryRepository memoryRepository,
+            EventParticipantRepository eventParticipantRepository,
+            MemoryDetailService memoryDetailService
+    ) {
+        this.memoryPolicy = memoryPolicy;
+        this.memoryRepository = memoryRepository;
+        this.eventParticipantRepository = eventParticipantRepository;
+        this.memoryDetailService = memoryDetailService;
+    }
+
+    public MemoryCreationService(
+            MemoryPolicy memoryPolicy,
+            MemoryRepository memoryRepository,
+            EventParticipantRepository eventParticipantRepository
+    ) {
+        this(
+                memoryPolicy,
+                memoryRepository,
+                eventParticipantRepository,
+                null
+        );
+    }
 
     public List<Memory> createFrom(
             Event event
+    ) {
+        return createFrom(
+                event,
+                List.of()
+        );
+    }
+
+    public List<Memory> createFrom(
+            Event event,
+            List<MemoryDetailCandidate> memoryDetails
     ) {
         MemoryDecision decision =
                 memoryPolicy.evaluate(event);
@@ -51,9 +88,17 @@ public class MemoryCreationService {
                             event.getOccurredAt()
                     );
 
-            memories.add(
-                    memoryRepository.save(memory)
-            );
+            Memory persisted =
+                    memoryRepository.save(memory);
+
+            if (memoryDetailService != null) {
+                memoryDetailService.saveDetails(
+                        persisted,
+                        memoryDetails
+                );
+            }
+
+            memories.add(persisted);
         }
 
         return memories;

@@ -18,6 +18,8 @@ import static org.mockito.Mockito.*;
 
 class MemoryCompressionPromptBuilderTest {
     private final MemoryAccessStateRepository access = mock(MemoryAccessStateRepository.class);
+    private final com.example.projectmm.application.memory.ProtectedMemoryDetailPolicy protectedDetailPolicy =
+            mock(com.example.projectmm.application.memory.ProtectedMemoryDetailPolicy.class);
     private final MemoryCompressionPromptBuilder builder = new MemoryCompressionPromptBuilder(access, mock(com.example.projectmm.application.memory.MemoryProvenanceAccessPolicy.class));
 
     @Test
@@ -100,5 +102,103 @@ class MemoryCompressionPromptBuilderTest {
         var memory = new Memory(character, null, summary, 5, 50, LocalDateTime.of(2026, 1, 1, 12, 0));
         ReflectionTestUtils.setField(memory, "id", id);
         return memory;
+    }
+
+    @Test
+    void protectedDetailsAreIncludedInCompressionPrompt() {
+
+        var current =
+                memory(
+                        1,
+                        "왼손에 반지를 끼워주고 다시는 떠나지 않겠다고 약속했다."
+                );
+
+        var first =
+                new ProtectedMemoryDetail(
+                        current,
+                        "왼손에 반지를 끼워줬다",
+                        MemoryDetailSalience.HIGH,
+                        false
+                );
+
+        var second =
+                new ProtectedMemoryDetail(
+                        current,
+                        "다시는 떠나지 않겠다고 약속했다",
+                        MemoryDetailSalience.NORMAL,
+                        true
+                );
+
+        when(
+                protectedDetailPolicy.protectedDetails(1L)
+        ).thenReturn(
+                List.of(
+                        first,
+                        second
+                )
+        );
+
+        var protectedBuilder =
+                new MemoryCompressionPromptBuilder(
+                        access,
+                        mock(
+                                com.example.projectmm.application.memory.MemoryProvenanceAccessPolicy.class
+                        ),
+                        protectedDetailPolicy
+                );
+
+        String text =
+                protectedBuilder.build(
+                        current,
+                        MemoryDetailLevel.SUMMARY,
+                        List.of()
+                ).orElseThrow();
+
+        assertThat(text)
+                .contains(
+                        "Protected details:",
+                        "왼손에 반지를 끼워줬다",
+                        "다시는 떠나지 않겠다고 약속했다",
+                        "Do not omit, generalize away, contradict, or change them."
+                );
+    }
+
+    @Test
+    void noProtectedDetailsKeepsOrdinaryCompressionPrompt() {
+
+        var current =
+                memory(
+                        1,
+                        "ordinary event"
+                );
+
+        when(
+                protectedDetailPolicy.protectedDetails(1L)
+        ).thenReturn(List.of());
+
+        var protectedBuilder =
+                new MemoryCompressionPromptBuilder(
+                        access,
+                        mock(
+                                com.example.projectmm.application.memory.MemoryProvenanceAccessPolicy.class
+                        ),
+                        protectedDetailPolicy
+                );
+
+        String text =
+                protectedBuilder.build(
+                        current,
+                        MemoryDetailLevel.SUMMARY,
+                        List.of()
+                ).orElseThrow();
+
+        assertThat(text)
+                .contains(
+                        "Target: SUMMARY",
+                        "ordinary event"
+                )
+                .doesNotContain(
+                        "Protected details:"
+                );
     }
 }

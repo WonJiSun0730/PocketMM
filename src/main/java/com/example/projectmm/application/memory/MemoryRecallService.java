@@ -3,6 +3,7 @@ package com.example.projectmm.application.memory;
 import com.example.projectmm.domain.character.CharacterStateRepository;
 import com.example.projectmm.domain.memory.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -10,7 +11,6 @@ import java.util.Comparator;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class MemoryRecallService {
 
     private final MemoryRepository memoryRepository;
@@ -21,6 +21,27 @@ public class MemoryRecallService {
     private final MemoryLifecycleService memoryLifecycleService;
     private final MemoryProvenanceAccessPolicy provenanceAccess;
     private final MemoryTierPolicy memoryTierPolicy;
+
+    @Autowired
+    public MemoryRecallService(
+            MemoryRepository memoryRepository,
+            MemoryDecayPolicy memoryDecayPolicy,
+            MemoryCompressionService memoryCompressionService,
+            CharacterStateRepository characterStateRepository,
+            MemoryAccessStateRepository memoryAccessStateRepository,
+            MemoryLifecycleService memoryLifecycleService,
+            MemoryProvenanceAccessPolicy provenanceAccess,
+            MemoryTierPolicy memoryTierPolicy
+    ) {
+        this.memoryRepository = memoryRepository;
+        this.memoryDecayPolicy = memoryDecayPolicy;
+        this.memoryCompressionService = memoryCompressionService;
+        this.characterStateRepository = characterStateRepository;
+        this.memoryAccessStateRepository = memoryAccessStateRepository;
+        this.memoryLifecycleService = memoryLifecycleService;
+        this.provenanceAccess = provenanceAccess;
+        this.memoryTierPolicy = memoryTierPolicy;
+    }
 
     public MemoryRecallService(
             MemoryRepository memoryRepository,

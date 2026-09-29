@@ -43,7 +43,11 @@ import static org.assertj.core.api.Assertions.*;
         ConversationStartService.class,
         PlayerProfileService.class,
         ConversationPlayerService.class,
-        CustomStateService.class
+        CustomStateService.class,
+        MemoryDetailService.class,
+        ProtectedMemoryDetailPolicy.class,
+        MemoryTierPolicy.class,
+        MemoryProvenanceAccessPolicy.class
 })
 class ChatMemoryPersistenceTest {
     @Autowired EntityManager em;
@@ -55,6 +59,7 @@ class ChatMemoryPersistenceTest {
     @Autowired ConversationRepository conversations;
     @Autowired PlayerProfileService playerProfiles;
     @Autowired ConversationPlayerService players;
+    @Autowired ProtectedMemoryDetailRepository protectedDetails;
     private final LocalDateTime now = LocalDateTime.of(2026, 9, 23, 12, 0);
 
     @Test
@@ -370,5 +375,102 @@ class ChatMemoryPersistenceTest {
         var foreignRoom = Conversation.fresh(second, now); em.persist(foreignRoom);
         assertThatThrownBy(() -> contexts.build(first.getId(), foreignRoom.getId(), ContentMode.NORMAL))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("mismatch");
+    }
+
+    @Test
+    void groundedHighDetailPersistsWithChatMemory() {
+
+        Character character =
+                new Character("Detail Salience QA");
+
+        em.persist(character);
+
+        Conversation conversation =
+                Conversation.fresh(
+                        character,
+                        now
+                );
+
+        em.persist(conversation);
+
+        String quote =
+                "내 반려묘 이름은 감자야.";
+
+        ChatMessage source =
+                message(
+                        conversation,
+                        quote,
+                        now
+                );
+
+        em.persist(source);
+
+        ChatMemoryCandidate candidate =
+                new ChatMemoryCandidate(
+                        quote,
+                        7,
+                        new MemoryFact(
+                                MemoryFact.Kind.RELATIONSHIP,
+                                "반려묘",
+                                "이름",
+                                "감자"
+                        ),
+                        List.of(
+                                new MemoryDetailCandidate(
+                                        "감자",
+                                        MemoryDetailSalience.HIGH,
+                                        false
+                                ),
+                                new MemoryDetailCandidate(
+                                        "반려묘",
+                                        MemoryDetailSalience.NORMAL,
+                                        false
+                                )
+                        )
+                );
+
+        ChatMemoryResult result =
+                writer.save(
+                        conversation,
+                        source,
+                        quote,
+                        List.of(candidate),
+                        now
+                );
+
+        assertThat(result.status())
+                .isEqualTo("SAVED");
+
+        em.flush();
+        em.clear();
+
+        Memory stored =
+                memories.findForConversation(
+                        character.getId(),
+                        conversation.getId()
+                ).getFirst();
+
+        List<ProtectedMemoryDetail> storedDetails =
+                protectedDetails
+                        .findByMemoryIdOrderByIdAsc(
+                                stored.getId()
+                        );
+
+        assertThat(storedDetails)
+                .hasSize(1);
+
+        ProtectedMemoryDetail detail =
+                storedDetails.getFirst();
+
+        assertThat(detail.getDetailText())
+                .isEqualTo("감자");
+
+        assertThat(detail.getSalience())
+                .isEqualTo(
+                        MemoryDetailSalience.HIGH
+                );
+
+        assertThat(detail.mustPreserve())
+                .isTrue();
     }
 }

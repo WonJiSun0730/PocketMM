@@ -1,9 +1,11 @@
 package com.example.projectmm.domain.simulation;
 
+import com.example.projectmm.application.memory.MemoryDetailCandidate;
 import com.example.projectmm.domain.memory.MemoryAccessChange;
 import com.example.projectmm.domain.relationship.RelationshipDelta;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public record ResolvedEvent(
         LocalDateTime occurredAt,
@@ -15,8 +17,16 @@ public record ResolvedEvent(
         Long relationshipTargetCharacterId,
         RelationshipDelta relationshipDelta,
         EventSource source,
-        MemoryAccessChange memoryAccessChange
+        MemoryAccessChange memoryAccessChange,
+        List<MemoryDetailCandidate> memoryDetails
 ) {
+
+    public ResolvedEvent {
+        memoryDetails = memoryDetails == null
+                ? List.of()
+                : List.copyOf(memoryDetails);
+    }
+
     public ResolvedEvent(
             LocalDateTime occurredAt,
             String eventType,
@@ -37,7 +47,8 @@ public record ResolvedEvent(
                 relationshipTargetCharacterId,
                 relationshipDelta,
                 source,
-                null
+                null,
+                List.of()
         );
     }
 
@@ -62,7 +73,35 @@ public record ResolvedEvent(
                 relationshipTargetCharacterId,
                 relationshipDelta,
                 source,
-                memoryAccessChange
+                memoryAccessChange,
+                List.of()
+        );
+    }
+
+    public ResolvedEvent(
+            LocalDateTime occurredAt,
+            String eventType,
+            String summary,
+            int importance,
+            int narrativeAnchor,
+            StateDelta stateDelta,
+            Long relationshipTargetCharacterId,
+            RelationshipDelta relationshipDelta,
+            EventSource source,
+            MemoryAccessChange memoryAccessChange
+    ) {
+        this(
+                occurredAt,
+                eventType,
+                summary,
+                importance,
+                narrativeAnchor,
+                stateDelta,
+                relationshipTargetCharacterId,
+                relationshipDelta,
+                source,
+                memoryAccessChange,
+                List.of()
         );
     }
 }

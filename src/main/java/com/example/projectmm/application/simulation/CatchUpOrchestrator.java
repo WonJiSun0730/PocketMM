@@ -259,7 +259,8 @@ public class CatchUpOrchestrator {
                         decision.relationshipTargetCharacterId(),
                         decision.relationshipDelta(),
                         EventSource.AI,
-                        decision.memoryAccessChange()
+                        decision.memoryAccessChange(),
+                        decision.memoryDetails()
                 )
         );
     }

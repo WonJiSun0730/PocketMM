@@ -7,13 +7,13 @@ import com.example.projectmm.domain.memory.MemoryCompressionResult;
 import com.example.projectmm.domain.memory.MemoryDecayResult;
 import com.example.projectmm.domain.memory.MemoryDetailLevel;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
-@RequiredArgsConstructor
 public class MemoryCompressionService {
     private static final int MIN_PATTERN_RELATED_MEMORIES = 1;
     private static final int MIN_SCHEMA_RELATED_MEMORIES = 2;
@@ -24,6 +24,45 @@ public class MemoryCompressionService {
     private final MemoryCompressionPersistenceService persistence;
     private final MemoryAccessStateRepository accessStates;
     private final MemoryProvenanceAccessPolicy provenanceAccess;
+    private final ProtectedMemoryDetailPolicy protectedDetailPolicy;
+
+    @Autowired
+    public MemoryCompressionService(
+            MemoryDecayPolicy memoryDecayPolicy,
+            MemoryCompressor memoryCompressor,
+            MemoryPatternCandidateFinder candidateFinder,
+            MemoryCompressionPersistenceService persistence,
+            MemoryAccessStateRepository accessStates,
+            MemoryProvenanceAccessPolicy provenanceAccess,
+            ProtectedMemoryDetailPolicy protectedDetailPolicy
+    ) {
+        this.memoryDecayPolicy = memoryDecayPolicy;
+        this.memoryCompressor = memoryCompressor;
+        this.candidateFinder = candidateFinder;
+        this.persistence = persistence;
+        this.accessStates = accessStates;
+        this.provenanceAccess = provenanceAccess;
+        this.protectedDetailPolicy = protectedDetailPolicy;
+    }
+
+    public MemoryCompressionService(
+            MemoryDecayPolicy memoryDecayPolicy,
+            MemoryCompressor memoryCompressor,
+            MemoryPatternCandidateFinder candidateFinder,
+            MemoryCompressionPersistenceService persistence,
+            MemoryAccessStateRepository accessStates,
+            MemoryProvenanceAccessPolicy provenanceAccess
+    ) {
+        this(
+                memoryDecayPolicy,
+                memoryCompressor,
+                candidateFinder,
+                persistence,
+                accessStates,
+                provenanceAccess,
+                null
+        );
+    }
 
     public MemoryCompressionResult compressIfNeeded(
             Memory memory,
@@ -84,6 +123,16 @@ public class MemoryCompressionService {
         String compressedSummary = output == null ? null : output.summary();
         if (compressedSummary == null || compressedSummary.isBlank() || compressedSummary.length() > 500) {
             return MemoryCompressionResult.skipped(memory.getSummary());
+        }
+
+        if (protectedDetailPolicy != null
+                && !protectedDetailPolicy.preservesProtectedDetails(
+                memory.getId(),
+                compressedSummary
+        )) {
+            return MemoryCompressionResult.skipped(
+                    memory.getSummary()
+            );
         }
 
         int minimum = targetLevel == MemoryDetailLevel.SCHEMA ? 2 : targetLevel == MemoryDetailLevel.PATTERN ? 1 : 0;

@@ -1,5 +1,6 @@
 package com.example.projectmm.infrastructure.memory;
 
+import com.example.projectmm.application.memory.ProtectedMemoryDetailPolicy;
 import com.example.projectmm.domain.memory.*;
 import com.example.projectmm.application.memory.MemoryProvenanceAccessPolicy;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,18 @@ public class MemoryCompressionPromptBuilder {
     private static final int MAX_RELATED = 8;
     private final MemoryAccessStateRepository accessStates;
     private final MemoryProvenanceAccessPolicy provenanceAccess;
+    private final ProtectedMemoryDetailPolicy protectedDetailPolicy;
+
+    public MemoryCompressionPromptBuilder(
+            MemoryAccessStateRepository accessStates,
+            MemoryProvenanceAccessPolicy provenanceAccess
+    ) {
+        this(
+                accessStates,
+                provenanceAccess,
+                null
+        );
+    }
 
     public Optional<String> build(Memory memory, MemoryDetailLevel target, List<Memory> related) {
         return prepare(memory, target, related).map(MemoryCompressionPrompt::text);
@@ -69,6 +82,14 @@ public class MemoryCompressionPromptBuilder {
                     """;
             case DETAILED -> throw new IllegalArgumentException("DETAILED is not a compression target");
         };
+
+        List<ProtectedMemoryDetail> protectedDetails =
+                protectedDetailPolicy == null
+                        ? List.of()
+                        : protectedDetailPolicy.protectedDetails(
+                        memory.getId()
+                );
+
         StringBuilder prompt = new StringBuilder("""
                 Compress memory for PocketMM. Return JSON only: {"summary":"compressed text"}.
                 Use the source language and at most 500 characters. Return {"summary":null} to abstain.
@@ -77,7 +98,26 @@ public class MemoryCompressionPromptBuilder {
                 Importance and narrative anchor are separate from detail resolution and access.
                 Do not derive facts or traits from either score. Do not change access or these scores.
                 """);
-        prompt.append("Target: ").append(target).append('\n').append(semantics);
+        prompt.append("Target: ")
+                .append(target)
+                .append('\n')
+                .append(semantics);
+
+        if (!protectedDetails.isEmpty()) {
+            prompt.append("""
+            
+            Protected details:
+            The following details are required for narrative continuity.
+            Preserve each detail explicitly in the compressed summary.
+            Do not omit, generalize away, contradict, or change them.
+            """);
+
+            for (ProtectedMemoryDetail detail : protectedDetails) {
+                prompt.append("- ")
+                        .append(detail.getDetailText())
+                        .append('\n');
+            }
+        }
         append(prompt, "Current memory", memory);
         for (int i = 0; i < evidence.size(); i++) append(prompt, "Related evidence " + (i + 1), evidence.get(i));
         return Optional.of(new MemoryCompressionPrompt(prompt.toString(), evidence.stream().map(Memory::getId).toList()));

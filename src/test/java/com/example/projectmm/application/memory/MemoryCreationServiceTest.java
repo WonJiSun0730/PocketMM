@@ -4,8 +4,7 @@ import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.event.Event;
 import com.example.projectmm.domain.event.EventParticipant;
 import com.example.projectmm.domain.event.EventParticipantRepository;
-import com.example.projectmm.domain.memory.Memory;
-import com.example.projectmm.domain.memory.MemoryRepository;
+import com.example.projectmm.domain.memory.*;
 import com.example.projectmm.domain.scene.Scene;
 import org.junit.jupiter.api.Test;
 
@@ -244,6 +243,161 @@ class MemoryCreationServiceTest {
 
         verifyNoInteractions(
                 memoryRepository
+        );
+    }
+
+    @Test
+    void 이벤트_memoryDetails가_생성된_기억의_protectedDetail로_저장된다() {
+
+        MemoryRepository memoryRepository =
+                mock(MemoryRepository.class);
+
+        EventParticipantRepository eventParticipantRepository =
+                mock(EventParticipantRepository.class);
+
+        ProtectedMemoryDetailRepository protectedDetailRepository =
+                mock(ProtectedMemoryDetailRepository.class);
+
+        MemoryDetailService memoryDetailService =
+                new MemoryDetailService(
+                        protectedDetailRepository
+                );
+
+        MemoryCreationService service =
+                new MemoryCreationService(
+                        new MemoryPolicy(),
+                        memoryRepository,
+                        eventParticipantRepository,
+                        memoryDetailService
+                );
+
+        Character millie =
+                new Character("Millie");
+
+        LocalDateTime occurredAt =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        15, 0
+                );
+
+        Scene scene =
+                new Scene(
+                        occurredAt,
+                        "관계 사건",
+                        "DAILY"
+                );
+
+        Event event =
+                new Event(
+                        scene,
+                        occurredAt,
+                        "RELATIONSHIP_MILESTONE",
+                        "마르바스와 붉은 반지를 교환하며 약속을 나눴다.",
+                        8,
+                        9
+                );
+
+        EventParticipant participant =
+                new EventParticipant(
+                        event,
+                        millie,
+                        "ACTOR"
+                );
+
+        when(
+                eventParticipantRepository.findByEventId(
+                        event.getId()
+                )
+        ).thenReturn(
+                List.of(participant)
+        );
+
+        when(memoryRepository.save(any(Memory.class)))
+                .thenAnswer(invocation -> {
+                    Memory memory =
+                            invocation.getArgument(0);
+
+                    org.springframework.test.util.ReflectionTestUtils
+                            .setField(
+                                    memory,
+                                    "id",
+                                    1L
+                            );
+
+                    return memory;
+                });
+
+        when(
+                protectedDetailRepository.save(
+                        any(ProtectedMemoryDetail.class)
+                )
+        ).thenAnswer(
+                invocation ->
+                        invocation.getArgument(0)
+        );
+
+        List<Memory> memories =
+                service.createFrom(
+                        event,
+                        List.of(
+                                new MemoryDetailCandidate(
+                                        "붉은 반지",
+                                        MemoryDetailSalience.HIGH,
+                                        false
+                                ),
+                                new MemoryDetailCandidate(
+                                        "약속",
+                                        MemoryDetailSalience.CRITICAL,
+                                        true
+                                ),
+                                new MemoryDetailCandidate(
+                                        "교환",
+                                        MemoryDetailSalience.LOW,
+                                        false
+                                )
+                        )
+                );
+
+        assertThat(memories)
+                .hasSize(1);
+
+        verify(
+                protectedDetailRepository,
+                times(2)
+        ).save(
+                any(ProtectedMemoryDetail.class)
+        );
+
+        verify(protectedDetailRepository)
+                .save(
+                        argThat(detail ->
+                                detail.getDetailText()
+                                        .equals("붉은 반지")
+                                        && detail.getSalience()
+                                        == MemoryDetailSalience.HIGH
+                                        && detail.mustPreserve()
+                        )
+                );
+
+        verify(protectedDetailRepository)
+                .save(
+                        argThat(detail ->
+                                detail.getDetailText()
+                                        .equals("약속")
+                                        && detail.getSalience()
+                                        == MemoryDetailSalience.CRITICAL
+                                        && detail.mustPreserve()
+                        )
+                );
+
+        verify(
+                protectedDetailRepository,
+                never()
+        ).save(
+                argThat(detail ->
+                        detail.getDetailText()
+                                .equals("교환")
+                )
         );
     }
 }

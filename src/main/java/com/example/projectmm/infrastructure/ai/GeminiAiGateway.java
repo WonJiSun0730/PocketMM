@@ -1,8 +1,10 @@
 package com.example.projectmm.infrastructure.ai;
 
 import com.example.projectmm.application.ai.AiGateway;
+import com.example.projectmm.application.memory.MemoryDetailCandidate;
 import com.example.projectmm.domain.ai.AiContext;
 import com.example.projectmm.domain.ai.AiDecision;
+import com.example.projectmm.domain.memory.MemoryDetailSalience;
 import com.example.projectmm.domain.relationship.RelationshipDelta;
 import com.example.projectmm.domain.simulation.StateDelta;
 import com.example.projectmm.domain.memory.MemoryAccessChange;
@@ -72,7 +74,12 @@ public class GeminiAiGateway implements AiGateway {
         return toDecision(decision);
     }
 
-    AiDecision toDecision(GeminiDecisionResponse decision) {
+    AiDecision toDecision(
+            GeminiDecisionResponse decision
+    ) {
+        List<MemoryDetailCandidate> memoryDetails =
+                memoryDetails(decision);
+
         return new AiDecision(
                 decision.eventType(),
                 decision.summary(),
@@ -89,8 +96,52 @@ public class GeminiAiGateway implements AiGateway {
                         decision.trustChange(),
                         decision.tensionChange()
                 ),
-                memoryAccessChange(decision.memoryAccessChange())
+                memoryAccessChange(
+                        decision.memoryAccessChange()
+                ),
+                memoryDetails
         );
+    }
+
+    private List<MemoryDetailCandidate> memoryDetails(
+            GeminiDecisionResponse decision
+    ) {
+        if (decision.memoryDetails() == null
+                || decision.memoryDetails().isEmpty()
+                || decision.summary() == null
+                || decision.summary().isBlank()) {
+
+            return List.of();
+        }
+
+        return decision.memoryDetails()
+                .stream()
+                .filter(detail ->
+                        detail != null
+                                && detail.text() != null
+                                && !detail.text().isBlank()
+                                && detail.text().length() <= 300
+                                && decision.summary().contains(
+                                detail.text().strip()
+                        )
+                )
+                .map(detail -> {
+                    try {
+                        return new MemoryDetailCandidate(
+                                detail.text().strip(),
+                                MemoryDetailSalience.valueOf(
+                                        detail.salience()
+                                ),
+                                detail.protectedAnchor()
+                        );
+                    } catch (IllegalArgumentException
+                             | NullPointerException ignored) {
+
+                        return null;
+                    }
+                })
+                .filter(java.util.Objects::nonNull)
+                .toList();
     }
 
     private MemoryAccessChange memoryAccessChange(JsonNode node) {
@@ -153,7 +204,30 @@ public class GeminiAiGateway implements AiGateway {
                 A highly intense one-time event may have high importance but a lower
                 narrativeAnchor. A lasting relationship-defining event may have a high
                 narrativeAnchor independently of its immediate intensity.
-
+                
+                Also identify up to 5 concrete memory details from the final event summary.
+                
+                Each memory detail:
+                - must be an exact non-empty substring of the final summary;
+                - must represent a concrete detail that could matter when this memory is recalled;
+                - must not invent information absent from the summary.
+                
+                Assign one salience level:
+                LOW = incidental detail with little continuity value.
+                NORMAL = useful concrete detail, but safe to lose during strong compression.
+                HIGH = important continuity detail that should survive compression.
+                CRITICAL = identity-, relationship-, promise-, or world-continuity detail
+                           whose loss could materially break future narrative continuity.
+                
+                Set protectedAnchor to true only when that exact detail must survive
+                memory compression regardless of ordinary detail loss.
+                
+                HIGH and CRITICAL details are protected by policy even when
+                protectedAnchor is false.
+                
+                Do not mark a detail HIGH or CRITICAL merely because the event itself
+                has high importance or narrativeAnchor. Judge each detail independently.
+                
                 Keep state changes conservative.
                 Energy, mood, and memory ability changes should normally
                 remain between -20 and 20.
@@ -296,6 +370,42 @@ public class GeminiAiGateway implements AiGateway {
                         )
                 );
 
+                schemaProperties.put(
+                        "memoryDetails",
+                        Map.of(
+                                "type", "array",
+                                "maxItems", 5,
+                                "items", Map.of(
+                                        "type", "object",
+                                        "additionalProperties", false,
+                                        "properties", Map.of(
+                                                "text", Map.of(
+                                                        "type", "string",
+                                                        "minLength", 1,
+                                                        "maxLength", 300
+                                                ),
+                                                "salience", Map.of(
+                                                        "type", "string",
+                                                        "enum", List.of(
+                                                                "LOW",
+                                                                "NORMAL",
+                                                                "HIGH",
+                                                                "CRITICAL"
+                                                        )
+                                                ),
+                                                "protectedAnchor", Map.of(
+                                                        "type", "boolean"
+                                                )
+                                        ),
+                                        "required", List.of(
+                                                "text",
+                                                "salience",
+                                                "protectedAnchor"
+                                        )
+                                )
+                        )
+                );
+
                 Map<String, Object> schema =
                         new LinkedHashMap<>();
 
@@ -314,7 +424,8 @@ public class GeminiAiGateway implements AiGateway {
                                 "relationshipTargetCharacterId",
                                 "affinityChange",
                                 "trustChange",
-                                "tensionChange"
+                                "tensionChange",
+                                "memoryDetails"
                         )
                 );
 

@@ -23,7 +23,7 @@ import static org.mockito.Mockito.*;
 
 @DataJpaTest(properties = {"spring.datasource.driver-class-name=org.h2.Driver",
         "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.show-sql=false"}, showSql = false)
-@Import({MemoryCompressionService.class, MemoryCompressionPersistenceService.class, MemoryDecayPolicy.class, MemoryProvenanceAccessPolicy.class})
+@Import({MemoryCompressionService.class, MemoryCompressionPersistenceService.class, MemoryDecayPolicy.class, MemoryProvenanceAccessPolicy.class,ProtectedMemoryDetailPolicy.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class MemoryCompressionPersistenceTest {
     @Autowired MemoryCompressionService service;
@@ -31,6 +31,7 @@ class MemoryCompressionPersistenceTest {
     @Autowired MemoryRepository memories;
     @Autowired MemoryAccessStateRepository access;
     @Autowired EntityManager em;
+    @Autowired ProtectedMemoryDetailRepository protectedDetails;
     @Autowired PlatformTransactionManager transactions;
     @MockitoSpyBean MemoryCompressionEvidenceRepository provenance;
     @MockitoBean MemoryCompressor compressor;
@@ -48,6 +49,109 @@ class MemoryCompressionPersistenceTest {
         });
         assertThat(service.compressIfNeeded(memory, at.plusYears(2)).compressed()).isFalse();
         assertUnchanged(memory, MemoryDetailLevel.SUMMARY);
+    }
+
+    @Test
+    void protectedDetailAddedDuringCompressionRejectsPersistence() {
+
+        var memory =
+                seed(MemoryDetailLevel.DETAILED);
+
+        when(
+                compressor.compress(
+                        any(),
+                        any(),
+                        any()
+                )
+        ).thenAnswer(invocation -> {
+
+            new TransactionTemplate(transactions)
+                    .executeWithoutResult(status ->
+                            protectedDetails.saveAndFlush(
+                                    new ProtectedMemoryDetail(
+                                            memories.findById(
+                                                    memory.getId()
+                                            ).orElseThrow(),
+                                            "왼손에 반지를 끼워줬다",
+                                            MemoryDetailSalience.HIGH,
+                                            false
+                                    )
+                            )
+                    );
+
+            return new MemoryCompressorOutput(
+                    "중요한 사건이었다.",
+                    List.of()
+            );
+        });
+
+        assertThat(
+                service.compressIfNeeded(
+                        memory,
+                        at.plusYears(2)
+                ).compressed()
+        ).isFalse();
+
+        assertUnchanged(
+                memory,
+                MemoryDetailLevel.DETAILED
+        );
+    }
+
+    @Test
+    void persistenceAcceptsSummaryThatPreservesProtectedDetail() {
+
+        var memory =
+                seed(MemoryDetailLevel.DETAILED);
+
+        new TransactionTemplate(transactions)
+                .executeWithoutResult(status ->
+                        protectedDetails.saveAndFlush(
+                                new ProtectedMemoryDetail(
+                                        memories.findById(
+                                                memory.getId()
+                                        ).orElseThrow(),
+                                        "왼손에 반지를 끼워줬다",
+                                        MemoryDetailSalience.HIGH,
+                                        false
+                                )
+                        )
+                );
+
+        when(
+                compressor.compress(
+                        any(),
+                        any(),
+                        any()
+                )
+        ).thenReturn(
+                new MemoryCompressorOutput(
+                        "그는 왼손에 반지를 끼워줬다.",
+                        List.of()
+                )
+        );
+
+        assertThat(
+                service.compressIfNeeded(
+                        memory,
+                        at.plusYears(2)
+                ).compressed()
+        ).isTrue();
+
+        var stored =
+                memories.findById(
+                        memory.getId()
+                ).orElseThrow();
+
+        assertThat(stored.getSummary())
+                .contains(
+                        "왼손에 반지를 끼워줬다"
+                );
+
+        assertThat(stored.getDetailLevel())
+                .isEqualTo(
+                        MemoryDetailLevel.SUMMARY
+                );
     }
 
     @Test

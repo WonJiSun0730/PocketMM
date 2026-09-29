@@ -2,6 +2,8 @@ package com.example.projectmm.infrastructure.ai;
 
 import tools.jackson.databind.JsonNode;
 
+import java.util.List;
+
 public record GeminiDecisionResponse(
         String eventType,
         String summary,
@@ -14,7 +16,8 @@ public record GeminiDecisionResponse(
         int affinityChange,
         int trustChange,
         int tensionChange,
-        JsonNode memoryAccessChange
+        JsonNode memoryAccessChange,
+        List<GeminiMemoryDetailResponse> memoryDetails
 ) {
 
     public int resolvedNarrativeAnchor() {
