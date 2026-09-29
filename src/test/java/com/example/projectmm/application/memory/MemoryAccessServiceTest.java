@@ -503,6 +503,15 @@ class MemoryAccessServiceTest {
 
         assertThat(secondState.getUpdatedAt())
                 .isEqualTo(now);
+
+        verify(memoryLifecycleService)
+                .markAccessed(
+                        List.of(
+                                201L,
+                                202L
+                        ),
+                        now
+                );
     }
 
     @Test
@@ -625,6 +634,148 @@ class MemoryAccessServiceTest {
         ).save(
                 any(MemoryAccessState.class)
         );
+    }
+
+    @Test
+    void 특정_시점_이후의_차단된_기억만_명시적으로_회복한다() {
+
+        Long characterId = 1L;
+
+        LocalDateTime since =
+                LocalDateTime.of(
+                        2026, 6, 1,
+                        0, 0
+                );
+
+        LocalDateTime before =
+                LocalDateTime.of(
+                        2026, 5, 1,
+                        0, 0
+                );
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        11, 30
+                );
+
+        Memory oldMemory =
+                createMemory(before);
+
+        Memory boundaryMemory =
+                createMemory(since);
+
+        Memory recentMemory =
+                createMemory(
+                        since.plusDays(30)
+                );
+
+        ReflectionTestUtils.setField(
+                oldMemory,
+                "id",
+                401L
+        );
+
+        ReflectionTestUtils.setField(
+                boundaryMemory,
+                "id",
+                402L
+        );
+
+        ReflectionTestUtils.setField(
+                recentMemory,
+                "id",
+                403L
+        );
+
+        MemoryAccessState boundaryState =
+                new MemoryAccessState(
+                        boundaryMemory,
+                        MemoryAccessLevel.BLOCKED,
+                        before
+                );
+
+        MemoryAccessState recentState =
+                new MemoryAccessState(
+                        recentMemory,
+                        MemoryAccessLevel.RESIDUAL,
+                        before
+                );
+
+        when(
+                memoryRepository
+                        .findByCharacterIdOrderByRememberedAtDesc(
+                                characterId
+                        )
+        ).thenReturn(
+                List.of(
+                        recentMemory,
+                        boundaryMemory,
+                        oldMemory
+                )
+        );
+
+        when(
+                memoryAccessStateRepository
+                        .findByMemoryId(402L)
+        ).thenReturn(
+                Optional.of(boundaryState)
+        );
+
+        when(
+                memoryAccessStateRepository
+                        .findByMemoryId(403L)
+        ).thenReturn(
+                Optional.of(recentState)
+        );
+
+        when(
+                memoryAccessStateRepository.save(
+                        any(MemoryAccessState.class)
+                )
+        ).thenAnswer(
+                invocation ->
+                        invocation.getArgument(0)
+        );
+
+        List<MemoryAccessState> results =
+                memoryAccessService
+                        .changeAccessForCharacterSince(
+                                characterId,
+                                since,
+                                MemoryAccessLevel.EXPLICIT,
+                                now
+                        );
+
+        assertThat(results)
+                .containsExactly(
+                        recentState,
+                        boundaryState
+                );
+
+        assertThat(results)
+                .allSatisfy(
+                        state ->
+                                assertThat(
+                                        state.getAccessLevel()
+                                ).isEqualTo(
+                                        MemoryAccessLevel.EXPLICIT
+                                )
+                );
+
+        verify(
+                memoryAccessStateRepository,
+                never()
+        ).findByMemoryId(401L);
+
+        verify(memoryLifecycleService)
+                .markAccessed(
+                        List.of(
+                                403L,
+                                402L
+                        ),
+                        now
+                );
     }
 
     private Memory createMemory(

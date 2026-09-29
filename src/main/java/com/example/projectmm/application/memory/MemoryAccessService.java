@@ -119,15 +119,27 @@ public class MemoryAccessService {
                                 characterId
                         );
 
-        return memories.stream()
-                .map(memory ->
-                        changeAccessForMemory(
-                                memory,
-                                accessLevel,
-                                currentTime
+        List<Long> recoveredMemoryIds =
+                new java.util.ArrayList<>();
+
+        List<MemoryAccessState> results =
+                memories.stream()
+                        .map(memory ->
+                                changeAccessForMemory(
+                                        memory,
+                                        accessLevel,
+                                        currentTime,
+                                        recoveredMemoryIds
+                                )
                         )
-                )
-                .toList();
+                        .toList();
+
+        markRecoveredMemoriesAccessed(
+                recoveredMemoryIds,
+                currentTime
+        );
+
+        return results;
     }
 
     @Transactional
@@ -167,25 +179,38 @@ public class MemoryAccessService {
                                 characterId
                         );
 
-        return memories.stream()
-                .filter(memory ->
-                        !memory.getRememberedAt()
-                                .isBefore(since)
-                )
-                .map(memory ->
-                        changeAccessForMemory(
-                                memory,
-                                accessLevel,
-                                currentTime
+        List<Long> recoveredMemoryIds =
+                new java.util.ArrayList<>();
+
+        List<MemoryAccessState> results =
+                memories.stream()
+                        .filter(memory ->
+                                !memory.getRememberedAt()
+                                        .isBefore(since)
                         )
-                )
-                .toList();
+                        .map(memory ->
+                                changeAccessForMemory(
+                                        memory,
+                                        accessLevel,
+                                        currentTime,
+                                        recoveredMemoryIds
+                                )
+                        )
+                        .toList();
+
+        markRecoveredMemoriesAccessed(
+                recoveredMemoryIds,
+                currentTime
+        );
+
+        return results;
     }
 
     private MemoryAccessState changeAccessForMemory(
             Memory memory,
             MemoryAccessLevel accessLevel,
-            LocalDateTime currentTime
+            LocalDateTime currentTime,
+            List<Long> recoveredMemoryIds
     ) {
         MemoryAccessState accessState =
                 memoryAccessStateRepository
@@ -200,17 +225,41 @@ public class MemoryAccessService {
                                 )
                         );
 
-        if (accessState.getAccessLevel()
-                != accessLevel) {
+        MemoryAccessLevel previousLevel =
+                accessState.getAccessLevel();
+
+        if (previousLevel != accessLevel) {
 
             accessState.changeAccessLevel(
                     accessLevel,
                     currentTime
             );
+
+            if (accessLevel == MemoryAccessLevel.EXPLICIT
+                    && previousLevel != MemoryAccessLevel.EXPLICIT) {
+
+                recoveredMemoryIds.add(
+                        memory.getId()
+                );
+            }
         }
 
         return memoryAccessStateRepository.save(
                 accessState
+        );
+    }
+
+    private void markRecoveredMemoriesAccessed(
+            List<Long> recoveredMemoryIds,
+            LocalDateTime currentTime
+    ) {
+        if (recoveredMemoryIds.isEmpty()) {
+            return;
+        }
+
+        memoryLifecycleService.markAccessed(
+                recoveredMemoryIds,
+                currentTime
         );
     }
 }
