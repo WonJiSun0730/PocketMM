@@ -7,6 +7,7 @@ import com.example.projectmm.domain.ai.AiContext;
 import com.example.projectmm.domain.ai.AiDecision;
 import com.example.projectmm.domain.character.CharacterState;
 import com.example.projectmm.domain.relationship.RelationshipDelta;
+import com.example.projectmm.domain.relationship.RelationshipRepository;
 import com.example.projectmm.domain.simulation.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,7 @@ public class CatchUpOrchestrator {
     private final AiContextBuilder aiContextBuilder;
     private final AiGateway aiGateway;
     private final AiDecisionValidator aiDecisionValidator;
+    private final RelationshipRepository relationshipRepository;
 
     public CatchUpExecutionResult execute(
             CharacterState state,
@@ -93,6 +95,14 @@ public class CatchUpOrchestrator {
                                         candidate.occurredAt()
                                 );
 
+                        if (retryValidation.valid()) {
+                            retryValidation =
+                                    validateRelationshipTarget(
+                                            state,
+                                            retryDecision
+                                    );
+                        }
+
                         if (!retryValidation.valid()) {
                             log.warn(
                                     "Retried AI decision rejected. characterId={}, reason={}",
@@ -118,6 +128,14 @@ public class CatchUpOrchestrator {
                                     firstDecision,
                                     candidate.occurredAt()
                             );
+
+                    if (firstValidation.valid()) {
+                        firstValidation =
+                                validateRelationshipTarget(
+                                        state,
+                                        firstDecision
+                                );
+                    }
 
                     if (firstValidation.valid()) {
                         applyAiDecision(
@@ -157,6 +175,14 @@ public class CatchUpOrchestrator {
                                     retryDecision,
                                     candidate.occurredAt()
                             );
+
+                    if (retryValidation.valid()) {
+                        retryValidation =
+                                validateRelationshipTarget(
+                                        state,
+                                        retryDecision
+                                );
+                    }
 
                     if (!retryValidation.valid()) {
                         log.warn(
@@ -238,6 +264,42 @@ public class CatchUpOrchestrator {
 
             return null;
         }
+    }
+
+    private ValidationResult validateRelationshipTarget(
+            CharacterState state,
+            AiDecision decision
+    ) {
+        RelationshipDelta delta =
+                decision.relationshipDelta();
+
+        boolean hasRelationshipChange =
+                delta.affinityChange() != 0
+                        || delta.trustChange() != 0
+                        || delta.tensionChange() != 0;
+
+        if (!hasRelationshipChange) {
+            return ValidationResult.accept();
+        }
+
+        Long targetCharacterId =
+                decision.relationshipTargetCharacterId();
+
+        boolean relationshipExists =
+                relationshipRepository
+                        .findByFromCharacterIdAndToCharacterId(
+                                state.getCharacter().getId(),
+                                targetCharacterId
+                        )
+                        .isPresent();
+
+        if (!relationshipExists) {
+            return ValidationResult.reject(
+                    "relationship target is not an existing relationship"
+            );
+        }
+
+        return ValidationResult.accept();
     }
 
     private void applyAiDecision(

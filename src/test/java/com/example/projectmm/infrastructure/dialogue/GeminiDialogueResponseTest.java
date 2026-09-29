@@ -81,6 +81,135 @@ class GeminiDialogueResponseTest {
                 .path("energyDelta").path("minimum").asInt()).isEqualTo(-10);
     }
 
+    @Test
+    void parsesRelationshipChangeFromDialogueResponse() {
+
+        String body = """
+            {
+              "reply":"*잠시 바라보다가 부드럽게 웃었다.*",
+              "state":{
+                "energyDelta":0,
+                "moodDelta":0,
+                "energyEvidence":"",
+                "moodEvidence":""
+              },
+              "playerState":{
+                "energyDelta":0,
+                "moodDelta":0,
+                "energyEvidence":"",
+                "moodEvidence":""
+              },
+              "customStateChanges":[],
+              "relationshipChange":{
+                "targetCharacterId":2,
+                "affinityDelta":3,
+                "trustDelta":2,
+                "tensionDelta":-1
+              }
+            }
+            """;
+
+        var turn =
+                gateway.parseResponse(
+                        envelope(body, "STOP")
+                );
+
+        assertThat(turn.relationshipChange().targetCharacterId())
+                .isEqualTo(2L);
+
+        assertThat(turn.relationshipChange().delta().affinityChange())
+                .isEqualTo(3);
+
+        assertThat(turn.relationshipChange().delta().trustChange())
+                .isEqualTo(2);
+
+        assertThat(turn.relationshipChange().delta().tensionChange())
+                .isEqualTo(-1);
+    }
+
+    @Test
+    void parsesNoRelationshipChangeAsZeroDelta() {
+
+        String body = """
+            {
+              "reply":"*고개를 끄덕였다.*",
+              "state":{
+                "energyDelta":0,
+                "moodDelta":0,
+                "energyEvidence":"",
+                "moodEvidence":""
+              },
+              "playerState":{
+                "energyDelta":0,
+                "moodDelta":0,
+                "energyEvidence":"",
+                "moodEvidence":""
+              },
+              "customStateChanges":[],
+              "relationshipChange":{
+                "targetCharacterId":null,
+                "affinityDelta":0,
+                "trustDelta":0,
+                "tensionDelta":0
+              }
+            }
+            """;
+
+        var turn =
+                gateway.parseResponse(
+                        envelope(body, "STOP")
+                );
+
+        assertThat(turn.relationshipChange().targetCharacterId())
+                .isNull();
+
+        assertThat(turn.relationshipChange().hasChange())
+                .isFalse();
+    }
+
+    @Test
+    void malformedRelationshipChangeIsRejectedWithoutDiscardingReply() {
+
+        String body = """
+            {
+              "reply":"*조용히 웃었다.*",
+              "state":{
+                "energyDelta":0,
+                "moodDelta":0,
+                "energyEvidence":"",
+                "moodEvidence":""
+              },
+              "playerState":{
+                "energyDelta":0,
+                "moodDelta":0,
+                "energyEvidence":"",
+                "moodEvidence":""
+              },
+              "customStateChanges":[],
+              "relationshipChange":{
+                "targetCharacterId":"wrong",
+                "affinityDelta":"five",
+                "trustDelta":0,
+                "tensionDelta":0
+              }
+            }
+            """;
+
+        var turn =
+                gateway.parseResponse(
+                        envelope(body, "STOP")
+                );
+
+        assertThat(turn.reply())
+                .isEqualTo("*조용히 웃었다.*");
+
+        assertThat(turn.relationshipChange().delta())
+                .isNull();
+
+        assertThat(turn.relationshipChange().hasChange())
+                .isFalse();
+    }
+
     @Test void plainRpResponseSurvivesWithoutGuessingStateOrExposingMetadata() {
         for (String body : List.of("*서류를 내려놓았다.*\n안녕하세요.", "안녕하세요.", "\"안녕하세요.\"\n*고개를 끄덕였다.*")) {
             var turn = gateway.parseResponse(envelope(body, "STOP"));

@@ -60,7 +60,8 @@ class CatchUpOrchestratorTest {
                     validator,
                     aiContextBuilder,
                     aiGateway,
-                    aiDecisionValidator
+                    aiDecisionValidator,
+                    relationshipRepository
             );
 
     @Test
@@ -200,7 +201,8 @@ class CatchUpOrchestratorTest {
                                 relationshipRepository
                         ),
                         memoryChangingGateway,
-                        new AiDecisionValidator()
+                        new AiDecisionValidator(),
+                        relationshipRepository
                 );
 
         LocalDateTime last =
@@ -273,7 +275,8 @@ class CatchUpOrchestratorTest {
                                 relationshipRepository
                         ),
                         failingGateway,
-                        new AiDecisionValidator()
+                        new AiDecisionValidator(),
+                        relationshipRepository
                 );
 
         Character character =
@@ -390,7 +393,8 @@ class CatchUpOrchestratorTest {
                                 relationshipRepository
                         ),
                         anchorGateway,
-                        new AiDecisionValidator()
+                        new AiDecisionValidator(),
+                        relationshipRepository
                 );
 
         LocalDateTime last =
@@ -569,6 +573,95 @@ class CatchUpOrchestratorTest {
     }
 
     @Test
+    void AI가_존재하지_않는_관계_대상을_선택하면_재시도한다() {
+
+        AtomicInteger attempts =
+                new AtomicInteger();
+
+        AiGateway relationshipGateway =
+                context -> {
+                    if (attempts.incrementAndGet() == 1) {
+                        return new com.example.projectmm.domain.ai.AiDecision(
+                                "INVALID_RELATIONSHIP",
+                                "존재하지 않는 관계 대상을 선택했다.",
+                                5,
+                                new StateDelta(
+                                        0,
+                                        3,
+                                        0
+                                ),
+                                999L,
+                                new com.example.projectmm.domain.relationship.RelationshipDelta(
+                                        5,
+                                        0,
+                                        0
+                                )
+                        );
+                    }
+
+                    return new com.example.projectmm.domain.ai.AiDecision(
+                            "VALID_AFTER_RETRY",
+                            "재시도에서는 관계를 변경하지 않았다.",
+                            5,
+                            new StateDelta(
+                                    0,
+                                    3,
+                                    0
+                            ),
+                            null,
+                            com.example.projectmm.domain.relationship.RelationshipDelta.none()
+                    );
+                };
+
+        CatchUpOrchestrator relationshipOrchestrator =
+                createOrchestrator(
+                        relationshipGateway
+                );
+
+        CharacterState state =
+                createAiRequiredState();
+
+        CatchUpExecutionResult result =
+                relationshipOrchestrator.execute(
+                        state,
+                        LocalDateTime.of(
+                                2026,
+                                9,
+                                21,
+                                13,
+                                0
+                        )
+                );
+
+        assertThat(attempts.get())
+                .isEqualTo(2);
+
+        assertThat(result.resolvedEvents())
+                .hasSize(1);
+
+        ResolvedEvent resolved =
+                result.resolvedEvents()
+                        .getFirst();
+
+        assertThat(resolved.eventType())
+                .isEqualTo("VALID_AFTER_RETRY");
+
+        assertThat(resolved.source())
+                .isEqualTo(EventSource.AI);
+
+        assertThat(resolved.relationshipTargetCharacterId())
+                .isNull();
+
+        assertThat(resolved.relationshipDelta())
+                .isEqualTo(
+                        com.example.projectmm.domain.relationship.RelationshipDelta.none()
+                );
+
+        assertThat(state.getMood())
+                .isEqualTo(13);
+    }
+
+    @Test
     void AI_호출이_두_번_모두_실패하면_safe_fallback을_적용한다() {
 
         AtomicInteger attempts =
@@ -711,7 +804,8 @@ class CatchUpOrchestratorTest {
                         relationshipRepository
                 ),
                 gateway,
-                new AiDecisionValidator()
+                new AiDecisionValidator(),
+                relationshipRepository
         );
     }
 

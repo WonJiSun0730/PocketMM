@@ -21,9 +21,15 @@ import static org.mockito.Mockito.when;
 
 @DataJpaTest(properties = {"spring.datasource.driver-class-name=org.h2.Driver",
         "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.show-sql=false"}, showSql = false)
-@Import({ConversationProgressService.class, CatchUpSimulationService.class, CatchUpSegmentService.class,
-        CatchUpEventCandidateService.class, EventCandidateValidator.class,
-        com.example.projectmm.application.state.CustomStateProposalService.class})
+@Import({
+        ConversationProgressService.class,
+        CatchUpSimulationService.class,
+        CatchUpSegmentService.class,
+        CatchUpEventCandidateService.class,
+        EventCandidateValidator.class,
+        com.example.projectmm.application.state.CustomStateProposalService.class,
+        com.example.projectmm.application.relationship.RelationshipChangeService.class
+})
 class ConversationProgressTest {
     @Autowired EntityManager em;
     @Autowired ConversationProgressService service;
@@ -623,6 +629,134 @@ class ConversationProgressTest {
         assertThat(savedMessages)
                 .noneMatch(message ->
                         message.getRole() == ChatRole.USER
+                );
+    }
+
+    @Test
+    void dialogueRelationshipChangeAppliesToExistingRelationship() {
+
+        var room = fixture(true, 70, 70);
+        Long characterId =
+                room.getCharacter().getId();
+
+        var target =
+                new Character("관계 대상");
+
+        em.persist(target);
+
+        var relationship =
+                new com.example.projectmm.domain.relationship.Relationship(
+                        room.getCharacter(),
+                        target
+                );
+
+        em.persist(relationship);
+        em.flush();
+
+        var operation =
+                service.beginChat(
+                        characterId,
+                        room.getId()
+                );
+
+        var turn =
+                new com.example.projectmm.domain.dialogue.DialogueTurn(
+                        "*상대를 조금 더 신뢰하게 되었다.*",
+                        com.example.projectmm.domain.dialogue.DialogueStateChange.none(),
+                        com.example.projectmm.domain.dialogue.DialoguePlayerStateChange.none(),
+                        java.util.List.of(),
+                        new com.example.projectmm.domain.dialogue.DialogueRelationshipChange(
+                                target.getId(),
+                                new com.example.projectmm.domain.relationship.RelationshipDelta(
+                                        3,
+                                        2,
+                                        -1
+                                )
+                        )
+                );
+
+        service.completeChat(
+                characterId,
+                room.getId(),
+                operation.token(),
+                "약속을 지켰어요.",
+                turn,
+                ContentMode.NORMAL
+        );
+
+        em.flush();
+        em.clear();
+
+        var saved =
+                em.find(
+                        com.example.projectmm.domain.relationship.Relationship.class,
+                        relationship.getId()
+                );
+
+        assertThat(saved.getAffinity())
+                .isEqualTo(3);
+
+        assertThat(saved.getTrust())
+                .isEqualTo(2);
+
+        assertThat(saved.getTension())
+                .isEqualTo(0);
+    }
+
+    @Test
+    void dialogueRelationshipChangeIgnoresUnknownTargetWithoutDiscardingChat() {
+
+        var room = fixture(true, 70, 70);
+        Long characterId =
+                room.getCharacter().getId();
+
+        var operation =
+                service.beginChat(
+                        characterId,
+                        room.getId()
+                );
+
+        var turn =
+                new com.example.projectmm.domain.dialogue.DialogueTurn(
+                        "*고개를 끄덕였다.*",
+                        com.example.projectmm.domain.dialogue.DialogueStateChange.none(),
+                        com.example.projectmm.domain.dialogue.DialoguePlayerStateChange.none(),
+                        java.util.List.of(),
+                        new com.example.projectmm.domain.dialogue.DialogueRelationshipChange(
+                                999999L,
+                                new com.example.projectmm.domain.relationship.RelationshipDelta(
+                                        5,
+                                        5,
+                                        5
+                                )
+                        )
+                );
+
+        service.completeChat(
+                characterId,
+                room.getId(),
+                operation.token(),
+                "안녕하세요.",
+                turn,
+                ContentMode.NORMAL
+        );
+
+        em.flush();
+        em.clear();
+
+        var savedMessages =
+                messages.findTop20ByConversationIdOrderByCreatedAtDesc(
+                        room.getId()
+                );
+
+        assertThat(savedMessages)
+                .hasSize(2);
+
+        assertThat(savedMessages)
+                .anyMatch(message ->
+                        message.getRole() == ChatRole.CHARACTER
+                                && message.getContent()
+                                .equals("*고개를 끄덕였다.*")
                 );
     }
 

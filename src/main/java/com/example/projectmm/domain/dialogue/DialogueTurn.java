@@ -9,7 +9,8 @@ public record DialogueTurn(
         String reply,
         DialogueStateChange stateChange,
         DialoguePlayerStateChange playerStateChange,
-        List<CustomStateChangeProposal> customStateChanges
+        List<CustomStateChangeProposal> customStateChanges,
+        DialogueRelationshipChange relationshipChange
 ) {
     public DialogueTurn {
         // 호출자가 원본 목록을 수정해도 이미 생성된 대화 결과는 변하지 않는다.
@@ -20,6 +21,10 @@ public record DialogueTurn(
         playerStateChange = playerStateChange == null
                 ? DialoguePlayerStateChange.invalid()
                 : playerStateChange;
+
+        relationshipChange = relationshipChange == null
+                ? DialogueRelationshipChange.invalid()
+                : relationshipChange;
     }
 
     public DialogueTurn(
@@ -30,7 +35,8 @@ public record DialogueTurn(
                 reply,
                 stateChange,
                 DialoguePlayerStateChange.none(),
-                List.of()
+                List.of(),
+                DialogueRelationshipChange.none()
         );
     }
 
@@ -43,7 +49,23 @@ public record DialogueTurn(
                 reply,
                 stateChange,
                 DialoguePlayerStateChange.none(),
-                customStateChanges
+                customStateChanges,
+                DialogueRelationshipChange.none()
+        );
+    }
+
+    public DialogueTurn(
+            String reply,
+            DialogueStateChange stateChange,
+            DialoguePlayerStateChange playerStateChange,
+            List<CustomStateChangeProposal> customStateChanges
+    ) {
+        this(
+                reply,
+                stateChange,
+                playerStateChange,
+                customStateChanges,
+                DialogueRelationshipChange.none()
         );
     }
 }

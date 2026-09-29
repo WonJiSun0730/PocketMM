@@ -1,6 +1,7 @@
 package com.example.projectmm.application.chat;
 
 import com.example.projectmm.application.policy.ContentMode;
+import com.example.projectmm.application.relationship.RelationshipChangeService;
 import com.example.projectmm.application.state.CustomStateProposalService;
 import com.example.projectmm.application.simulation.*;
 import com.example.projectmm.domain.character.CharacterState;
@@ -10,6 +11,7 @@ import com.example.projectmm.domain.memory.Memory;
 import com.example.projectmm.domain.memory.MemoryRepository;
 import com.example.projectmm.domain.dialogue.DialogueTurn;
 import com.example.projectmm.domain.dialogue.DialogueStateChange;
+import com.example.projectmm.domain.relationship.RelationshipRepository;
 import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -37,6 +39,8 @@ public class ConversationProgressService {
     private final PresenceClock clock;
     private final EntityManager em;
     private final CustomStateProposalService customStateProposals;
+    private final RelationshipRepository relationshipRepository;
+    private final RelationshipChangeService relationshipChangeService;
 
     public record Report(Long id, LocalDateTime from, LocalDateTime to, long elapsedSeconds,
                          long appliedSeconds, boolean capped, String pauseReason, String actions) {}
@@ -339,6 +343,11 @@ public class ConversationProgressService {
                 turn.playerStateChange()
         );
 
+        applyRelationshipChange(
+                characterId,
+                turn
+        );
+
 // NPC와 플레이어의 확정 상태를 같은 채팅 트랜잭션에서 반영한다.
         room.applyRoomState(
                 update.energy(),
@@ -391,6 +400,57 @@ public class ConversationProgressService {
                 update,
                 playerUpdate,
                 customStatus
+        );
+    }
+
+    private void applyRelationshipChange(
+            Long characterId,
+            DialogueTurn turn
+    ) {
+        var change =
+                turn.relationshipChange();
+
+        if (change == null
+                || !change.hasChange()) {
+            return;
+        }
+
+        Long targetCharacterId =
+                change.targetCharacterId();
+
+        if (targetCharacterId == null
+                || change.delta() == null) {
+            return;
+        }
+
+        var delta =
+                change.delta();
+
+        if (delta.affinityChange() < -10
+                || delta.affinityChange() > 10
+                || delta.trustChange() < -10
+                || delta.trustChange() > 10
+                || delta.tensionChange() < -10
+                || delta.tensionChange() > 10) {
+            return;
+        }
+
+        boolean relationshipExists =
+                relationshipRepository
+                        .findByFromCharacterIdAndToCharacterId(
+                                characterId,
+                                targetCharacterId
+                        )
+                        .isPresent();
+
+        if (!relationshipExists) {
+            return;
+        }
+
+        relationshipChangeService.apply(
+                characterId,
+                targetCharacterId,
+                delta
         );
     }
 

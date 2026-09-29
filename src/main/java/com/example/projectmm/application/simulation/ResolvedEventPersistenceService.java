@@ -1,6 +1,7 @@
 package com.example.projectmm.application.simulation;
 
 import com.example.projectmm.application.memory.MemoryCreationService;
+import com.example.projectmm.application.relationship.RelationshipChangeService;
 import com.example.projectmm.domain.event.Event;
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.event.EventParticipant;
@@ -22,6 +23,7 @@ public class ResolvedEventPersistenceService {
     private final ResolvedEventMapper resolvedEventMapper;
     private final EventParticipantRepository eventParticipantRepository;
     private final MemoryCreationService memoryCreationService;
+    private final RelationshipChangeService relationshipChangeService;
 
     public List<Event> saveAll(
             Scene scene,
@@ -56,6 +58,12 @@ public class ResolvedEventPersistenceService {
             memoryCreationService.createFrom(
                     savedEvent,
                     resolvedEvent.memoryDetails()
+            );
+
+            relationshipChangeService.apply(
+                    character.getId(),
+                    resolvedEvent.relationshipTargetCharacterId(),
+                    resolvedEvent.relationshipDelta()
             );
 
             savedEvents.add(savedEvent);
