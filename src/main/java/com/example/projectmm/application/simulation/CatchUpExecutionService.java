@@ -73,7 +73,7 @@ public class CatchUpExecutionService {
                 room == null ? catchUpSceneResolver.resolveOrCreate(
                         state.getCharacter(),
                         result.catchUp().from()
-                ) : catchUpSceneResolver.createForConversation(state.getCharacter(), result.catchUp().from());
+                ) : catchUpSceneResolver.createForConversation(room, state.getCharacter(), result.catchUp().from());
 
         // Relationship deltas are applied exactly once by the persistence service.
         if (room != null) return persistenceService.saveAll(scene, state.getCharacter(), result.resolvedEvents(), room);

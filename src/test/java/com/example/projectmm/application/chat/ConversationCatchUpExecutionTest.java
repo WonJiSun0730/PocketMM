@@ -126,6 +126,12 @@ class ConversationCatchUpExecutionTest {
         assertThat(stored.getProgressPauseReason()).isNull();
         assertThat(events.count()).isEqualTo(2);
         assertThat(scenes.count()).isEqualTo(1);
+        assertThat(scenes.findAll())
+                .singleElement()
+                .satisfies(scene ->
+                        assertThat(scene.getConversation().getId())
+                                .isEqualTo(room.getId())
+                );
         assertThat(facts.findByFromCharacterId(room.getCharacter().getId())).hasSize(1);
         assertThat(relationships.findByFromCharacterIdAndToCharacterId(room.getCharacter().getId(), other.getId())
                 .orElseThrow().getTrust()).isEqualTo(3);

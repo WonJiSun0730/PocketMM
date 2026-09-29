@@ -1,6 +1,7 @@
 package com.example.projectmm.application.simulation;
 
 import com.example.projectmm.domain.character.Character;
+import com.example.projectmm.domain.chat.Conversation;
 import com.example.projectmm.domain.scene.Scene;
 import com.example.projectmm.domain.scene.SceneParticipant;
 import com.example.projectmm.domain.scene.SceneParticipantRepository;
@@ -23,6 +24,33 @@ public class CatchUpSceneFactory {
     ) {
         Scene scene =
                 new Scene(
+                        startedAt,
+                        "Catch-up 일상",
+                        "DAILY"
+                );
+
+        Scene savedScene =
+                sceneRepository.save(scene);
+
+        SceneParticipant participant =
+                new SceneParticipant(
+                        savedScene,
+                        character
+                );
+
+        sceneParticipantRepository.save(participant);
+
+        return savedScene;
+    }
+
+    public Scene createForConversation(
+            Conversation conversation,
+            Character character,
+            LocalDateTime startedAt
+    ) {
+        Scene scene =
+                Scene.forConversation(
+                        conversation,
                         startedAt,
                         "Catch-up 일상",
                         "DAILY"

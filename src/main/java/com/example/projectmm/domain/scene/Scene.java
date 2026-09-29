@@ -1,5 +1,6 @@
 package com.example.projectmm.domain.scene;
 
+import com.example.projectmm.domain.chat.Conversation;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -21,9 +22,32 @@ public class Scene { // 일정 시간 동안 여러 이벤트가 발생하는 �
         this.active = true;
     }
 
+    public static Scene forConversation(
+            Conversation conversation,
+            LocalDateTime startedAt,
+            String title,
+            String sceneType
+    ) {
+        if (conversation == null) {
+            throw new IllegalArgumentException("Conversation is required");
+        }
+
+        Scene scene = new Scene(
+                startedAt,
+                title,
+                sceneType
+        );
+        scene.conversation = conversation;
+        return scene;
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "conversation_id")
+    private Conversation conversation;
 
     @Column(nullable = false)
     private LocalDateTime startedAt; //세계 시간 상 장면 시작
