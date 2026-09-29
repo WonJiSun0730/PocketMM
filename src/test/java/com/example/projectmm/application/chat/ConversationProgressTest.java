@@ -29,7 +29,6 @@ import static org.mockito.Mockito.when;
         EventCandidateValidator.class,
         com.example.projectmm.application.state.CustomStateProposalService.class,
         com.example.projectmm.application.relationship.RelationshipChangeService.class,
-        com.example.projectmm.application.relationship.RelationshipChangeService.class,
         com.example.projectmm.application.relationship.RelationshipFactService.class
 })
 class ConversationProgressTest {
