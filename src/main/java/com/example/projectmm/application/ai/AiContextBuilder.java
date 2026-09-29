@@ -5,10 +5,12 @@ import com.example.projectmm.application.memory.MemoryRecallService;
 import com.example.projectmm.domain.ai.AiContext;
 import com.example.projectmm.domain.ai.AiMemoryContext;
 import com.example.projectmm.domain.ai.AiRelationshipContext;
+import com.example.projectmm.domain.ai.AiRelationshipFactContext;
 import com.example.projectmm.domain.character.CharacterState;
 import com.example.projectmm.domain.memory.EffectiveMemory;
 import com.example.projectmm.domain.memory.MemoryAccessLevel;
 import com.example.projectmm.domain.relationship.Relationship;
+import com.example.projectmm.domain.relationship.RelationshipFactRepository;
 import com.example.projectmm.domain.relationship.RelationshipRepository;
 import com.example.projectmm.domain.simulation.EventCandidate;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +24,7 @@ public class AiContextBuilder {
     private final MemoryRecallService memoryRecallService;
     private final RelationshipRepository relationshipRepository;
     private final MemoryReactivationContextService reactivationContextService;
+    private final RelationshipFactRepository relationshipFactRepository;
 
 
     public AiContextBuilder(
@@ -31,6 +34,20 @@ public class AiContextBuilder {
         this(
                 memoryRecallService,
                 relationshipRepository,
+                null,
+                null
+        );
+    }
+
+    public AiContextBuilder(
+            MemoryRecallService memoryRecallService,
+            RelationshipRepository relationshipRepository,
+            MemoryReactivationContextService reactivationContextService
+    ) {
+        this(
+                memoryRecallService,
+                relationshipRepository,
+                reactivationContextService,
                 null
         );
     }
@@ -73,6 +90,24 @@ public class AiContextBuilder {
                         )
                         .toList();
 
+        List<AiRelationshipFactContext> relationshipFactContexts =
+                relationshipFactRepository == null
+                        ? List.of()
+                        : relationshipFactRepository
+                        .findByFromCharacterId(
+                                state.getCharacter().getId()
+                        )
+                        .stream()
+                        .map(fact ->
+                                new AiRelationshipFactContext(
+                                        fact.getToCharacter().getId(),
+                                        fact.getToCharacter().getName(),
+                                        fact.getRelation(),
+                                        fact.getValue()
+                                )
+                        )
+                        .toList();
+
         return new AiContext(
                 state.getCharacter().getId(),
                 state.getCharacter().getName(),
@@ -82,7 +117,8 @@ public class AiContextBuilder {
                 candidate.eventType(),
                 candidate.summary(),
                 memoryContexts,
-                relationshipContexts
+                relationshipContexts,
+                relationshipFactContexts
         );
     }
 

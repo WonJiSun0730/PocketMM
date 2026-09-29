@@ -11,6 +11,8 @@ import com.example.projectmm.domain.chat.ConversationRepository;
 import com.example.projectmm.domain.dialogue.*;
 import com.example.projectmm.domain.memory.EffectiveMemory;
 import com.example.projectmm.domain.relationship.Relationship;
+import com.example.projectmm.domain.relationship.RelationshipFact;
+import com.example.projectmm.domain.relationship.RelationshipFactRepository;
 import com.example.projectmm.domain.relationship.RelationshipRepository;
 import com.example.projectmm.domain.state.CustomStateValueRepository;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,7 @@ public class DialogueContextBuilder {
     private final ChatMessageRepository chatMessageRepository;
     private final MemoryRecallService memoryRecallService;
     private final RelationshipRepository relationshipRepository;
+    private final RelationshipFactRepository relationshipFactRepository;
     private final ContentModePolicy contentModePolicy;
     private final ConversationRepository conversationRepository;
     private final CharacterExampleRepository characterExampleRepository;
@@ -117,6 +120,11 @@ public class DialogueContextBuilder {
         List<DialogueRelationshipContext> relationships =
                 conversation.isIndependentStart() ? List.of() : buildRelationships(characterId);
 
+        List<DialogueRelationshipFactContext> relationshipFacts =
+                conversation.isIndependentStart()
+                        ? List.of()
+                        : buildRelationshipFacts(characterId);
+
         return new DialogueContext(
                 state.getCharacter().getId(),
                 state.getCharacter().getName(),
@@ -132,7 +140,8 @@ public class DialogueContextBuilder {
                         conversation.getPlayerProfile().getName(), conversation.getPlayerProfile().getDescription()),
                 conversation.getPlayerEnergy(),
                 conversation.getPlayerMood(),
-                buildCustomStates(conversation)
+                buildCustomStates(conversation),
+                relationshipFacts
         );
     }
 
@@ -273,6 +282,26 @@ public class DialogueContextBuilder {
                                 relationship.getAffinity(),
                                 relationship.getTrust(),
                                 relationship.getTension()
+                        )
+                )
+                .toList();
+    }
+
+    private List<DialogueRelationshipFactContext> buildRelationshipFacts(
+            Long characterId
+    ) {
+
+        List<RelationshipFact> facts =
+                relationshipFactRepository
+                        .findByFromCharacterId(characterId);
+
+        return facts.stream()
+                .map(fact ->
+                        new DialogueRelationshipFactContext(
+                                fact.getToCharacter().getId(),
+                                fact.getToCharacter().getName(),
+                                fact.getRelation(),
+                                fact.getValue()
                         )
                 )
                 .toList();

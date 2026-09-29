@@ -9,6 +9,8 @@ import com.example.projectmm.domain.memory.EffectiveMemory;
 import com.example.projectmm.domain.memory.Memory;
 import com.example.projectmm.domain.memory.MemoryAccessLevel;
 import com.example.projectmm.domain.memory.MemoryTier;
+import com.example.projectmm.domain.relationship.RelationshipFact;
+import com.example.projectmm.domain.relationship.RelationshipFactRepository;
 import com.example.projectmm.domain.relationship.RelationshipRepository;
 import com.example.projectmm.domain.simulation.EventCandidate;
 import com.example.projectmm.domain.simulation.StateDelta;
@@ -33,6 +35,9 @@ class AiContextBuilderTest {
     private final RelationshipRepository relationshipRepository =
             mock(RelationshipRepository.class);
 
+    private final RelationshipFactRepository relationshipFactRepository =
+            mock(RelationshipFactRepository.class);
+
     private final MemoryReactivationContextService reactivationContextService =
             mock(MemoryReactivationContextService.class);
 
@@ -40,7 +45,8 @@ class AiContextBuilderTest {
             new AiContextBuilder(
                     memoryRecallService,
                     relationshipRepository,
-                    reactivationContextService
+                    reactivationContextService,
+                    relationshipFactRepository
             );
 
     @Test
@@ -1088,5 +1094,98 @@ class AiContextBuilderTest {
                 reactivationContextService,
                 never()
         ).accessibleEvidence(anyLong());
+    }
+
+    @Test
+    void 확정된_관계_사실을_AI_Context에_별도로_포함한다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 29,
+                        15, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        Character target =
+                new Character("Marbas");
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        80,
+                        70,
+                        now
+                );
+
+        EventCandidate candidate =
+                new EventCandidate(
+                        now,
+                        "TEST",
+                        "관계 사실 context 테스트",
+                        4,
+                        true,
+                        StateDelta.none()
+                );
+
+        RelationshipFact fact =
+                new RelationshipFact(
+                        character,
+                        target,
+                        "relationship_status",
+                        "spouse",
+                        null,
+                        now.minusDays(10)
+                );
+
+        when(
+                memoryRecallService.recall(
+                        character.getId(),
+                        now,
+                        5
+                )
+        ).thenReturn(List.of());
+
+        when(
+                relationshipRepository.findByFromCharacterId(
+                        character.getId()
+                )
+        ).thenReturn(List.of());
+
+        when(
+                relationshipFactRepository.findByFromCharacterId(
+                        character.getId()
+                )
+        ).thenReturn(
+                List.of(fact)
+        );
+
+        AiContext context =
+                builder.build(
+                        state,
+                        candidate
+                );
+
+        assertThat(context.relationshipFacts())
+                .hasSize(1);
+
+        assertThat(
+                context.relationshipFacts()
+                        .getFirst()
+                        .targetCharacterName()
+        ).isEqualTo("Marbas");
+
+        assertThat(
+                context.relationshipFacts()
+                        .getFirst()
+                        .relation()
+        ).isEqualTo("relationship_status");
+
+        assertThat(
+                context.relationshipFacts()
+                        .getFirst()
+                        .value()
+        ).isEqualTo("spouse");
     }
 }
