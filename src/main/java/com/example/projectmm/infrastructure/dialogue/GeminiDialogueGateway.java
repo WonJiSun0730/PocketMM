@@ -274,6 +274,30 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 )
         );
 
+        var relationshipFactChange = Map.of(
+                "type", List.of("object", "null"),
+                "required", List.of(
+                        "targetCharacterId",
+                        "relation",
+                        "value"
+                ),
+                "additionalProperties", false,
+                "properties", Map.of(
+                        "targetCharacterId", Map.of(
+                                "type", "integer",
+                                "minimum", 1
+                        ),
+                        "relation", Map.of(
+                                "type", "string",
+                                "minLength", 1
+                        ),
+                        "value", Map.of(
+                                "type", "string",
+                                "minLength", 1
+                        )
+                )
+        );
+
         return Map.of(
                 "type", "object",
                 "required", List.of(
@@ -281,14 +305,16 @@ public class GeminiDialogueGateway implements DialogueGateway {
                         "state",
                         "playerState",
                         "customStateChanges",
-                        "relationshipChange"
+                        "relationshipChange",
+                        "relationshipFactChange"
                 ),
                 "properties", Map.of(
                         "reply", Map.of("type", "string"),
                         "state", coreState,
                         "playerState", coreState,
                         "customStateChanges", customChanges,
-                        "relationshipChange", relationshipChange
+                        "relationshipChange", relationshipChange,
+                        "relationshipFactChange", relationshipFactChange
                 )
         );
     }
@@ -946,7 +972,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
                  "state":{"energyDelta":0,"moodDelta":0,"energyEvidence":"","moodEvidence":""},
                  "playerState":{"energyDelta":0,"moodDelta":0,"energyEvidence":"","moodEvidence":""},
                  "customStateChanges":[],
-                 "relationshipChange":{"targetCharacterId":null,"affinityDelta":0,"trustDelta":0,"tensionDelta":0}}
+                 "relationshipChange":{"targetCharacterId":null,"affinityDelta":0,"trustDelta":0,"tensionDelta":0},"relationshipFactChange":null}
                 All preceding RP prose/language/asterisk rules apply INSIDE reply.
                 Never show this JSON structure or state assessment as character dialogue.
                 Assess ONLY the controlled NPC's NEW change during this turn, relative to
@@ -1042,6 +1068,43 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 The server validates the target and applies accepted changes to the latest persisted relationship.
                 If there is no clear new relationship change, or the target is uncertain,
                 return targetCharacterId null and all three deltas 0.
+                
+                [RELATIONSHIP FACT CHANGE — CONFIRMED NARRATIVE FACT]
+                relationshipFactChange represents a factual relationship state that is explicitly
+                established or changed by THIS turn.
+                
+                Set relationshipFactChange only when this turn itself contains explicit narrative
+                evidence establishing or changing a factual relationship between the controlled NPC
+                and one character already present in the supplied relationship list.
+                
+                relationshipFactChange must contain:
+                - targetCharacterId: the affected character's ID from the supplied relationship context.
+                - relation: the factual relationship dimension being established or changed.
+                - value: the new confirmed factual value.
+                
+                relation and value are open narrative data. Do not restrict them to a predefined
+                relationship vocabulary.
+                
+                The generated reply must itself contain the explicit narrative evidence that
+                establishes or changes this factual relationship.
+                
+                Existing confirmed relationship facts describe current state and must not be emitted
+                again merely because they remain true.
+                
+                Relationship scores are quantitative tendencies only. Never create or change a factual
+                relationship merely because affinity, trust, or tension changed or reached a particular value.
+                
+                Do not infer a factual relationship from affection, hostility, intimacy, emotional tone,
+                memories, profile descriptions, or accumulated relationship scores alone.
+                
+                Do not invent a confession, acceptance, marriage, breakup, reconciliation, adoption,
+                appointment, contract, rivalry, or similar event merely to justify relationshipFactChange.
+                
+                Use only a targetCharacterId present in the supplied relationship context.
+                Never invent, guess, or derive another character ID.
+                
+                If this turn does not explicitly establish or change a factual relationship,
+                relationshipFactChange must be null.
                 """;
     }
 
@@ -1156,6 +1219,43 @@ public class GeminiDialogueGateway implements DialogueGateway {
                         );
             }
 
+            JsonNode relationshipFact =
+                    payload.path("relationshipFactChange");
+
+            DialogueRelationshipFactChange relationshipFactChange =
+                    DialogueRelationshipFactChange.invalid();
+
+            if (relationshipFact.isNull()) {
+                relationshipFactChange =
+                        DialogueRelationshipFactChange.none();
+            } else if (relationshipFact.isObject()) {
+
+                JsonNode factTargetCharacterId =
+                        relationshipFact.path("targetCharacterId");
+
+                JsonNode relation =
+                        relationshipFact.path("relation");
+
+                JsonNode value =
+                        relationshipFact.path("value");
+
+                if (factTargetCharacterId.isIntegralNumber()
+                        && factTargetCharacterId.canConvertToLong()
+                        && factTargetCharacterId.asLong() > 0
+                        && relation.isString()
+                        && !relation.asText().isBlank()
+                        && value.isString()
+                        && !value.asText().isBlank()) {
+
+                    relationshipFactChange =
+                            new DialogueRelationshipFactChange(
+                                    factTargetCharacterId.asLong(),
+                                    relation.asText(),
+                                    value.asText()
+                            );
+                }
+            }
+
             return new DialogueTurn(
                     reply.asText(),
                     change,
@@ -1163,7 +1263,8 @@ public class GeminiDialogueGateway implements DialogueGateway {
                     parseCustomStateChanges(
                             payload.path("customStateChanges")
                     ),
-                    relationshipChange
+                    relationshipChange,
+                    relationshipFactChange
             );
         } catch (Exception e) {
             // 깨진 JSON 전체가 채팅에 노출되지 않도록 본문 파싱 실패는 저장 전에 중단한다.
@@ -1191,7 +1292,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
     private boolean isPlainRp(String text) {
         // 일반 RP는 살리되 깨진 객체·배열·메타데이터를 원문 그대로 노출하지 않는다.
         if (text.isBlank() || text.startsWith("{") || text.startsWith("[") || text.startsWith("`")) return false;
-        if (text.matches("(?s).*\\\"(?:reply|state|playerState|energyDelta|moodDelta|energyEvidence|moodEvidence|customStateChanges|definitionId|delta|relationshipChange|targetCharacterId|affinityDelta|trustDelta|tensionDelta)\\\"\\s*:.*")) return false;
+        if (text.matches("(?s).*\\\"(?:reply|state|playerState|energyDelta|moodDelta|energyEvidence|moodEvidence|customStateChanges|definitionId|delta|relationshipChange|relationshipFactChange|targetCharacterId|relation|value|affinityDelta|trustDelta|tensionDelta)\\\"\\s*:.*")) return false;
         int first = text.codePointAt(0);
         return Character.isLetter(first) || first == '*' || first == '"' || first == '“' || first == '「';
     }

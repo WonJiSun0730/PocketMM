@@ -10,7 +10,8 @@ public record DialogueTurn(
         DialogueStateChange stateChange,
         DialoguePlayerStateChange playerStateChange,
         List<CustomStateChangeProposal> customStateChanges,
-        DialogueRelationshipChange relationshipChange
+        DialogueRelationshipChange relationshipChange,
+        DialogueRelationshipFactChange relationshipFactChange
 ) {
     public DialogueTurn {
         // 호출자가 원본 목록을 수정해도 이미 생성된 대화 결과는 변하지 않는다.
@@ -25,6 +26,10 @@ public record DialogueTurn(
         relationshipChange = relationshipChange == null
                 ? DialogueRelationshipChange.invalid()
                 : relationshipChange;
+
+        relationshipFactChange = relationshipFactChange == null
+                ? DialogueRelationshipFactChange.invalid()
+                : relationshipFactChange;
     }
 
     public DialogueTurn(
@@ -36,7 +41,8 @@ public record DialogueTurn(
                 stateChange,
                 DialoguePlayerStateChange.none(),
                 List.of(),
-                DialogueRelationshipChange.none()
+                DialogueRelationshipChange.none(),
+                DialogueRelationshipFactChange.none()
         );
     }
 
@@ -50,7 +56,8 @@ public record DialogueTurn(
                 stateChange,
                 DialoguePlayerStateChange.none(),
                 customStateChanges,
-                DialogueRelationshipChange.none()
+                DialogueRelationshipChange.none(),
+                DialogueRelationshipFactChange.none()
         );
     }
 
@@ -65,7 +72,25 @@ public record DialogueTurn(
                 stateChange,
                 playerStateChange,
                 customStateChanges,
-                DialogueRelationshipChange.none()
+                DialogueRelationshipChange.none(),
+                DialogueRelationshipFactChange.none()
+        );
+    }
+
+    public DialogueTurn(
+            String reply,
+            DialogueStateChange stateChange,
+            DialoguePlayerStateChange playerStateChange,
+            List<CustomStateChangeProposal> customStateChanges,
+            DialogueRelationshipChange relationshipChange
+    ) {
+        this(
+                reply,
+                stateChange,
+                playerStateChange,
+                customStateChanges,
+                relationshipChange,
+                DialogueRelationshipFactChange.none()
         );
     }
 }

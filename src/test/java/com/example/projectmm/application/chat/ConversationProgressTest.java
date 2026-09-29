@@ -28,7 +28,9 @@ import static org.mockito.Mockito.when;
         CatchUpEventCandidateService.class,
         EventCandidateValidator.class,
         com.example.projectmm.application.state.CustomStateProposalService.class,
-        com.example.projectmm.application.relationship.RelationshipChangeService.class
+        com.example.projectmm.application.relationship.RelationshipChangeService.class,
+        com.example.projectmm.application.relationship.RelationshipChangeService.class,
+        com.example.projectmm.application.relationship.RelationshipFactService.class
 })
 class ConversationProgressTest {
     @Autowired EntityManager em;
@@ -743,6 +745,172 @@ class ConversationProgressTest {
 
         em.flush();
         em.clear();
+
+        var savedMessages =
+                messages.findTop20ByConversationIdOrderByCreatedAtDesc(
+                        room.getId()
+                );
+
+        assertThat(savedMessages)
+                .hasSize(2);
+
+        assertThat(savedMessages)
+                .anyMatch(message ->
+                        message.getRole() == ChatRole.CHARACTER
+                                && message.getContent()
+                                .equals("*고개를 끄덕였다.*")
+                );
+    }
+
+    @Test
+    void dialogueRelationshipFactPersistsWithCharacterMessageProvenance() {
+
+        var room = fixture(true, 70, 70);
+        Long characterId =
+                room.getCharacter().getId();
+
+        var target =
+                new Character("관계 대상");
+
+        em.persist(target);
+
+        var relationship =
+                new com.example.projectmm.domain.relationship.Relationship(
+                        room.getCharacter(),
+                        target
+                );
+
+        em.persist(relationship);
+        em.flush();
+
+        var operation =
+                service.beginChat(
+                        characterId,
+                        room.getId()
+                );
+
+        var turn =
+                new com.example.projectmm.domain.dialogue.DialogueTurn(
+                        "우리 이제 부부예요.",
+                        com.example.projectmm.domain.dialogue.DialogueStateChange.none(),
+                        com.example.projectmm.domain.dialogue.DialoguePlayerStateChange.none(),
+                        java.util.List.of(),
+                        com.example.projectmm.domain.dialogue.DialogueRelationshipChange.none(),
+                        new com.example.projectmm.domain.dialogue.DialogueRelationshipFactChange(
+                                target.getId(),
+                                "relationship_status",
+                                "spouse"
+                        )
+                );
+
+        service.completeChat(
+                characterId,
+                room.getId(),
+                operation.token(),
+                "그럼 이제 우리 부부인 거죠?",
+                turn,
+                ContentMode.NORMAL
+        );
+
+        em.flush();
+        em.clear();
+
+        var fact =
+                em.createQuery(
+                                """
+                                select f
+                                from RelationshipFact f
+                                where f.fromCharacter.id = :fromId
+                                  and f.toCharacter.id = :toId
+                                  and f.relation = :relation
+                                """,
+                                com.example.projectmm.domain.relationship.RelationshipFact.class
+                        )
+                        .setParameter("fromId", characterId)
+                        .setParameter("toId", target.getId())
+                        .setParameter("relation", "relationship_status")
+                        .getSingleResult();
+
+        assertThat(fact.getValue())
+                .isEqualTo("spouse");
+
+        assertThat(fact.getSourceEvent())
+                .isNull();
+
+        assertThat(fact.getSourceChatMessage())
+                .isNotNull();
+
+        assertThat(fact.getSourceChatMessage().getRole())
+                .isEqualTo(ChatRole.CHARACTER);
+
+        assertThat(fact.getSourceChatMessage().getContent())
+                .isEqualTo("우리 이제 부부예요.");
+
+        assertThat(fact.getEstablishedAt())
+                .isEqualTo(real);
+    }
+
+    @Test
+    void dialogueRelationshipFactIgnoresUnknownRelationshipWithoutDiscardingChat() {
+
+        var room = fixture(true, 70, 70);
+        Long characterId =
+                room.getCharacter().getId();
+
+        var unrelatedTarget =
+                new Character("관계 없는 대상");
+
+        em.persist(unrelatedTarget);
+        em.flush();
+
+        var operation =
+                service.beginChat(
+                        characterId,
+                        room.getId()
+                );
+
+        var turn =
+                new com.example.projectmm.domain.dialogue.DialogueTurn(
+                        "*고개를 끄덕였다.*",
+                        com.example.projectmm.domain.dialogue.DialogueStateChange.none(),
+                        com.example.projectmm.domain.dialogue.DialoguePlayerStateChange.none(),
+                        java.util.List.of(),
+                        com.example.projectmm.domain.dialogue.DialogueRelationshipChange.none(),
+                        new com.example.projectmm.domain.dialogue.DialogueRelationshipFactChange(
+                                unrelatedTarget.getId(),
+                                "relationship_status",
+                                "spouse"
+                        )
+                );
+
+        service.completeChat(
+                characterId,
+                room.getId(),
+                operation.token(),
+                "안녕하세요.",
+                turn,
+                ContentMode.NORMAL
+        );
+
+        em.flush();
+        em.clear();
+
+        Long factCount =
+                em.createQuery(
+                                """
+                                select count(f)
+                                from RelationshipFact f
+                                where f.fromCharacter.id = :fromId
+                                  and f.toCharacter.id = :toId
+                                """,
+                                Long.class
+                        )
+                        .setParameter("fromId", characterId)
+                        .setParameter("toId", unrelatedTarget.getId())
+                        .getSingleResult();
+
+        assertThat(factCount)
+                .isZero();
 
         var savedMessages =
                 messages.findTop20ByConversationIdOrderByCreatedAtDesc(

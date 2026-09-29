@@ -79,6 +79,31 @@ class GeminiDialogueResponseTest {
         assertThat(format.path("schema").path("required").toString()).contains("reply", "state");
         assertThat(format.path("schema").path("properties").path("state").path("properties")
                 .path("energyDelta").path("minimum").asInt()).isEqualTo(-10);
+        var schema =
+                format.path("schema");
+
+        assertThat(schema.path("required").toString())
+                .contains("relationshipFactChange");
+
+        var relationshipFactSchema =
+                schema.path("properties")
+                        .path("relationshipFactChange");
+
+        assertThat(relationshipFactSchema.path("type").toString())
+                .contains("object", "null");
+
+        assertThat(relationshipFactSchema.path("required").toString())
+                .contains(
+                        "targetCharacterId",
+                        "relation",
+                        "value"
+                );
+
+        assertThat(relationshipFactSchema.path("properties")
+                .path("targetCharacterId")
+                .path("minimum")
+                .asLong())
+                .isEqualTo(1L);
     }
 
     @Test
@@ -225,6 +250,98 @@ class GeminiDialogueResponseTest {
         assertThat(gateway.parseResponse(envelope("\"*고개를 끄덕였다.*\"", "STOP")).reply()).isEqualTo("*고개를 끄덕였다.*");
         assertThat(gateway.parseResponse(envelope("```json\n{\"reply\":\"안녕하세요\",\"state\":null}\n```", "STOP")).reply())
                 .isEqualTo("안녕하세요");
+    }
+
+    @Test
+    void parsesRelationshipFactChangeFromDialogueResponse() {
+
+        String body = """
+        {
+          "reply":"우리 이제 부부예요.",
+          "state":{
+            "energyDelta":0,
+            "moodDelta":0,
+            "energyEvidence":"",
+            "moodEvidence":""
+          },
+          "playerState":{
+            "energyDelta":0,
+            "moodDelta":0,
+            "energyEvidence":"",
+            "moodEvidence":""
+          },
+          "customStateChanges":[],
+          "relationshipChange":{
+            "targetCharacterId":null,
+            "affinityDelta":0,
+            "trustDelta":0,
+            "tensionDelta":0
+          },
+          "relationshipFactChange":{
+            "targetCharacterId":2,
+            "relation":"relationship_status",
+            "value":"spouse"
+          }
+        }
+        """;
+
+        var turn =
+                gateway.parseResponse(
+                        envelope(body, "STOP")
+                );
+
+        assertThat(turn.relationshipFactChange().hasChange())
+                .isTrue();
+
+        assertThat(turn.relationshipFactChange().targetCharacterId())
+                .isEqualTo(2L);
+
+        assertThat(turn.relationshipFactChange().relation())
+                .isEqualTo("relationship_status");
+
+        assertThat(turn.relationshipFactChange().value())
+                .isEqualTo("spouse");
+    }
+
+    @Test
+    void parsesNullRelationshipFactChangeAsNoChange() {
+
+        String body = """
+        {
+          "reply":"*고개를 끄덕였다.*",
+          "state":{
+            "energyDelta":0,
+            "moodDelta":0,
+            "energyEvidence":"",
+            "moodEvidence":""
+          },
+          "playerState":{
+            "energyDelta":0,
+            "moodDelta":0,
+            "energyEvidence":"",
+            "moodEvidence":""
+          },
+          "customStateChanges":[],
+          "relationshipChange":{
+            "targetCharacterId":null,
+            "affinityDelta":0,
+            "trustDelta":0,
+            "tensionDelta":0
+          },
+          "relationshipFactChange":null
+        }
+        """;
+
+        var turn =
+                gateway.parseResponse(
+                        envelope(body, "STOP")
+                );
+
+        assertThat(turn.relationshipFactChange().hasChange())
+                .isFalse();
+
+        assertThat(turn.relationshipFactChange().targetCharacterId())
+                .isNull();
     }
 
     private String envelope(String body, String finish) {

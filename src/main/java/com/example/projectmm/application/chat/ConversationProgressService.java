@@ -2,8 +2,10 @@ package com.example.projectmm.application.chat;
 
 import com.example.projectmm.application.policy.ContentMode;
 import com.example.projectmm.application.relationship.RelationshipChangeService;
+import com.example.projectmm.application.relationship.RelationshipFactService;
 import com.example.projectmm.application.state.CustomStateProposalService;
 import com.example.projectmm.application.simulation.*;
+import com.example.projectmm.domain.character.CharacterRepository;
 import com.example.projectmm.domain.character.CharacterState;
 import com.example.projectmm.domain.character.CharacterStateRepository;
 import com.example.projectmm.domain.chat.*;
@@ -41,6 +43,8 @@ public class ConversationProgressService {
     private final CustomStateProposalService customStateProposals;
     private final RelationshipRepository relationshipRepository;
     private final RelationshipChangeService relationshipChangeService;
+    private final RelationshipFactService relationshipFactService;
+    private final CharacterRepository characterRepository;
 
     public record Report(Long id, LocalDateTime from, LocalDateTime to, long elapsedSeconds,
                          long appliedSeconds, boolean capped, String pauseReason, String actions) {}
@@ -380,17 +384,25 @@ public class ConversationProgressService {
                     );
         }
 
-        messages.save(
-                new ChatMessage(
-                        room,
-                        room.getCharacter(),
-                        ChatRole.CHARACTER,
-                        turn.reply(),
-                        mode,
-                        source == null
-                                ? now
-                                : now.plusNanos(1000)
-                )
+        ChatMessage characterMessage =
+                messages.save(
+                        new ChatMessage(
+                                room,
+                                room.getCharacter(),
+                                ChatRole.CHARACTER,
+                                turn.reply(),
+                                mode,
+                                source == null
+                                        ? now
+                                        : now.plusNanos(1000)
+                        )
+                );
+
+        applyRelationshipFactChange(
+                room.getCharacter(),
+                turn,
+                characterMessage,
+                now
         );
 
         room.endChat(token, now);
@@ -451,6 +463,62 @@ public class ConversationProgressService {
                 characterId,
                 targetCharacterId,
                 delta
+        );
+    }
+
+    private void applyRelationshipFactChange(
+            com.example.projectmm.domain.character.Character fromCharacter,
+            DialogueTurn turn,
+            ChatMessage sourceChatMessage,
+            LocalDateTime establishedAt
+    ) {
+        var change =
+                turn.relationshipFactChange();
+
+        if (change == null
+                || !change.hasChange()) {
+            return;
+        }
+
+        Long targetCharacterId =
+                change.targetCharacterId();
+
+        if (targetCharacterId == null
+                || change.relation() == null
+                || change.relation().isBlank()
+                || change.value() == null
+                || change.value().isBlank()) {
+            return;
+        }
+
+        boolean relationshipExists =
+                relationshipRepository
+                        .findByFromCharacterIdAndToCharacterId(
+                                fromCharacter.getId(),
+                                targetCharacterId
+                        )
+                        .isPresent();
+
+        if (!relationshipExists) {
+            return;
+        }
+
+        var targetCharacter =
+                characterRepository
+                        .findById(targetCharacterId)
+                        .orElse(null);
+
+        if (targetCharacter == null) {
+            return;
+        }
+
+        relationshipFactService.establishFromChatMessage(
+                fromCharacter,
+                targetCharacter,
+                change.relation(),
+                change.value(),
+                sourceChatMessage,
+                establishedAt
         );
     }
 

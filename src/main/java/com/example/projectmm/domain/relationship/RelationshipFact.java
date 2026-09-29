@@ -1,6 +1,7 @@
 package com.example.projectmm.domain.relationship;
 
 import com.example.projectmm.domain.character.Character;
+import com.example.projectmm.domain.chat.ChatMessage;
 import com.example.projectmm.domain.event.Event;
 import jakarta.persistence.*;
 
@@ -43,6 +44,10 @@ public class RelationshipFact {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "source_event_id")
     private Event sourceEvent;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_chat_message_id")
+    private ChatMessage sourceChatMessage;
 
     @Column(nullable = false)
     private LocalDateTime establishedAt;
@@ -100,6 +105,36 @@ public class RelationshipFact {
         this.updatedAt = LocalDateTime.now();
     }
 
+    public static RelationshipFact fromChatMessage(
+            Character fromCharacter,
+            Character toCharacter,
+            String relation,
+            String value,
+            ChatMessage sourceChatMessage,
+            LocalDateTime establishedAt
+    ) {
+        if (sourceChatMessage == null) {
+            throw new IllegalArgumentException(
+                    "sourceChatMessage is required"
+            );
+        }
+
+        RelationshipFact fact =
+                new RelationshipFact(
+                        fromCharacter,
+                        toCharacter,
+                        relation,
+                        value,
+                        (Event) null,
+                        establishedAt
+                );
+
+        fact.sourceChatMessage =
+                sourceChatMessage;
+
+        return fact;
+    }
+
     public Long getId() {
         return id;
     }
@@ -139,12 +174,50 @@ public class RelationshipFact {
 
         this.value = value.strip();
         this.sourceEvent = sourceEvent;
+        this.sourceChatMessage = null;
         this.establishedAt = establishedAt;
         this.updatedAt = LocalDateTime.now();
     }
 
+    public void updateFromChatMessage(
+            String value,
+            ChatMessage sourceChatMessage,
+            LocalDateTime establishedAt
+    ) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(
+                    "value is required"
+            );
+        }
+
+        if (sourceChatMessage == null) {
+            throw new IllegalArgumentException(
+                    "sourceChatMessage is required"
+            );
+        }
+
+        if (establishedAt == null) {
+            throw new IllegalArgumentException(
+                    "establishedAt is required"
+            );
+        }
+
+        this.value = value.strip();
+        this.sourceEvent = null;
+        this.sourceChatMessage =
+                sourceChatMessage;
+        this.establishedAt =
+                establishedAt;
+        this.updatedAt =
+                LocalDateTime.now();
+    }
+
     public Event getSourceEvent() {
         return sourceEvent;
+    }
+
+    public ChatMessage getSourceChatMessage() {
+        return sourceChatMessage;
     }
 
     public LocalDateTime getEstablishedAt() {

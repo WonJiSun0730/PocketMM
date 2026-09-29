@@ -1,6 +1,7 @@
 package com.example.projectmm.application.relationship;
 
 import com.example.projectmm.domain.character.Character;
+import com.example.projectmm.domain.chat.ChatMessage;
 import com.example.projectmm.domain.event.Event;
 import com.example.projectmm.domain.relationship.RelationshipFact;
 import com.example.projectmm.domain.relationship.RelationshipFactRepository;
@@ -62,6 +63,64 @@ public class RelationshipFactService {
                         normalizedRelation,
                         value,
                         sourceEvent,
+                        establishedAt
+                );
+
+        return relationshipFactRepository.save(fact);
+    }
+
+    @Transactional
+    public RelationshipFact establishFromChatMessage(
+            Character fromCharacter,
+            Character toCharacter,
+            String relation,
+            String value,
+            ChatMessage sourceChatMessage,
+            LocalDateTime establishedAt
+    ) {
+        if (relation == null || relation.isBlank()) {
+            throw new IllegalArgumentException(
+                    "relation is required"
+            );
+        }
+
+        if (sourceChatMessage == null) {
+            throw new IllegalArgumentException(
+                    "sourceChatMessage is required"
+            );
+        }
+
+        String normalizedRelation =
+                relation.strip();
+
+        var existing =
+                relationshipFactRepository
+                        .findByFromCharacterIdAndToCharacterIdAndRelation(
+                                fromCharacter.getId(),
+                                toCharacter.getId(),
+                                normalizedRelation
+                        );
+
+        if (existing.isPresent()) {
+            RelationshipFact fact =
+                    existing.get();
+
+            fact.updateFromChatMessage(
+                    value,
+                    sourceChatMessage,
+                    establishedAt
+            );
+
+            return fact;
+        }
+
+        RelationshipFact fact =
+                RelationshipFact.fromChatMessage(
+                        fromCharacter,
+                        toCharacter,
+                        normalizedRelation,
+                        value,
+                        sourceChatMessage,
                         establishedAt
                 );
 
