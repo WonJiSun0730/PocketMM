@@ -253,6 +253,57 @@ class GeminiAiGatewaySchemaTest {
                 .isEqualTo(5);
     }
 
+    @Test
+    void relationshipScoresDoNotDefineFactualRelationshipStatus() {
+
+        GeminiAiGateway gateway =
+                new GeminiAiGateway(
+                        "test-key",
+                        "test-model",
+                        new ObjectMapper()
+                );
+
+        AiContext context =
+                new AiContext(
+                        1L,
+                        "Millie",
+                        80,
+                        70,
+                        LocalDateTime.of(
+                                2026, 9, 21,
+                                13, 0
+                        ),
+                        "RELATIONSHIP_CHANGE",
+                        "마르바스와 대화를 나눴다.",
+                        List.of(),
+                        List.of(
+                                new com.example.projectmm.domain.ai.AiRelationshipContext(
+                                        2L,
+                                        "Marbas",
+                                        100,
+                                        100,
+                                        0
+                                )
+                        )
+                );
+
+        Map<String, Object> request =
+                gateway.createRequest(context);
+
+        String prompt =
+                request.get("contents")
+                        .toString();
+
+        assertThat(prompt)
+                .contains(
+                        "Relationship scores are quantitative tendencies only",
+                        "They are NOT authoritative relationship facts or relationship statuses",
+                        "A high affinity or trust score does not mean",
+                        "A factual relationship change requires explicit narrative evidence",
+                        "Do not invent such an event merely to justify a relationship change"
+                );
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> map(
             Object value

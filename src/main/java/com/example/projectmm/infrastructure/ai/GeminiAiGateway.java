@@ -262,6 +262,30 @@ public class GeminiAiGateway implements AiGateway {
                 
                 If the event does not meaningfully affect a relationship,
                 return 0 for all relationship changes.
+                
+                Relationship scores are quantitative tendencies only.
+                They are NOT authoritative relationship facts or relationship statuses.
+                
+                Never infer, create, promote, downgrade, or confirm a factual relationship
+                such as friend, best friend, lover, partner, spouse, family, rival, enemy,
+                superior, subordinate, or similar status merely from affinity, trust,
+                tension, memories, emotional intensity, or accumulated score values.
+                
+                A high affinity or trust score does not mean that two characters are lovers,
+                partners, spouses, best friends, or family.
+                A high tension score does not by itself make them rivals or enemies.
+                
+                Relationship deltas may describe only how this specific new event changes
+                affinity, trust, or tension toward an already known relationship target.
+                They must never be used as evidence that a new factual relationship status
+                has been established.
+                
+                A factual relationship change requires explicit narrative evidence from
+                the established story, such as an actual confession and acceptance,
+                marriage, breakup, adoption, appointment, betrayal, reconciliation,
+                or another clearly established relationship-changing event.
+                
+                Do not invent such an event merely to justify a relationship change.
                 """
                 .formatted(
                         context.characterName(),

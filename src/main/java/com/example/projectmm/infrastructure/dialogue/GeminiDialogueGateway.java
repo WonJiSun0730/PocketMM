@@ -861,7 +861,9 @@ public class GeminiDialogueGateway implements DialogueGateway {
 
         return context.relationships().stream()
                 .map(relationship ->
-                        "- "
+                        "- ID "
+                                + relationship.characterId()
+                                + ": "
                                 + relationship.characterName()
                                 + " (affinity: "
                                 + relationship.affinity()
@@ -973,6 +975,27 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 existing relationship status, remembered event, profile description, or mere time passage.
                 Do not change relationship values merely because the reply is affectionate, hostile,
                 friendly, romantic, or tense if no new relationship-relevant development occurred.
+                
+                Relationship scores are quantitative tendencies only.
+                They are not authoritative relationship facts or statuses.
+                
+                Never infer or establish statuses such as friend, best friend, lover,
+                partner, spouse, family, rival, enemy, superior, subordinate, or similar
+                merely from affinity, trust, tension, memories, emotional intensity,
+                or accumulated score values.
+                
+                High affinity or trust does not by itself establish romance, partnership,
+                marriage, friendship, or family.
+                High tension does not by itself establish rivalry or enmity.
+                
+                A factual relationship status or status change requires explicit,
+                already-established narrative evidence.
+                Do not invent a confession, acceptance, marriage, breakup, reconciliation,
+                betrayal, appointment, adoption, or similar event merely to justify
+                relationshipChange.
+                
+                relationshipChange may represent only the quantitative effect of a clear
+                new event in this turn.
                 
                 These are deltas only, never final values.
                 The server validates the target and applies accepted changes to the latest persisted relationship.

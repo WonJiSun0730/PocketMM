@@ -35,7 +35,7 @@ class GeminiCustomStatePromptTest {
                 .isEqualTo("피에타는 67이다.");
         var properties = request.path("generationConfig").path("responseFormat").path("text")
                 .path("schema").path("properties");
-        assertThat(properties.size()).isEqualTo(4);
+        assertThat(properties.size()).isEqualTo(5);
         assertThat(properties.has("playerState")).isTrue();
         assertThat(properties.has("reply")).isTrue();
         var proposals = properties.path("customStateChanges");
@@ -66,8 +66,82 @@ class GeminiCustomStatePromptTest {
     void optionalUnitAndDescriptionDoNotProduceNullText() {
         String prompt = request(List.of(new DialogueCustomState(3L, "중독도", 3, 0, 10, null, null)))
                 .path("systemInstruction").path("parts").path(0).path("text").asText();
-        assertThat(prompt).contains("중독도: 3.0 (range 0.0..10.0)");
-        assertThat(prompt.substring(prompt.indexOf("[CURRENT CUSTOM STATE"))).doesNotContain("null");
+        assertThat(prompt)
+                .contains("중독도: 3.0 (range 0.0..10.0)");
+
+        String customStateSection =
+                prompt.substring(
+                        prompt.indexOf("[CURRENT CUSTOM STATE"),
+                        prompt.indexOf("[REQUIRED TRANSPORT FORMAT")
+                );
+
+        assertThat(customStateSection)
+                .doesNotContain("null");
+    }
+
+    @Test
+    void relationshipScoresDoNotDefineFactualRelationshipStatus() {
+
+        var context =
+                new DialogueContext(
+                        1L,
+                        "NPC",
+                        null,
+                        70,
+                        70,
+                        LocalDateTime.of(
+                                2030, 1, 1,
+                                12, 0
+                        ),
+                        ContentMode.NORMAL,
+                        List.of(),
+                        List.of(),
+                        List.of(
+                                new DialogueRelationshipContext(
+                                        2L,
+                                        "Target",
+                                        100,
+                                        100,
+                                        0
+                                )
+                        ),
+                        null,
+                        70,
+                        70,
+                        List.of()
+                );
+
+        Object rawRequest =
+                ReflectionTestUtils.invokeMethod(
+                        gateway,
+                        "createRequest",
+                        context,
+                        "계속 이야기한다."
+                );
+
+        JsonNode request =
+                mapper.readTree(
+                        mapper.writeValueAsString(
+                                rawRequest
+                        )
+                );
+
+        String prompt =
+                request.path("systemInstruction")
+                        .path("parts")
+                        .path(0)
+                        .path("text")
+                        .asText();
+
+        assertThat(prompt)
+                .contains(
+                        "Relationship scores are quantitative tendencies only",
+                        "They are not authoritative relationship facts or statuses",
+                        "High affinity or trust does not by itself establish",
+                        "A factual relationship status or status change requires explicit",
+                        "Do not invent a confession",
+                        "- ID 2: Target (affinity: 100, trust: 100, tension: 0)"
+                );
     }
 
     private JsonNode request(List<DialogueCustomState> states) {
