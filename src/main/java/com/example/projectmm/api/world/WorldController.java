@@ -3,6 +3,10 @@ package com.example.projectmm.api.world;
 import com.example.projectmm.application.world.WorldService;
 import com.example.projectmm.application.world.WorldSystemService;
 import com.example.projectmm.application.world.WorldCharacterService;
+import com.example.projectmm.application.chat.ChatHistoryResponse;
+import com.example.projectmm.application.chat.ChatRequest;
+import com.example.projectmm.application.chat.ChatResponse;
+import com.example.projectmm.application.chat.ChatService;
 import com.example.projectmm.domain.world.WorldLoreCategory;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +24,7 @@ public class WorldController {
     private final WorldService worldService;
     private final WorldSystemService worldSystemService;
     private final WorldCharacterService worldCharacterService;
+    private final ChatService chatService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -94,6 +99,16 @@ public class WorldController {
     public List<WorldCharacterItem> replaceCharacters(@PathVariable Long worldId, @RequestBody WorldCharacterUpdateRequest request, Authentication authentication) {
         return worldCharacterService.replace(worldId, request.characterIds(), authentication.getName());
     }
+    @PostMapping("/{worldId}/characters/{characterId}/chat")
+    public ChatResponse chatInWorld(@PathVariable Long worldId, @PathVariable Long characterId, @RequestBody ChatRequest request) {
+        return chatService.chatInWorld(worldId, characterId, request);
+    }
+
+    @GetMapping("/{worldId}/characters/{characterId}/messages")
+    public List<ChatHistoryResponse> getWorldMessages(@PathVariable Long worldId, @PathVariable Long characterId) {
+        return chatService.getRecentWorldMessages(worldId, characterId);
+    }
 }
+
 
 
