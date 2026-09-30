@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ArrowLeft, BookOpen, ChevronRight, Plus, Save, Sparkles, X } from "lucide-react"
+import { ArrowLeft, BookOpen, ChevronRight, Pencil, Plus, Save, Sparkles, X } from "lucide-react"
 
 import "./WorldPage.css"
 
@@ -20,6 +20,9 @@ export default function WorldPage({ onBack }) {
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState("")
   const [draftReady, setDraftReady] = useState(false)
+  const [worldDialog, setWorldDialog] = useState(null)
+  const [worldForm, setWorldForm] = useState({ name: "", description: "" })
+  const [worldSubmitting, setWorldSubmitting] = useState(false)
   const autosaveTimer = useRef(null)
   const loadedLoreRef = useRef(null)
   const editVersionRef = useRef(0)
@@ -96,22 +99,45 @@ export default function WorldPage({ onBack }) {
     return values.map((entry) => typeof entry === "string" ? { title: "", content: entry } : { title: entry.title ?? "", content: entry.content ?? "" })
   }
 
-  async function createWorld() {
-    const name = window.prompt("새 월드의 이름을 입력해 주세요.")
-    if (!name?.trim()) return
-    const response = await fetch("/api/worlds", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ name: name.trim(), description: null }),
-    })
-    if (!response.ok) {
-      setMessage("월드를 만들지 못했어요.")
-      return
+  function openCreateWorld() {
+    setWorldForm({ name: "", description: "" })
+    setWorldDialog("create")
+  }
+
+  function openEditWorld() {
+    if (!selectedWorld) return
+    setWorldForm({ name: selectedWorld.name, description: selectedWorld.description ?? "" })
+    setWorldDialog("edit")
+  }
+
+  async function submitWorld(event) {
+    event.preventDefault()
+    const name = worldForm.name.trim()
+    if (!name || worldSubmitting) return
+    setWorldSubmitting(true)
+    try {
+      const editing = worldDialog === "edit"
+      const response = await fetch(editing ? `/api/worlds/${selectedWorld.id}` : "/api/worlds", {
+        method: editing ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ name, description: worldForm.description.trim() || null }),
+      })
+      if (!response.ok) throw new Error(editing ? "월드 정보를 수정하지 못했어요." : "월드를 만들지 못했어요.")
+      const world = await response.json()
+      if (editing) {
+        setWorlds((current) => current.map((item) => item.id === world.id ? world : item))
+      } else {
+        setWorlds((current) => [world, ...current])
+      }
+      setSelectedWorld(world)
+      setWorldDialog(null)
+      setMessage(editing ? "월드 정보를 수정했어요." : "")
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setWorldSubmitting(false)
     }
-    const world = await response.json()
-    setWorlds((current) => [world, ...current])
-    setSelectedWorld(world)
   }
 
   function markEdited() {
@@ -184,9 +210,9 @@ export default function WorldPage({ onBack }) {
 
       <div className="world-maker-layout">
         <aside className="world-list-panel">
-          <div className="world-panel-heading"><strong>내 월드</strong><button onClick={createWorld} type="button" aria-label="월드 추가"><Plus size={17} /></button></div>
+          <div className="world-panel-heading"><strong>내 월드</strong><button onClick={openCreateWorld} type="button" aria-label="월드 추가"><Plus size={17} /></button></div>
           {worlds.length === 0 ? (
-            <button className="world-empty" onClick={createWorld} type="button"><Sparkles size={20} /><strong>첫 월드 만들기</strong><span>캐릭터들이 살아갈 배경을 만들어 보세요.</span></button>
+            <button className="world-empty" onClick={openCreateWorld} type="button"><Sparkles size={20} /><strong>첫 월드 만들기</strong><span>캐릭터들이 살아갈 배경을 만들어 보세요.</span></button>
           ) : (
             <div className="world-list">
               {worlds.map((world) => (
@@ -203,7 +229,7 @@ export default function WorldPage({ onBack }) {
             <div className="world-editor-empty"><Sparkles size={26} /><h2>아직 월드가 없어요</h2><p>왼쪽에서 첫 월드를 만들어 주세요.</p></div>
           ) : (
             <>
-              <div className="world-title-row"><div><span className="world-eyebrow">EDITING</span><h2>{selectedWorld.name}</h2></div>{message && <span className="world-message">{message}</span>}</div>
+              <div className="world-title-row"><div><span className="world-eyebrow">EDITING</span><div className="world-name-line"><h2>{selectedWorld.name}</h2><button className="world-edit-meta" onClick={openEditWorld} type="button" aria-label="월드 정보 수정"><Pencil size={14} /></button></div>{selectedWorld.description && <p className="world-private-description">{selectedWorld.description}</p>}</div>{message && <span className="world-message">{message}</span>}</div>
               <div className="world-category-tabs">
                 {categories.map((category) => (
                   <button className={selectedCategory.id === category.id ? "active" : ""} key={category.id} onClick={() => setSelectedCategory(category)} type="button">{category.label}</button>
@@ -229,6 +255,8 @@ export default function WorldPage({ onBack }) {
           )}
         </section>
       </div>
+
+      {worldDialog && <div className="world-dialog-backdrop" onMouseDown={() => setWorldDialog(null)}><form className="world-dialog" onSubmit={submitWorld} onMouseDown={(event) => event.stopPropagation()}><div className="world-dialog-heading"><div><span className="world-eyebrow">{worldDialog === "edit" ? "EDIT WORLD" : "NEW WORLD"}</span><h2>{worldDialog === "edit" ? "세계관 정보 수정" : "새 세계관 만들기"}</h2></div><button type="button" onClick={() => setWorldDialog(null)} aria-label="닫기"><X size={18} /></button></div><label>세계관 이름<input autoFocus maxLength={100} value={worldForm.name} onChange={(event) => setWorldForm((current) => ({ ...current, name: event.target.value }))} placeholder="세계관 이름" /></label><label>설명 <small>AI에게 전달되지 않는 메모예요.</small><textarea value={worldForm.description} onChange={(event) => setWorldForm((current) => ({ ...current, description: event.target.value }))} placeholder="이 세계관을 구분하기 위한 설명이나 개인 메모를 적어 주세요." /></label><div className="world-dialog-actions"><button type="button" onClick={() => setWorldDialog(null)}>취소</button><button className="primary" disabled={!worldForm.name.trim() || worldSubmitting} type="submit">{worldSubmitting ? "처리 중..." : worldDialog === "edit" ? "수정" : "생성"}</button></div></form></div>}
     </main>
   )
 }
