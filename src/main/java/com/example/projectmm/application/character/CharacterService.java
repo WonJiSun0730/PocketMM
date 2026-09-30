@@ -45,7 +45,6 @@ public class CharacterService {
                                 character,
                                 request.description(),
                                 request.rawDescription(),
-                                request.playGuide(),
                                 request.exampleDialogue(),
                                 request.personality(),
                                 request.speechStyle(),
@@ -122,7 +121,6 @@ public class CharacterService {
         profile.update(
                 request.description(),
                 request.rawDescription(),
-                request.playGuide(),
                 request.exampleDialogue(),
                 request.personality(),
                 request.speechStyle(),
@@ -158,7 +156,6 @@ public class CharacterService {
                     character.getName(),
                     null, // description
                     null, // rawDescription
-                    null, // playGuide
                     null, // examples
                     null, // exampleDialogue
                     null, // personality
@@ -180,7 +177,6 @@ public class CharacterService {
                 character.getName(),
                 profile.getDescription(),
                 profile.getRawDescription(),
-                profile.getPlayGuide(),
                 getExamples(character.getId()),
                 profile.getExampleDialogue(),
                 profile.getPersonality(),
