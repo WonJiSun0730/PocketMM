@@ -15,7 +15,12 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest(properties = {\n        "spring.datasource.url=jdbc:h2:mem:character-ownership;MODE=MySQL;DB_CLOSE_DELAY=-1",\n        "spring.datasource.driver-class-name=org.h2.Driver",\n        "spring.jpa.hibernate.ddl-auto=create-drop"\n})\n@Transactional
+@SpringBootTest(properties = {
+        "spring.datasource.url=jdbc:h2:mem:character-ownership;MODE=MySQL;DB_CLOSE_DELAY=-1",
+        "spring.datasource.driver-class-name=org.h2.Driver",
+        "spring.jpa.hibernate.ddl-auto=create-drop"
+})
+@Transactional
 class CharacterOwnershipServiceTest {
 
     @Autowired CharacterService characterService;
