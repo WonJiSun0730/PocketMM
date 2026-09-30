@@ -8,6 +8,8 @@ import com.example.projectmm.domain.event.Event;
 import com.example.projectmm.domain.event.EventParticipant;
 import com.example.projectmm.domain.event.EventParticipantRepository;
 import com.example.projectmm.domain.event.EventRepository;
+import com.example.projectmm.domain.member.Member;
+import com.example.projectmm.domain.member.MemberRepository;
 import com.example.projectmm.domain.scene.Scene;
 import com.example.projectmm.domain.scene.SceneParticipant;
 import com.example.projectmm.domain.scene.SceneParticipantRepository;
@@ -17,6 +19,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -33,6 +36,8 @@ public class DevSeedRunner implements CommandLineRunner {
     private final SceneParticipantRepository sceneParticipantRepository;
     private final EventRepository eventRepository;
     private final EventParticipantRepository eventParticipantRepository;
+    private final MemberRepository memberRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
@@ -42,11 +47,22 @@ public class DevSeedRunner implements CommandLineRunner {
             return;
         }
 
+        Member devOwner = memberRepository.findByLoginId("devseed")
+                .orElseGet(() -> memberRepository.save(
+                        Member.createLocal(
+                                "devseed",
+                                "devseed-password",
+                                "Dev Seed",
+                                "devseed@pocketmm.local",
+                                passwordEncoder
+                        )
+                ));
+
         Character millie =
-                characterRepository.save(new Character("Millie"));
+                characterRepository.save(new Character("Millie", devOwner));
 
         Character marbas =
-                characterRepository.save(new Character("Marbas"));
+                characterRepository.save(new Character("Marbas", devOwner));
 
         CharacterState millieState =
                 new CharacterState(
