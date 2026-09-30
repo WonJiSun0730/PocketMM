@@ -26,6 +26,11 @@ public interface ConversationRepository
     // 동일한 생성 시각이어도 마지막 생성된 방을 확실하게 선택한다.
     Optional<Conversation> findTopByCharacterIdOrderByCreatedAtDescIdDesc(Long characterId);
 
+    Optional<Conversation> findTopByCharacterIdAndWorldIdOrderByCreatedAtDescIdDesc(
+            Long characterId,
+            Long worldId
+    );
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from Conversation c where c.id = :id")
     Optional<Conversation> lockForMemory(@Param("id") Long id);
