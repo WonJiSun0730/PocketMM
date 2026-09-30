@@ -79,6 +79,7 @@ export default function WorldPage({ onBack }) {
   }
 
   function addSystem() {
+    if (systems.length >= 5) return
     setSystems((current) => [...current, { name: "", changeCondition: "", minValue: 0, maxValue: 100, states: [] }])
   }
 
@@ -101,7 +102,10 @@ export default function WorldPage({ onBack }) {
       if (!response.ok) throw new Error("월드를 불러오지 못했어요.")
       const data = await response.json()
       setWorlds(data)
-      if (data.length > 0) setSelectedWorld(data[0])
+      if (data.length > 0) {
+        const savedWorldId = Number(localStorage.getItem("pocketmm:selected-world-id"))
+        setSelectedWorld(data.find((world) => world.id === savedWorldId) ?? data[0])
+      }
     } catch (error) {
       setMessage(error.message)
     } finally {
@@ -259,7 +263,7 @@ export default function WorldPage({ onBack }) {
           ) : (
             <div className="world-list">
               {worlds.map((world) => (
-                <button className={selectedWorld?.id === world.id ? "world-list-item active" : "world-list-item"} key={world.id} onClick={() => setSelectedWorld(world)} type="button">
+                <button className={selectedWorld?.id === world.id ? "world-list-item active" : "world-list-item"} key={world.id} onClick={() => { setSelectedWorld(world); localStorage.setItem("pocketmm:selected-world-id", String(world.id)) }} type="button">
                   <BookOpen size={16} /><span><strong>{world.name}</strong><small>{world.description || "설명 없음"}</small></span><ChevronRight size={15} />
                 </button>
               ))}
@@ -280,7 +284,7 @@ export default function WorldPage({ onBack }) {
               </div>
               {systemMode ? (
                 <div className="world-system-editor">
-                  <section className="system-play-guide"><label>플레이 가이드</label><p>월드 제작자가 자유롭게 수정하는 시스템 안내예요.</p><textarea value={playGuide} onChange={(event) => setPlayGuide(event.target.value)} placeholder="상태 체계, 시스템 사용법, 플레이 팁 등을 자유롭게 작성하세요." /></section>
+                  <section className="system-play-guide"><label>플레이 가이드</label><p>월드 제작자가 자유롭게 수정하는 시스템 안내예요. <span>{playGuide.length} / 1000자</span></p><textarea maxLength={1000} value={playGuide} onChange={(event) => setPlayGuide(event.target.value)} placeholder="상태 체계, 시스템 사용법, 플레이 팁 등을 자유롭게 작성하세요." /></section>
                   <div className="system-list">
                     {systems.map((system, index) => <article className="system-card" key={index}>
                       <div className="system-card-head"><input value={system.name} onChange={(e) => updateSystem(index, "name", e.target.value)} placeholder="시스템 이름 (예: 피에타)" /><button onClick={() => setSystems((current) => current.filter((_, i) => i !== index))} type="button"><X size={16}/></button></div>
@@ -288,7 +292,7 @@ export default function WorldPage({ onBack }) {
                       <div className="system-bounds"><label>하한<input type="number" value={system.minValue} onChange={(e) => updateSystem(index, "minValue", Number(e.target.value))}/></label><label>상한<input type="number" value={system.maxValue} onChange={(e) => updateSystem(index, "maxValue", Number(e.target.value))}/></label></div>
                       <div className="system-states"><strong>수치에 따른 상태</strong>{(system.states ?? []).map((state, stateIndex) => <div className="system-state-row" key={stateIndex}><input type="number" value={state.minValue} onChange={(e) => updateSystemState(index,stateIndex,"minValue",Number(e.target.value))}/><span>~</span><input type="number" value={state.maxValue} onChange={(e) => updateSystemState(index,stateIndex,"maxValue",Number(e.target.value))}/><input value={state.label} onChange={(e) => updateSystemState(index,stateIndex,"label",e.target.value)} placeholder="상태 / 설명"/><button type="button" onClick={() => setSystems((current) => current.map((item,i) => i === index ? {...item,states:item.states.filter((_,j)=>j!==stateIndex)} : item))}><X size={14}/></button></div>)}<button className="add-system-state" type="button" onClick={() => addSystemState(index)}><Plus size={14}/> 상태 추가</button></div>
                     </article>)}
-                    <button className="add-lore-entry" onClick={addSystem} type="button"><Plus size={17}/> 시스템 추가</button>
+                    <button className="add-lore-entry" disabled={systems.length >= 5} onClick={addSystem} type="button"><Plus size={17}/> 시스템 추가 ({systems.length}/5)</button>
                   </div>
                 </div>
               ) : (<>
