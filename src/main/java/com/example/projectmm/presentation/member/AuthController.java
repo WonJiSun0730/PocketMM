@@ -6,6 +6,7 @@ import com.example.projectmm.domain.member.Member;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -40,4 +41,17 @@ public class AuthController {
     public Map<String, Boolean> checkEmail(@RequestParam String email) {
         return Map.of("available", memberSignupService.isEmailAvailable(email));
     }
+    @GetMapping("/me")
+    public CurrentMemberResponse me(Authentication authentication) {
+        Member member = memberSignupService.findByLoginId(authentication.getName());
+
+        return new CurrentMemberResponse(
+                member.getId(),
+                member.getLoginId(),
+                member.getName(),
+                member.getEmail(),
+                member.getRole().name()
+        );
+    }
 }
+
