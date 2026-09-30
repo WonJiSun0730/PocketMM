@@ -4,6 +4,7 @@ import com.example.projectmm.application.character.CharacterService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -16,31 +17,35 @@ public class CharacterController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public CharacterResponse create(
-            @Valid @RequestBody CharacterCreateRequest request
+            @Valid @RequestBody CharacterCreateRequest request,
+            Authentication authentication
     ) {
-        return characterService.create(request);
+        return characterService.create(request, authentication.getName());
     }
 
     @GetMapping
-    public java.util.List<CharacterResponse> getAll() {
-        return characterService.getAll();
+    public java.util.List<CharacterResponse> getAll(Authentication authentication) {
+        return characterService.getAll(authentication.getName());
     }
 
     @GetMapping("/{characterId}")
     public CharacterResponse getById(
-            @PathVariable Long characterId
+            @PathVariable Long characterId,
+            Authentication authentication
     ) {
-        return characterService.getById(characterId);
+        return characterService.getById(characterId, authentication.getName());
     }
 
     @PutMapping("/{characterId}/profile")
     public CharacterResponse updateProfile(
             @PathVariable Long characterId,
-            @RequestBody CharacterUpdateRequest request
+            @RequestBody CharacterUpdateRequest request,
+            Authentication authentication
     ) {
         return characterService.updateProfile(
                 characterId,
-                request
+                request,
+                authentication.getName()
         );
     }
 }
