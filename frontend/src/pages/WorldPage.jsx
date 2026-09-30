@@ -308,7 +308,7 @@ export default function WorldPage({ onBack }) {
                   <button className="add-lore-entry" onClick={addEntry} type="button"><Plus size={17} /> 설정 슬롯 추가</button>
                 )}
               </div></>) }
-
+            </>
           )}
         </section>
       </div>
