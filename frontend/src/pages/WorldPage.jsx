@@ -6,7 +6,7 @@ import "./WorldPage.css"
 const categories = [
   { id: "ERA_REGION_BACKGROUND", label: "시대 / 지역 / 배경", maxCharacters: 2000, maxEntries: 20 },
   { id: "SOCIETY_CULTURE", label: "사회 / 문화", maxCharacters: 500, maxEntries: 10 },
-  { id: "RACE_ORGANIZATION", label: "종족 / 조직", maxCharacters: 1000, maxEntries: 10 },
+  { id: "RACE_ORGANIZATION", label: "종족 / 조직", maxCharacters: 1500, maxEntries: 10 },
   { id: "WORLD_RULE", label: "세계 규칙", maxCharacters: 1000, maxEntries: 15 },
   { id: "TERMINOLOGY", label: "용어 / 고유명사", maxCharacters: 500, maxEntries: 20 },
   { id: "HISTORY", label: "세계 사건 / 역사", maxCharacters: 1000, maxEntries: 10 },
@@ -22,6 +22,7 @@ export default function WorldPage({ onBack }) {
   const [message, setMessage] = useState("")
   const [draftReady, setDraftReady] = useState(false)
   const autosaveTimer = useRef(null)
+  const loadedLoreRef = useRef(null)
 
   const totalCharacters = useMemo(
     () => entries.reduce((sum, entry) => sum + entry.length, 0),
@@ -35,13 +36,14 @@ export default function WorldPage({ onBack }) {
   }, [selectedWorld, selectedCategory])
 
   useEffect(() => {
-    if (!selectedWorld || !draftReady) return
-    const key = draftKey(selectedWorld.id, selectedCategory.id)
+    if (!selectedWorld || !draftReady || !loadedLoreRef.current) return
+    const { worldId, categoryId } = loadedLoreRef.current
+    const key = draftKey(worldId, categoryId)
     localStorage.setItem(key, JSON.stringify(entries))
 
     window.clearTimeout(autosaveTimer.current)
     if (totalCharacters <= selectedCategory.maxCharacters) {
-      autosaveTimer.current = window.setTimeout(() => saveLore(true), 800)
+      autosaveTimer.current = window.setTimeout(() => saveLore(true, worldId, categoryId, entries), 800)
     }
     return () => window.clearTimeout(autosaveTimer.current)
   }, [entries, draftReady])
@@ -67,6 +69,7 @@ export default function WorldPage({ onBack }) {
 
   async function loadLore(worldId, category) {
     setDraftReady(false)
+    loadedLoreRef.current = null
     setMessage("")
     const response = await fetch(`/api/worlds/${worldId}/lore/${category}`, { credentials: "include" })
     if (!response.ok) {
@@ -85,6 +88,7 @@ export default function WorldPage({ onBack }) {
     } else {
       setEntries(data.entries ?? [])
     }
+    loadedLoreRef.current = { worldId, categoryId: category }
     setDraftReady(true)
   }
 
@@ -119,24 +123,24 @@ export default function WorldPage({ onBack }) {
     setEntries((current) => current.filter((_, i) => i !== index))
   }
 
-  async function saveLore(silent = false) {
-    if (!selectedWorld || totalCharacters > selectedCategory.maxCharacters) return
+  async function saveLore(silent = false, worldId = selectedWorld?.id, categoryId = selectedCategory.id, values = entries) {
+    if (!worldId || values.reduce((sum, entry) => sum + entry.length, 0) > selectedCategory.maxCharacters) return
     setSaving(true)
     setMessage("")
     try {
       const response = await fetch(
-        `/api/worlds/${selectedWorld.id}/lore/${selectedCategory.id}`,
+        `/api/worlds/${worldId}/lore/${categoryId}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ entries }),
+          body: JSON.stringify({ entries: values }),
         }
       )
       if (!response.ok) throw new Error("세계 설정을 저장하지 못했어요.")
       const data = await response.json()
       setEntries(data.entries ?? [])
-      localStorage.removeItem(draftKey(selectedWorld.id, selectedCategory.id))
+      localStorage.removeItem(draftKey(worldId, categoryId))
       if (!silent) setMessage("저장했어요.")
     } catch (error) {
       setMessage(error.message)
