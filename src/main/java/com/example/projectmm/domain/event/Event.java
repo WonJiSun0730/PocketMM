@@ -1,6 +1,7 @@
 package com.example.projectmm.domain.event;
 
 import com.example.projectmm.domain.scene.Scene;
+import com.example.projectmm.domain.simulation.StateDelta;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -36,6 +37,26 @@ public class Event { //세계에서 실제로 무슨 일이 일어났는가 - �
             int importance,
             int narrativeAnchor
     ) {
+        this(
+                scene,
+                occurredAt,
+                eventType,
+                summary,
+                importance,
+                narrativeAnchor,
+                StateDelta.none()
+        );
+    }
+
+    public Event(
+            Scene scene,
+            LocalDateTime occurredAt,
+            String eventType,
+            String summary,
+            int importance,
+            int narrativeAnchor,
+            StateDelta stateDelta
+    ) {
         this.scene = scene;
         this.occurredAt = occurredAt;
         this.eventType = eventType;
@@ -45,6 +66,19 @@ public class Event { //세계에서 실제로 무슨 일이 일어났는가 - �
                 clampNarrativeAnchor(
                         narrativeAnchor
                 );
+
+        StateDelta safeStateDelta =
+                stateDelta == null
+                        ? StateDelta.none()
+                        : stateDelta;
+
+        this.energyChange =
+                safeStateDelta.energyChange();
+        this.moodChange =
+                safeStateDelta.moodChange();
+        this.memoryAbilityChange =
+                safeStateDelta.memoryAbilityChange();
+
         this.createdAt = LocalDateTime.now();
     }
 
@@ -59,6 +93,15 @@ public class Event { //세계에서 실제로 무슨 일이 일어났는가 - �
                 )
         );
     }
+
+    @Column(nullable = false)
+    private int energyChange;
+
+    @Column(nullable = false)
+    private int moodChange;
+
+    @Column(nullable = false)
+    private int memoryAbilityChange;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

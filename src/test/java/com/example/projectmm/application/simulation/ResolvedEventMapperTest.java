@@ -67,5 +67,14 @@ class ResolvedEventMapperTest {
 
         assertThat(event.getImportance())
                 .isEqualTo(4);
+
+        assertThat(event.getEnergyChange())
+                .isZero();
+
+        assertThat(event.getMoodChange())
+                .isEqualTo(5);
+
+        assertThat(event.getMemoryAbilityChange())
+                .isZero();
     }
 }
