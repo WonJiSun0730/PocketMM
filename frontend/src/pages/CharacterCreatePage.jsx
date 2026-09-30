@@ -14,7 +14,6 @@ export default function CharacterCreatePage({
   const [description, setDescription] = useState("")
   const [rawDescription, setRawDescription] = useState("")
   const [playGuide, setPlayGuide] = useState("")
-  const [intro, setIntro] = useState("")
   const [examples, setExamples] = useState([""])
 
   const [personality, setPersonality] = useState("")
@@ -34,7 +33,6 @@ export default function CharacterCreatePage({
     setDescription(character.description ?? "")
     setRawDescription(character.rawDescription ?? "")
     setPlayGuide(character.playGuide ?? "")
-    setIntro(character.intro ?? "")
     setExamples(
       character.examples?.length
         ? character.examples
@@ -104,7 +102,6 @@ export default function CharacterCreatePage({
       description: description.trim() || null,
       rawDescription: rawDescription.trim() || null,
       playGuide: playGuide.trim() || null,
-      intro: intro.trim() || null,
       examples: examples
         .map((example) => example.trim())
         .filter(Boolean),
@@ -249,27 +246,9 @@ export default function CharacterCreatePage({
               </h2>
 
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                캐릭터와의 이야기가 시작되는 장면과
-                대화 스타일을 설정하세요.
+                캐릭터의 대화 스타일과 예시를 설정하세요.
               </p>
             </div>
-
-            <Field
-              label="인트로"
-              description="새로운 이야기를 시작할 때 처음 보여줄 장면이에요."
-            >
-              <Textarea
-                value={intro}
-                onChange={(event) => setIntro(event.target.value)}
-                placeholder={`예시
-
-          *늦은 밤, 캐릭터는 창가에 기대어 밖을 바라보고 있었다.
-          문이 열리는 소리에 천천히 고개를 돌렸다.*
-
-          "왔어요?"`}
-                className="min-h-48 resize-y leading-6"
-              />
-            </Field>
 
             <Field
               label="예시 대화"
