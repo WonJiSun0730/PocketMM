@@ -49,6 +49,7 @@ function RpText({ text, isUser }) {
 
 export default function ChatPage({
   character,
+  world = null,
   onBack,
 }) {
   const [messages, setMessages] = useState([])
@@ -66,6 +67,16 @@ export default function ChatPage({
 
   const loadMessages = useCallback(async (resume = false) => {
     try {
+      if (world) {
+        const response = await fetch(`/api/worlds/${world.id}/characters/${character.id}/messages`, { credentials: "include" })
+        if (!response.ok) throw new Error("월드 대화를 불러오지 못했습니다.")
+        setMessages(await response.json())
+        setSession({ conversationId: null, playerProfile: { id: "world", name: "월드 플레이" } })
+        setProgress(null)
+        setStartError("")
+        setLoading(false)
+        return
+      }
       const sessionResponse = await fetch(`/api/chat/${character.id}/session`)
       if (!sessionResponse.ok) throw new Error("대화방 정보를 불러오지 못했습니다.")
       const room = await sessionResponse.json()
@@ -92,7 +103,7 @@ export default function ChatPage({
     } finally {
       setLoading(false)
     }
-  }, [character.id])
+  }, [character.id, world])
 
   const selectedProfileId = session?.playerProfile?.id
 
@@ -185,7 +196,7 @@ export default function ChatPage({
     }
 
     try {
-      const response = await fetch(`/api/chat/${character.id}`, {
+      const response = await fetch(world ? `/api/worlds/${world.id}/characters/${character.id}/chat` : `/api/chat/${character.id}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -332,23 +343,23 @@ export default function ChatPage({
               {character.name}
             </h1>
             <p className="mt-1 text-xs text-muted-foreground">
-              PocketMM
+              {world ? `${world.name} · WORLD` : "PocketMM"}
             </p>
           </div>
-          <Button type="button" variant="ghost" disabled={loading || sending || starting || !session}
+          {!world && <Button type="button" variant="ghost" disabled={loading || sending || starting || !session}
             onClick={() => { setStartError(""); setPickerMode("select") }}>
             {session?.playerProfile?.avatar && <img src={session.playerProfile.avatar} alt="" className="size-6 rounded-full object-cover" />}
             나: {session?.playerProfile?.name ?? "프로필 선택"}
-          </Button>
-          <Button type="button" variant="outline" className="ml-auto shrink-0"
+          </Button>}
+          {!world && <Button type="button" variant="outline" className="ml-auto shrink-0"
             onClick={startConversation} disabled={loading || sending || starting || !session}>
             {starting ? "시작 중..." : "새 대화 시작"}
-          </Button>
+          </Button>}
         </header>
 
         {startError && <p role="alert" className="px-4 py-2 text-sm text-destructive">{startError}</p>}
 
-        {progress && <div className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
+        {!world && progress && <div className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
           <div className="flex items-center gap-3">
             <Button type="button" variant="outline" size="sm" onClick={toggleProgress}
               disabled={loading || sending || starting || !session?.playerProfile}>
@@ -367,10 +378,10 @@ export default function ChatPage({
           </details>}
         </div>}
 
-        <CustomStatePanel
+        {!world && <CustomStatePanel
           characterId={character.id}
           conversationId={session?.conversationId}
-        />
+        />}
 
         {debugInfo && (
           <div className="shrink-0 border-b bg-muted/40 px-4 py-2 font-mono text-[11px] text-muted-foreground sm:px-6">
@@ -479,7 +490,7 @@ export default function ChatPage({
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={`${character.name}에게 메시지 보내기`}
+              placeholder={world ? `${world.name}에서 ${character.name}에게 말하기` : `${character.name}에게 메시지 보내기`}
               disabled={loading || sending || starting || !session?.playerProfile}
               rows={1}
               className="max-h-36 min-h-11 resize-none text-base"
