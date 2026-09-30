@@ -252,9 +252,11 @@ export default function ChatPage({
     setStarting(true)
     setStartError("")
     try {
-      const newRoom = !world && pickerMode === "new"
+      const newRoom = pickerMode === "new"
       const url = world
-        ? `/api/worlds/${world.id}/characters/${character.id}/player-profile`
+        ? newRoom
+          ? `/api/worlds/${world.id}/characters/${character.id}/conversations`
+          : `/api/worlds/${world.id}/characters/${character.id}/player-profile`
         : newRoom ? `/api/chat/${character.id}/conversations`
           : `/api/chat/${character.id}/conversations/${session.conversationId}/player-profile`
       const response = await fetch(url, {
@@ -359,10 +361,10 @@ export default function ChatPage({
               : <span className="grid size-7 place-items-center rounded-full bg-accent text-xs text-accent-foreground">{session?.playerProfile?.name?.slice(0, 1) ?? "나"}</span>}
             {session?.playerProfile?.name ?? "프로필 선택"}
           </Button>
-          {!world && <Button type="button" variant="outline" className="ml-auto shrink-0"
+          <Button type="button" variant="outline" className={world ? "shrink-0" : "ml-auto shrink-0"}
             onClick={startConversation} disabled={loading || sending || starting || !session}>
             {starting ? "시작 중..." : "새 대화 시작"}
-          </Button>}
+          </Button>
         </header>
 
         {startError && <p role="alert" className="px-4 py-2 text-sm text-destructive">{startError}</p>}
