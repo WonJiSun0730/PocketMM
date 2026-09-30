@@ -3,6 +3,7 @@ package com.example.projectmm.application.chat;
 import com.example.projectmm.domain.character.CharacterRepository;
 import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.player.PlayerProfileRepository;
+import com.example.projectmm.domain.world.WorldRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -18,10 +19,30 @@ public class ConversationStartService {
     private final CharacterRepository characters;
     private final ConversationRepository conversations;
     private final PlayerProfileRepository players;
+    private final WorldRepository worlds;
 
     @Transactional
     public NewConversationResponse start(Long characterId) {
         return start(characterId, null);
+    }
+
+    @Transactional
+    public NewConversationResponse startWorld(Long worldId, Long characterId, Long playerProfileId) {
+        var character = characters.findById(characterId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Character not found"));
+        var world = worlds.findById(worldId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "World not found"));
+        if (character.getWorld() == null || !character.getWorld().getId().equals(worldId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Character is not assigned to this world");
+        }
+        var conversation = Conversation.forWorld(
+                character, world, LocalDateTime.now().truncatedTo(ChronoUnit.MICROS));
+        if (playerProfileId != null) {
+            conversation.selectPlayerProfile(players.findById(playerProfileId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Player profile not found")));
+        }
+        conversations.save(conversation);
+        return new NewConversationResponse(conversation.getId(), conversation.getSimulatedAt(), java.util.List.of());
     }
 
     @Transactional
