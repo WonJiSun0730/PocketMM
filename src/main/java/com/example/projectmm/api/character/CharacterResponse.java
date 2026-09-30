@@ -7,7 +7,6 @@ public record CharacterResponse(
         String name,
         String description,
         String rawDescription,
-        String playGuide,
         List<String> examples,
         String exampleDialogue,
         String personality,
