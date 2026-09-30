@@ -7,6 +7,8 @@ import com.example.projectmm.application.chat.ChatHistoryResponse;
 import com.example.projectmm.application.chat.ChatRequest;
 import com.example.projectmm.application.chat.ChatResponse;
 import com.example.projectmm.application.chat.ChatService;
+import com.example.projectmm.application.chat.ConversationStartService;
+import com.example.projectmm.application.chat.NewConversationResponse;
 import com.example.projectmm.application.player.ConversationPlayerService;
 import com.example.projectmm.application.player.PlayerSelectionRequest;
 import com.example.projectmm.domain.world.WorldLoreCategory;
@@ -27,6 +29,7 @@ public class WorldController {
     private final WorldSystemService worldSystemService;
     private final WorldCharacterService worldCharacterService;
     private final ChatService chatService;
+    private final ConversationStartService conversationStartService;
     private final ConversationPlayerService conversationPlayerService;
 
     @PostMapping
@@ -102,6 +105,16 @@ public class WorldController {
     public List<WorldCharacterItem> replaceCharacters(@PathVariable Long worldId, @RequestBody WorldCharacterUpdateRequest request, Authentication authentication) {
         return worldCharacterService.replace(worldId, request.characterIds(), authentication.getName());
     }
+    @PostMapping("/{worldId}/characters/{characterId}/conversations")
+    @ResponseStatus(HttpStatus.CREATED)
+    public NewConversationResponse startWorldConversation(
+            @PathVariable Long worldId,
+            @PathVariable Long characterId,
+            @Valid @RequestBody PlayerSelectionRequest request
+    ) {
+        return conversationStartService.startWorld(worldId, characterId, request.playerProfileId());
+    }
+
     @GetMapping("/{worldId}/characters/{characterId}/session")
     public ConversationPlayerService.Session worldSession(@PathVariable Long worldId, @PathVariable Long characterId) {
         var room = chatService.getOrCreateWorldConversation(worldId, characterId);
