@@ -7,6 +7,8 @@ public record WorldCreateRequest(
         @NotBlank
         @Size(max = 100)
         String name,
-        String description
+        String description,
+        @Size(max = 2000)
+        String introduction
 ) {
 }
