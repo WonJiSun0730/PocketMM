@@ -19,11 +19,17 @@ export default function CharacterCreatePage({
   const [speechStyle, setSpeechStyle] = useState("")
   const [background, setBackground] = useState("")
   const [appearance, setAppearance] = useState("")
+  const [worlds, setWorlds] = useState([])
+  const [worldId, setWorldId] = useState("")
 
   const [showDetails, setShowDetails] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState("")
   const editing = Boolean(character)
+
+  useEffect(() => {
+    fetch("/api/worlds", { credentials: "include" }).then((response) => response.ok ? response.json() : []).then(setWorlds).catch(() => setWorlds([]))
+  }, [])
 
   useEffect(() => {
     if (!character) return
@@ -40,6 +46,7 @@ export default function CharacterCreatePage({
     setSpeechStyle(character.speechStyle ?? "")
     setBackground(character.background ?? "")
     setAppearance(character.appearance ?? "")
+    setWorldId(character.worldId ? String(character.worldId) : "")
   }, [character])
 
   const totalExampleLength = examples.reduce(
@@ -136,7 +143,21 @@ export default function CharacterCreatePage({
         )
       }
 
-      const savedCharacter = await response.json()
+      let savedCharacter = await response.json()
+
+      if (worldId || editing) {
+        const targetWorldIds = worlds.map((world) => world.id)
+        for (const targetWorldId of targetWorldIds) {
+          const assignedResponse = await fetch(`/api/worlds/${targetWorldId}/characters`, { credentials: "include" })
+          if (!assignedResponse.ok) continue
+          const assigned = await assignedResponse.json()
+          const ids = assigned.map((item) => item.id).filter((id) => id !== savedCharacter.id)
+          if (String(targetWorldId) === worldId) ids.push(savedCharacter.id)
+          if (assigned.some((item) => item.id === savedCharacter.id) || String(targetWorldId) === worldId) {
+            await fetch(`/api/worlds/${targetWorldId}/characters`, { method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ characterIds: ids }) })
+          }
+        }
+      }
 
       if (editing) {
         onUpdated(savedCharacter)
@@ -389,12 +410,13 @@ export default function CharacterCreatePage({
             </h2>
 
             <p className="mt-1 text-sm text-muted-foreground">
-              현재는 월드를 지정하지 않고 캐릭터를 만들 수 있어요.
+              캐릭터는 월드 없이도 개별 대화를 사용할 수 있고, 필요할 때 월드에 참여시킬 수 있어요.
             </p>
 
-            <div className="mt-4 rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-              지정하지 않음
-            </div>
+            <select value={worldId} onChange={(event) => setWorldId(event.target.value)} className="mt-4 flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-ring">
+              <option value="">지정하지 않음</option>
+              {worlds.map((world) => <option key={world.id} value={world.id}>{world.name}</option>)}
+            </select>
           </section>
 
           {error && (
