@@ -22,6 +22,31 @@ public class Scene { // 일정 시간 동안 여러 이벤트가 발생하는 �
         this.active = true;
     }
 
+    public void end(
+            LocalDateTime endedAt
+    ) {
+        if (endedAt == null) {
+            throw new IllegalArgumentException(
+                    "Scene end time is required"
+            );
+        }
+
+        if (endedAt.isBefore(startedAt)) {
+            throw new IllegalArgumentException(
+                    "Scene cannot end before it starts"
+            );
+        }
+
+        if (!active) {
+            throw new IllegalStateException(
+                    "Scene is already ended"
+            );
+        }
+
+        this.endedAt = endedAt;
+        this.active = false;
+    }
+
     public static Scene forConversation(
             Conversation conversation,
             LocalDateTime startedAt,
