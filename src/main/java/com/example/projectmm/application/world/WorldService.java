@@ -1,6 +1,7 @@
 package com.example.projectmm.application.world;
 
 import com.example.projectmm.api.world.WorldCreateRequest;
+import com.example.projectmm.api.world.WorldLoreItem;
 import com.example.projectmm.api.world.WorldLoreResponse;
 import com.example.projectmm.api.world.WorldResponse;
 import com.example.projectmm.domain.member.Member;
@@ -52,7 +53,7 @@ public class WorldService {
         List<String> entries = worldLoreEntryRepository
                 .findByWorldIdAndCategoryOrderBySortOrderAsc(world.getId(), category)
                 .stream()
-                .map(WorldLoreEntry::getContent)
+                .map(entry -> new WorldLoreItem(entry.getTitle(), entry.getContent()))
                 .toList();
         return toLoreResponse(category, entries);
     }
@@ -61,16 +62,16 @@ public class WorldService {
     public WorldLoreResponse replaceLore(
             Long worldId,
             WorldLoreCategory category,
-            List<String> entries,
+            List<WorldLoreItem> entries,
             String loginId
     ) {
         World world = findOwnedWorld(worldId, loginId);
-        List<String> normalized = worldLorePolicy.normalizeAndValidate(category, entries);
+        List<WorldLoreItem> normalized = worldLorePolicy.normalizeAndValidate(category, entries);
 
         worldLoreEntryRepository.deleteByWorldIdAndCategory(world.getId(), category);
         for (int i = 0; i < normalized.size(); i++) {
             worldLoreEntryRepository.save(
-                    new WorldLoreEntry(world, category, normalized.get(i), i)
+                    new WorldLoreEntry(world, category, normalized.get(i).title(), normalized.get(i).content(), i)
             );
         }
 
@@ -92,8 +93,10 @@ public class WorldService {
         return new WorldResponse(world.getId(), world.getName(), world.getDescription());
     }
 
-    private WorldLoreResponse toLoreResponse(WorldLoreCategory category, List<String> entries) {
-        int totalCharacters = entries.stream().mapToInt(String::length).sum();
+    private WorldLoreResponse toLoreResponse(WorldLoreCategory category, List<WorldLoreItem> entries) {
+        int totalCharacters = entries.stream()
+                .mapToInt(entry -> (entry.title() == null ? 0 : entry.title().length()) + entry.content().length())
+                .sum();
         return new WorldLoreResponse(
                 category,
                 entries,
