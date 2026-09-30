@@ -25,7 +25,7 @@ export default function WorldPage({ onBack }) {
   const editVersionRef = useRef(0)
 
   const totalCharacters = useMemo(
-    () => entries.reduce((sum, entry) => sum + entry.length, 0),
+    () => entries.reduce((sum, entry) => sum + (entry.title?.length ?? 0) + (entry.content?.length ?? 0), 0),
     [entries]
   )
 
@@ -80,16 +80,20 @@ export default function WorldPage({ onBack }) {
     const stored = localStorage.getItem(draftKey(worldId, category))
     if (stored) {
       try {
-        setEntries(JSON.parse(stored))
+        setEntries(normalizeDraftEntries(JSON.parse(stored)))
         setMessage("작성 중이던 내용을 복원했어요.")
       } catch {
-        setEntries(data.entries ?? [])
+        setEntries(normalizeDraftEntries(data.entries ?? []))
       }
     } else {
       setEntries(data.entries ?? [])
     }
     loadedLoreRef.current = { worldId, categoryId: category }
     setDraftReady(true)
+  }
+
+  function normalizeDraftEntries(values) {
+    return values.map((entry) => typeof entry === "string" ? { title: "", content: entry } : { title: entry.title ?? "", content: entry.content ?? "" })
   }
 
   async function createWorld() {
@@ -114,15 +118,15 @@ export default function WorldPage({ onBack }) {
     editVersionRef.current += 1
   }
 
-  function updateEntry(index, value) {
+  function updateEntry(index, field, value) {
     markEdited()
-    setEntries((current) => current.map((entry, i) => i === index ? value : entry))
+    setEntries((current) => current.map((entry, i) => i === index ? { ...entry, [field]: value } : entry))
   }
 
   function addEntry() {
     if (entries.length >= selectedCategory.maxEntries) return
     markEdited()
-    setEntries((current) => [...current, ""])
+    setEntries((current) => [...current, { title: "", content: "" }])
   }
 
   function removeEntry(index) {
@@ -131,7 +135,7 @@ export default function WorldPage({ onBack }) {
   }
 
   async function saveLore(silent = false, worldId = selectedWorld?.id, categoryId = selectedCategory.id, values = entries) {
-    if (!worldId || values.reduce((sum, entry) => sum + entry.length, 0) > selectedCategory.maxCharacters) return
+    if (!worldId || values.reduce((sum, entry) => sum + (entry.title?.length ?? 0) + (entry.content?.length ?? 0), 0) > selectedCategory.maxCharacters) return
     const saveVersion = editVersionRef.current
     if (!silent) setMessage("")
     try {
@@ -213,7 +217,7 @@ export default function WorldPage({ onBack }) {
                 {entries.map((entry, index) => (
                   <article className="lore-entry" key={index}>
                     <span className="lore-number">{String(index + 1).padStart(2, "0")}</span>
-                    <textarea value={entry} onChange={(event) => updateEntry(index, event.target.value)} placeholder="이 설정에 필요한 내용만 간단히 적어 주세요." />
+                    <div className="lore-fields"><input className="lore-title-input" value={entry.title} onChange={(event) => updateEntry(index, "title", event.target.value)} placeholder="제목" /><textarea value={entry.content} onChange={(event) => updateEntry(index, "content", event.target.value)} placeholder="이 설정에 필요한 내용만 간단히 적어 주세요." /></div>
                     <button onClick={() => removeEntry(index)} type="button" aria-label="슬롯 삭제"><X size={16} /></button>
                   </article>
                 ))}
