@@ -13,7 +13,6 @@ public record CharacterCreateRequest(
 
         String description,
         String rawDescription,
-        String playGuide,
 
         @Size(max = 10)
         List<String> examples,
