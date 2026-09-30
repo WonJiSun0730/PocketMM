@@ -32,8 +32,7 @@ public class BeginChatCatchUpResolver {
 
     public record Resolution(
             CharacterState state,
-            List<CatchUpExecutionResult> aiResults,
-            List<EventCandidate> restCandidates,
+            List<CatchUpExecutionResult> executionResults,
             String pauseReason,
             boolean capped
     ) {}
@@ -73,11 +72,11 @@ public class BeginChatCatchUpResolver {
                                 )
                 );
 
-        var aiResults =
+        var executionResults =
                 new ArrayList<CatchUpExecutionResult>();
 
-        var restCandidates =
-                new ArrayList<EventCandidate>();
+        var transientNarrative =
+                new ArrayList<String>();
 
         String pauseReason = null;
 
@@ -107,43 +106,32 @@ public class BeginChatCatchUpResolver {
                 break;
             }
 
-            if (proposed.stream().anyMatch(
-                    EventCandidate::requiresAi
-            )) {
-                var result =
-                        catchUpExecution.resolve(
-                                state,
-                                segment,
-                                proposed,
-                                room
-                        );
+            var result =
+                    catchUpExecution.resolve(
+                            state,
+                            segment,
+                            proposed,
+                            room,
+                            transientNarrative
+                    );
 
-                aiResults.add(
-                        result
-                );
-
-                continue;
-            }
-
-            for (var candidate : proposed) {
-                state.apply(
-                        candidate.stateDelta()
-                );
-
-                restCandidates.add(
-                        candidate
-                );
-            }
-
-            state.advanceSimulatedAt(
-                    segment.end()
+            executionResults.add(
+                    result
             );
+
+            result.resolvedEvents()
+                    .stream()
+                    .map(event -> event.summary())
+                    .filter(summary ->
+                            summary != null
+                                    && !summary.isBlank()
+                    )
+                    .forEach(transientNarrative::add);
         }
 
         return new Resolution(
                 state,
-                List.copyOf(aiResults),
-                List.copyOf(restCandidates),
+                List.copyOf(executionResults),
                 pauseReason,
                 interval.capped()
         );

@@ -7,6 +7,8 @@ import com.example.projectmm.domain.ai.AiMemoryContext;
 import com.example.projectmm.domain.ai.AiRelationshipContext;
 import com.example.projectmm.domain.ai.AiRelationshipFactContext;
 import com.example.projectmm.domain.character.CharacterState;
+import com.example.projectmm.domain.chat.ChatMessageRepository;
+import com.example.projectmm.domain.chat.Conversation;
 import com.example.projectmm.domain.memory.EffectiveMemory;
 import com.example.projectmm.domain.memory.MemoryAccessLevel;
 import com.example.projectmm.domain.relationship.Relationship;
@@ -25,6 +27,7 @@ public class AiContextBuilder {
     private final RelationshipRepository relationshipRepository;
     private final MemoryReactivationContextService reactivationContextService;
     private final RelationshipFactRepository relationshipFactRepository;
+    private final ChatMessageRepository chatMessageRepository;
 
 
     public AiContextBuilder(
@@ -34,6 +37,7 @@ public class AiContextBuilder {
         this(
                 memoryRecallService,
                 relationshipRepository,
+                null,
                 null,
                 null
         );
@@ -48,6 +52,22 @@ public class AiContextBuilder {
                 memoryRecallService,
                 relationshipRepository,
                 reactivationContextService,
+                null,
+                null
+        );
+    }
+
+    public AiContextBuilder(
+            MemoryRecallService memoryRecallService,
+            RelationshipRepository relationshipRepository,
+            MemoryReactivationContextService reactivationContextService,
+            RelationshipFactRepository relationshipFactRepository
+    ) {
+        this(
+                memoryRecallService,
+                relationshipRepository,
+                reactivationContextService,
+                relationshipFactRepository,
                 null
         );
     }
@@ -59,8 +79,26 @@ public class AiContextBuilder {
         return build(state, candidate, null);
     }
 
-    public AiContext build(CharacterState state, EventCandidate candidate,
-                           com.example.projectmm.domain.chat.Conversation room) {
+    public AiContext build(
+            CharacterState state,
+            EventCandidate candidate,
+            Conversation room
+    ) {
+        return build(
+                state,
+                candidate,
+                room,
+                List.of()
+        );
+    }
+
+
+    public AiContext build(
+            CharacterState state,
+            EventCandidate candidate,
+            Conversation room,
+            List<String> transientNarrative
+    ) {
         List<EffectiveMemory> recalledMemories =
                 room == null ? memoryRecallService.recall(
                         state.getCharacter().getId(),
@@ -114,6 +152,36 @@ public class AiContextBuilder {
                         )
                         .toList();
 
+        List<String> storedNarrative =
+                room == null || chatMessageRepository == null
+                        ? List.of()
+                        : chatMessageRepository
+                        .findTop20ByConversationIdOrderByCreatedAtDesc(
+                                room.getId()
+                        )
+                        .stream()
+                        .limit(6)
+                        .map(message ->
+                                message.getRole().name()
+                                        + ": "
+                                        + message.getContent()
+                        )
+                        .toList()
+                        .reversed();
+
+        List<String> recentNarrative =
+                java.util.stream.Stream.concat(
+                                storedNarrative.stream(),
+                                transientNarrative == null
+                                        ? java.util.stream.Stream.empty()
+                                        : transientNarrative.stream()
+                        )
+                        .filter(item ->
+                                item != null
+                                        && !item.isBlank()
+                        )
+                        .toList();
+
         return new AiContext(
                 state.getCharacter().getId(),
                 state.getCharacter().getName(),
@@ -124,7 +192,8 @@ public class AiContextBuilder {
                 candidate.summary(),
                 memoryContexts,
                 relationshipContexts,
-                relationshipFactContexts
+                relationshipFactContexts,
+                recentNarrative
         );
     }
 

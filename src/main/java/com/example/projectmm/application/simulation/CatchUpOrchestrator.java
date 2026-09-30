@@ -48,18 +48,68 @@ public class CatchUpOrchestrator {
                         catchUp.to()
                 );
 
-        return executeSegments(state, catchUp, segments, null, null);
+        return executeSegments(
+                state,
+                catchUp,
+                segments,
+                null,
+                null,
+                List.of()
+        );
     }
 
-    public CatchUpExecutionResult execute(CharacterState state, CatchUpSegment segment,
-                                          List<EventCandidate> prepared, Conversation room) {
-        var duration = java.time.Duration.between(segment.start(), segment.end());
-        return executeSegments(state, new CatchUpResult(segment.start(), segment.end(), duration, duration, false),
-                List.of(segment), prepared, room);
+    public CatchUpExecutionResult execute(
+            CharacterState state,
+            CatchUpSegment segment,
+            List<EventCandidate> prepared,
+            Conversation room
+    ) {
+        return execute(
+                state,
+                segment,
+                prepared,
+                room,
+                List.of()
+        );
     }
 
-    private CatchUpExecutionResult executeSegments(CharacterState state, CatchUpResult catchUp,
-            List<CatchUpSegment> segments, List<EventCandidate> prepared, Conversation room) {
+    public CatchUpExecutionResult execute(
+            CharacterState state,
+            CatchUpSegment segment,
+            List<EventCandidate> prepared,
+            Conversation room,
+            List<String> transientNarrative
+    ) {
+        var duration =
+                java.time.Duration.between(
+                        segment.start(),
+                        segment.end()
+                );
+
+        return executeSegments(
+                state,
+                new CatchUpResult(
+                        segment.start(),
+                        segment.end(),
+                        duration,
+                        duration,
+                        false
+                ),
+                List.of(segment),
+                prepared,
+                room,
+                transientNarrative
+        );
+    }
+
+    private CatchUpExecutionResult executeSegments(
+            CharacterState state,
+            CatchUpResult catchUp,
+            List<CatchUpSegment> segments,
+            List<EventCandidate> prepared,
+            Conversation room,
+            List<String> transientNarrative
+    ) {
 
         List<EventCandidate> candidates =
                 new ArrayList<>();
@@ -83,16 +133,20 @@ public class CatchUpOrchestrator {
                             requestAiDecision(
                                     state,
                                     candidate,
-                                    "first", room
+                                    "first",
+                                    room,
+                                    transientNarrative
                             );
 
                     if (firstDecision == null) {
                         AiDecision retryDecision =
-                                requestAiDecision(
-                                        state,
-                                        candidate,
-                                        "retry", room
-                                );
+                        requestAiDecision(
+                                state,
+                                candidate,
+                                "retry",
+                                room,
+                                transientNarrative
+                        );
 
                         if (retryDecision == null) {
                             applyFallback(
@@ -172,7 +226,9 @@ public class CatchUpOrchestrator {
                             requestAiDecision(
                                     state,
                                     candidate,
-                                    "retry", room
+                                    "retry",
+                                    room,
+                                    transientNarrative
                             );
 
                     if (retryDecision == null) {
@@ -257,14 +313,22 @@ public class CatchUpOrchestrator {
             CharacterState state,
             EventCandidate candidate,
             String attempt,
-            Conversation room
+            Conversation room,
+            List<String> transientNarrative
     ) {
         try {
             AiContext context =
-                    room == null ? aiContextBuilder.build(
+                    room == null
+                            ? aiContextBuilder.build(
                             state,
                             candidate
-                    ) : aiContextBuilder.build(state, candidate, room);
+                    )
+                            : aiContextBuilder.build(
+                            state,
+                            candidate,
+                            room,
+                            transientNarrative
+                    );
 
             return aiGateway.decide(context);
 

@@ -188,6 +188,9 @@ public class GeminiAiGateway implements AiGateway {
         String relationshipFactPrompt =
                 buildRelationshipFactPrompt(context);
 
+        String recentNarrativePrompt =
+                buildRecentNarrativePrompt(context);
+
         String prompt = """
                 You are a simulation decision component for PocketMM.
 
@@ -207,6 +210,18 @@ public class GeminiAiGateway implements AiGateway {
                 
                 Confirmed relationship facts — authoritative current narrative state:
                 %s
+                
+                Recent narrative context — chronological, oldest to newest:
+                %s
+                
+                Narrative continuity rules:
+                - Treat recent narrative context as the immediate situation leading into this simulation step.
+                - Continue unresolved actions, conversations, conflicts, plans, obligations, and ongoing situations when they are still relevant.
+                - Do not abruptly replace an active situation with an unrelated routine activity merely because the candidate event is DAILY_ACTIVITY.
+                - For DAILY_ACTIVITY, choose a concrete plausible action from the character's current state, recent narrative context, memories, relationships, and simulation time.
+                - When several actions are plausible, variation is allowed only among actions that fit the established context.
+                - Do not invent a major event solely to make the simulation more interesting.
+                - If recent narrative context is empty or contains no active situation, ordinary autonomous daily activity is allowed.
                 
                 Relationship fact rules:
                 - The confirmed relationship facts above are authoritative current relationship state.
@@ -349,6 +364,7 @@ public class GeminiAiGateway implements AiGateway {
                         memoryPrompt,
                         relationshipPrompt,
                         relationshipFactPrompt,
+                        recentNarrativePrompt,
                         context.eventType(),
                         context.eventSummary()
                 );
@@ -641,6 +657,26 @@ public class GeminiAiGateway implements AiGateway {
                                 + fact.relation()
                                 + " | value="
                                 + fact.value()
+                )
+                .collect(
+                        java.util.stream.Collectors.joining("\n")
+                );
+    }
+
+    private String buildRecentNarrativePrompt(
+            AiContext context
+    ) {
+        if (context.recentNarrative() == null
+                || context.recentNarrative().isEmpty()) {
+
+            return "No recent narrative context.";
+        }
+
+        return context.recentNarrative()
+                .stream()
+                .filter(item ->
+                        item != null
+                                && !item.isBlank()
                 )
                 .collect(
                         java.util.stream.Collectors.joining("\n")

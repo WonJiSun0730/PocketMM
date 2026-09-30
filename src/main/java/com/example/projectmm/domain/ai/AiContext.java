@@ -13,7 +13,8 @@ public record AiContext(
         String eventSummary,
         List<AiMemoryContext> memories,
         List<AiRelationshipContext> relationships,
-        List<AiRelationshipFactContext> relationshipFacts
+        List<AiRelationshipFactContext> relationshipFacts,
+        List<String> recentNarrative
 ) {
 
     public AiContext(
@@ -37,6 +38,34 @@ public record AiContext(
                 eventSummary,
                 memories,
                 relationships,
+                List.of(),
+                List.of()
+        );
+    }
+
+    public AiContext(
+            Long characterId,
+            String characterName,
+            int energy,
+            int mood,
+            LocalDateTime simulatedAt,
+            String eventType,
+            String eventSummary,
+            List<AiMemoryContext> memories,
+            List<AiRelationshipContext> relationships,
+            List<AiRelationshipFactContext> relationshipFacts
+    ) {
+        this(
+                characterId,
+                characterName,
+                energy,
+                mood,
+                simulatedAt,
+                eventType,
+                eventSummary,
+                memories,
+                relationships,
+                relationshipFacts,
                 List.of()
         );
     }

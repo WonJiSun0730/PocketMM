@@ -29,8 +29,8 @@ public class BeginChatFinalizationService {
     private final ConversationRepository conversations;
     private final ConversationCatchUpRepository reports;
     private final ChatMessageRepository messages;
-    private final MemoryRepository memories;
     private final CatchUpExecutionService catchUpExecution;
+    private final CatchUpNarrativeComposer narrativeComposer;
     private final EntityManager em;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -120,66 +120,46 @@ public class BeginChatFinalizationService {
         var actions =
                 new ArrayList<String>();
 
-        for (var result : resolution.aiResults()) {
-            var events =
-                    catchUpExecution.persist(
-                            resolution.state(),
-                            result,
-                            room
-                    );
+        var resolvedEvents =
+                new ArrayList<com.example.projectmm.domain.simulation.ResolvedEvent>();
 
-            for (var event : events) {
-                String summary =
+        for (var result : resolution.executionResults()) {
+
+            catchUpExecution.persist(
+                    resolution.state(),
+                    result,
+                    room
+            );
+
+            resolvedEvents.addAll(
+                    result.resolvedEvents()
+            );
+
+            for (var event : result.resolvedEvents()) {
+                actions.add(
                         room.getCharacter().getName()
                                 + " — "
-                                + event.getSummary();
-
-                messages.save(
-                        new ChatMessage(
-                                room,
-                                room.getCharacter(),
-                                ChatRole.CHARACTER,
-                                "*" + summary + "*",
-                                ContentMode.NORMAL,
-                                preparation.requestedAt()
-                        )
-                );
-
-                actions.add(
-                        summary
+                                + event.summary()
                 );
             }
         }
 
-        for (var candidate : resolution.restCandidates()) {
-            String summary =
-                    room.getCharacter().getName()
-                            + " — 피로가 누적되어 휴식을 취했다.";
+        String catchUpNarrative =
+                narrativeComposer.compose(
+                        room.getCharacter(),
+                        resolvedEvents
+                );
 
-            var source =
-                    messages.save(
-                            new ChatMessage(
-                                    room,
-                                    room.getCharacter(),
-                                    ChatRole.CHARACTER,
-                                    "*" + summary + "*",
-                                    ContentMode.NORMAL,
-                                    preparation.requestedAt()
-                            )
-                    );
-
-            memories.save(
-                    Memory.fromAutomaticAction(
+        if (!catchUpNarrative.isBlank()) {
+            messages.save(
+                    new ChatMessage(
                             room,
-                            source,
-                            summary,
-                            candidate.importance(),
-                            candidate.occurredAt()
+                            room.getCharacter(),
+                            ChatRole.CHARACTER,
+                            "*" + catchUpNarrative + "*",
+                            ContentMode.NORMAL,
+                            preparation.requestedAt()
                     )
-            );
-
-            actions.add(
-                    summary
             );
         }
 

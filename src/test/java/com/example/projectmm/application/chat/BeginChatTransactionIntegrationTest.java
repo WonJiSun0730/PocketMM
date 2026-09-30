@@ -24,6 +24,15 @@ import static org.mockito.Mockito.when;
 @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
 class BeginChatTransactionIntegrationTest extends ConversationProgressTestSupport {
 
+    @MockitoBean
+    CatchUpNarrativeComposer narrativeComposer;
+    @BeforeEach
+    void catchUpNarrative() {
+        when(narrativeComposer.compose(
+                org.mockito.ArgumentMatchers.any(Character.class),
+                org.mockito.ArgumentMatchers.anyList()
+        )).thenReturn("");
+    }
     private record CommittedFixture(Long roomId, Long profileId, Long characterId) {}
     private final java.util.List<CommittedFixture> committedFixtures = new java.util.ArrayList<>();
 
@@ -187,7 +196,8 @@ class BeginChatTransactionIntegrationTest extends ConversationProgressTestSuppor
                     org.mockito.ArgumentMatchers.any(CharacterState.class),
                     org.mockito.ArgumentMatchers.any(CatchUpSegment.class),
                     org.mockito.ArgumentMatchers.anyList(),
-                    org.mockito.ArgumentMatchers.any(Conversation.class)
+                    org.mockito.ArgumentMatchers.any(Conversation.class),
+                    org.mockito.ArgumentMatchers.anyList()
             );
 
             var operation =
@@ -333,7 +343,8 @@ class BeginChatTransactionIntegrationTest extends ConversationProgressTestSuppor
                     org.mockito.ArgumentMatchers.any(CharacterState.class),
                     org.mockito.ArgumentMatchers.any(CatchUpSegment.class),
                     org.mockito.ArgumentMatchers.anyList(),
-                    org.mockito.ArgumentMatchers.any(Conversation.class)
+                    org.mockito.ArgumentMatchers.any(Conversation.class),
+                    org.mockito.ArgumentMatchers.anyList()
             );
 
             try (var executor =
@@ -489,7 +500,8 @@ class BeginChatTransactionIntegrationTest extends ConversationProgressTestSuppor
                 org.mockito.ArgumentMatchers.any(CharacterState.class),
                 org.mockito.ArgumentMatchers.any(CatchUpSegment.class),
                 org.mockito.ArgumentMatchers.anyList(),
-                org.mockito.ArgumentMatchers.any(Conversation.class)
+                org.mockito.ArgumentMatchers.any(Conversation.class),
+                org.mockito.ArgumentMatchers.anyList()
         );
 
         assertThatThrownBy(() ->
@@ -541,6 +553,13 @@ class BeginChatTransactionIntegrationTest extends ConversationProgressTestSuppor
         when(clock.now())
                 .thenReturn(real.plusHours(1));
 
+        when(narrativeComposer.compose(
+                org.mockito.ArgumentMatchers.any(Character.class),
+                org.mockito.ArgumentMatchers.anyList()
+        )).thenReturn(
+                "충분히 휴식을 취한 뒤, 한결 가벼워진 몸으로 다시 하루를 이어갈 준비를 했다."
+        );
+
         var operation =
                 service.beginChat(
                         characterId,
@@ -569,7 +588,7 @@ class BeginChatTransactionIntegrationTest extends ConversationProgressTestSuppor
                         characterId,
                         room.getId()
                 )
-        ).hasSize(1);
+        ).isEmpty();
 
         service.endChat(
                 characterId,
@@ -808,7 +827,6 @@ class BeginChatTransactionIntegrationTest extends ConversationProgressTestSuppor
             var resolution =
                     new BeginChatCatchUpResolver.Resolution(
                             state,
-                            java.util.List.of(),
                             java.util.List.of(),
                             null,
                             false

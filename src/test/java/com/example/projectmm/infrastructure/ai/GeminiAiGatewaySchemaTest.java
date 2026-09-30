@@ -539,6 +539,62 @@ class GeminiAiGatewaySchemaTest {
         ).isEqualTo("spouse");
     }
 
+    @Test
+    void DAILY_ACTIVITY_프롬프트에_최근_서사와_연속성_규칙을_포함한다() {
+
+        GeminiAiGateway gateway =
+                new GeminiAiGateway(
+                        "test-key",
+                        "test-model",
+                        new ObjectMapper()
+                );
+
+        AiContext context =
+                new AiContext(
+                        1L,
+                        "Millie",
+                        70,
+                        70,
+                        LocalDateTime.of(
+                                2026, 9, 30,
+                                15, 0
+                        ),
+                        "DAILY_ACTIVITY",
+                        "현재 상태와 최근 맥락에 맞는 일상 행동을 했다.",
+                        List.of(),
+                        List.of(),
+                        List.of(),
+                        List.of(
+                                "USER: 오늘은 일이 너무 많았어.",
+                                "CHARACTER: 밀리는 아직 책상 앞에서 일을 이어가고 있었다."
+                        )
+                );
+
+        Map<String, Object> request =
+                gateway.createRequest(context);
+
+        String prompt =
+                request.get("contents")
+                        .toString();
+
+        assertThat(prompt)
+                .contains(
+                        "Recent narrative context",
+                        "USER: 오늘은 일이 너무 많았어.",
+                        "CHARACTER: 밀리는 아직 책상 앞에서 일을 이어가고 있었다.",
+                        "Continue unresolved actions",
+                        "For DAILY_ACTIVITY, choose a concrete plausible action"
+                );
+
+        assertThat(
+                prompt.indexOf("USER: 오늘은 일이 너무 많았어.")
+        ).isLessThan(
+                prompt.indexOf(
+                        "CHARACTER: 밀리는 아직 책상 앞에서 일을 이어가고 있었다."
+                )
+        );
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> map(
             Object value

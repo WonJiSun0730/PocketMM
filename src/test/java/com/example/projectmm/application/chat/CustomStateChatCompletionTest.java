@@ -39,6 +39,8 @@ import static org.mockito.Mockito.*;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class CustomStateChatCompletionTest {
     @MockitoBean CatchUpExecutionService execution;
+    @MockitoBean CatchUpNarrativeComposer narrativeComposer;
+
     @Autowired ConversationProgressService progress;
     @Autowired CustomStateService custom;
     @Autowired CustomStateProposalService proposals;

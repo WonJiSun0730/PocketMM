@@ -32,6 +32,8 @@ public class CatchUpEventCandidateService {
                             new StateDelta(30, 0)
                     )
             );
+
+            return candidates;
         }
 
         if (state.getMood() <= 20) {
@@ -46,7 +48,20 @@ public class CatchUpEventCandidateService {
                             StateDelta.none()
                     )
             );
+
+            return candidates;
         }
+
+        candidates.add(
+                new EventCandidate(
+                        segment.start(),
+                        "DAILY_ACTIVITY",
+                        "현재 상태와 최근 맥락에 맞는 일상 행동을 했다.",
+                        2,
+                        true,
+                        StateDelta.none()
+                )
+        );
 
         return candidates;
     }

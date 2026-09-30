@@ -59,6 +59,22 @@ public class CatchUpExecutionService {
             List<EventCandidate> prepared,
             Conversation room
     ) {
+        return resolve(
+                state,
+                segment,
+                prepared,
+                room,
+                List.of()
+        );
+    }
+
+    public CatchUpExecutionResult resolve(
+            CharacterState state,
+            CatchUpSegment segment,
+            List<EventCandidate> prepared,
+            Conversation room,
+            List<String> transientNarrative
+    ) {
         if (!state.getCharacter().getId().equals(room.getCharacter().getId())) {
             throw new IllegalArgumentException(
                     "catch-up character must match conversation"
@@ -69,7 +85,8 @@ public class CatchUpExecutionService {
                 state,
                 segment,
                 prepared,
-                room
+                room,
+                transientNarrative
         );
     }
 

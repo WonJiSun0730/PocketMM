@@ -51,11 +51,71 @@ abstract class ConversationProgressTestSupport {
     BeginChatFinalizationService beginChatFinalization;
     @MockitoBean PresenceClock clock;
     @MockitoBean CatchUpExecutionService execution;
+    @MockitoBean CatchUpNarrativeComposer narrativeComposer;
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean CatchUpEventCandidateService candidateService;
     final LocalDateTime real = LocalDateTime.of(2026, 9, 23, 12, 0);
     final LocalDateTime story = LocalDateTime.of(2030, 1, 1, 23, 0);
 
-    @BeforeEach void time() { when(clock.now()).thenReturn(real); }
+    @BeforeEach
+    void time() {
+        when(clock.now()).thenReturn(real);
+
+        when(execution.resolve(
+                org.mockito.ArgumentMatchers.any(CharacterState.class),
+                org.mockito.ArgumentMatchers.any(CatchUpSegment.class),
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.any(Conversation.class),
+                org.mockito.ArgumentMatchers.anyList()
+        )).thenAnswer(invocation -> {
+            CharacterState state =
+                    invocation.getArgument(0);
+
+            CatchUpSegment segment =
+                    invocation.getArgument(1);
+
+            state.advanceSimulatedAt(
+                    segment.end()
+            );
+
+            var duration =
+                    java.time.Duration.between(
+                            segment.start(),
+                            segment.end()
+                    );
+
+            return new CatchUpExecutionResult(
+                    new CatchUpResult(
+                            segment.start(),
+                            segment.end(),
+                            duration,
+                            duration,
+                            false
+                    ),
+                    java.util.List.of(segment),
+                    java.util.List.of(),
+                    java.util.List.of()
+            );
+        });
+
+        when(execution.execute(
+                org.mockito.ArgumentMatchers.any(CharacterState.class),
+                org.mockito.ArgumentMatchers.any(CatchUpSegment.class),
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.any(Conversation.class)
+        )).thenAnswer(invocation -> {
+            CharacterState state =
+                    invocation.getArgument(0);
+
+            CatchUpSegment segment =
+                    invocation.getArgument(1);
+
+            state.advanceSimulatedAt(
+                    segment.end()
+            );
+
+            return java.util.List.of();
+        });
+    }
 
     Conversation fixture(boolean independent, int energy, int mood) {
         var character = new Character("자동 행동 QA");

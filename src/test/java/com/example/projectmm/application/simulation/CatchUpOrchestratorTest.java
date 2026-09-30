@@ -5,6 +5,7 @@ import com.example.projectmm.application.ai.AiDecisionValidator;
 import com.example.projectmm.application.ai.AiGateway;
 import com.example.projectmm.application.memory.MemoryDetailCandidate;
 import com.example.projectmm.application.memory.MemoryRecallService;
+import com.example.projectmm.domain.ai.AiContext;
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.character.CharacterState;
 import com.example.projectmm.domain.memory.MemoryDetailSalience;
@@ -15,6 +16,7 @@ import com.example.projectmm.infrastructure.ai.MockAiGateway;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -98,13 +100,34 @@ class CatchUpOrchestratorTest {
                 .hasSize(4);
 
         assertThat(result.candidates())
-                .hasSize(1);
+                .extracting(EventCandidate::eventType)
+                .containsExactly(
+                        "DAILY_ACTIVITY",
+                        "DAILY_ACTIVITY",
+                        "REST",
+                        "DAILY_ACTIVITY"
+                );
 
-        assertThat(result.candidates().getFirst().eventType())
-                .isEqualTo("REST");
+        assertThat(result.candidates())
+                .filteredOn(candidate ->
+                        "REST".equals(candidate.eventType())
+                )
+                .singleElement()
+                .satisfies(candidate ->
+                        assertThat(candidate.requiresAi())
+                                .isFalse()
+                );
 
-        assertThat(result.candidates().getFirst().requiresAi())
-                .isFalse();
+        assertThat(result.candidates())
+                .filteredOn(candidate ->
+                        "DAILY_ACTIVITY".equals(
+                                candidate.eventType()
+                        )
+                )
+                .allSatisfy(candidate ->
+                        assertThat(candidate.requiresAi())
+                                .isTrue()
+                );
 
         assertThat(state.getEnergy())
                 .isEqualTo(60);
@@ -113,13 +136,35 @@ class CatchUpOrchestratorTest {
                 .isEqualTo(currentTime);
 
         assertThat(result.resolvedEvents())
-                .hasSize(1);
+                .hasSize(4);
 
-        assertThat(result.resolvedEvents().getFirst().eventType())
-                .isEqualTo("REST");
+        assertThat(result.resolvedEvents())
+                .extracting(ResolvedEvent::eventType)
+                .containsExactly(
+                        "REFLECTION",
+                        "REFLECTION",
+                        "REST",
+                        "REFLECTION"
+                );
 
-        assertThat(result.resolvedEvents().getFirst().source())
-                .isEqualTo(EventSource.RULE);
+        assertThat(result.resolvedEvents())
+                .filteredOn(event ->
+                        "REST".equals(event.eventType())
+                )
+                .singleElement()
+                .satisfies(event ->
+                        assertThat(event.source())
+                                .isEqualTo(EventSource.RULE)
+                );
+
+        assertThat(result.resolvedEvents())
+                .filteredOn(event ->
+                        "REFLECTION".equals(event.eventType())
+                )
+                .allSatisfy(event ->
+                        assertThat(event.source())
+                                .isEqualTo(EventSource.AI)
+                );
     }
 
     @Test

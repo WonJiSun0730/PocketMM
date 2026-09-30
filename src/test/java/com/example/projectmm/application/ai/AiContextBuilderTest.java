@@ -5,6 +5,10 @@ import com.example.projectmm.application.memory.MemoryRecallService;
 import com.example.projectmm.domain.ai.AiContext;
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.character.CharacterState;
+import com.example.projectmm.domain.chat.ChatMessage;
+import com.example.projectmm.domain.chat.ChatMessageRepository;
+import com.example.projectmm.domain.chat.ChatRole;
+import com.example.projectmm.domain.chat.Conversation;
 import com.example.projectmm.domain.memory.EffectiveMemory;
 import com.example.projectmm.domain.memory.Memory;
 import com.example.projectmm.domain.memory.MemoryAccessLevel;
@@ -41,12 +45,16 @@ class AiContextBuilderTest {
     private final MemoryReactivationContextService reactivationContextService =
             mock(MemoryReactivationContextService.class);
 
+    private final ChatMessageRepository chatMessageRepository =
+            mock(ChatMessageRepository.class);
+
     private final AiContextBuilder builder =
             new AiContextBuilder(
                     memoryRecallService,
                     relationshipRepository,
                     reactivationContextService,
-                    relationshipFactRepository
+                    relationshipFactRepository,
+                    chatMessageRepository
             );
 
     @Test
@@ -1187,5 +1195,118 @@ class AiContextBuilderTest {
                         .getFirst()
                         .value()
         ).isEqualTo("spouse");
+    }
+
+    @Test
+    void 대화방의_최근_서사를_시간순으로_AI_Context에_포함한다() {
+
+        LocalDateTime now =
+                LocalDateTime.of(
+                        2026, 9, 30,
+                        15, 0
+                );
+
+        Character character =
+                new Character("Millie");
+
+        CharacterState state =
+                new CharacterState(
+                        character,
+                        70,
+                        70,
+                        now
+                );
+
+        EventCandidate candidate =
+                new EventCandidate(
+                        now,
+                        "DAILY_ACTIVITY",
+                        "현재 상태와 최근 맥락에 맞는 일상 행동을 했다.",
+                        2,
+                        true,
+                        StateDelta.none()
+                );
+
+        Conversation room =
+                mock(Conversation.class);
+
+        when(room.getId())
+                .thenReturn(10L);
+
+        when(room.isIndependentStart())
+                .thenReturn(false);
+
+        ChatMessage older =
+                mock(ChatMessage.class);
+
+        when(older.getRole())
+                .thenReturn(ChatRole.USER);
+
+        when(older.getContent())
+                .thenReturn(
+                        "오늘은 일이 너무 많았어."
+                );
+
+        ChatMessage newer =
+                mock(ChatMessage.class);
+
+        when(newer.getRole())
+                .thenReturn(ChatRole.CHARACTER);
+
+        when(newer.getContent())
+                .thenReturn(
+                        "밀리는 아직 책상 앞에서 일을 이어가고 있었다."
+                );
+
+        when(
+                memoryRecallService.recallForConversation(
+                        character.getId(),
+                        10L,
+                        now,
+                        5,
+                        candidate.summary(),
+                        true
+                )
+        ).thenReturn(List.of());
+
+        when(
+                relationshipRepository.findByFromCharacterId(
+                        character.getId()
+                )
+        ).thenReturn(List.of());
+
+        when(
+                relationshipFactRepository.findByFromCharacterId(
+                        character.getId()
+                )
+        ).thenReturn(List.of());
+
+        /*
+         * Repository는 최신순으로 반환한다.
+         */
+        when(
+                chatMessageRepository
+                        .findTop20ByConversationIdOrderByCreatedAtDesc(
+                                10L
+                        )
+        ).thenReturn(
+                List.of(
+                        newer,
+                        older
+                )
+        );
+
+        AiContext context =
+                builder.build(
+                        state,
+                        candidate,
+                        room
+                );
+
+        assertThat(context.recentNarrative())
+                .containsExactly(
+                        "USER: 오늘은 일이 너무 많았어.",
+                        "CHARACTER: 밀리는 아직 책상 앞에서 일을 이어가고 있었다."
+                );
     }
 }
