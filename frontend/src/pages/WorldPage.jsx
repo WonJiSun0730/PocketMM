@@ -21,7 +21,7 @@ export default function WorldPage({ onBack }) {
   const [message, setMessage] = useState("")
   const [draftReady, setDraftReady] = useState(false)
   const [worldDialog, setWorldDialog] = useState(null)
-  const [worldForm, setWorldForm] = useState({ name: "", description: "" })
+  const [worldForm, setWorldForm] = useState({ name: "", description: "", introduction: "" })
   const [worldSubmitting, setWorldSubmitting] = useState(false)
   const [systemMode, setSystemMode] = useState(false)
   const [playGuide, setPlayGuide] = useState("")
@@ -171,13 +171,13 @@ export default function WorldPage({ onBack }) {
   }
 
   function openCreateWorld() {
-    setWorldForm({ name: "", description: "" })
+    setWorldForm({ name: "", description: "", introduction: "" })
     setWorldDialog("create")
   }
 
   function openEditWorld() {
     if (!selectedWorld) return
-    setWorldForm({ name: selectedWorld.name, description: selectedWorld.description ?? "" })
+    setWorldForm({ name: selectedWorld.name, description: selectedWorld.description ?? "", introduction: selectedWorld.introduction ?? "" })
     setWorldDialog("edit")
   }
 
@@ -192,7 +192,7 @@ export default function WorldPage({ onBack }) {
         method: editing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ name, description: worldForm.description.trim() || null }),
+        body: JSON.stringify({ name, description: worldForm.description.trim() || null, introduction: worldForm.introduction.trim() || null }),
       })
       if (!response.ok) throw new Error(editing ? "월드 정보를 수정하지 못했어요." : "월드를 만들지 못했어요.")
       const world = await response.json()
@@ -342,7 +342,7 @@ export default function WorldPage({ onBack }) {
         </section>
       </div>
 
-      {worldDialog && <div className="world-dialog-backdrop" onMouseDown={() => setWorldDialog(null)}><form className="world-dialog" onSubmit={submitWorld} onMouseDown={(event) => event.stopPropagation()}><div className="world-dialog-heading"><div><span className="world-eyebrow">{worldDialog === "edit" ? "EDIT WORLD" : "NEW WORLD"}</span><h2>{worldDialog === "edit" ? "세계관 정보 수정" : "새 세계관 만들기"}</h2></div><button type="button" onClick={() => setWorldDialog(null)} aria-label="닫기"><X size={18} /></button></div><label>세계관 이름<input autoFocus maxLength={100} value={worldForm.name} onChange={(event) => setWorldForm((current) => ({ ...current, name: event.target.value }))} placeholder="세계관 이름" /></label><label>설명 <small>AI에게 전달되지 않는 메모예요.</small><textarea value={worldForm.description} onChange={(event) => setWorldForm((current) => ({ ...current, description: event.target.value }))} placeholder="이 세계관을 구분하기 위한 설명이나 개인 메모를 적어 주세요." /></label><div className="world-dialog-actions"><button type="button" onClick={() => setWorldDialog(null)}>취소</button><button className="primary" disabled={!worldForm.name.trim() || worldSubmitting} type="submit">{worldSubmitting ? "처리 중..." : worldDialog === "edit" ? "수정" : "생성"}</button></div></form></div>}
+      {worldDialog && <div className="world-dialog-backdrop" onMouseDown={() => setWorldDialog(null)}><form className="world-dialog" onSubmit={submitWorld} onMouseDown={(event) => event.stopPropagation()}><div className="world-dialog-heading"><div><span className="world-eyebrow">{worldDialog === "edit" ? "EDIT WORLD" : "NEW WORLD"}</span><h2>{worldDialog === "edit" ? "세계관 정보 수정" : "새 세계관 만들기"}</h2></div><button type="button" onClick={() => setWorldDialog(null)} aria-label="닫기"><X size={18} /></button></div><label>세계관 이름<input autoFocus maxLength={100} value={worldForm.name} onChange={(event) => setWorldForm((current) => ({ ...current, name: event.target.value }))} placeholder="세계관 이름" /></label><label>설명 <small>AI에게 전달되지 않는 메모예요.</small><textarea value={worldForm.description} onChange={(event) => setWorldForm((current) => ({ ...current, description: event.target.value }))} placeholder="이 세계관을 구분하기 위한 설명이나 개인 메모를 적어 주세요." /></label><label>도입 <small>월드에 처음 들어갔을 때 시작되는 장면이에요. {worldForm.introduction.length}/2000자</small><textarea maxLength={2000} value={worldForm.introduction} onChange={(event) => setWorldForm((current) => ({ ...current, introduction: event.target.value }))} placeholder="이 세계에 들어왔을 때 처음 마주하는 상황과 장면을 작성해 주세요." /></label><div className="world-dialog-actions"><button type="button" onClick={() => setWorldDialog(null)}>취소</button><button className="primary" disabled={!worldForm.name.trim() || worldSubmitting} type="submit">{worldSubmitting ? "처리 중..." : worldDialog === "edit" ? "수정" : "생성"}</button></div></form></div>}
     </main>
   )
 }
