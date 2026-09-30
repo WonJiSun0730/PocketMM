@@ -7,6 +7,8 @@ import com.example.projectmm.application.chat.ChatHistoryResponse;
 import com.example.projectmm.application.chat.ChatRequest;
 import com.example.projectmm.application.chat.ChatResponse;
 import com.example.projectmm.application.chat.ChatService;
+import com.example.projectmm.application.player.ConversationPlayerService;
+import com.example.projectmm.application.player.PlayerSelectionRequest;
 import com.example.projectmm.domain.world.WorldLoreCategory;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ public class WorldController {
     private final WorldSystemService worldSystemService;
     private final WorldCharacterService worldCharacterService;
     private final ChatService chatService;
+    private final ConversationPlayerService conversationPlayerService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -99,6 +102,22 @@ public class WorldController {
     public List<WorldCharacterItem> replaceCharacters(@PathVariable Long worldId, @RequestBody WorldCharacterUpdateRequest request, Authentication authentication) {
         return worldCharacterService.replace(worldId, request.characterIds(), authentication.getName());
     }
+    @GetMapping("/{worldId}/characters/{characterId}/session")
+    public ConversationPlayerService.Session worldSession(@PathVariable Long worldId, @PathVariable Long characterId) {
+        var room = chatService.getOrCreateWorldConversation(worldId, characterId);
+        return conversationPlayerService.current(characterId, room.getId());
+    }
+
+    @PutMapping("/{worldId}/characters/{characterId}/player-profile")
+    public ConversationPlayerService.Session selectWorldPlayer(
+            @PathVariable Long worldId,
+            @PathVariable Long characterId,
+            @Valid @RequestBody PlayerSelectionRequest request
+    ) {
+        var room = chatService.getOrCreateWorldConversation(worldId, characterId);
+        return conversationPlayerService.select(characterId, room.getId(), request.playerProfileId());
+    }
+
     @PostMapping("/{worldId}/characters/{characterId}/chat")
     public ChatResponse chatInWorld(@PathVariable Long worldId, @PathVariable Long characterId, @RequestBody ChatRequest request) {
         return chatService.chatInWorld(worldId, characterId, request);
