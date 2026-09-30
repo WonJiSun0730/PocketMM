@@ -31,7 +31,9 @@ public class WorldSystemService {
     @Transactional
     public WorldSystemsResponse replace(Long worldId, WorldSystemsRequest request, String loginId) {
         World world = owned(worldId, loginId);
-        world.updatePlayGuide(blankToNull(request.playGuide()));
+        String playGuide = blankToNull(request.playGuide());
+        if (playGuide != null && playGuide.length() > 1000) throw new IllegalArgumentException("Play guide must not exceed 1000 characters.");
+        world.updatePlayGuide(playGuide);
         for (WorldSystem system : systems.findByWorldIdOrderBySortOrderAsc(worldId)) {
             states.deleteBySystemId(system.getId());
         }
@@ -39,6 +41,8 @@ public class WorldSystemService {
 
         List<WorldSystemItem> normalized = new ArrayList<>();
         List<WorldSystemItem> requested = request.systems() == null ? List.of() : request.systems();
+        long definedSystemCount = requested.stream().filter(item -> item.name() != null && !item.name().isBlank()).count();
+        if (definedSystemCount > 5) throw new IllegalArgumentException("World systems must not exceed 5.");
         for (int i = 0; i < requested.size(); i++) {
             WorldSystemItem item = requested.get(i);
             if (item.name() == null || item.name().isBlank()) continue;
