@@ -1,6 +1,7 @@
 package com.example.projectmm.domain.character;
 
 import com.example.projectmm.domain.member.Member;
+import com.example.projectmm.domain.world.World;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -38,4 +39,12 @@ public class Character {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_member_id")
     private Member owner;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "world_id")
+    private World world;
+
+    public void assignWorld(World world) {
+        this.world = world;
+    }
 }
