@@ -16,6 +16,7 @@ import com.example.projectmm.domain.relationship.*;
 import com.example.projectmm.domain.scene.SceneRepository;
 import com.example.projectmm.domain.simulation.StateDelta;
 import jakarta.persistence.EntityManager;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -66,12 +67,23 @@ class ConversationCatchUpExecutionTest {
     private final java.util.List<Long> fixtureCharacters = new java.util.ArrayList<>();
     private Long fixtureProfileId;
     @MockitoBean PresenceClock clock;
+    @MockitoBean CatchUpNarrativeComposer narrativeComposer;
     @MockitoBean AiGateway gateway;
     @MockitoBean MemoryRecallService recall;
     @MockitoBean MemoryReactivationContextService reactivation;
     @MockitoSpyBean CatchUpEventCandidateService candidates;
     private final LocalDateTime real = LocalDateTime.of(2026, 9, 29, 12, 0);
     private final LocalDateTime story = LocalDateTime.of(2030, 1, 1, 23, 0);
+
+    @BeforeEach
+    void catchUpNarrative() {
+        when(narrativeComposer.compose(
+                any(Character.class),
+                anyList()
+        )).thenReturn(
+                "자리를 비운 동안의 시간을 보내고 다시 대화를 이어갈 준비를 했다."
+        );
+    }
 
     @Test
     void httpChatReachesAdvancedPersistenceBeforeLiveReply() throws Exception {
@@ -131,7 +143,15 @@ class ConversationCatchUpExecutionTest {
                 new StateDelta(-3, 8), other.getId(), new RelationshipDelta(2, 3, 0),
                 new MemoryAccessChange("ALL", "BLOCKED", null), List.of(),
                 new RelationshipFactChange(other.getId(), "role", "friend")));
-        absent(room);
+        progress.configure(
+                room.getCharacter().getId(),
+                room.getId(),
+                true
+        );
+
+        when(clock.now()).thenReturn(
+                real.plusHours(7)
+        );
         var operation = narrative.beginLiveDialogue(room.getCharacter().getId(), room.getId());
         assertThat(operation.entry()).isEqualTo(NarrativeEntry.AFTER_CATCH_UP);
         assertThat(operation.mode()).isEqualTo(NarrativeMode.LIVE_DIALOGUE);
@@ -141,7 +161,8 @@ class ConversationCatchUpExecutionTest {
         var stored = rooms.findById(room.getId()).orElseThrow();
         assertThat(stored.getEnergy()).isEqualTo(47); // REST +30, AI -3, each once
         assertThat(stored.getMood()).isEqualTo(18);
-        assertThat(stored.getSimulatedAt()).isEqualTo(story.plusMinutes(2));
+        assertThat(stored.getSimulatedAt())
+                .isEqualTo(story.plusHours(7));
         assertThat(stored.getChatOperationId()).isEqualTo(operation.token());
         assertThat(stored.getProgressPauseReason()).isNull();
         assertThat(events.count()).isEqualTo(2);
@@ -162,7 +183,11 @@ class ConversationCatchUpExecutionTest {
         assertThat(access.findByMemoryId(worldMemory.getId())).isEmpty();
         assertThat(rooms.findById(otherRoom.getId()).orElseThrow().getEnergy()).isEqualTo(70);
         assertThat(em.createQuery("select s from CharacterState s", CharacterState.class).getSingleResult().getEnergy()).isEqualTo(20);
-        assertThat(reports.findTopByConversationIdOrderByIdDesc(room.getId()).orElseThrow().getAppliedSeconds()).isEqualTo(120);
+        assertThat(
+                reports.findTopByConversationIdOrderByIdDesc(room.getId())
+                        .orElseThrow()
+                        .getAppliedSeconds()
+        ).isEqualTo(7 * 60 * 60);
         assertThat(messages.findTop20ByConversationIdOrderByCreatedAtDesc(room.getId())).hasSize(2);
         progress.endChat(room.getCharacter().getId(), room.getId(), operation.token());
         assertThat(narrative.beginLiveDialogue(room.getCharacter().getId(), room.getId()).entry()).isEqualTo(NarrativeEntry.DIRECT);
@@ -191,7 +216,10 @@ class ConversationCatchUpExecutionTest {
         var operation = narrative.beginLiveDialogue(room.getCharacter().getId(), room.getId());
         assertThat(operation.room().getEnergy()).isEqualTo(50);
         assertThat(operation.entry()).isEqualTo(NarrativeEntry.AFTER_CATCH_UP);
-        assertThat(memories.findForConversation(room.getCharacter().getId(), room.getId())).hasSize(1);
+        assertThat(memories.findForConversation(
+                room.getCharacter().getId(),
+                room.getId()
+        )).isEmpty();
         assertThat(messages.findTop20ByConversationIdOrderByCreatedAtDesc(room.getId())).hasSize(1);
         assertThat(events.count()).isZero();
         verifyNoInteractions(gateway);
