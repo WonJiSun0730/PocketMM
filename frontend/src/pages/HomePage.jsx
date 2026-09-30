@@ -32,7 +32,7 @@ const navItems = [
   { id: "settings", label: "설정", icon: Settings },
 ]
 
-export default function HomePage({ onOpenCharacters }) {
+export default function HomePage({ onOpenCharacters, onOpenWorld }) {
   const [dark, setDark] = useState(() =>
     document.documentElement.classList.contains("dark")
   )
@@ -44,6 +44,9 @@ export default function HomePage({ onOpenCharacters }) {
   function selectNav(id) {
     if (id === "characters") {
       onOpenCharacters()
+    }
+    if (id === "timeline") {
+      onOpenWorld()
     }
   }
 
