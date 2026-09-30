@@ -22,6 +22,12 @@ public class Character {
         this.owner = owner;
     }
 
+    public void assignOwnerIfMissing(Member owner) {
+        if (this.owner == null) {
+            this.owner = owner;
+        }
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
