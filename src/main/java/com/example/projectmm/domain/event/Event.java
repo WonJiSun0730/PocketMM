@@ -57,10 +57,36 @@ public class Event { //세계에서 실제로 무슨 일이 일어났는가 - �
             int narrativeAnchor,
             StateDelta stateDelta
     ) {
+        this(
+                scene,
+                occurredAt,
+                eventType,
+                summary,
+                "",
+                importance,
+                narrativeAnchor,
+                stateDelta
+        );
+    }
+
+    public Event(
+            Scene scene,
+            LocalDateTime occurredAt,
+            String eventType,
+            String summary,
+            String outcome,
+            int importance,
+            int narrativeAnchor,
+            StateDelta stateDelta
+    ) {
         this.scene = scene;
         this.occurredAt = occurredAt;
         this.eventType = eventType;
         this.summary = summary;
+        this.outcome =
+                outcome == null
+                        ? ""
+                        : outcome.strip();
         this.importance = importance;
         this.narrativeAnchor =
                 clampNarrativeAnchor(
@@ -115,6 +141,9 @@ public class Event { //세계에서 실제로 무슨 일이 일어났는가 - �
 
     @Column(nullable = false, length = 500)
     private String summary;                 //사건 기록
+
+    @Column(nullable = false, length = 500)
+    private String outcome;
 
     @Column(nullable = false)
     private int importance;                 //기억 후보/요약 등에 사용할 중요도

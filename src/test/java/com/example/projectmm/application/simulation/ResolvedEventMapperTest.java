@@ -38,11 +38,16 @@ class ResolvedEventMapperTest {
                         occurredAt,
                         "REFLECTION",
                         "밀리는 잠시 자신의 감정을 돌아보았다.",
+                        "친구에게 연락하기로 마음먹었다.",
                         4,
+                        0,
                         new StateDelta(0, 5),
                         null,
                         RelationshipDelta.none(),
-                        EventSource.AI
+                        EventSource.AI,
+                        null,
+                        java.util.List.of(),
+                        null
                 );
 
         Event event =

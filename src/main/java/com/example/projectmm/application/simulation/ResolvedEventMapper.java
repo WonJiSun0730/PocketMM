@@ -17,6 +17,7 @@ public class ResolvedEventMapper {
                 resolvedEvent.occurredAt(),
                 resolvedEvent.eventType(),
                 resolvedEvent.summary(),
+                resolvedEvent.outcome(),
                 resolvedEvent.importance(),
                 resolvedEvent.narrativeAnchor(),
                 resolvedEvent.stateDelta()
