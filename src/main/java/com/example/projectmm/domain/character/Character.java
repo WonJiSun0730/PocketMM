@@ -10,6 +10,13 @@ import lombok.*;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Character {
 
+    /**
+     * Test/legacy compatibility constructor. Production character creation should supply an owner.
+     */
+    public Character(String name) {
+        this.name = name;
+    }
+
     public Character(String name, Member owner) {
         this.name = name;
         this.owner = owner;
