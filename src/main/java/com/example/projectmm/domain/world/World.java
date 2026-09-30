@@ -27,10 +27,18 @@ public class World {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Lob
+    @Column(name = "play_guide", columnDefinition = "TEXT")
+    private String playGuide;
+
     public World(Member owner, String name, String description) {
         this.owner = owner;
         this.name = name;
         this.description = description;
+    }
+
+    public void updatePlayGuide(String playGuide) {
+        this.playGuide = playGuide;
     }
 
     public void updateMetadata(String name, String description) {
