@@ -3,9 +3,10 @@ import { useState } from "react"
 import CharacterCreatePage from "@/pages/CharacterCreatePage"
 import CharacterPage from "@/pages/CharacterPage"
 import ChatPage from "@/pages/ChatPage"
+import HomePage from "@/pages/HomePage"
 
 export default function App() {
-  const [page, setPage] = useState("characters")
+  const [page, setPage] = useState("home")
   const [selectedCharacter, setSelectedCharacter] = useState(null)
 
   function openChat(character) {
@@ -26,6 +27,10 @@ export default function App() {
   function finishEdit(character) {
     setSelectedCharacter(character)
     setPage("characters")
+  }
+
+  if (page === "home") {
+    return <HomePage onOpenCharacters={openCharacters} />
   }
 
   if (page === "create") {
