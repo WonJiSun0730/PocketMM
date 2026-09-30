@@ -53,6 +53,14 @@ public class DevSeedRunner implements CommandLineRunner {
                         )
                 ));
 
+        characterRepository.findAll().stream()
+                .filter(character ->
+                        ("Millie".equals(character.getName())
+                                || "Marbas".equals(character.getName()))
+                                && character.getOwner() == null
+                )
+                .forEach(character -> character.assignOwnerIfMissing(devOwner));
+
         if (characterRepository.existsByName("Millie")
                 || characterRepository.existsByName("Marbas")) {
             return;
