@@ -147,8 +147,12 @@ export default function WorldPage({ onBack }) {
       if (!response.ok) throw new Error("세계 설정을 저장하지 못했어요.")
       const data = await response.json()
       if (editVersionRef.current === saveVersion) {
-        setEntries(data.entries ?? [])
-        localStorage.removeItem(draftKey(worldId, categoryId))
+        const savedEntries = data.entries ?? []
+        if (JSON.stringify(savedEntries) === JSON.stringify(values)) {
+          localStorage.removeItem(draftKey(worldId, categoryId))
+        } else {
+          localStorage.setItem(draftKey(worldId, categoryId), JSON.stringify(values))
+        }
       }
       if (!silent) setMessage("저장했어요.")
     } catch (error) {
