@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { ArrowLeft, BookOpen, ChevronRight, Plus, Save, Sparkles, X } from "lucide-react"
 
 import "./WorldPage.css"
@@ -20,6 +20,8 @@ export default function WorldPage({ onBack }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState("")
+  const [draftReady, setDraftReady] = useState(false)
+  const autosaveTimer = useRef(null)
 
   const totalCharacters = useMemo(
     () => entries.reduce((sum, entry) => sum + entry.length, 0),
@@ -31,6 +33,18 @@ export default function WorldPage({ onBack }) {
   useEffect(() => {
     if (selectedWorld) loadLore(selectedWorld.id, selectedCategory.id)
   }, [selectedWorld, selectedCategory])
+
+  useEffect(() => {
+    if (!selectedWorld || !draftReady) return
+    const key = draftKey(selectedWorld.id, selectedCategory.id)
+    localStorage.setItem(key, JSON.stringify(entries))
+
+    window.clearTimeout(autosaveTimer.current)
+    if (totalCharacters <= selectedCategory.maxCharacters) {
+      autosaveTimer.current = window.setTimeout(() => saveLore(true), 800)
+    }
+    return () => window.clearTimeout(autosaveTimer.current)
+  }, [entries, draftReady])
 
   async function loadWorlds() {
     setLoading(true)
@@ -47,7 +61,12 @@ export default function WorldPage({ onBack }) {
     }
   }
 
+  function draftKey(worldId, category) {
+    return `pocketmm:world-lore-draft:${worldId}:${category}`
+  }
+
   async function loadLore(worldId, category) {
+    setDraftReady(false)
     setMessage("")
     const response = await fetch(`/api/worlds/${worldId}/lore/${category}`, { credentials: "include" })
     if (!response.ok) {
@@ -55,7 +74,18 @@ export default function WorldPage({ onBack }) {
       return
     }
     const data = await response.json()
-    setEntries(data.entries ?? [])
+    const stored = localStorage.getItem(draftKey(worldId, category))
+    if (stored) {
+      try {
+        setEntries(JSON.parse(stored))
+        setMessage("작성 중이던 내용을 복원했어요.")
+      } catch {
+        setEntries(data.entries ?? [])
+      }
+    } else {
+      setEntries(data.entries ?? [])
+    }
+    setDraftReady(true)
   }
 
   async function createWorld() {
@@ -89,7 +119,7 @@ export default function WorldPage({ onBack }) {
     setEntries((current) => current.filter((_, i) => i !== index))
   }
 
-  async function saveLore() {
+  async function saveLore(silent = false) {
     if (!selectedWorld || totalCharacters > selectedCategory.maxCharacters) return
     setSaving(true)
     setMessage("")
@@ -106,7 +136,8 @@ export default function WorldPage({ onBack }) {
       if (!response.ok) throw new Error("세계 설정을 저장하지 못했어요.")
       const data = await response.json()
       setEntries(data.entries ?? [])
-      setMessage("저장했어요.")
+      localStorage.removeItem(draftKey(selectedWorld.id, selectedCategory.id))
+      if (!silent) setMessage("저장했어요.")
     } catch (error) {
       setMessage(error.message)
     } finally {
