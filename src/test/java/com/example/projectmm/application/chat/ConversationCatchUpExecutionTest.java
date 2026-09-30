@@ -139,10 +139,25 @@ class ConversationCatchUpExecutionTest {
         var ownMemory = related.own();
         var foreignMemory = related.foreign();
         var worldMemory = related.world();
-        when(gateway.decide(any())).thenReturn(new AiDecision("RECOVER", "친구와 이야기하며 진정했다.", 5, 3,
-                new StateDelta(-3, 8), other.getId(), new RelationshipDelta(2, 3, 0),
-                new MemoryAccessChange("ALL", "BLOCKED", null), List.of(),
-                new RelationshipFactChange(other.getId(), "role", "friend")));
+        when(gateway.decide(any())).thenReturn(
+                new AiDecision(
+                        "RECOVER",
+                        "친구와 이야기하며 진정했다.",
+                        "친구와 다음 주에 만나기로 약속했다.",
+                        5,
+                        3,
+                        new StateDelta(-3, 8),
+                        other.getId(),
+                        new RelationshipDelta(2, 3, 0),
+                        new MemoryAccessChange("ALL", "BLOCKED", null),
+                        List.of(),
+                        new RelationshipFactChange(
+                                other.getId(),
+                                "role",
+                                "friend"
+                        )
+                )
+        );
         progress.configure(
                 room.getCharacter().getId(),
                 room.getId(),
@@ -199,6 +214,14 @@ class ConversationCatchUpExecutionTest {
 
         assertThat(storedEvents.get(1).getMemoryAbilityChange())
                 .isZero();
+
+        assertThat(storedEvents.get(0).getOutcome())
+                .isEmpty();
+
+        assertThat(storedEvents.get(1).getOutcome())
+                .isEqualTo(
+                        "친구와 다음 주에 만나기로 약속했다."
+                );
 
         assertThat(scenes.findAll())
                 .allSatisfy(scene ->
