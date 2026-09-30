@@ -22,6 +22,7 @@ export default function WorldPage({ onBack }) {
   const [draftReady, setDraftReady] = useState(false)
   const autosaveTimer = useRef(null)
   const loadedLoreRef = useRef(null)
+  const editVersionRef = useRef(0)
 
   const totalCharacters = useMemo(
     () => entries.reduce((sum, entry) => sum + entry.length, 0),
@@ -109,21 +110,29 @@ export default function WorldPage({ onBack }) {
     setSelectedWorld(world)
   }
 
+  function markEdited() {
+    editVersionRef.current += 1
+  }
+
   function updateEntry(index, value) {
+    markEdited()
     setEntries((current) => current.map((entry, i) => i === index ? value : entry))
   }
 
   function addEntry() {
     if (entries.length >= selectedCategory.maxEntries) return
+    markEdited()
     setEntries((current) => [...current, ""])
   }
 
   function removeEntry(index) {
+    markEdited()
     setEntries((current) => current.filter((_, i) => i !== index))
   }
 
   async function saveLore(silent = false, worldId = selectedWorld?.id, categoryId = selectedCategory.id, values = entries) {
     if (!worldId || values.reduce((sum, entry) => sum + entry.length, 0) > selectedCategory.maxCharacters) return
+    const saveVersion = editVersionRef.current
     if (!silent) setMessage("")
     try {
       const response = await fetch(
@@ -137,8 +146,10 @@ export default function WorldPage({ onBack }) {
       )
       if (!response.ok) throw new Error("세계 설정을 저장하지 못했어요.")
       const data = await response.json()
-      setEntries(data.entries ?? [])
-      localStorage.removeItem(draftKey(worldId, categoryId))
+      if (editVersionRef.current === saveVersion) {
+        setEntries(data.entries ?? [])
+        localStorage.removeItem(draftKey(worldId, categoryId))
+      }
       if (!silent) setMessage("저장했어요.")
     } catch (error) {
       setMessage(error.message)
