@@ -40,7 +40,8 @@ public class SecurityConfig {
                                 .permitAll()
                                  .requestMatchers(
                                         "/api/auth/me",
-                                        "/api/characters/**"
+                                        "/api/characters/**",
+                                        "/api/worlds/**"
                                 )
                                 .authenticated()
                                 .requestMatchers("/api/**")
