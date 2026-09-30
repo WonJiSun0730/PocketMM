@@ -12,4 +12,8 @@ public interface CharacterRepository extends JpaRepository<Character, Long> {
     List<Character> findAllByOwnerIdOrderByIdDesc(Long ownerId);
 
     Optional<Character> findByIdAndOwnerId(Long id, Long ownerId);
+
+    List<Character> findAllByWorldIdOrderByIdAsc(Long worldId);
+
+    boolean existsByWorldId(Long worldId);
 }
