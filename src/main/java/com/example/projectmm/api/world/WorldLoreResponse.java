@@ -6,7 +6,7 @@ import java.util.List;
 
 public record WorldLoreResponse(
         WorldLoreCategory category,
-        List<String> entries,
+        List<WorldLoreItem> entries,
         int totalCharacters,
         int maxTotalCharacters,
         int maxEntries
