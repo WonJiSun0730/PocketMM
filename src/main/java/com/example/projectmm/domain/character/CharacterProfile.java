@@ -13,7 +13,6 @@ public class CharacterProfile {
             Character character,
             String description,
             String rawDescription,
-            String playGuide,
             String exampleDialogue,
             String personality,
             String speechStyle,
@@ -23,7 +22,6 @@ public class CharacterProfile {
         this.character = character;
         this.description = description;
         this.rawDescription = rawDescription;
-        this.playGuide = playGuide;
         this.exampleDialogue = exampleDialogue;
         this.personality = personality;
         this.speechStyle = speechStyle;
@@ -52,10 +50,6 @@ public class CharacterProfile {
     private String rawDescription;
 
     @Lob
-    @Column(name = "play_guide", columnDefinition = "TEXT")
-    private String playGuide;
-
-    @Lob
     @Column(name = "example_dialogue", columnDefinition = "TEXT")
     private String exampleDialogue;
 
@@ -78,7 +72,6 @@ public class CharacterProfile {
     public void update(
             String description,
             String rawDescription,
-            String playGuide,
             String exampleDialogue,
             String personality,
             String speechStyle,
@@ -87,7 +80,6 @@ public class CharacterProfile {
     ) {
         this.description = description;
         this.rawDescription = rawDescription;
-        this.playGuide = playGuide;
         this.exampleDialogue = exampleDialogue;
         this.personality = personality;
         this.speechStyle = speechStyle;
