@@ -252,6 +252,66 @@ class GeminiAiGatewaySchemaTest {
 
         assertThat(memoryDetails.get("maxItems"))
                 .isEqualTo(5);
+
+        Map<String, Object> itemSchema =
+                map(memoryDetails.get("items"));
+
+        assertThat(itemSchema.get("type"))
+                .isEqualTo("object");
+
+        assertThat(itemSchema.get("additionalProperties"))
+                .isEqualTo(false);
+
+        assertThat(
+                (List<String>) itemSchema.get("required")
+        ).containsExactlyInAnyOrder(
+                "text",
+                "salience",
+                "protectedAnchor"
+        );
+
+        Map<String, Object> itemProperties =
+                map(itemSchema.get("properties"));
+
+        assertThat(itemProperties.keySet())
+                .containsExactlyInAnyOrder(
+                        "text",
+                        "salience",
+                        "protectedAnchor"
+                );
+
+        Map<String, Object> text =
+                map(itemProperties.get("text"));
+
+        assertThat(text.get("type"))
+                .isEqualTo("string");
+
+        assertThat(text.get("minLength"))
+                .isEqualTo(1);
+
+        assertThat(text.get("maxLength"))
+                .isEqualTo(300);
+
+        Map<String, Object> salience =
+                map(itemProperties.get("salience"));
+
+        assertThat(salience.get("type"))
+                .isEqualTo("string");
+
+        assertThat(
+                (List<String>) salience.get("enum")
+        ).containsExactlyInAnyOrder(
+                "LOW",
+                "NORMAL",
+                "HIGH",
+                "CRITICAL"
+        );
+
+        Map<String, Object> protectedAnchor =
+                map(itemProperties.get("protectedAnchor"));
+
+        assertThat(protectedAnchor.get("type"))
+                .isEqualTo("boolean");
     }
 
     @Test

@@ -14,6 +14,8 @@ public interface RelationshipRepository
             Long toCharacterId
     );
 
+    // AI 호출을 transaction으로 감싸지 않고 context에 필요한 상대 이름까지 조회한다.
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "toCharacter")
     List<Relationship> findByFromCharacterId(
             Long fromCharacterId
     );

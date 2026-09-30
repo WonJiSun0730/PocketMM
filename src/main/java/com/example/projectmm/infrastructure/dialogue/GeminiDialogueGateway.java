@@ -37,16 +37,28 @@ public class GeminiDialogueGateway implements DialogueGateway {
             @Value("${gemini.model}") String model,
             ObjectMapper objectMapper
     ) {
-        this.apiKey = apiKey;
-        this.model = model;
-        this.objectMapper = objectMapper;
-
-        this.restClient =
+        this(
+                apiKey,
+                model,
+                objectMapper,
                 RestClient.builder()
                         .baseUrl(
                                 "https://generativelanguage.googleapis.com"
                         )
-                        .build();
+                        .build()
+        );
+    }
+
+    GeminiDialogueGateway(
+            String apiKey,
+            String model,
+            ObjectMapper objectMapper,
+            RestClient restClient
+    ) {
+        this.apiKey = apiKey;
+        this.model = model;
+        this.objectMapper = objectMapper;
+        this.restClient = restClient;
     }
 
     @Override

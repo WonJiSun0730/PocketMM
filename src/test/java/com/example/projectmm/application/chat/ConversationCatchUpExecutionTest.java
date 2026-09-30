@@ -34,12 +34,14 @@ import static org.mockito.Mockito.*;
 @Import({com.example.projectmm.presentation.chat.ChatController.class, ChatService.class,
         com.example.projectmm.application.policy.ContentModePolicy.class,
         NarrativeOrchestrator.class, ConversationProgressService.class, CustomStateProposalService.class,
+        BeginChatPreparationService.class, BeginChatCatchUpResolver.class, BeginChatFinalizationService.class, CatchUpClaimService.class,
         CatchUpExecutionService.class, CatchUpOrchestrator.class, CatchUpSimulationService.class,
         CatchUpSegmentService.class, CatchUpEventCandidateService.class, EventCandidateValidator.class,
         AiContextBuilder.class, AiDecisionValidator.class, CatchUpSceneResolver.class, CatchUpSceneFactory.class,
         ResolvedEventPersistenceService.class, ResolvedEventMapper.class, RelationshipChangeService.class,
         RelationshipFactService.class, MemoryAccessService.class, MemoryLifecycleService.class,
         MemoryCreationService.class, MemoryPolicy.class, MemoryDetailService.class})
+@org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
 class ConversationCatchUpExecutionTest {
     @Autowired com.example.projectmm.presentation.chat.ChatController controller;
     @MockitoBean ConversationStartService starts;
@@ -60,6 +62,9 @@ class ConversationCatchUpExecutionTest {
     @Autowired RelationshipFactRepository facts;
     @Autowired ChatMessageRepository messages;
     @Autowired EntityManager em;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
+    private final java.util.List<Long> fixtureCharacters = new java.util.ArrayList<>();
+    private Long fixtureProfileId;
     @MockitoBean PresenceClock clock;
     @MockitoBean AiGateway gateway;
     @MockitoBean MemoryRecallService recall;
@@ -71,8 +76,13 @@ class ConversationCatchUpExecutionTest {
     @Test
     void httpChatReachesAdvancedPersistenceBeforeLiveReply() throws Exception {
         var room = fixture(70, 10);
-        when(gateway.decide(any())).thenReturn(new AiDecision("REFLECTION", "잠시 감정을 돌아보았다.", 4,
-                new StateDelta(0, 5), null, RelationshipDelta.none()));
+        when(gateway.decide(any())).thenAnswer(call -> {
+            assertThat(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            com.example.projectmm.domain.ai.AiContext aiContext = call.getArgument(0);
+            assertThat(aiContext.characterName()).isEqualTo("NPC");
+            return new AiDecision("REFLECTION", "잠시 감정을 돌아보았다.", 4,
+                    new StateDelta(0, 5), null, RelationshipDelta.none());
+        });
         var context = mock(com.example.projectmm.domain.dialogue.DialogueContext.class);
         when(context.simulatedAt()).thenReturn(story.plusMinutes(2));
         when(dialogueContexts.build(anyLong(), anyLong(), any(), anyString())).thenAnswer(call -> {
@@ -87,7 +97,7 @@ class ConversationCatchUpExecutionTest {
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/chat/" + room.getCharacter().getId())
                 .contentType(org.springframework.http.MediaType.APPLICATION_JSON).content("{\"message\":\"\"}"))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
-        em.flush(); em.clear();
+        em.clear(); // beginChat/completeChat의 실제 commit 결과를 다시 조회한다.
         assertThat(rooms.findById(room.getId()).orElseThrow().getChatOperationId()).isNull();
         assertThat(events.count()).isEqualTo(1);
         assertThat(reports.count()).isEqualTo(1);
@@ -98,15 +108,25 @@ class ConversationCatchUpExecutionTest {
     @Test
     void runtimeMixedSegmentPersistsOnceAndKeepsRoomTokenAndEntryContracts() {
         var room = fixture(20, 10);
-        var otherRoom = Conversation.fresh(room.getCharacter(), story);
-        em.persist(otherRoom);
-        var other = new Character("친구");
-        em.persist(other);
-        em.persist(new Relationship(room.getCharacter(), other));
-        var ownMemory = Memory.fromAutomaticAction(room, null, "own", 5, story.minusDays(1));
-        var foreignMemory = Memory.fromAutomaticAction(otherRoom, null, "foreign", 5, story.minusDays(1));
-        var worldMemory = new Memory(room.getCharacter(), null, "world", 5, 50, story.minusDays(1));
-        em.persist(ownMemory); em.persist(foreignMemory); em.persist(worldMemory); em.flush();
+        record RelatedFixture(Conversation room, Character friend, Memory own, Memory foreign, Memory world) {}
+        var related = tx().execute(status -> {
+            var otherRoom = Conversation.fresh(room.getCharacter(), story);
+            em.persist(otherRoom);
+            var other = new Character("친구");
+            em.persist(other);
+            fixtureCharacters.add(other.getId());
+            em.persist(new Relationship(room.getCharacter(), other));
+            var ownMemory = Memory.fromAutomaticAction(room, null, "own", 5, story.minusDays(1));
+            var foreignMemory = Memory.fromAutomaticAction(otherRoom, null, "foreign", 5, story.minusDays(1));
+            var worldMemory = new Memory(room.getCharacter(), null, "world", 5, 50, story.minusDays(1));
+            em.persist(ownMemory); em.persist(foreignMemory); em.persist(worldMemory);
+            return new RelatedFixture(otherRoom, other, ownMemory, foreignMemory, worldMemory);
+        });
+        var otherRoom = related.room();
+        var other = related.friend();
+        var ownMemory = related.own();
+        var foreignMemory = related.foreign();
+        var worldMemory = related.world();
         when(gateway.decide(any())).thenReturn(new AiDecision("RECOVER", "친구와 이야기하며 진정했다.", 5, 3,
                 new StateDelta(-3, 8), other.getId(), new RelationshipDelta(2, 3, 0),
                 new MemoryAccessChange("ALL", "BLOCKED", null), List.of(),
@@ -117,7 +137,7 @@ class ConversationCatchUpExecutionTest {
         assertThat(operation.mode()).isEqualTo(NarrativeMode.LIVE_DIALOGUE);
         assertThat(operation.room().getId()).isEqualTo(room.getId());
         assertThat(operation.token()).isNotBlank();
-        em.flush(); em.clear();
+        em.clear();
         var stored = rooms.findById(room.getId()).orElseThrow();
         assertThat(stored.getEnergy()).isEqualTo(47); // REST +30, AI -3, each once
         assertThat(stored.getMood()).isEqualTo(18);
@@ -204,15 +224,52 @@ class ConversationCatchUpExecutionTest {
 
     private Conversation fixture(int energy, int mood) {
         when(clock.now()).thenReturn(real);
+        return tx().execute(status -> {
         var actor = new Character("NPC");
-        var profile = new PlayerProfile(1, "Player", "설정", null);
-        em.persist(actor); em.persist(profile);
+        em.persist(actor);
+        fixtureCharacters.add(actor.getId());
+        var profile = new PlayerProfile(Math.toIntExact(actor.getId()), "Player", "설정", null);
+        em.persist(profile);
+        fixtureProfileId = profile.getId();
         em.persist(new CharacterState(actor, energy, mood, story));
         var room = Conversation.fresh(actor, story);
         room.selectPlayerProfile(profile);
         room.applyRoomState(energy, mood, story);
         em.persist(room); em.flush();
         return room;
+        });
+    }
+
+    private org.springframework.transaction.support.TransactionTemplate tx() {
+        return new org.springframework.transaction.support.TransactionTemplate(transactions);
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void cleanupCommittedGraph() {
+        if (fixtureCharacters.isEmpty()) return;
+        // 실제 고급 catch-up이 저장하는 종속 엔티티부터, 이 테스트의 character graph만 삭제한다.
+        tx().executeWithoutResult(status -> {
+            for (String query : List.of(
+                    "delete from RelationshipFact f where f.fromCharacter.id in :ids or f.toCharacter.id in :ids",
+                    "delete from MemoryCompressionEvidence e where e.memory.character.id in :ids or e.evidenceMemory.character.id in :ids",
+                    "delete from ProtectedMemoryDetail d where d.memory.character.id in :ids",
+                    "delete from MemoryAccessState a where a.memory.character.id in :ids",
+                    "delete from Memory m where m.character.id in :ids",
+                    "delete from ChatMessage m where m.character.id in :ids",
+                    "delete from EventParticipant p where p.character.id in :ids",
+                    "delete from Event e where e.scene.conversation.character.id in :ids",
+                    "delete from SceneParticipant p where p.character.id in :ids",
+                    "delete from Scene s where s.conversation.character.id in :ids",
+                    "delete from ConversationCatchUp r where r.conversation.character.id in :ids",
+                    "delete from Relationship r where r.fromCharacter.id in :ids or r.toCharacter.id in :ids",
+                    "delete from Conversation c where c.character.id in :ids",
+                    "delete from CharacterState s where s.character.id in :ids")) {
+                em.createQuery(query).setParameter("ids", fixtureCharacters).executeUpdate();
+            }
+            if (fixtureProfileId != null) em.createQuery("delete from PlayerProfile p where p.id = :id")
+                    .setParameter("id", fixtureProfileId).executeUpdate();
+            em.createQuery("delete from Character c where c.id in :ids").setParameter("ids", fixtureCharacters).executeUpdate();
+        });
     }
 
     private void absent(Conversation room) {

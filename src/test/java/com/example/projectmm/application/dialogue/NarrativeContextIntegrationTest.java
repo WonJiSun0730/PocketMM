@@ -42,6 +42,10 @@ import static org.mockito.Mockito.when;
 )
 @Import({
         ConversationProgressService.class,
+        com.example.projectmm.application.chat.BeginChatPreparationService.class,
+        com.example.projectmm.application.chat.BeginChatCatchUpResolver.class,
+        com.example.projectmm.application.chat.BeginChatFinalizationService.class,
+        com.example.projectmm.application.simulation.CatchUpClaimService.class,
         CatchUpSimulationService.class,
         CatchUpSegmentService.class,
         CatchUpEventCandidateService.class,
@@ -150,14 +154,14 @@ class NarrativeContextIntegrationTest {
         when(clock.now())
                 .thenReturn(real.plusHours(1));
 
-        var operation =
-                progressService.beginChat(
+        // beginChat 경계는 별도 integration test에서 검증한다. 여기서는 저장된 catch-up의 context 반영을 검증한다.
+        var progress =
+                progressService.resume(
                         characterId,
                         conversationId
                 );
 
-        assertThat(operation.entry())
-                .isEqualTo(NarrativeEntry.AFTER_CATCH_UP);
+        assertThat(progress.lastReport()).isNotNull();
 
         var context =
                 contextBuilder.build(
@@ -176,10 +180,5 @@ class NarrativeContextIntegrationTest {
                         content.contains("휴식")
                 );
 
-        progressService.endChat(
-                characterId,
-                conversationId,
-                operation.token()
-        );
     }
 }

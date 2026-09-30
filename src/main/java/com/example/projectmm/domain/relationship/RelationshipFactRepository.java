@@ -8,6 +8,7 @@ import java.util.Optional;
 public interface RelationshipFactRepository
         extends JpaRepository<RelationshipFact, Long> {
 
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "toCharacter")
     List<RelationshipFact>
     findByFromCharacterId(Long fromCharacterId);
 

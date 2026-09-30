@@ -12,6 +12,11 @@ import java.util.Optional;
 public interface ConversationRepository
         extends JpaRepository<Conversation, Long> {
 
+    // transaction 밖 beginChat resolve에서 context의 캐릭터 이름을 안전하게 읽는다.
+    @Override
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = "character")
+    Optional<Conversation> findById(Long id);
+
     List<Conversation>
     findByCharacterIdOrderByCreatedAtDesc(Long characterId);
 

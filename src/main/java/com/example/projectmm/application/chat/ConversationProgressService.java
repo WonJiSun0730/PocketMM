@@ -292,7 +292,6 @@ public class ConversationProgressService {
         );
     }
 
-    @Transactional
     public ChatOperation beginChat(
             Long characterId,
             Long roomId

@@ -20,47 +20,14 @@ import java.time.LocalDateTime;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.when;
 
-@DataJpaTest(properties = {"spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.show-sql=false"}, showSql = false)
-@Import({
-        ConversationProgressService.class,
-        CatchUpSimulationService.class,
-        CatchUpSegmentService.class,
-        CatchUpEventCandidateService.class,
-        EventCandidateValidator.class,
-        CatchUpClaimService.class,
-        BeginChatPreparationService.class,
-        BeginChatCatchUpResolver.class,
-        BeginChatFinalizationService.class,
-        com.example.projectmm.application.state.CustomStateProposalService.class,
-        com.example.projectmm.application.relationship.RelationshipChangeService.class,
-        com.example.projectmm.application.relationship.RelationshipFactService.class
-})
-class ConversationProgressTest {
-    @Autowired EntityManager em;
-    @Autowired CatchUpClaimService catchUpClaims;
-    @Autowired ConversationProgressService service;
-    @Autowired ConversationRepository rooms;
-    @Autowired ConversationCatchUpRepository reports;
-    @Autowired ChatMessageRepository messages;
-    @Autowired MemoryRepository memories;
-    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
-    @Autowired
-    BeginChatPreparationService beginChatPreparation;
-    @MockitoBean PresenceClock clock;
-    @MockitoBean CatchUpExecutionService execution;
-    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean CatchUpEventCandidateService candidateService;
-    private final LocalDateTime real = LocalDateTime.of(2026, 9, 23, 12, 0);
-    private final LocalDateTime story = LocalDateTime.of(2030, 1, 1, 23, 0);
-
-    @BeforeEach void time() { when(clock.now()).thenReturn(real); }
-
+// 기능 검증은 test-managed rollback transaction 안에서 격리한다.
+class ConversationProgressTest extends ConversationProgressTestSupport {
     @Test
     void playerStateAppliesFromExactUserEvidence() {
         var room = fixture(true, 70, 70);
         Long id = room.getCharacter().getId();
 
-        var operation = service.beginChat(id, room.getId());
+        var operation = liveChatFixture(room);
 
         String userText = "*두 시간 동안 달리고 나니 완전히 지쳤다.*";
 
@@ -106,7 +73,7 @@ class ConversationProgressTest {
         var room = fixture(true, 70, 70);
         Long id = room.getCharacter().getId();
 
-        var operation = service.beginChat(id, room.getId());
+        var operation = liveChatFixture(room);
 
         var turn = new com.example.projectmm.domain.dialogue.DialogueTurn(
                 "*하린은 갑자기 몹시 지쳐 보였다.*",
@@ -155,7 +122,7 @@ class ConversationProgressTest {
         var room = fixture(true, 70, 70);
         Long id = room.getCharacter().getId();
 
-        var operation = service.beginChat(id, room.getId());
+        var operation = liveChatFixture(room);
 
         String userText = "*한참 뛰어서 숨이 찼다.*";
 
@@ -211,10 +178,7 @@ class ConversationProgressTest {
         room.applyPlayerState(80, 70);
         em.flush();
 
-        var operation = service.beginChat(
-                characterId,
-                room.getId()
-        );
+        var operation = liveChatFixture(room);
 
         var turn = new com.example.projectmm.domain.dialogue.DialogueTurn(
                 "많이 달렸군.",
@@ -344,11 +308,11 @@ class ConversationProgressTest {
         var room = fixture(true, 70, 70);
         Long id = room.getCharacter().getId();
         service.configure(id, room.getId(), true);
-        var operation = service.beginChat(id, room.getId());
+        var operation = liveChatFixture(room);
         assertThatThrownBy(() -> service.resume(id, room.getId()))
                 .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
         when(clock.now()).thenReturn(real.plusMinutes(11));
-        var replacement = service.beginChat(id, room.getId());
+        var replacement = liveChatFixture(room);
         assertThatThrownBy(() -> service.applyChatTime(id, room.getId(), operation.token(), story.plusDays(99)))
                 .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
         service.endChat(id, room.getId(), operation.token());
@@ -367,23 +331,12 @@ class ConversationProgressTest {
                 .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
     }
 
-    @Test void sendingFirstAfterNetworkRecoveryStillAppliesMissingInterval() {
-        var room = fixture(true, 70, 70);
-        Long id = room.getCharacter().getId();
-        service.configure(id, room.getId(), true);
-        when(clock.now()).thenReturn(real.plusMinutes(4));
-        var operation = service.beginChat(id, room.getId());
-        assertThat(operation.room().getSimulatedAt()).isEqualTo(story.plusMinutes(4));
-        assertThat(service.current(id, room.getId()).lastReport().appliedSeconds()).isEqualTo(240);
-        service.endChat(id, room.getId(), operation.token());
-    }
-
     @Test void dialogueStateIsRoomScopedPersistsAndTriggersExistingRestRule() {
         var room = fixture(false, 52, 70);
         Long id = room.getCharacter().getId();
         var other = Conversation.fresh(room.getCharacter(), story);
         em.persist(other); em.flush();
-        var operation = service.beginChat(id, room.getId());
+        var operation = liveChatFixture(room);
         var turn = new com.example.projectmm.domain.dialogue.DialogueTurn("*무거운 서류를 옮겨 지쳤다.*",
                 new com.example.projectmm.domain.dialogue.DialogueStateChange(-6, 0, "무거운 서류를 옮겨 지쳤다", ""));
         var saved = service.completeChat(id, room.getId(), operation.token(), "서류 정리를 마쳤네요.", turn, ContentMode.NORMAL);
@@ -404,7 +357,7 @@ class ConversationProgressTest {
     @Test void stateAndMessageApplyOnceAndInvalidProposalOnlyRejectsState() {
         var room = fixture(true, 70, 70);
         Long id = room.getCharacter().getId();
-        var first = service.beginChat(id, room.getId());
+        var first = liveChatFixture(room);
         var turn = new com.example.projectmm.domain.dialogue.DialogueTurn("*칭찬을 듣고 기뻐했다.*",
                 new com.example.projectmm.domain.dialogue.DialogueStateChange(0, 4, "", "칭찬을 듣고 기뻐했다"));
         service.completeChat(id, room.getId(), first.token(), "잘했어요.", turn, ContentMode.NORMAL);
@@ -413,7 +366,7 @@ class ConversationProgressTest {
         assertThat(service.current(id, room.getId()).mood()).isEqualTo(74);
         assertThat(messages.findTop20ByConversationIdOrderByCreatedAtDesc(room.getId())).hasSize(2);
 
-        var second = service.beginChat(id, room.getId());
+        var second = liveChatFixture(room);
         var invalid = new com.example.projectmm.domain.dialogue.DialogueTurn("안녕하세요.",
                 new com.example.projectmm.domain.dialogue.DialogueStateChange(-99, 10, "", "없는 근거"));
         var completed = service.completeChat(id, room.getId(), second.token(), "안녕", invalid, ContentMode.NORMAL);
@@ -426,7 +379,7 @@ class ConversationProgressTest {
     @Test void emptyReplyAndExpiredOperationCannotApplyState() {
         var room = fixture(true, 70, 70);
         Long id = room.getCharacter().getId();
-        var operation = service.beginChat(id, room.getId());
+        var operation = liveChatFixture(room);
         var change = new com.example.projectmm.domain.dialogue.DialogueStateChange(5, 0, "쉬었다", "");
         assertThatThrownBy(() -> service.completeChat(id, room.getId(), operation.token(), "안녕",
                 new com.example.projectmm.domain.dialogue.DialogueTurn(" ", change), ContentMode.NORMAL))
@@ -440,308 +393,12 @@ class ConversationProgressTest {
     }
 
     @Test
-    @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
-    void simultaneousReconnectsCommitOneReportAndOneRest() throws Exception {
-        // 별도 커넥션의 실제 트랜잭션 두 개로 잠금과 체크포인트의 중복 방지를 검증한다.
-        var tx = new org.springframework.transaction.support.TransactionTemplate(transactions);
-        var room = tx.execute(status -> fixture(true, 20, 70));
-        Long id = room.getCharacter().getId();
-        service.configure(id, room.getId(), true);
-        when(clock.now()).thenReturn(real.plusMinutes(2));
-        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
-            var ready = new java.util.concurrent.CountDownLatch(2);
-            var start = new java.util.concurrent.CountDownLatch(1);
-            java.util.concurrent.Callable<ConversationProgressService.Status> reconnect = () -> {
-                ready.countDown();
-                if (!start.await(5, java.util.concurrent.TimeUnit.SECONDS)) throw new IllegalStateException("시작 대기 초과");
-                return service.resume(id, room.getId());
-            };
-            var first = executor.submit(reconnect);
-            var second = executor.submit(reconnect);
-            assertThat(ready.await(5, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
-            start.countDown();
-            var firstReport = first.get(10, java.util.concurrent.TimeUnit.SECONDS).lastReport();
-            var secondReport = second.get(10, java.util.concurrent.TimeUnit.SECONDS).lastReport();
-            assertThat(firstReport.id()).isEqualTo(secondReport.id());
-            assertThat(rooms.findById(room.getId()).orElseThrow().getSimulatedAt()).isEqualTo(story.plusMinutes(2));
-            assertThat(messages.findTop20ByConversationIdOrderByCreatedAtDesc(room.getId())).hasSize(1);
-        } finally {
-            // 이 테스트만 커밋하므로 자신이 만든 데이터만 격리 DB에서 정리한다.
-            tx.executeWithoutResult(status -> {
-                em.createQuery("delete from ConversationCatchUp r where r.conversation.id = :id").setParameter("id", room.getId()).executeUpdate();
-                em.createQuery("delete from Memory m where m.conversation.id = :id").setParameter("id", room.getId()).executeUpdate();
-                em.createQuery("delete from ChatMessage m where m.conversation.id = :id").setParameter("id", room.getId()).executeUpdate();
-                em.remove(em.find(Conversation.class, room.getId()));
-                em.flush();
-                em.remove(em.find(PlayerProfile.class, room.getPlayerProfile().getId()));
-                em.createQuery("delete from CharacterState s where s.character.id = :id").setParameter("id", id).executeUpdate();
-                em.remove(em.find(Character.class, id));
-            });
-        }
-    }
-
-    @Test
-    void beginChatReportsLiveDialogueWhenCatchUpIsNotNeeded() {
-        var room = fixture(true, 70, 70);
-        Long characterId = room.getCharacter().getId();
-
-        var operation =
-                service.beginChat(
-                        characterId,
-                        room.getId()
-                );
-
-        assertThat(operation.entry())
-                .isEqualTo(NarrativeEntry.DIRECT);
-
-        service.endChat(
-                characterId,
-                room.getId(),
-                operation.token()
-        );
-    }
-
-    @Test
-    void beginChatReportsCatchUpWhenAbsenceWasActuallyProcessed() {
-        var room = fixture(true, 70, 70);
-        Long characterId = room.getCharacter().getId();
-
-        service.configure(
-                characterId,
-                room.getId(),
-                true
-        );
-
-        when(clock.now())
-                .thenReturn(real.plusMinutes(4));
-
-        org.mockito.Mockito.doAnswer(invocation -> {
-            assertThat(
-                    org.springframework.transaction.support.TransactionSynchronizationManager
-                            .isActualTransactionActive()
-            ).isFalse();
-
-            CharacterState state =
-                    invocation.getArgument(0);
-
-            CatchUpSegment segment =
-                    invocation.getArgument(1);
-
-            state.advanceSimulatedAt(
-                    segment.end()
-            );
-
-            var duration =
-                    java.time.Duration.between(
-                            segment.start(),
-                            segment.end()
-                    );
-
-            return new CatchUpExecutionResult(
-                    new CatchUpResult(
-                            segment.start(),
-                            segment.end(),
-                            duration,
-                            duration,
-                            false
-                    ),
-                    java.util.List.of(segment),
-                    java.util.List.of(),
-                    java.util.List.of()
-            );
-        }).when(execution).resolve(
-                org.mockito.ArgumentMatchers.any(CharacterState.class),
-                org.mockito.ArgumentMatchers.any(CatchUpSegment.class),
-                org.mockito.ArgumentMatchers.anyList(),
-                org.mockito.ArgumentMatchers.any(Conversation.class)
-        );
-
-        var operation =
-                service.beginChat(
-                        characterId,
-                        room.getId()
-                );
-
-        assertThat(operation.entry())
-                .isEqualTo(NarrativeEntry.AFTER_CATCH_UP);
-
-        assertThat(operation.room().getSimulatedAt())
-                .isEqualTo(story.plusMinutes(4));
-
-        assertThat(
-                service.current(
-                        characterId,
-                        room.getId()
-                ).lastReport().appliedSeconds()
-        ).isEqualTo(240);
-
-        service.endChat(
-                characterId,
-                room.getId(),
-                operation.token()
-        );
-    }
-
-    @Test
-    @org.springframework.transaction.annotation.Transactional(
-            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED
-    )
-    void beginChatReleasesCatchUpClaimWithoutConsumingPresenceWhenResolveFails() {
-
-        var tx =
-                new org.springframework.transaction.support.TransactionTemplate(
-                        transactions
-                );
-
-        LocalDateTime previousPresence =
-                real.minusMinutes(4);
-
-        var room =
-                tx.execute(status -> {
-                    var created =
-                            fixture(true, 70, 70);
-
-                    created.configureAutoProgress(
-                            true,
-                            previousPresence
-                    );
-
-                    created.markPresent(
-                            previousPresence
-                    );
-
-                    return created;
-                });
-
-        Long characterId =
-                room.getCharacter().getId();
-
-        Long profileId =
-                room.getPlayerProfile().getId();
-
-        try {
-
-        org.mockito.Mockito.doReturn(
-                java.util.List.of(
-                        new EventCandidate(
-                                story,
-                                "AI_TEST",
-                                "AI resolve failure test",
-                                5,
-                                true,
-                                StateDelta.none()
-                        )
-                )
-        ).when(candidateService).generate(
-                org.mockito.ArgumentMatchers.any(CharacterState.class),
-                org.mockito.ArgumentMatchers.any(CatchUpSegment.class)
-        );
-
-        org.mockito.Mockito.doThrow(
-                new IllegalStateException("AI resolve failure")
-        ).when(execution).resolve(
-                org.mockito.ArgumentMatchers.any(CharacterState.class),
-                org.mockito.ArgumentMatchers.any(CatchUpSegment.class),
-                org.mockito.ArgumentMatchers.anyList(),
-                org.mockito.ArgumentMatchers.any(Conversation.class)
-        );
-
-        assertThatThrownBy(() ->
-                service.beginChat(
-                        characterId,
-                        room.getId()
-                )
-        )
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage("AI resolve failure");
-
-        var saved =
-                rooms.findById(
-                        room.getId()
-                ).orElseThrow();
-
-        assertThat(saved.getCatchUpOperationId())
-                .isNull();
-
-        assertThat(saved.catchUpInProgress(real))
-                .isFalse();
-
-        assertThat(saved.getLastPresenceAt())
-                .isEqualTo(previousPresence);
-
-        assertThat(saved.getSimulatedAt())
-                .isEqualTo(story);
-
-        } finally {
-            cleanupCommittedFixture(
-                    room.getId(),
-                    profileId,
-                    characterId
-            );
-        }
-    }
-
-    @Test
-    void catchUpBeforeChatPersistsNarrativeContextForFollowingLiveDialogue() {
-        var room = fixture(true, 20, 70);
-        Long characterId = room.getCharacter().getId();
-
-        service.configure(
-                characterId,
-                room.getId(),
-                true
-        );
-
-        when(clock.now())
-                .thenReturn(real.plusHours(1));
-
-        var operation =
-                service.beginChat(
-                        characterId,
-                        room.getId()
-                );
-
-        assertThat(operation.entry())
-                .isEqualTo(NarrativeEntry.AFTER_CATCH_UP);
-
-        var savedMessages =
-                messages.findTop20ByConversationIdOrderByCreatedAtDesc(
-                        room.getId()
-                );
-
-        assertThat(savedMessages)
-                .hasSize(1);
-
-        assertThat(savedMessages.getFirst().getRole())
-                .isEqualTo(ChatRole.CHARACTER);
-
-        assertThat(savedMessages.getFirst().getContent())
-                .contains("휴식");
-
-        assertThat(
-                memories.findForConversation(
-                        characterId,
-                        room.getId()
-                )
-        ).hasSize(1);
-
-        service.endChat(
-                characterId,
-                room.getId(),
-                operation.token()
-        );
-    }
-
-    @Test
     void continuationSavesOnlyCharacterMessageWithoutBlankUserMessage() {
         var room = fixture(true, 70, 70);
         Long characterId = room.getCharacter().getId();
 
         var operation =
-                service.beginChat(
-                        characterId,
-                        room.getId()
-                );
+                liveChatFixture(room);
 
         var turn =
                 new com.example.projectmm.domain.dialogue.DialogueTurn(
@@ -809,10 +466,7 @@ class ConversationProgressTest {
         em.flush();
 
         var operation =
-                service.beginChat(
-                        characterId,
-                        room.getId()
-                );
+                liveChatFixture(room);
 
         var turn =
                 new com.example.projectmm.domain.dialogue.DialogueTurn(
@@ -866,10 +520,7 @@ class ConversationProgressTest {
                 room.getCharacter().getId();
 
         var operation =
-                service.beginChat(
-                        characterId,
-                        room.getId()
-                );
+                liveChatFixture(room);
 
         var turn =
                 new com.example.projectmm.domain.dialogue.DialogueTurn(
@@ -937,10 +588,7 @@ class ConversationProgressTest {
         em.flush();
 
         var operation =
-                service.beginChat(
-                        characterId,
-                        room.getId()
-                );
+                liveChatFixture(room);
 
         var turn =
                 new com.example.projectmm.domain.dialogue.DialogueTurn(
@@ -1017,10 +665,7 @@ class ConversationProgressTest {
         em.flush();
 
         var operation =
-                service.beginChat(
-                        characterId,
-                        room.getId()
-                );
+                liveChatFixture(room);
 
         var turn =
                 new com.example.projectmm.domain.dialogue.DialogueTurn(
@@ -1082,87 +727,6 @@ class ConversationProgressTest {
     }
 
     @Test
-    void beginChat은_부재CatchUp이_없으면_DIRECT로_진입한다() {
-
-        var room =
-                fixture(
-                        true,
-                        70,
-                        70
-                );
-
-        Long characterId =
-                room.getCharacter().getId();
-
-        var operation =
-                service.beginChat(
-                        characterId,
-                        room.getId()
-                );
-
-        assertThat(operation.entry())
-                .isEqualTo(
-                        NarrativeEntry.DIRECT
-                );
-
-        assertThat(operation.room().getId())
-                .isEqualTo(room.getId());
-
-        assertThat(operation.token())
-                .isNotBlank();
-    }
-
-    @Test
-    void beginChat은_실제_부재CatchUp을_처리한뒤_AFTER_CATCH_UP으로_진입한다() {
-
-        var room =
-                fixture(
-                        true,
-                        70,
-                        70
-                );
-
-        Long characterId =
-                room.getCharacter().getId();
-
-        // 첫 접속으로 lastPresenceAt을 만든다.
-        service.resume(
-                characterId,
-                room.getId()
-        );
-
-        // 이후 자동 진행을 켠다.
-        service.configure(
-                characterId,
-                room.getId(),
-                true
-        );
-
-        // 실제 시간 기준 2분 부재.
-        when(clock.now())
-                .thenReturn(
-                        real.plusMinutes(2)
-                );
-
-        var operation =
-                service.beginChat(
-                        characterId,
-                        room.getId()
-                );
-
-        assertThat(operation.entry())
-                .isEqualTo(
-                        NarrativeEntry.AFTER_CATCH_UP
-                );
-
-        assertThat(operation.room().getId())
-                .isEqualTo(room.getId());
-
-        assertThat(operation.token())
-                .isNotBlank();
-    }
-
-    @Test
     void catchUpClaimIsIndependentFromLiveChatOperationAndExpires() {
         var room = fixture(true, 70, 70);
 
@@ -1188,396 +752,13 @@ class ConversationProgressTest {
                 .isFalse();
     }
 
-    @Test
-    @org.springframework.transaction.annotation.Transactional(
-            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED
-    )
-    void catchUpClaimCommitsImmediatelyAndBlocksSecondClaim() {
-        var tx =
-                new org.springframework.transaction.support.TransactionTemplate(
-                        transactions
-                );
 
-        var room =
-                tx.execute(status ->
-                        fixture(true, 70, 70)
-                );
-
-        Long characterId =
-                room.getCharacter().getId();
-
-        Long profileId =
-                room.getPlayerProfile().getId();
-
-        try {
-            String firstToken =
-                    catchUpClaims.claim(
-                            characterId,
-                            room.getId(),
-                            real
-                    );
-
-            assertThat(firstToken)
-                    .isNotBlank();
-
-            var committed =
-                    rooms.findById(room.getId())
-                            .orElseThrow();
-
-            assertThat(committed.getCatchUpOperationId())
-                    .isEqualTo(firstToken);
-
-            assertThat(committed.catchUpInProgress(real))
-                    .isTrue();
-
-            assertThatThrownBy(() ->
-                    catchUpClaims.claim(
-                            characterId,
-                            room.getId(),
-                            real
-                    )
-            ).isInstanceOf(
-                    org.springframework.web.server.ResponseStatusException.class
-            );
-
-            catchUpClaims.release(
-                    characterId,
-                    room.getId(),
-                    firstToken
-            );
-
-            var released =
-                    rooms.findById(room.getId())
-                            .orElseThrow();
-
-            assertThat(released.catchUpInProgress(real))
-                    .isFalse();
-
-        } finally {
-            cleanupCommittedFixture(
-                    room.getId(),
-                    profileId,
-                    characterId
-            );
-        }
+    // 완료 처리 테스트의 전제만 준비한다. beginChat orchestration은 별도 integration test가 검증한다.
+    private ConversationProgressService.ChatOperation liveChatFixture(Conversation fixture) {
+        var room = em.find(Conversation.class, fixture.getId());
+        String token = java.util.UUID.randomUUID().toString();
+        room.beginChat(token, clock.now());
+        em.flush(); // completeChat의 lock/refresh가 같은 transaction의 token을 읽는다.
+        return new ConversationProgressService.ChatOperation(room, token, NarrativeEntry.DIRECT);
     }
-
-    @Test
-    @org.springframework.transaction.annotation.Transactional(
-            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED
-    )
-    void activeCatchUpClaimBlocksNormalRoomOperations() {
-
-        var tx =
-                new org.springframework.transaction.support.TransactionTemplate(
-                        transactions
-                );
-
-        var room =
-                tx.execute(status ->
-                        fixture(true, 70, 70)
-                );
-
-        Long characterId =
-                room.getCharacter().getId();
-
-        Long profileId =
-                room.getPlayerProfile().getId();
-
-        try {
-            String claim =
-                    catchUpClaims.claim(
-                            characterId,
-                            room.getId(),
-                            real
-                    );
-
-            assertThatThrownBy(() ->
-                    service.resume(
-                            characterId,
-                            room.getId()
-                    )
-            ).isInstanceOf(
-                    org.springframework.web.server.ResponseStatusException.class
-            );
-
-            assertThatThrownBy(() ->
-                    service.configure(
-                            characterId,
-                            room.getId(),
-                            true
-                    )
-            ).isInstanceOf(
-                    org.springframework.web.server.ResponseStatusException.class
-            );
-
-            assertThatThrownBy(() ->
-                    service.beginChat(
-                            characterId,
-                            room.getId()
-                    )
-            ).isInstanceOf(
-                    org.springframework.web.server.ResponseStatusException.class
-            );
-
-            assertThatThrownBy(() ->
-                    service.heartbeat(
-                            characterId,
-                            room.getId()
-                    )
-            ).isInstanceOf(
-                    org.springframework.web.server.ResponseStatusException.class
-            );
-
-            catchUpClaims.release(
-                    characterId,
-                    room.getId(),
-                    claim
-            );
-
-        } finally {
-            cleanupCommittedFixture(
-                    room.getId(),
-                    profileId,
-                    characterId
-            );
-        }
-    }
-
-    @Test
-    @org.springframework.transaction.annotation.Transactional(
-            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED
-    )
-    void beginChatPreparationClaimsFixedAbsenceWithoutConsumingPresence() {
-
-        var tx =
-                new org.springframework.transaction.support.TransactionTemplate(
-                        transactions
-                );
-
-        LocalDateTime previousPresence =
-                real.minusHours(2);
-
-        var room =
-                tx.execute(status -> {
-                    var created =
-                            fixture(true, 70, 70);
-
-                    created.configureAutoProgress(
-                            true,
-                            previousPresence
-                    );
-
-                    created.markPresent(
-                            previousPresence
-                    );
-
-                    return created;
-                });
-
-        Long characterId =
-                room.getCharacter().getId();
-
-        Long profileId =
-                room.getPlayerProfile().getId();
-
-        try {
-
-        var preparation =
-                beginChatPreparation.prepare(
-                        characterId,
-                        room.getId()
-                );
-
-        assertThat(preparation.claimToken())
-                .isNotBlank();
-
-        assertThat(preparation.previousPresence())
-                .isEqualTo(previousPresence);
-
-        assertThat(preparation.requestedAt())
-                .isEqualTo(real);
-
-        assertThat(preparation.absenceSeconds())
-                .isEqualTo(7200);
-
-        assertThat(preparation.catchUpRequired())
-                .isTrue();
-
-        assertThat(preparation.simulatedAt())
-                .isEqualTo(story);
-
-        assertThat(preparation.roomEnergy())
-                .isEqualTo(70);
-
-        assertThat(preparation.roomMood())
-                .isEqualTo(70);
-
-        var committed =
-                rooms.findById(
-                        room.getId()
-                ).orElseThrow();
-
-        assertThat(committed.getLastPresenceAt())
-                .isEqualTo(previousPresence);
-
-        assertThat(committed.getCatchUpOperationId())
-                .isEqualTo(preparation.claimToken());
-
-        assertThat(committed.catchUpInProgress(real))
-                .isTrue();
-
-        catchUpClaims.release(
-                characterId,
-                room.getId(),
-                preparation.claimToken()
-        );
-        } finally {
-            cleanupCommittedFixture(
-                    room.getId(),
-                    profileId,
-                    characterId
-            );
-        }
-    }
-
-    @Test
-    @org.springframework.transaction.annotation.Transactional(
-            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED
-    )
-    void beginChatPreparationSkipsCatchUpForShortAbsence() {
-
-        var tx =
-                new org.springframework.transaction.support.TransactionTemplate(
-                        transactions
-                );
-
-        var room =
-                tx.execute(status -> {
-                    var created =
-                            fixture(true, 70, 70);
-
-                    created.markPresent(
-                            real.minusSeconds(30)
-                    );
-
-                    return created;
-                });
-
-        Long characterId =
-                room.getCharacter().getId();
-
-        Long profileId =
-                room.getPlayerProfile().getId();
-
-        try {
-
-        var preparation =
-                beginChatPreparation.prepare(
-                        characterId,
-                        room.getId()
-                );
-
-        assertThat(preparation.absenceSeconds())
-                .isEqualTo(30);
-
-        assertThat(preparation.catchUpRequired())
-                .isFalse();
-
-        catchUpClaims.release(
-                characterId,
-                room.getId(),
-                preparation.claimToken()
-        );
-        } finally {
-            cleanupCommittedFixture(
-                    room.getId(),
-                    profileId,
-                    characterId
-            );
-        }
-    }
-
-    private void cleanupCommittedFixture(
-            Long roomId,
-            Long profileId,
-            Long characterId
-    ) {
-        var tx =
-                new org.springframework.transaction.support.TransactionTemplate(
-                        transactions
-                );
-
-        tx.executeWithoutResult(status -> {
-            em.createQuery(
-                            "delete from ConversationCatchUp r where r.conversation.id = :id"
-                    )
-                    .setParameter("id", roomId)
-                    .executeUpdate();
-
-            em.createQuery(
-                            "delete from Memory m where m.conversation.id = :id"
-                    )
-                    .setParameter("id", roomId)
-                    .executeUpdate();
-
-            em.createQuery(
-                            "delete from ChatMessage m where m.conversation.id = :id"
-                    )
-                    .setParameter("id", roomId)
-                    .executeUpdate();
-
-            var conversation =
-                    em.find(
-                            Conversation.class,
-                            roomId
-                    );
-
-            if (conversation != null) {
-                em.remove(conversation);
-                em.flush();
-            }
-
-            var profile =
-                    em.find(
-                            PlayerProfile.class,
-                            profileId
-                    );
-
-            if (profile != null) {
-                em.remove(profile);
-            }
-
-            em.createQuery(
-                            "delete from CharacterState s where s.character.id = :id"
-                    )
-                    .setParameter("id", characterId)
-                    .executeUpdate();
-
-            var character =
-                    em.find(
-                            Character.class,
-                            characterId
-                    );
-
-            if (character != null) {
-                em.remove(character);
-            }
-        });
-    }
-
-    private Conversation fixture(boolean independent, int energy, int mood) {
-        var character = new Character("자동 행동 QA");
-        em.persist(character);
-        em.persist(new CharacterState(character, energy, mood, story));
-        var profile = new PlayerProfile(1, "하린", "사서", null);
-        em.persist(profile);
-        var room = independent ? Conversation.fresh(character, story) : new Conversation(character, story);
-        if (independent) room.applyRoomState(energy, mood, story);
-        room.selectPlayerProfile(profile);
-        em.persist(room); em.flush();
-        return room;
-    }
-
-
 }
