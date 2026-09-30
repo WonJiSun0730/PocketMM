@@ -31,6 +31,15 @@ public class WorldController {
         return worldService.getAll(authentication.getName());
     }
 
+    @PutMapping("/{worldId}")
+    public WorldResponse update(
+            @PathVariable Long worldId,
+            @Valid @RequestBody WorldUpdateRequest request,
+            Authentication authentication
+    ) {
+        return worldService.update(worldId, request, authentication.getName());
+    }
+
     @GetMapping("/{worldId}")
     public WorldResponse getById(
             @PathVariable Long worldId,
