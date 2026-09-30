@@ -2,6 +2,7 @@ package com.example.projectmm.domain.chat;
 
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.player.PlayerProfile;
+import com.example.projectmm.domain.world.World;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -22,6 +23,10 @@ public class Conversation {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "character_id", nullable = false)
     private Character character;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "world_id")
+    private World world;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
@@ -129,6 +134,12 @@ public class Conversation {
 
     public boolean isIndependentStart() {
         return Boolean.TRUE.equals(independentStart);
+    }
+
+    public static Conversation forWorld(Character character, World world, LocalDateTime at) {
+        Conversation conversation = new Conversation(character, at);
+        conversation.world = world;
+        return conversation;
     }
 
     public static Conversation fresh(Character character, LocalDateTime at) {
