@@ -662,6 +662,17 @@ public class GeminiDialogueGateway implements DialogueGateway {
                   a sensory detail, or another contextually suitable subject.
                 - Dialogue and narration may alternate naturally within the
                   same response.
+                - Prefix every spoken line with the speaker's name followed by a colon,
+                  for example: Marbas: "..." or Ninja: "...". This applies to the primary
+                  controlled character and to any other character who speaks.
+                - The scene is not limited to the primary controlled character. The user may
+                  introduce additional people, creatures, NPCs, or unexpected participants at
+                  any time. Treat clearly introduced participants as part of the scene and let
+                  them act and speak naturally when appropriate, even if they are not stored
+                  character profiles. Do not reject a participant merely because no profile
+                  exists for them.
+                - When multiple characters are present, keep speaker attribution explicit and
+                  unambiguous. Narration remains ordinary prose without a speaker-name prefix.
                 - Do not explain the roleplay notation or describe narration
                   as narration.
 
