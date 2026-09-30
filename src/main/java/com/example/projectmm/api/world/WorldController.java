@@ -1,6 +1,7 @@
 package com.example.projectmm.api.world;
 
 import com.example.projectmm.application.world.WorldService;
+import com.example.projectmm.application.world.WorldSystemService;
 import com.example.projectmm.domain.world.WorldLoreCategory;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +17,7 @@ import java.util.List;
 public class WorldController {
 
     private final WorldService worldService;
+    private final WorldSystemService worldSystemService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -66,4 +68,14 @@ public class WorldController {
     ) {
         return worldService.replaceLore(worldId, category, request.entries(), authentication.getName());
     }
+    @GetMapping("/{worldId}/systems")
+    public WorldSystemsResponse getSystems(@PathVariable Long worldId, Authentication authentication) {
+        return worldSystemService.get(worldId, authentication.getName());
+    }
+
+    @PutMapping("/{worldId}/systems")
+    public WorldSystemsResponse replaceSystems(@PathVariable Long worldId, @RequestBody WorldSystemsRequest request, Authentication authentication) {
+        return worldSystemService.replace(worldId, request, authentication.getName());
+    }
 }
+
