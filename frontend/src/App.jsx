@@ -8,7 +8,15 @@ import LoginPage from "@/pages/LoginPage"
 import SignupPage from "@/pages/SignupPage"
 import WorldPage from "@/pages/WorldPage"
 
-const routePaths = { home: "/", characters: "/characters", world: "/worlds" }\n\nfunction pageFromPath(pathname) {\n  if (pathname.startsWith("/worlds")) return "world"\n  if (pathname.startsWith("/characters")) return "characters"\n  return "home"\n}\n\nexport default function App() {
+const routePaths = { home: "/", characters: "/characters", world: "/worlds" }
+
+function pageFromPath(pathname) {
+  if (pathname.startsWith("/worlds")) return "world"
+  if (pathname.startsWith("/characters")) return "characters"
+  return "home"
+}
+
+export default function App() {
   const [page, setPage] = useState(() => pageFromPath(window.location.pathname))
   const [selectedCharacter, setSelectedCharacter] = useState(null)
   const [member, setMember] = useState(null)
@@ -29,7 +37,22 @@ const routePaths = { home: "/", characters: "/characters", world: "/worlds" }\n\
     }
   }
 
-  useEffect(() => { refreshMember() }, [])\n\n  useEffect(() => {\n    const handlePopState = () => {\n      setSelectedCharacter(null)\n      setPage(pageFromPath(window.location.pathname))\n    }\n    window.addEventListener("popstate", handlePopState)\n    return () => window.removeEventListener("popstate", handlePopState)\n  }, [])\n\n  function navigate(nextPage) {\n    const path = routePaths[nextPage] ?? "/"\n    if (window.location.pathname !== path) window.history.pushState({}, "", path)\n    setPage(nextPage)\n  }
+  useEffect(() => { refreshMember() }, [])
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setSelectedCharacter(null)
+      setPage(pageFromPath(window.location.pathname))
+    }
+    window.addEventListener("popstate", handlePopState)
+    return () => window.removeEventListener("popstate", handlePopState)
+  }, [])
+
+  function navigate(nextPage) {
+    const path = routePaths[nextPage] ?? "/"
+    if (window.location.pathname !== path) window.history.pushState({}, "", path)
+    setPage(nextPage)
+  }
 
   function openChat(character) { setSelectedCharacter(character); setPage("chat") }
   function openCharacters() { setSelectedCharacter(null); navigate("characters") }
