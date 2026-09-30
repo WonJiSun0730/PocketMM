@@ -28,6 +28,10 @@ public class World {
     private String description;
 
     @Lob
+    @Column(name = "introduction", columnDefinition = "TEXT")
+    private String introduction;
+
+    @Lob
     @Column(name = "play_guide", columnDefinition = "TEXT")
     private String playGuide;
 
@@ -41,8 +45,9 @@ public class World {
         this.playGuide = playGuide;
     }
 
-    public void updateMetadata(String name, String description) {
+    public void updateMetadata(String name, String description, String introduction) {
         this.name = name;
         this.description = description;
+        this.introduction = introduction;
     }
 }
