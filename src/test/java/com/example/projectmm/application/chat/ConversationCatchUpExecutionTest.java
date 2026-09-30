@@ -169,6 +169,36 @@ class ConversationCatchUpExecutionTest {
         assertThat(stored.getProgressPauseReason()).isNull();
         assertThat(events.count()).isEqualTo(2);
         assertThat(scenes.count()).isEqualTo(2);
+        var storedEvents =
+                events.findAll()
+                        .stream()
+                        .sorted(
+                                java.util.Comparator.comparing(
+                                        com.example.projectmm.domain.event.Event::getOccurredAt
+                                )
+                        )
+                        .toList();
+
+        assertThat(storedEvents)
+                .hasSize(2);
+
+        assertThat(storedEvents.get(0).getEnergyChange())
+                .isEqualTo(30);
+
+        assertThat(storedEvents.get(0).getMoodChange())
+                .isZero();
+
+        assertThat(storedEvents.get(0).getMemoryAbilityChange())
+                .isZero();
+
+        assertThat(storedEvents.get(1).getEnergyChange())
+                .isEqualTo(-3);
+
+        assertThat(storedEvents.get(1).getMoodChange())
+                .isEqualTo(8);
+
+        assertThat(storedEvents.get(1).getMemoryAbilityChange())
+                .isZero();
 
         assertThat(scenes.findAll())
                 .allSatisfy(scene ->
