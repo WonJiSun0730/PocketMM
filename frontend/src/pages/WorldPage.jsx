@@ -91,6 +91,14 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
 
   async function saveSystems() {
     if (!selectedWorld) return
+    const worldResponse = await fetch(`/api/worlds/${selectedWorld.id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include",
+      body: JSON.stringify({ name: selectedWorld.name, description: selectedWorld.description ?? null, introduction: selectedWorld.introduction?.trim() || null }),
+    })
+    if (!worldResponse.ok) return setMessage("인트로를 저장하지 못했어요.")
+    const savedWorld = await worldResponse.json()
+    setSelectedWorld(savedWorld)
+    setWorlds((current) => current.map((item) => item.id === savedWorld.id ? savedWorld : item))
     const response = await fetch(`/api/worlds/${selectedWorld.id}/systems`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include",
       body: JSON.stringify({ playGuide, systems }),
@@ -309,7 +317,7 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
               </div>
               {systemMode ? (
                 <div className="world-system-editor">
-                  <section className="system-play-guide"><label>플레이 가이드</label><p>월드 제작자가 자유롭게 수정하는 시스템 안내예요. <span>{playGuide.length} / 1000자</span></p><textarea maxLength={1000} value={playGuide} onChange={(event) => setPlayGuide(event.target.value)} placeholder="상태 체계, 시스템 사용법, 플레이 팁 등을 자유롭게 작성하세요." /></section>
+                  <section className="system-play-guide"><label>인트로</label><p>월드에 처음 들어갔을 때 시작되는 장면이에요. <span>{selectedWorld?.introduction?.length ?? 0} / 2000자</span></p><textarea maxLength={2000} value={selectedWorld?.introduction ?? ""} onChange={(event) => setSelectedWorld((current) => current ? { ...current, introduction: event.target.value } : current)} placeholder="이 세계에 들어왔을 때 처음 마주하는 상황과 장면을 작성해 주세요." /><label className="system-section-label">플레이 가이드</label><p>월드 제작자가 자유롭게 수정하는 시스템 안내예요. <span>{playGuide.length} / 1000자</span></p><textarea maxLength={1000} value={playGuide} onChange={(event) => setPlayGuide(event.target.value)} placeholder="상태 체계, 시스템 사용법, 플레이 팁 등을 자유롭게 작성하세요." /></section>
                   <div className="system-list">
                     {systems.map((system, index) => <article className="system-card" key={index}>
                       <div className="system-card-head"><input value={system.name} onChange={(e) => updateSystem(index, "name", e.target.value)} placeholder="시스템 이름 (예: 피에타)" /><button onClick={() => setSystems((current) => current.filter((_, i) => i !== index))} type="button"><X size={16}/></button></div>
@@ -342,7 +350,7 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
         </section>
       </div>
 
-      {worldDialog && <div className="world-dialog-backdrop" onMouseDown={() => setWorldDialog(null)}><form className="world-dialog" onSubmit={submitWorld} onMouseDown={(event) => event.stopPropagation()}><div className="world-dialog-heading"><div><span className="world-eyebrow">{worldDialog === "edit" ? "EDIT WORLD" : "NEW WORLD"}</span><h2>{worldDialog === "edit" ? "세계관 정보 수정" : "새 세계관 만들기"}</h2></div><button type="button" onClick={() => setWorldDialog(null)} aria-label="닫기"><X size={18} /></button></div><label>세계관 이름<input autoFocus maxLength={100} value={worldForm.name} onChange={(event) => setWorldForm((current) => ({ ...current, name: event.target.value }))} placeholder="세계관 이름" /></label><label>설명 <small>AI에게 전달되지 않는 메모예요.</small><textarea value={worldForm.description} onChange={(event) => setWorldForm((current) => ({ ...current, description: event.target.value }))} placeholder="이 세계관을 구분하기 위한 설명이나 개인 메모를 적어 주세요." /></label><label>도입 <small>월드에 처음 들어갔을 때 시작되는 장면이에요. {worldForm.introduction.length}/2000자</small><textarea maxLength={2000} value={worldForm.introduction} onChange={(event) => setWorldForm((current) => ({ ...current, introduction: event.target.value }))} placeholder="이 세계에 들어왔을 때 처음 마주하는 상황과 장면을 작성해 주세요." /></label><div className="world-dialog-actions"><button type="button" onClick={() => setWorldDialog(null)}>취소</button><button className="primary" disabled={!worldForm.name.trim() || worldSubmitting} type="submit">{worldSubmitting ? "처리 중..." : worldDialog === "edit" ? "수정" : "생성"}</button></div></form></div>}
+      {worldDialog && <div className="world-dialog-backdrop" onMouseDown={() => setWorldDialog(null)}><form className="world-dialog" onSubmit={submitWorld} onMouseDown={(event) => event.stopPropagation()}><div className="world-dialog-heading"><div><span className="world-eyebrow">{worldDialog === "edit" ? "EDIT WORLD" : "NEW WORLD"}</span><h2>{worldDialog === "edit" ? "세계관 정보 수정" : "새 세계관 만들기"}</h2></div><button type="button" onClick={() => setWorldDialog(null)} aria-label="닫기"><X size={18} /></button></div><label>세계관 이름<input autoFocus maxLength={100} value={worldForm.name} onChange={(event) => setWorldForm((current) => ({ ...current, name: event.target.value }))} placeholder="세계관 이름" /></label><label>설명 <small>AI에게 전달되지 않는 메모예요.</small><textarea value={worldForm.description} onChange={(event) => setWorldForm((current) => ({ ...current, description: event.target.value }))} placeholder="이 세계관을 구분하기 위한 설명이나 개인 메모를 적어 주세요." /></label><div className="world-dialog-actions"><button type="button" onClick={() => setWorldDialog(null)}>취소</button><button className="primary" disabled={!worldForm.name.trim() || worldSubmitting} type="submit">{worldSubmitting ? "처리 중..." : worldDialog === "edit" ? "수정" : "생성"}</button></div></form></div>}
     </main>
   )
 }
