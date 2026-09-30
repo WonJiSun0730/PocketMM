@@ -14,7 +14,6 @@ public class CharacterProfile {
             String description,
             String rawDescription,
             String playGuide,
-            String intro,
             String exampleDialogue,
             String personality,
             String speechStyle,
@@ -25,7 +24,6 @@ public class CharacterProfile {
         this.description = description;
         this.rawDescription = rawDescription;
         this.playGuide = playGuide;
-        this.intro = intro;
         this.exampleDialogue = exampleDialogue;
         this.personality = personality;
         this.speechStyle = speechStyle;
@@ -58,10 +56,6 @@ public class CharacterProfile {
     private String playGuide;
 
     @Lob
-    @Column(columnDefinition = "TEXT")
-    private String intro;
-
-    @Lob
     @Column(name = "example_dialogue", columnDefinition = "TEXT")
     private String exampleDialogue;
 
@@ -85,7 +79,6 @@ public class CharacterProfile {
             String description,
             String rawDescription,
             String playGuide,
-            String intro,
             String exampleDialogue,
             String personality,
             String speechStyle,
@@ -95,7 +88,6 @@ public class CharacterProfile {
         this.description = description;
         this.rawDescription = rawDescription;
         this.playGuide = playGuide;
-        this.intro = intro;
         this.exampleDialogue = exampleDialogue;
         this.personality = personality;
         this.speechStyle = speechStyle;
