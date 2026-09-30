@@ -31,6 +31,14 @@ public class ConversationPlayerService {
         return response(room);
     }
 
+    @Transactional(readOnly = true)
+    public Session current(Long characterId, Long conversationId) {
+        var room = conversations.findById(conversationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (!room.getCharacter().getId().equals(characterId)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return response(room);
+    }
+
     @Transactional
     public Session select(Long characterId, Long conversationId, Long profileId) {
         var room = conversations.lockForMemory(conversationId)
