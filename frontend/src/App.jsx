@@ -8,8 +8,8 @@ import LoginPage from "@/pages/LoginPage"
 import SignupPage from "@/pages/SignupPage"
 import WorldPage from "@/pages/WorldPage"
 
-export default function App() {
-  const [page, setPage] = useState("home")
+const routePaths = { home: "/", characters: "/characters", world: "/worlds" }\n\nfunction pageFromPath(pathname) {\n  if (pathname.startsWith("/worlds")) return "world"\n  if (pathname.startsWith("/characters")) return "characters"\n  return "home"\n}\n\nexport default function App() {
+  const [page, setPage] = useState(() => pageFromPath(window.location.pathname))
   const [selectedCharacter, setSelectedCharacter] = useState(null)
   const [member, setMember] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
@@ -22,17 +22,17 @@ export default function App() {
         return false
       }
       setMember(await response.json())
-      setPage("home")
+      setPage(pageFromPath(window.location.pathname))
       return true
     } finally {
       setAuthLoading(false)
     }
   }
 
-  useEffect(() => { refreshMember() }, [])
+  useEffect(() => { refreshMember() }, [])\n\n  useEffect(() => {\n    const handlePopState = () => {\n      setSelectedCharacter(null)\n      setPage(pageFromPath(window.location.pathname))\n    }\n    window.addEventListener("popstate", handlePopState)\n    return () => window.removeEventListener("popstate", handlePopState)\n  }, [])\n\n  function navigate(nextPage) {\n    const path = routePaths[nextPage] ?? "/"\n    if (window.location.pathname !== path) window.history.pushState({}, "", path)\n    setPage(nextPage)\n  }
 
   function openChat(character) { setSelectedCharacter(character); setPage("chat") }
-  function openCharacters() { setSelectedCharacter(null); setPage("characters") }
+  function openCharacters() { setSelectedCharacter(null); navigate("characters") }
   function openEdit(character) { setSelectedCharacter(character); setPage("edit") }
   function finishEdit(character) { setSelectedCharacter(character); setPage("characters") }
 
@@ -47,8 +47,8 @@ export default function App() {
     return <LoginPage onAuthenticated={refreshMember} onOpenSignup={() => setPage("signup")} />
   }
 
-  if (page === "home") return <HomePage onOpenCharacters={openCharacters} onOpenWorld={() => setPage("world")} />
-  if (page === "world") return <WorldPage onBack={() => setPage("home")} />
+  if (page === "home") return <HomePage onOpenCharacters={openCharacters} onOpenWorld={() => navigate("world")} />
+  if (page === "world") return <WorldPage onBack={() => navigate("home")} />
   if (page === "create") return <CharacterCreatePage onBack={openCharacters} onCreated={openChat} />
   if (page === "edit" && selectedCharacter) {
     return <CharacterCreatePage character={selectedCharacter} onBack={openCharacters} onUpdated={finishEdit} />
