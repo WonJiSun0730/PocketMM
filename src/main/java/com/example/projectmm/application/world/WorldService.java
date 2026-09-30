@@ -5,6 +5,7 @@ import com.example.projectmm.api.world.WorldLoreItem;
 import com.example.projectmm.api.world.WorldLoreResponse;
 import com.example.projectmm.api.world.WorldResponse;
 import com.example.projectmm.api.world.WorldUpdateRequest;
+import com.example.projectmm.api.world.WorldUpdateRequest;
 import com.example.projectmm.domain.member.Member;
 import com.example.projectmm.domain.member.MemberRepository;
 import com.example.projectmm.domain.world.World;
@@ -41,6 +42,13 @@ public class WorldService {
         return worldRepository.findAllByOwnerIdOrderByIdDesc(findMember(loginId).getId()).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional
+    public WorldResponse update(Long worldId, WorldUpdateRequest request, String loginId) {
+        World world = findOwnedWorld(worldId, loginId);
+        world.updateMetadata(request.name().trim(), normalizeNullable(request.description()));
+        return toResponse(world);
     }
 
     @Transactional
