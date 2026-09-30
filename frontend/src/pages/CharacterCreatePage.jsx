@@ -13,7 +13,6 @@ export default function CharacterCreatePage({
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [rawDescription, setRawDescription] = useState("")
-  const [playGuide, setPlayGuide] = useState("")
   const [examples, setExamples] = useState([""])
 
   const [personality, setPersonality] = useState("")
@@ -32,7 +31,6 @@ export default function CharacterCreatePage({
     setName(character.name ?? "")
     setDescription(character.description ?? "")
     setRawDescription(character.rawDescription ?? "")
-    setPlayGuide(character.playGuide ?? "")
     setExamples(
       character.examples?.length
         ? character.examples
@@ -101,7 +99,6 @@ export default function CharacterCreatePage({
     const payload = {
       description: description.trim() || null,
       rawDescription: rawDescription.trim() || null,
-      playGuide: playGuide.trim() || null,
       examples: examples
         .map((example) => example.trim())
         .filter(Boolean),
@@ -312,34 +309,6 @@ export default function CharacterCreatePage({
                 </div>
                 </div>
             </Field>
-          </section>
-
-          <section className="space-y-5 rounded-2xl border bg-card p-5 sm:p-6">
-            <div>
-              <h2 className="font-semibold">
-                플레이 가이드
-              </h2>
-
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                플레이어에게 보여줄 안내를 자유롭게 작성하세요.
-                권장 설정, 상태 체계, 명령어나 단축어, 플레이 팁 등을
-                안내할 수 있어요.
-              </p>
-            </div>
-
-            <Textarea
-              value={playGuide}
-              onChange={(event) =>
-                setPlayGuide(event.target.value)
-              }
-              placeholder={`예시
-
-• 권장 설정
-• 상태 또는 시스템 안내
-• 사용할 수 있는 명령어
-• 플레이 팁`}
-              className="min-h-40 resize-y leading-6"
-            />
           </section>
 
           <section className="rounded-2xl border bg-card">
