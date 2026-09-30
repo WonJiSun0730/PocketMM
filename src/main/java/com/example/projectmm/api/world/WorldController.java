@@ -44,6 +44,12 @@ public class WorldController {
         return worldService.update(worldId, request, authentication.getName());
     }
 
+    @DeleteMapping("/{worldId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable Long worldId, Authentication authentication) {
+        worldService.delete(worldId, authentication.getName());
+    }
+
     @GetMapping("/{worldId}")
     public WorldResponse getById(
             @PathVariable Long worldId,
