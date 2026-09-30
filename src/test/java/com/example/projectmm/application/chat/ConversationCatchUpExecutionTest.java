@@ -224,10 +224,15 @@ class ConversationCatchUpExecutionTest {
                 );
 
         assertThat(scenes.findAll())
-                .allSatisfy(scene ->
-                        assertThat(scene.getConversation().getId())
-                                .isEqualTo(room.getId())
-                );
+                .allSatisfy(scene -> {
+                    assertThat(scene.getConversation().getId())
+                            .isEqualTo(room.getId());
+                    assertThat(scene.isActive())
+                            .isFalse();
+                    assertThat(scene.getEndedAt())
+                            .isNotNull()
+                            .isAfterOrEqualTo(scene.getStartedAt());
+                });
         assertThat(facts.findByFromCharacterId(room.getCharacter().getId())).hasSize(1);
         assertThat(relationships.findByFromCharacterIdAndToCharacterId(room.getCharacter().getId(), other.getId())
                 .orElseThrow().getTrust()).isEqualTo(3);
