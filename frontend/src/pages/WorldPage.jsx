@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ArrowLeft, BookOpen, ChevronRight, Pencil, Plus, Save, Sparkles, Trash2, Users, X } from "lucide-react"
+import { ArrowLeft, BookOpen, ChevronRight, MessageCircle, Pencil, Plus, Save, Sparkles, Trash2, Users, X } from "lucide-react"
 
 import "./WorldPage.css"
 
@@ -12,7 +12,7 @@ const categories = [
   { id: "HISTORY", label: "세계 사건 / 역사", maxCharacters: 1000, maxEntries: 10 },
 ]
 
-export default function WorldPage({ onBack }) {
+export default function WorldPage({ onBack, onOpenWorldChat }) {
   const [worlds, setWorlds] = useState([])
   const [selectedWorld, setSelectedWorld] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState(categories[0])
@@ -301,7 +301,7 @@ export default function WorldPage({ onBack }) {
           ) : (
             <>
               <div className="world-title-row"><div><span className="world-eyebrow">EDITING</span><div className="world-name-line"><h2>{selectedWorld.name}</h2><button className="world-edit-meta" onClick={openEditWorld} type="button" aria-label="월드 정보 수정"><Pencil size={14} /></button><button className="world-delete" onClick={deleteWorld} type="button" aria-label="월드 삭제"><Trash2 size={14} /></button></div>{selectedWorld.description && <p className="world-private-description">{selectedWorld.description}</p>}</div>{message && <span className="world-message">{message}</span>}</div>
-              <div className="world-cast-summary"><Users size={15}/><span>등장인물 {worldCharacters.length}명</span>{worldCharacters.length > 0 && <span className="world-cast-names">{worldCharacters.map((character) => character.name).join(" · ")}</span>}</div>
+              <div className="world-cast-summary"><Users size={15}/><span>등장인물 {worldCharacters.length}명</span>{worldCharacters.length > 0 && <span className="world-cast-names">{worldCharacters.map((character) => character.name).join(" · ")}</span>}{worldCharacters.length > 0 && <div className="world-cast-actions">{worldCharacters.map((character) => <button key={character.id} type="button" onClick={() => onOpenWorldChat?.(selectedWorld, character)}><MessageCircle size={13}/>{character.name}과 대화</button>)}</div>}</div>
               <div className="world-category-tabs"><button className={systemMode ? "active" : ""} onClick={() => setSystemMode(true)} type="button">시스템</button>
                 {categories.map((category) => (
                   <button className={selectedCategory.id === category.id ? "active" : ""} key={category.id} onClick={() => { setSystemMode(false); setSelectedCategory(category) }} type="button">{category.label}</button>
