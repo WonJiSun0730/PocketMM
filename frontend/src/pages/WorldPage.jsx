@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ArrowLeft, BookOpen, ChevronRight, Pencil, Plus, Save, Sparkles, X } from "lucide-react"
+import { ArrowLeft, BookOpen, ChevronRight, Pencil, Plus, Save, Sparkles, Trash2, Users, X } from "lucide-react"
 
 import "./WorldPage.css"
 
@@ -26,6 +26,7 @@ export default function WorldPage({ onBack }) {
   const [systemMode, setSystemMode] = useState(false)
   const [playGuide, setPlayGuide] = useState("")
   const [systems, setSystems] = useState([])
+  const [worldCharacters, setWorldCharacters] = useState([])
   const autosaveTimer = useRef(null)
   const loadedLoreRef = useRef(null)
   const editVersionRef = useRef(0)
@@ -39,6 +40,7 @@ export default function WorldPage({ onBack }) {
 
   useEffect(() => {
     if (!selectedWorld) return
+    loadWorldCharacters(selectedWorld.id)
     if (systemMode) loadSystems(selectedWorld.id)
     else loadLore(selectedWorld.id, selectedCategory.id)
   }, [selectedWorld, selectedCategory, systemMode])
@@ -55,6 +57,28 @@ export default function WorldPage({ onBack }) {
     }
     return () => window.clearTimeout(autosaveTimer.current)
   }, [entries, draftReady])
+
+  async function loadWorldCharacters(worldId) {
+    const response = await fetch(`/api/worlds/${worldId}/characters`, { credentials: "include" })
+    if (response.ok) setWorldCharacters(await response.json())
+  }
+
+  async function deleteWorld() {
+    if (!selectedWorld) return
+    if (worldCharacters.length > 0) {
+      setMessage("등장인물이 연결된 월드는 삭제할 수 없어요. 먼저 캐릭터의 월드 연결을 해제해 주세요.")
+      return
+    }
+    if (!window.confirm(`"${selectedWorld.name}" 월드를 삭제할까요?`)) return
+    const response = await fetch(`/api/worlds/${selectedWorld.id}`, { method: "DELETE", credentials: "include" })
+    if (!response.ok) return setMessage("월드를 삭제하지 못했어요.")
+    const remaining = worlds.filter((world) => world.id !== selectedWorld.id)
+    setWorlds(remaining)
+    setSelectedWorld(remaining[0] ?? null)
+    if (remaining[0]) localStorage.setItem("pocketmm:selected-world-id", String(remaining[0].id))
+    else localStorage.removeItem("pocketmm:selected-world-id")
+    setMessage("")
+  }
 
   async function loadSystems(worldId) {
     setMessage("")
@@ -276,7 +300,8 @@ export default function WorldPage({ onBack }) {
             <div className="world-editor-empty"><Sparkles size={26} /><h2>아직 월드가 없어요</h2><p>왼쪽에서 첫 월드를 만들어 주세요.</p></div>
           ) : (
             <>
-              <div className="world-title-row"><div><span className="world-eyebrow">EDITING</span><div className="world-name-line"><h2>{selectedWorld.name}</h2><button className="world-edit-meta" onClick={openEditWorld} type="button" aria-label="월드 정보 수정"><Pencil size={14} /></button></div>{selectedWorld.description && <p className="world-private-description">{selectedWorld.description}</p>}</div>{message && <span className="world-message">{message}</span>}</div>
+              <div className="world-title-row"><div><span className="world-eyebrow">EDITING</span><div className="world-name-line"><h2>{selectedWorld.name}</h2><button className="world-edit-meta" onClick={openEditWorld} type="button" aria-label="월드 정보 수정"><Pencil size={14} /></button><button className="world-delete" onClick={deleteWorld} type="button" aria-label="월드 삭제"><Trash2 size={14} /></button></div>{selectedWorld.description && <p className="world-private-description">{selectedWorld.description}</p>}</div>{message && <span className="world-message">{message}</span>}</div>
+              <div className="world-cast-summary"><Users size={15}/><span>등장인물 {worldCharacters.length}명</span>{worldCharacters.length > 0 && <span className="world-cast-names">{worldCharacters.map((character) => character.name).join(" · ")}</span>}</div>
               <div className="world-category-tabs"><button className={systemMode ? "active" : ""} onClick={() => setSystemMode(true)} type="button">시스템</button>
                 {categories.map((category) => (
                   <button className={selectedCategory.id === category.id ? "active" : ""} key={category.id} onClick={() => { setSystemMode(false); setSelectedCategory(category) }} type="button">{category.label}</button>
