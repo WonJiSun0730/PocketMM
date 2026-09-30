@@ -15,6 +15,9 @@ import com.example.projectmm.domain.relationship.RelationshipFact;
 import com.example.projectmm.domain.relationship.RelationshipFactRepository;
 import com.example.projectmm.domain.relationship.RelationshipRepository;
 import com.example.projectmm.domain.state.CustomStateValueRepository;
+import com.example.projectmm.domain.world.WorldLoreEntryRepository;
+import com.example.projectmm.domain.world.WorldSystemRepository;
+import com.example.projectmm.domain.world.WorldSystemStateRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +43,9 @@ public class DialogueContextBuilder {
     private final ConversationRepository conversationRepository;
     private final CharacterExampleRepository characterExampleRepository;
     private final CustomStateValueRepository customStateValueRepository;
+    private final WorldLoreEntryRepository worldLoreEntryRepository;
+    private final WorldSystemRepository worldSystemRepository;
+    private final WorldSystemStateRepository worldSystemStateRepository;
 
     @Transactional(readOnly = true)
     public DialogueContext build(
@@ -141,7 +147,48 @@ public class DialogueContextBuilder {
                 conversation.getPlayerEnergy(),
                 conversation.getPlayerMood(),
                 buildCustomStates(conversation),
-                relationshipFacts
+                relationshipFacts,
+                buildWorldContext(conversation)
+        );
+    }
+
+    private DialogueWorldContext buildWorldContext(Conversation conversation) {
+        if (conversation.getWorld() == null) {
+            return null;
+        }
+        var world = conversation.getWorld();
+        var lore = worldLoreEntryRepository.findByWorldIdOrderByCategoryAscSortOrderAsc(world.getId())
+                .stream()
+                .map(entry -> new DialogueWorldLore(
+                        entry.getCategory().name(),
+                        entry.getTitle(),
+                        entry.getContent()
+                ))
+                .toList();
+        var systems = worldSystemRepository.findByWorldIdOrderBySortOrderAsc(world.getId())
+                .stream()
+                .map(system -> new DialogueWorldSystem(
+                        system.getName(),
+                        system.getChangeCondition(),
+                        system.getMinValue(),
+                        system.getMaxValue(),
+                        worldSystemStateRepository.findBySystemIdOrderBySortOrderAsc(system.getId())
+                                .stream()
+                                .map(state -> new DialogueWorldSystemState(
+                                        state.getMinValue(),
+                                        state.getMaxValue(),
+                                        state.getLabel()
+                                ))
+                                .toList()
+                ))
+                .toList();
+        return new DialogueWorldContext(
+                world.getId(),
+                world.getName(),
+                world.getIntroduction(),
+                world.getPlayGuide(),
+                lore,
+                systems
         );
     }
 
