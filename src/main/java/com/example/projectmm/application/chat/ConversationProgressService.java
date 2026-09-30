@@ -46,6 +46,10 @@ public class ConversationProgressService {
     private final RelationshipChangeService relationshipChangeService;
     private final RelationshipFactService relationshipFactService;
     private final CharacterRepository characterRepository;
+    private final BeginChatPreparationService beginChatPreparation;
+    private final BeginChatCatchUpResolver beginChatCatchUpResolver;
+    private final BeginChatFinalizationService beginChatFinalization;
+    private final CatchUpClaimService catchUpClaims;
 
     public record Report(Long id, LocalDateTime from, LocalDateTime to, long elapsedSeconds,
                          long appliedSeconds, boolean capped, String pauseReason, String actions) {}
@@ -265,8 +269,27 @@ public class ConversationProgressService {
     }
 
     @Transactional
-    public void heartbeat(Long characterId, Long roomId) {
-        locked(characterId, roomId).markPresent(clock.now());
+    public void heartbeat(
+            Long characterId,
+            Long roomId
+    ) {
+        var room =
+                locked(
+                        characterId,
+                        roomId
+                );
+
+        var now =
+                clock.now();
+
+        requireIdle(
+                room,
+                now
+        );
+
+        room.markPresent(
+                now
+        );
     }
 
     @Transactional
@@ -274,47 +297,38 @@ public class ConversationProgressService {
             Long characterId,
             Long roomId
     ) {
-        // 네트워크 복구 후 입장 요청보다 전송이 먼저 와도
-        // 부재 구간을 버리지 않는다.
-        //
-        // catch-up 실행 여부도 함께 받아
-        // 상위 narrative 계층이 실제 실행 경로를 알 수 있게 한다.
-        var resumed =
-                resumeWithMode(
+        var preparation =
+                beginChatPreparation.prepare(
                         characterId,
                         roomId
                 );
 
-        var room =
-                locked(
-                        characterId,
-                        roomId
+        try {
+            if (!preparation.catchUpRequired()) {
+                return beginChatFinalization.finalizeDirect(
+                        preparation
                 );
+            }
 
-        requireIdle(
-                room,
-                clock.now()
-        );
+            var resolution =
+                    beginChatCatchUpResolver.resolve(
+                            preparation
+                    );
 
-        if (room.getPlayerProfile() == null) {
-            throw conflict(
-                    "유저 프로필을 먼저 선택해 주세요."
+            return beginChatFinalization.finalizeBeginChat(
+                    preparation,
+                    resolution
             );
+
+        } catch (RuntimeException | Error e) {
+            catchUpClaims.release(
+                    characterId,
+                    roomId,
+                    preparation.claimToken()
+            );
+
+            throw e;
         }
-
-        String token =
-                UUID.randomUUID().toString();
-
-        room.beginChat(
-                token,
-                clock.now()
-        );
-
-        return new ChatOperation(
-                room,
-                token,
-                resumed.entry()
-        );
     }
 
     private record ResumeResult(
@@ -555,7 +569,17 @@ public class ConversationProgressService {
     }
 
     private void requireIdle(Conversation room, LocalDateTime now) {
-        if (room.chatInProgress(now)) throw conflict("답변을 생성 중입니다. 잠시 후 다시 시도해 주세요.");
+        if (room.chatInProgress(now)) {
+            throw conflict(
+                    "답변을 생성 중입니다. 잠시 후 다시 시도해 주세요."
+            );
+        }
+
+        if (room.catchUpInProgress(now)) {
+            throw conflict(
+                    "자동 진행을 처리 중입니다. 잠시 후 다시 시도해 주세요."
+            );
+        }
     }
 
     private ResponseStatusException conflict(String message) {

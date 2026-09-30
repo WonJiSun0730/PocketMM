@@ -36,18 +36,67 @@ public class CatchUpExecutionService {
                         currentTime
                 );
 
-        return persist(state, result, null);
+        return persistResolved(state, result, null);
     }
 
     @Transactional
-    public List<Event> execute(CharacterState state, CatchUpSegment segment,
-                               List<EventCandidate> prepared, Conversation room) {
-        if (!state.getCharacter().getId().equals(room.getCharacter().getId()))
-            throw new IllegalArgumentException("catch-up character must match conversation");
-        return persist(state, catchUpOrchestrator.execute(state, segment, prepared, room), room);
+    public List<Event> execute(
+            CharacterState state,
+            CatchUpSegment segment,
+            List<EventCandidate> prepared,
+            Conversation room
+    ) {
+        return persist(
+                state,
+                resolve(state, segment, prepared, room),
+                room
+        );
     }
 
-    private List<Event> persist(CharacterState state, CatchUpExecutionResult result, Conversation room) {
+    public CatchUpExecutionResult resolve(
+            CharacterState state,
+            CatchUpSegment segment,
+            List<EventCandidate> prepared,
+            Conversation room
+    ) {
+        if (!state.getCharacter().getId().equals(room.getCharacter().getId())) {
+            throw new IllegalArgumentException(
+                    "catch-up character must match conversation"
+            );
+        }
+
+        return catchUpOrchestrator.execute(
+                state,
+                segment,
+                prepared,
+                room
+        );
+    }
+
+    @Transactional
+    public List<Event> persist(
+            CharacterState state,
+            CatchUpExecutionResult result,
+            Conversation room
+    ) {
+        if (!state.getCharacter().getId().equals(room.getCharacter().getId())) {
+            throw new IllegalArgumentException(
+                    "catch-up character must match conversation"
+            );
+        }
+
+        return persistResolved(
+                state,
+                result,
+                room
+        );
+    }
+
+    private List<Event> persistResolved(
+            CharacterState state,
+            CatchUpExecutionResult result,
+            Conversation room
+    ) {
 
         if (result.resolvedEvents().isEmpty()) {
             return List.of();

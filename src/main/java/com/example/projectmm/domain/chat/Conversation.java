@@ -50,6 +50,8 @@ public class Conversation {
     private String progressPauseReason;
     private String chatOperationId;
     private LocalDateTime chatOperationUntil;
+    private String catchUpOperationId;
+    private LocalDateTime catchUpOperationUntil;
 
     public boolean autoProgressEnabled() { return Boolean.TRUE.equals(autoProgressEnabled); }
 
@@ -71,6 +73,27 @@ public class Conversation {
     }
 
     public void pauseProgress(String reason) { progressPauseReason = reason; }
+
+    public boolean catchUpInProgress(LocalDateTime now) {
+        return catchUpOperationId != null
+                && catchUpOperationUntil != null
+                && now.isBefore(catchUpOperationUntil);
+    }
+
+    public void beginCatchUp(String token, LocalDateTime now) {
+        catchUpOperationId = token;
+
+        // AI 요청 실패나 서버 종료로 finalize되지 못해도
+        // 방이 영구적으로 잠기지 않게 한다.
+        catchUpOperationUntil = now.plusMinutes(10);
+    }
+
+    public void endCatchUp(String token) {
+        if (token.equals(catchUpOperationId)) {
+            catchUpOperationId = null;
+            catchUpOperationUntil = null;
+        }
+    }
 
     public boolean chatInProgress(LocalDateTime now) {
         return chatOperationId != null && chatOperationUntil != null && now.isBefore(chatOperationUntil);

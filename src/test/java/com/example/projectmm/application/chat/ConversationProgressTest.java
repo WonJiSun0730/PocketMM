@@ -7,6 +7,7 @@ import com.example.projectmm.domain.character.CharacterState;
 import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.memory.MemoryRepository;
 import com.example.projectmm.domain.player.PlayerProfile;
+import com.example.projectmm.domain.simulation.*;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,18 +28,25 @@ import static org.mockito.Mockito.when;
         CatchUpSegmentService.class,
         CatchUpEventCandidateService.class,
         EventCandidateValidator.class,
+        CatchUpClaimService.class,
+        BeginChatPreparationService.class,
+        BeginChatCatchUpResolver.class,
+        BeginChatFinalizationService.class,
         com.example.projectmm.application.state.CustomStateProposalService.class,
         com.example.projectmm.application.relationship.RelationshipChangeService.class,
         com.example.projectmm.application.relationship.RelationshipFactService.class
 })
 class ConversationProgressTest {
     @Autowired EntityManager em;
+    @Autowired CatchUpClaimService catchUpClaims;
     @Autowired ConversationProgressService service;
     @Autowired ConversationRepository rooms;
     @Autowired ConversationCatchUpRepository reports;
     @Autowired ChatMessageRepository messages;
     @Autowired MemoryRepository memories;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
+    @Autowired
+    BeginChatPreparationService beginChatPreparation;
     @MockitoBean PresenceClock clock;
     @MockitoBean CatchUpExecutionService execution;
     @org.springframework.test.context.bean.override.mockito.MockitoSpyBean CatchUpEventCandidateService candidateService;
@@ -507,6 +515,47 @@ class ConversationProgressTest {
         when(clock.now())
                 .thenReturn(real.plusMinutes(4));
 
+        org.mockito.Mockito.doAnswer(invocation -> {
+            assertThat(
+                    org.springframework.transaction.support.TransactionSynchronizationManager
+                            .isActualTransactionActive()
+            ).isFalse();
+
+            CharacterState state =
+                    invocation.getArgument(0);
+
+            CatchUpSegment segment =
+                    invocation.getArgument(1);
+
+            state.advanceSimulatedAt(
+                    segment.end()
+            );
+
+            var duration =
+                    java.time.Duration.between(
+                            segment.start(),
+                            segment.end()
+                    );
+
+            return new CatchUpExecutionResult(
+                    new CatchUpResult(
+                            segment.start(),
+                            segment.end(),
+                            duration,
+                            duration,
+                            false
+                    ),
+                    java.util.List.of(segment),
+                    java.util.List.of(),
+                    java.util.List.of()
+            );
+        }).when(execution).resolve(
+                org.mockito.ArgumentMatchers.any(CharacterState.class),
+                org.mockito.ArgumentMatchers.any(CatchUpSegment.class),
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.any(Conversation.class)
+        );
+
         var operation =
                 service.beginChat(
                         characterId,
@@ -531,6 +580,105 @@ class ConversationProgressTest {
                 room.getId(),
                 operation.token()
         );
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED
+    )
+    void beginChatReleasesCatchUpClaimWithoutConsumingPresenceWhenResolveFails() {
+
+        var tx =
+                new org.springframework.transaction.support.TransactionTemplate(
+                        transactions
+                );
+
+        LocalDateTime previousPresence =
+                real.minusMinutes(4);
+
+        var room =
+                tx.execute(status -> {
+                    var created =
+                            fixture(true, 70, 70);
+
+                    created.configureAutoProgress(
+                            true,
+                            previousPresence
+                    );
+
+                    created.markPresent(
+                            previousPresence
+                    );
+
+                    return created;
+                });
+
+        Long characterId =
+                room.getCharacter().getId();
+
+        Long profileId =
+                room.getPlayerProfile().getId();
+
+        try {
+
+        org.mockito.Mockito.doReturn(
+                java.util.List.of(
+                        new EventCandidate(
+                                story,
+                                "AI_TEST",
+                                "AI resolve failure test",
+                                5,
+                                true,
+                                StateDelta.none()
+                        )
+                )
+        ).when(candidateService).generate(
+                org.mockito.ArgumentMatchers.any(CharacterState.class),
+                org.mockito.ArgumentMatchers.any(CatchUpSegment.class)
+        );
+
+        org.mockito.Mockito.doThrow(
+                new IllegalStateException("AI resolve failure")
+        ).when(execution).resolve(
+                org.mockito.ArgumentMatchers.any(CharacterState.class),
+                org.mockito.ArgumentMatchers.any(CatchUpSegment.class),
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.any(Conversation.class)
+        );
+
+        assertThatThrownBy(() ->
+                service.beginChat(
+                        characterId,
+                        room.getId()
+                )
+        )
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("AI resolve failure");
+
+        var saved =
+                rooms.findById(
+                        room.getId()
+                ).orElseThrow();
+
+        assertThat(saved.getCatchUpOperationId())
+                .isNull();
+
+        assertThat(saved.catchUpInProgress(real))
+                .isFalse();
+
+        assertThat(saved.getLastPresenceAt())
+                .isEqualTo(previousPresence);
+
+        assertThat(saved.getSimulatedAt())
+                .isEqualTo(story);
+
+        } finally {
+            cleanupCommittedFixture(
+                    room.getId(),
+                    profileId,
+                    characterId
+            );
+        }
     }
 
     @Test
@@ -1012,6 +1160,410 @@ class ConversationProgressTest {
 
         assertThat(operation.token())
                 .isNotBlank();
+    }
+
+    @Test
+    void catchUpClaimIsIndependentFromLiveChatOperationAndExpires() {
+        var room = fixture(true, 70, 70);
+
+        String catchUpToken = "catch-up-token";
+
+        room.beginCatchUp(catchUpToken, real);
+
+        assertThat(room.catchUpInProgress(real))
+                .isTrue();
+
+        assertThat(room.chatInProgress(real))
+                .isFalse();
+
+        assertThat(room.catchUpInProgress(real.plusMinutes(9)))
+                .isTrue();
+
+        assertThat(room.catchUpInProgress(real.plusMinutes(10)))
+                .isFalse();
+
+        room.endCatchUp(catchUpToken);
+
+        assertThat(room.catchUpInProgress(real))
+                .isFalse();
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED
+    )
+    void catchUpClaimCommitsImmediatelyAndBlocksSecondClaim() {
+        var tx =
+                new org.springframework.transaction.support.TransactionTemplate(
+                        transactions
+                );
+
+        var room =
+                tx.execute(status ->
+                        fixture(true, 70, 70)
+                );
+
+        Long characterId =
+                room.getCharacter().getId();
+
+        Long profileId =
+                room.getPlayerProfile().getId();
+
+        try {
+            String firstToken =
+                    catchUpClaims.claim(
+                            characterId,
+                            room.getId(),
+                            real
+                    );
+
+            assertThat(firstToken)
+                    .isNotBlank();
+
+            var committed =
+                    rooms.findById(room.getId())
+                            .orElseThrow();
+
+            assertThat(committed.getCatchUpOperationId())
+                    .isEqualTo(firstToken);
+
+            assertThat(committed.catchUpInProgress(real))
+                    .isTrue();
+
+            assertThatThrownBy(() ->
+                    catchUpClaims.claim(
+                            characterId,
+                            room.getId(),
+                            real
+                    )
+            ).isInstanceOf(
+                    org.springframework.web.server.ResponseStatusException.class
+            );
+
+            catchUpClaims.release(
+                    characterId,
+                    room.getId(),
+                    firstToken
+            );
+
+            var released =
+                    rooms.findById(room.getId())
+                            .orElseThrow();
+
+            assertThat(released.catchUpInProgress(real))
+                    .isFalse();
+
+        } finally {
+            cleanupCommittedFixture(
+                    room.getId(),
+                    profileId,
+                    characterId
+            );
+        }
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED
+    )
+    void activeCatchUpClaimBlocksNormalRoomOperations() {
+
+        var tx =
+                new org.springframework.transaction.support.TransactionTemplate(
+                        transactions
+                );
+
+        var room =
+                tx.execute(status ->
+                        fixture(true, 70, 70)
+                );
+
+        Long characterId =
+                room.getCharacter().getId();
+
+        Long profileId =
+                room.getPlayerProfile().getId();
+
+        try {
+            String claim =
+                    catchUpClaims.claim(
+                            characterId,
+                            room.getId(),
+                            real
+                    );
+
+            assertThatThrownBy(() ->
+                    service.resume(
+                            characterId,
+                            room.getId()
+                    )
+            ).isInstanceOf(
+                    org.springframework.web.server.ResponseStatusException.class
+            );
+
+            assertThatThrownBy(() ->
+                    service.configure(
+                            characterId,
+                            room.getId(),
+                            true
+                    )
+            ).isInstanceOf(
+                    org.springframework.web.server.ResponseStatusException.class
+            );
+
+            assertThatThrownBy(() ->
+                    service.beginChat(
+                            characterId,
+                            room.getId()
+                    )
+            ).isInstanceOf(
+                    org.springframework.web.server.ResponseStatusException.class
+            );
+
+            assertThatThrownBy(() ->
+                    service.heartbeat(
+                            characterId,
+                            room.getId()
+                    )
+            ).isInstanceOf(
+                    org.springframework.web.server.ResponseStatusException.class
+            );
+
+            catchUpClaims.release(
+                    characterId,
+                    room.getId(),
+                    claim
+            );
+
+        } finally {
+            cleanupCommittedFixture(
+                    room.getId(),
+                    profileId,
+                    characterId
+            );
+        }
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED
+    )
+    void beginChatPreparationClaimsFixedAbsenceWithoutConsumingPresence() {
+
+        var tx =
+                new org.springframework.transaction.support.TransactionTemplate(
+                        transactions
+                );
+
+        LocalDateTime previousPresence =
+                real.minusHours(2);
+
+        var room =
+                tx.execute(status -> {
+                    var created =
+                            fixture(true, 70, 70);
+
+                    created.configureAutoProgress(
+                            true,
+                            previousPresence
+                    );
+
+                    created.markPresent(
+                            previousPresence
+                    );
+
+                    return created;
+                });
+
+        Long characterId =
+                room.getCharacter().getId();
+
+        Long profileId =
+                room.getPlayerProfile().getId();
+
+        try {
+
+        var preparation =
+                beginChatPreparation.prepare(
+                        characterId,
+                        room.getId()
+                );
+
+        assertThat(preparation.claimToken())
+                .isNotBlank();
+
+        assertThat(preparation.previousPresence())
+                .isEqualTo(previousPresence);
+
+        assertThat(preparation.requestedAt())
+                .isEqualTo(real);
+
+        assertThat(preparation.absenceSeconds())
+                .isEqualTo(7200);
+
+        assertThat(preparation.catchUpRequired())
+                .isTrue();
+
+        assertThat(preparation.simulatedAt())
+                .isEqualTo(story);
+
+        assertThat(preparation.roomEnergy())
+                .isEqualTo(70);
+
+        assertThat(preparation.roomMood())
+                .isEqualTo(70);
+
+        var committed =
+                rooms.findById(
+                        room.getId()
+                ).orElseThrow();
+
+        assertThat(committed.getLastPresenceAt())
+                .isEqualTo(previousPresence);
+
+        assertThat(committed.getCatchUpOperationId())
+                .isEqualTo(preparation.claimToken());
+
+        assertThat(committed.catchUpInProgress(real))
+                .isTrue();
+
+        catchUpClaims.release(
+                characterId,
+                room.getId(),
+                preparation.claimToken()
+        );
+        } finally {
+            cleanupCommittedFixture(
+                    room.getId(),
+                    profileId,
+                    characterId
+            );
+        }
+    }
+
+    @Test
+    @org.springframework.transaction.annotation.Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED
+    )
+    void beginChatPreparationSkipsCatchUpForShortAbsence() {
+
+        var tx =
+                new org.springframework.transaction.support.TransactionTemplate(
+                        transactions
+                );
+
+        var room =
+                tx.execute(status -> {
+                    var created =
+                            fixture(true, 70, 70);
+
+                    created.markPresent(
+                            real.minusSeconds(30)
+                    );
+
+                    return created;
+                });
+
+        Long characterId =
+                room.getCharacter().getId();
+
+        Long profileId =
+                room.getPlayerProfile().getId();
+
+        try {
+
+        var preparation =
+                beginChatPreparation.prepare(
+                        characterId,
+                        room.getId()
+                );
+
+        assertThat(preparation.absenceSeconds())
+                .isEqualTo(30);
+
+        assertThat(preparation.catchUpRequired())
+                .isFalse();
+
+        catchUpClaims.release(
+                characterId,
+                room.getId(),
+                preparation.claimToken()
+        );
+        } finally {
+            cleanupCommittedFixture(
+                    room.getId(),
+                    profileId,
+                    characterId
+            );
+        }
+    }
+
+    private void cleanupCommittedFixture(
+            Long roomId,
+            Long profileId,
+            Long characterId
+    ) {
+        var tx =
+                new org.springframework.transaction.support.TransactionTemplate(
+                        transactions
+                );
+
+        tx.executeWithoutResult(status -> {
+            em.createQuery(
+                            "delete from ConversationCatchUp r where r.conversation.id = :id"
+                    )
+                    .setParameter("id", roomId)
+                    .executeUpdate();
+
+            em.createQuery(
+                            "delete from Memory m where m.conversation.id = :id"
+                    )
+                    .setParameter("id", roomId)
+                    .executeUpdate();
+
+            em.createQuery(
+                            "delete from ChatMessage m where m.conversation.id = :id"
+                    )
+                    .setParameter("id", roomId)
+                    .executeUpdate();
+
+            var conversation =
+                    em.find(
+                            Conversation.class,
+                            roomId
+                    );
+
+            if (conversation != null) {
+                em.remove(conversation);
+                em.flush();
+            }
+
+            var profile =
+                    em.find(
+                            PlayerProfile.class,
+                            profileId
+                    );
+
+            if (profile != null) {
+                em.remove(profile);
+            }
+
+            em.createQuery(
+                            "delete from CharacterState s where s.character.id = :id"
+                    )
+                    .setParameter("id", characterId)
+                    .executeUpdate();
+
+            var character =
+                    em.find(
+                            Character.class,
+                            characterId
+                    );
+
+            if (character != null) {
+                em.remove(character);
+            }
+        });
     }
 
     private Conversation fixture(boolean independent, int energy, int mood) {
