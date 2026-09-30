@@ -20,7 +20,8 @@ public record DialogueContext(
         int playerEnergy,
         int playerMood,
         List<DialogueCustomState> customStates,
-        List<DialogueRelationshipFactContext> relationshipFacts
+        List<DialogueRelationshipFactContext> relationshipFacts,
+        DialogueWorldContext worldContext
 ) {
 
     public DialogueContext(
@@ -54,7 +55,8 @@ public record DialogueContext(
                 playerEnergy,
                 playerMood,
                 customStates,
-                List.of()
+                List.of(),
+                null
         );
     }
 }
