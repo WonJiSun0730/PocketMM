@@ -84,6 +84,7 @@ public class GeminiAiGateway implements AiGateway {
         return new AiDecision(
                 decision.eventType(),
                 decision.summary(),
+                decision.outcome(),
                 decision.importance(),
                 decision.resolvedNarrativeAnchor(),
                 new StateDelta(
@@ -235,6 +236,14 @@ public class GeminiAiGateway implements AiGateway {
                 Candidate event type: %s
                 Candidate summary: %s
                 
+                Event output rules:
+                - summary describes what the character actually did or what happened in this event.
+                - outcome describes a concrete confirmed consequence or result produced by this event.
+                - Do not merely repeat or paraphrase summary in outcome.
+                - If this event establishes no distinct consequence beyond the event itself, outcome must be an empty string.
+                - outcome must contain only consequences supported by the current context and this event.
+                - Do not invent future events, promises, decisions, meetings, relationship changes, or other consequences merely to fill outcome.
+                
                 Narrative anchor represents how strongly this event should be
                 preserved for long-term narrative continuity.
                 
@@ -379,6 +388,11 @@ public class GeminiAiGateway implements AiGateway {
 
                 schemaProperties.put(
                         "summary",
+                        Map.of("type", "string")
+                );
+
+                schemaProperties.put(
+                        "outcome",
                         Map.of("type", "string")
                 );
 
@@ -540,6 +554,7 @@ public class GeminiAiGateway implements AiGateway {
                         List.of(
                                 "eventType",
                                 "summary",
+                                "outcome",
                                 "importance",
                                 "narrativeAnchor",
                                 "energyChange",

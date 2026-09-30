@@ -138,6 +138,7 @@ class GeminiDecisionParserTest {
                 {
                   "eventType": "REFLECTION",
                   "summary": "조용히 지난 일을 돌아보았다.",
+                  "outcome": "복잡했던 감정이 조금 정리되었다.",
                   "importance": 5,
                   "narrativeAnchor": 3,
                   "energyChange": 0,
@@ -162,6 +163,11 @@ class GeminiDecisionParserTest {
         assertThat(result.summary())
                 .isEqualTo(
                         "조용히 지난 일을 돌아보았다."
+                );
+
+        assertThat(result.outcome())
+                .isEqualTo(
+                        "복잡했던 감정이 조금 정리되었다."
                 );
 
         assertThat(result.importance())
