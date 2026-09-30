@@ -6,7 +6,6 @@ public record CharacterUpdateRequest(
         String description,
         String rawDescription,
         String playGuide,
-        String intro,
         List<String> examples,
         String exampleDialogue,
         String personality,
