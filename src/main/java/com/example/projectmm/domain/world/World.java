@@ -32,4 +32,9 @@ public class World {
         this.name = name;
         this.description = description;
     }
+
+    public void updateMetadata(String name, String description) {
+        this.name = name;
+        this.description = description;
+    }
 }
