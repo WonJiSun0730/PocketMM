@@ -6,6 +6,7 @@ import ChatPage from "@/pages/ChatPage"
 import HomePage from "@/pages/HomePage"
 import LoginPage from "@/pages/LoginPage"
 import SignupPage from "@/pages/SignupPage"
+import WorldPage from "@/pages/WorldPage"
 
 export default function App() {
   const [page, setPage] = useState("home")
@@ -46,7 +47,8 @@ export default function App() {
     return <LoginPage onAuthenticated={refreshMember} onOpenSignup={() => setPage("signup")} />
   }
 
-  if (page === "home") return <HomePage onOpenCharacters={openCharacters} />
+  if (page === "home") return <HomePage onOpenCharacters={openCharacters} onOpenWorld={() => setPage("world")} />
+  if (page === "world") return <WorldPage onBack={() => setPage("home")} />
   if (page === "create") return <CharacterCreatePage onBack={openCharacters} onCreated={openChat} />
   if (page === "edit" && selectedCharacter) {
     return <CharacterCreatePage character={selectedCharacter} onBack={openCharacters} onUpdated={finishEdit} />
