@@ -14,7 +14,6 @@ public record CharacterCreateRequest(
         String description,
         String rawDescription,
         String playGuide,
-        String intro,
 
         @Size(max = 10)
         List<String> examples,
