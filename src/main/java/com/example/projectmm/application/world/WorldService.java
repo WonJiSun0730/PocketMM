@@ -4,6 +4,7 @@ import com.example.projectmm.api.world.WorldCreateRequest;
 import com.example.projectmm.api.world.WorldLoreItem;
 import com.example.projectmm.api.world.WorldLoreResponse;
 import com.example.projectmm.api.world.WorldResponse;
+import com.example.projectmm.api.world.WorldUpdateRequest;
 import com.example.projectmm.domain.member.Member;
 import com.example.projectmm.domain.member.MemberRepository;
 import com.example.projectmm.domain.world.World;
@@ -42,6 +43,13 @@ public class WorldService {
                 .toList();
     }
 
+    @Transactional
+    public WorldResponse update(Long worldId, WorldUpdateRequest request, String loginId) {
+        World world = findOwnedWorld(worldId, loginId);
+        world.updateMetadata(request.name().trim(), normalizeNullable(request.description()));
+        return toResponse(world);
+    }
+
     @Transactional(readOnly = true)
     public WorldResponse getById(Long worldId, String loginId) {
         return toResponse(findOwnedWorld(worldId, loginId));
@@ -50,7 +58,7 @@ public class WorldService {
     @Transactional(readOnly = true)
     public WorldLoreResponse getLore(Long worldId, WorldLoreCategory category, String loginId) {
         World world = findOwnedWorld(worldId, loginId);
-        List<String> entries = worldLoreEntryRepository
+        List<WorldLoreItem> entries = worldLoreEntryRepository
                 .findByWorldIdAndCategoryOrderBySortOrderAsc(world.getId(), category)
                 .stream()
                 .map(entry -> new WorldLoreItem(entry.getTitle(), entry.getContent()))
