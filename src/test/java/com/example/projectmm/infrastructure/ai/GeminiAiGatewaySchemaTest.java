@@ -55,6 +55,18 @@ class GeminiAiGatewaySchemaTest {
         Map<String, Object> properties =
                 map(schema.get("properties"));
 
+        assertThat(properties)
+                .containsKey("outcome");
+
+        assertThat(
+                map(properties.get("outcome"))
+                        .get("type")
+        ).isEqualTo("string");
+
+        assertThat(
+                (List<String>) schema.get("required")
+        ).contains("outcome");
+
         assertRange(
                 properties,
                 "importance",
@@ -502,6 +514,7 @@ class GeminiAiGatewaySchemaTest {
                 new GeminiDecisionResponse(
                         "RELATIONSHIP_MILESTONE",
                         "두 사람이 서로를 배우자로 명확히 인정했다.",
+                        "서로를 배우자로 인정한 관계가 확정되었다.",
                         8,
                         9,
                         0,
@@ -522,6 +535,11 @@ class GeminiAiGatewaySchemaTest {
 
         var decision =
                 gateway.toDecision(response);
+
+        assertThat(decision.outcome())
+                .isEqualTo(
+                        "서로를 배우자로 인정한 관계가 확정되었다."
+                );
 
         assertThat(
                 decision.relationshipFactChange()
