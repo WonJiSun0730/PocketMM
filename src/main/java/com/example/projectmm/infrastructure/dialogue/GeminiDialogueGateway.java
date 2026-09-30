@@ -273,7 +273,8 @@ public class GeminiDialogueGateway implements DialogueGateway {
                         "targetCharacterId",
                         "affinityDelta",
                         "trustDelta",
-                        "tensionDelta"
+                        "tensionDelta",
+                        "evidence"
                 ),
                 "additionalProperties", false,
                 "properties", Map.of(
@@ -282,7 +283,11 @@ public class GeminiDialogueGateway implements DialogueGateway {
                         ),
                         "affinityDelta", delta,
                         "trustDelta", delta,
-                        "tensionDelta", delta
+                        "tensionDelta", delta,
+                        "evidence", Map.of(
+                                "type", "string",
+                                "maxLength", 240
+                        )
                 )
         );
 
@@ -990,7 +995,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
                  "state":{"energyDelta":0,"moodDelta":0,"energyEvidence":"","moodEvidence":""},
                  "playerState":{"energyDelta":0,"moodDelta":0,"energyEvidence":"","moodEvidence":""},
                  "customStateChanges":[],
-                 "relationshipChange":{"targetCharacterId":null,"affinityDelta":0,"trustDelta":0,"tensionDelta":0},"relationshipFactChange":null}
+                 "relationshipChange":{"targetCharacterId":null,"affinityDelta":0,"trustDelta":0,"tensionDelta":0,"evidence":""},"relationshipFactChange":null}
                 All preceding RP prose/language/asterisk rules apply INSIDE reply.
                 Never show this JSON structure or state assessment as character dialogue.
                 Assess ONLY the controlled NPC's NEW change during this turn, relative to
@@ -1054,6 +1059,14 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 Never invent, guess, or derive another character ID.
                 Each affinityDelta, trustDelta, and tensionDelta must be an integer from -10 to 10.
                 
+                For any nonzero relationship delta, evidence is REQUIRED.
+                evidence must be an exact substring (at most 240 characters) from the latest USER INPUT
+                that establishes the new interpersonal event, action, or development justifying the change.
+                Never use reply text, generated narration, prior messages, memories, profile text,
+                or relationship context as evidence for a new relationship delta.
+                The reply cannot create its own evidence for changing relationship scores.
+                If all three deltas are 0, return evidence as an empty string.
+
                 Propose a nonzero change only when this turn contains a clear new interpersonal
                 event, action, or reaction that reasonably changes the relationship.
                 Do not repeatedly change the relationship for an already established feeling,
@@ -1230,7 +1243,8 @@ public class GeminiDialogueGateway implements DialogueGateway {
                     && relationship.path("trustDelta").isIntegralNumber()
                     && relationship.path("trustDelta").canConvertToInt()
                     && relationship.path("tensionDelta").isIntegralNumber()
-                    && relationship.path("tensionDelta").canConvertToInt()) {
+                    && relationship.path("tensionDelta").canConvertToInt()
+                    && relationship.path("evidence").isString()) {
 
                 relationshipChange =
                         new DialogueRelationshipChange(
@@ -1241,7 +1255,8 @@ public class GeminiDialogueGateway implements DialogueGateway {
                                         relationship.path("affinityDelta").asInt(),
                                         relationship.path("trustDelta").asInt(),
                                         relationship.path("tensionDelta").asInt()
-                                )
+                                ),
+                                relationship.path("evidence").asText()
                         );
             }
 

@@ -4,18 +4,21 @@ import com.example.projectmm.domain.relationship.RelationshipDelta;
 
 public record DialogueRelationshipChange(
         Long targetCharacterId,
-        RelationshipDelta delta
+        RelationshipDelta delta,
+        String evidence
 ) {
 
     public static DialogueRelationshipChange none() {
         return new DialogueRelationshipChange(
                 null,
-                RelationshipDelta.none()
+                RelationshipDelta.none(),
+                ""
         );
     }
 
     public static DialogueRelationshipChange invalid() {
         return new DialogueRelationshipChange(
+                null,
                 null,
                 null
         );
@@ -28,5 +31,24 @@ public record DialogueRelationshipChange(
                         || delta.trustChange() != 0
                         || delta.tensionChange() != 0
         );
+    }
+
+    public boolean validFor(String userText) {
+        if (!hasChange()) {
+            return true;
+        }
+
+        if (evidence == null
+                || evidence.isBlank()
+                || userText == null
+                || userText.isBlank()) {
+            return false;
+        }
+
+        String normalizedEvidence =
+                evidence.trim();
+
+        return normalizedEvidence.length() <= 240
+                && userText.contains(normalizedEvidence);
     }
 }

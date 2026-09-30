@@ -304,6 +304,103 @@ class ConversationProgressTest extends ConversationProgressTestSupport {
         assertThat(service.resume(id, room.getId()).lastReport().id()).isEqualTo(result.lastReport().id());
     }
 
+    @Test
+    void userDialogueClearsPendingProgressPauseSoFutureCatchUpCanResume() {
+        org.mockito.Mockito.doReturn(java.util.List.of(
+                new com.example.projectmm.domain.simulation.EventCandidate(
+                        story,
+                        "UNSUPPORTED",
+                        "needs user choice",
+                        4,
+                        false,
+                        com.example.projectmm.domain.simulation.StateDelta.none()
+                )
+        )).when(candidateService).generate(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
+
+        var room = fixture(true, 20, 10);
+        Long characterId = room.getCharacter().getId();
+
+        service.configure(
+                characterId,
+                room.getId(),
+                true
+        );
+
+        when(clock.now())
+                .thenReturn(real.plusHours(1));
+
+        var paused =
+                service.resume(
+                        characterId,
+                        room.getId()
+                );
+
+        assertThat(paused.pauseReason())
+                .isNotBlank();
+
+        var operation =
+                liveChatFixture(room);
+
+        service.completeChat(
+                characterId,
+                room.getId(),
+                operation.token(),
+                "제가 직접 결정할게요.",
+                "알겠어요. 그렇게 진행해요.",
+                ContentMode.NORMAL
+        );
+
+        em.flush();
+        em.clear();
+
+        var stored =
+                rooms.findById(room.getId())
+                        .orElseThrow();
+
+        assertThat(stored.getProgressPauseReason())
+                .isNull();
+
+        // 사용자 개입으로 보류가 해제된 뒤에는
+// 다음 부재 구간의 자동 진행이 다시 실행될 수 있어야 한다.
+        org.mockito.Mockito.doReturn(java.util.List.of(
+                new com.example.projectmm.domain.simulation.EventCandidate(
+                        story.plusHours(2),
+                        "REST",
+                        "휴식을 취했다.",
+                        2,
+                        false,
+                        new com.example.projectmm.domain.simulation.StateDelta(
+                                10,
+                                0
+                        )
+                )
+        )).when(candidateService).generate(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
+
+        when(clock.now())
+                .thenReturn(real.plusHours(2));
+
+        var resumed =
+                service.resume(
+                        characterId,
+                        room.getId()
+                );
+
+        assertThat(resumed.pauseReason())
+                .isNull();
+
+        assertThat(resumed.lastReport())
+                .isNotNull();
+
+        assertThat(resumed.lastReport().actions())
+                .contains("휴식");
+    }
+
     @Test void chatOperationExcludesCatchUpAndExpiredReplyCannotOverwriteNewOperation() {
         var room = fixture(true, 70, 70);
         Long id = room.getCharacter().getId();
@@ -480,7 +577,8 @@ class ConversationProgressTest extends ConversationProgressTestSupport {
                                         3,
                                         2,
                                         -1
-                                )
+                                ),
+                                "약속을 지켰어요."
                         )
                 );
 
@@ -513,6 +611,89 @@ class ConversationProgressTest extends ConversationProgressTestSupport {
     }
 
     @Test
+    void dialogueRelationshipChangeRejectsAiInventedDeltaWithoutUserEvidence() {
+
+        var room = fixture(true, 70, 70);
+        Long characterId =
+                room.getCharacter().getId();
+
+        var target =
+                new Character("관계 대상");
+
+        em.persist(target);
+
+        var relationship =
+                new com.example.projectmm.domain.relationship.Relationship(
+                        room.getCharacter(),
+                        target
+                );
+
+        em.persist(relationship);
+        em.flush();
+
+        var operation =
+                liveChatFixture(room);
+
+        var turn =
+                new com.example.projectmm.domain.dialogue.DialogueTurn(
+                        "*상대를 훨씬 더 신뢰하게 되었다.*",
+                        com.example.projectmm.domain.dialogue.DialogueStateChange.none(),
+                        com.example.projectmm.domain.dialogue.DialoguePlayerStateChange.none(),
+                        java.util.List.of(),
+                        new com.example.projectmm.domain.dialogue.DialogueRelationshipChange(
+                                target.getId(),
+                                new com.example.projectmm.domain.relationship.RelationshipDelta(
+                                        5,
+                                        5,
+                                        0
+                                ),
+                                "*상대를 훨씬 더 신뢰하게 되었다.*"
+                        )
+                );
+
+        service.completeChat(
+                characterId,
+                room.getId(),
+                operation.token(),
+                "안녕하세요.",
+                turn,
+                ContentMode.NORMAL
+        );
+
+        em.flush();
+        em.clear();
+
+        var saved =
+                em.find(
+                        com.example.projectmm.domain.relationship.Relationship.class,
+                        relationship.getId()
+                );
+
+        assertThat(saved.getAffinity())
+                .isEqualTo(0);
+
+        assertThat(saved.getTrust())
+                .isEqualTo(0);
+
+        assertThat(saved.getTension())
+                .isEqualTo(0);
+
+        var savedMessages =
+                messages.findTop20ByConversationIdOrderByCreatedAtDesc(
+                        room.getId()
+                );
+
+        assertThat(savedMessages)
+                .hasSize(2);
+
+        assertThat(savedMessages.get(0).getContent())
+                .isEqualTo("*상대를 훨씬 더 신뢰하게 되었다.*");
+
+        assertThat(savedMessages.get(1).getContent())
+                .isEqualTo("안녕하세요.");
+    }
+
+    @Test
     void dialogueRelationshipChangeIgnoresUnknownTargetWithoutDiscardingChat() {
 
         var room = fixture(true, 70, 70);
@@ -534,7 +715,8 @@ class ConversationProgressTest extends ConversationProgressTestSupport {
                                         5,
                                         5,
                                         5
-                                )
+                                ),
+                                "안녕하세요."
                         )
                 );
 
@@ -840,6 +1022,319 @@ class ConversationProgressTest extends ConversationProgressTestSupport {
                 .isFalse();
     }
 
+    @Test
+    void dialogueRelationshipFactChangeRejectsFutureRelationshipAsCurrentFact() {
+
+        var room = fixture(true, 70, 70);
+        Long characterId =
+                room.getCharacter().getId();
+
+        var target =
+                new Character("관계 대상");
+
+        em.persist(target);
+
+        var relationship =
+                new com.example.projectmm.domain.relationship.Relationship(
+                        room.getCharacter(),
+                        target
+                );
+
+        em.persist(relationship);
+        em.flush();
+
+        var operation =
+                liveChatFixture(room);
+
+        var turn =
+                new com.example.projectmm.domain.dialogue.DialogueTurn(
+                        "좋아요. 나중에 꼭 그렇게 해요.",
+                        com.example.projectmm.domain.dialogue.DialogueStateChange.none(),
+                        com.example.projectmm.domain.dialogue.DialoguePlayerStateChange.none(),
+                        java.util.List.of(),
+                        com.example.projectmm.domain.dialogue.DialogueRelationshipChange.none(),
+                        new com.example.projectmm.domain.dialogue.DialogueRelationshipFactChange(
+                                target.getId(),
+                                "relationship_status",
+                                "spouse",
+                                "나중에 결혼하자"
+                        )
+                );
+
+        service.completeChat(
+                characterId,
+                room.getId(),
+                operation.token(),
+                "나중에 결혼하자",
+                turn,
+                ContentMode.NORMAL
+        );
+
+        em.flush();
+        em.clear();
+
+        Long factCount =
+                em.createQuery(
+                                """
+                                select count(f)
+                                from RelationshipFact f
+                                where f.fromCharacter.id = :fromId
+                                  and f.toCharacter.id = :toId
+                                  and f.relation = :relation
+                                """,
+                                Long.class
+                        )
+                        .setParameter("fromId", characterId)
+                        .setParameter("toId", target.getId())
+                        .setParameter(
+                                "relation",
+                                "relationship_status"
+                        )
+                        .getSingleResult();
+
+        assertThat(factCount)
+                .isZero();
+    }
+
+    @Test
+    void dialogueRelationshipFactChangeRejectsHypotheticalRelationshipAsCurrentFact() {
+
+        var room = fixture(true, 70, 70);
+        Long characterId =
+                room.getCharacter().getId();
+
+        var target =
+                new Character("관계 대상");
+
+        em.persist(target);
+
+        var relationship =
+                new com.example.projectmm.domain.relationship.Relationship(
+                        room.getCharacter(),
+                        target
+                );
+
+        em.persist(relationship);
+        em.flush();
+
+        var operation =
+                liveChatFixture(room);
+
+        var turn =
+                new com.example.projectmm.domain.dialogue.DialogueTurn(
+                        "그런 미래도 좋겠네요.",
+                        com.example.projectmm.domain.dialogue.DialogueStateChange.none(),
+                        com.example.projectmm.domain.dialogue.DialoguePlayerStateChange.none(),
+                        java.util.List.of(),
+                        com.example.projectmm.domain.dialogue.DialogueRelationshipChange.none(),
+                        new com.example.projectmm.domain.dialogue.DialogueRelationshipFactChange(
+                                target.getId(),
+                                "relationship_status",
+                                "spouse",
+                                "만약 우리가 결혼한다면"
+                        )
+                );
+
+        service.completeChat(
+                characterId,
+                room.getId(),
+                operation.token(),
+                "만약 우리가 결혼한다면 어떨까요?",
+                turn,
+                ContentMode.NORMAL
+        );
+
+        em.flush();
+        em.clear();
+
+        Long factCount =
+                em.createQuery(
+                                """
+                                select count(f)
+                                from RelationshipFact f
+                                where f.fromCharacter.id = :fromId
+                                  and f.toCharacter.id = :toId
+                                  and f.relation = :relation
+                                """,
+                                Long.class
+                        )
+                        .setParameter("fromId", characterId)
+                        .setParameter("toId", target.getId())
+                        .setParameter("relation", "relationship_status")
+                        .getSingleResult();
+
+        assertThat(factCount)
+                .isZero();
+    }
+
+    @Test
+    void dialogueRelationshipFactChangeRejectsNegatedRelationshipAsCurrentFact() {
+
+        var room = fixture(true, 70, 70);
+        Long characterId =
+                room.getCharacter().getId();
+
+        var target =
+                new Character("관계 대상");
+
+        em.persist(target);
+
+        var relationship =
+                new com.example.projectmm.domain.relationship.Relationship(
+                        room.getCharacter(),
+                        target
+                );
+
+        em.persist(relationship);
+        em.flush();
+
+        var operation =
+                liveChatFixture(room);
+
+        var turn =
+                new com.example.projectmm.domain.dialogue.DialogueTurn(
+                        "알겠어요.",
+                        com.example.projectmm.domain.dialogue.DialogueStateChange.none(),
+                        com.example.projectmm.domain.dialogue.DialoguePlayerStateChange.none(),
+                        java.util.List.of(),
+                        com.example.projectmm.domain.dialogue.DialogueRelationshipChange.none(),
+                        new com.example.projectmm.domain.dialogue.DialogueRelationshipFactChange(
+                                target.getId(),
+                                "relationship_status",
+                                "spouse",
+                                "우린 부부가 아니야"
+                        )
+                );
+
+        service.completeChat(
+                characterId,
+                room.getId(),
+                operation.token(),
+                "우린 부부가 아니야.",
+                turn,
+                ContentMode.NORMAL
+        );
+
+        em.flush();
+        em.clear();
+
+        Long factCount =
+                em.createQuery(
+                                """
+                                select count(f)
+                                from RelationshipFact f
+                                where f.fromCharacter.id = :fromId
+                                  and f.toCharacter.id = :toId
+                                  and f.relation = :relation
+                                """,
+                                Long.class
+                        )
+                        .setParameter("fromId", characterId)
+                        .setParameter("toId", target.getId())
+                        .setParameter("relation", "relationship_status")
+                        .getSingleResult();
+
+        assertThat(factCount)
+                .isZero();
+    }
+
+    @Test
+    void emptyContinuationDoesNotClearPendingProgressPause() {
+        org.mockito.Mockito.doReturn(java.util.List.of(
+                new com.example.projectmm.domain.simulation.EventCandidate(
+                        story,
+                        "UNSUPPORTED",
+                        "needs user choice",
+                        4,
+                        false,
+                        com.example.projectmm.domain.simulation.StateDelta.none()
+                )
+        )).when(candidateService).generate(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
+
+        var room = fixture(true, 20, 10);
+        Long characterId = room.getCharacter().getId();
+
+        service.configure(characterId, room.getId(), true);
+
+        when(clock.now()).thenReturn(real.plusHours(1));
+
+        var paused = service.resume(characterId, room.getId());
+
+        assertThat(paused.pauseReason()).isNotBlank();
+
+        var operation = liveChatFixture(room);
+
+        service.completeChat(
+                characterId,
+                room.getId(),
+                operation.token(),
+                "",
+                "장면을 계속 이어간다.",
+                ContentMode.NORMAL
+        );
+
+        em.flush();
+        em.clear();
+
+        assertThat(
+                rooms.findById(room.getId())
+                        .orElseThrow()
+                        .getProgressPauseReason()
+        ).isNotBlank();
+    }
+
+    @Test
+    void invalidChatOperationDoesNotClearPendingProgressPause() {
+        org.mockito.Mockito.doReturn(java.util.List.of(
+                new com.example.projectmm.domain.simulation.EventCandidate(
+                        story,
+                        "UNSUPPORTED",
+                        "needs user choice",
+                        4,
+                        false,
+                        com.example.projectmm.domain.simulation.StateDelta.none()
+                )
+        )).when(candidateService).generate(
+                org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any()
+        );
+
+        var room = fixture(true, 20, 10);
+        Long characterId = room.getCharacter().getId();
+
+        service.configure(characterId, room.getId(), true);
+
+        when(clock.now()).thenReturn(real.plusHours(1));
+
+        var paused = service.resume(characterId, room.getId());
+
+        assertThat(paused.pauseReason()).isNotBlank();
+
+        assertThatThrownBy(() ->
+                service.completeChat(
+                        characterId,
+                        room.getId(),
+                        "invalid-operation-token",
+                        "제가 결정할게요.",
+                        "알겠어요.",
+                        ContentMode.NORMAL
+                )
+        ).isInstanceOf(
+                org.springframework.web.server.ResponseStatusException.class
+        );
+
+        em.flush();
+        em.clear();
+
+        assertThat(
+                rooms.findById(room.getId())
+                        .orElseThrow()
+                        .getProgressPauseReason()
+        ).isNotBlank();
+    }
 
     // 완료 처리 테스트의 전제만 준비한다. beginChat orchestration은 별도 integration test가 검증한다.
     private ConversationProgressService.ChatOperation liveChatFixture(Conversation fixture) {

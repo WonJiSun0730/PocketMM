@@ -85,6 +85,31 @@ class GeminiDialogueResponseTest {
         assertThat(schema.path("required").toString())
                 .contains("relationshipFactChange");
 
+        var relationshipChangeSchema =
+                schema.path("properties")
+                        .path("relationshipChange");
+
+        assertThat(relationshipChangeSchema.path("required").toString())
+                .contains(
+                        "targetCharacterId",
+                        "affinityDelta",
+                        "trustDelta",
+                        "tensionDelta",
+                        "evidence"
+                );
+
+        assertThat(relationshipChangeSchema.path("properties")
+                .path("evidence")
+                .path("type")
+                .asText())
+                .isEqualTo("string");
+
+        assertThat(relationshipChangeSchema.path("properties")
+                .path("evidence")
+                .path("maxLength")
+                .asInt())
+                .isEqualTo(240);
+
         var relationshipFactSchema =
                 schema.path("properties")
                         .path("relationshipFactChange");
@@ -142,7 +167,8 @@ class GeminiDialogueResponseTest {
                 "targetCharacterId":2,
                 "affinityDelta":3,
                 "trustDelta":2,
-                "tensionDelta":-1
+                "tensionDelta":-1,
+                "evidence":"약속을 지켰어요."
               }
             }
             """;
@@ -163,6 +189,9 @@ class GeminiDialogueResponseTest {
 
         assertThat(turn.relationshipChange().delta().tensionChange())
                 .isEqualTo(-1);
+
+        assertThat(turn.relationshipChange().evidence())
+                .isEqualTo("약속을 지켰어요.");
     }
 
     @Test
@@ -188,7 +217,8 @@ class GeminiDialogueResponseTest {
                 "targetCharacterId":null,
                 "affinityDelta":0,
                 "trustDelta":0,
-                "tensionDelta":0
+                "tensionDelta":0,
+                "evidence":""
               }
             }
             """;
@@ -228,7 +258,8 @@ class GeminiDialogueResponseTest {
                 "targetCharacterId":"wrong",
                 "affinityDelta":"five",
                 "trustDelta":0,
-                "tensionDelta":0
+                "tensionDelta":0,
+                "evidence":"안녕하세요."
               }
             }
             """;
@@ -288,7 +319,8 @@ class GeminiDialogueResponseTest {
             "targetCharacterId":null,
             "affinityDelta":0,
             "trustDelta":0,
-            "tensionDelta":0
+            "tensionDelta":0,
+            "evidence":""
           },
           "relationshipFactChange":{
             "targetCharacterId":2,
@@ -343,7 +375,8 @@ class GeminiDialogueResponseTest {
             "targetCharacterId":null,
             "affinityDelta":0,
             "trustDelta":0,
-            "tensionDelta":0
+            "tensionDelta":0,
+            "evidence":""
           },
           "relationshipFactChange":null
         }

@@ -79,6 +79,58 @@ public final class DialogueAgencyPolicy {
         return false;
     }
 
+    static boolean supportsRelationshipFactEvidence(
+            String userText,
+            String evidence
+    ) {
+        if (userText == null
+                || userText.isBlank()
+                || evidence == null
+                || evidence.isBlank()) {
+            return false;
+        }
+
+        String normalized =
+                evidence.trim();
+
+        if (normalized.length() > 240
+                || !userText.contains(normalized)) {
+            return false;
+        }
+
+        String compact =
+                normalized
+                        .replaceAll("\\s+", "")
+                        .toLowerCase();
+
+        // 가정적 관계는 현재 사실을 확정하지 않는다.
+        if (compact.contains("만약")
+                || compact.contains("만일")
+                || compact.contains("가정하면")
+                || compact.contains("가정해서")) {
+            return false;
+        }
+
+        // 미래의 약속/계획은 현재 관계 사실이 아니다.
+        if (compact.contains("나중에")
+                || compact.contains("언젠가")
+                || compact.contains("앞으로")
+                || compact.contains("훗날")) {
+            return false;
+        }
+
+        // 명시적 부정은 해당 사실의 성립 근거가 될 수 없다.
+        if (compact.contains("아니야")
+                || compact.contains("아니에요")
+                || compact.contains("아닙니다")
+                || compact.contains("아닌데")
+                || compact.contains("아니지")) {
+            return false;
+        }
+
+        return true;
+    }
+
     private static boolean hasOtherSubject(String text, String npcName) {
         if (Pattern.compile("(?:^|\\s)(?:그는|그가|그녀는|그녀가|NPC는|NPC가)\\s").matcher(text).find()) return true;
         return npcName != null && !npcName.isBlank()

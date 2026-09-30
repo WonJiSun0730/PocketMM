@@ -373,6 +373,7 @@ public class ConversationProgressService {
 
         applyRelationshipChange(
                 characterId,
+                userText,
                 turn
         );
 
@@ -430,6 +431,13 @@ public class ConversationProgressService {
                 now
         );
 
+        // 자동 진행이 사용자 판단을 기다리며 멈춘 경우,
+        // 실제 사용자 입력으로 장면을 이어간 성공한 대화가 그 보류를 소비한다.
+        // 빈 입력은 기존 장면 계속 생성 요청이므로 보류 해제로 취급하지 않는다.
+        if (userText != null && !userText.isBlank()) {
+            room.clearProgressPause();
+        }
+
         room.endChat(token, now);
 
         return new CompletedChat(
@@ -442,13 +450,15 @@ public class ConversationProgressService {
 
     private void applyRelationshipChange(
             Long characterId,
+            String userText,
             DialogueTurn turn
     ) {
         var change =
                 turn.relationshipChange();
 
         if (change == null
-                || !change.hasChange()) {
+                || !change.hasChange()
+                || !change.validFor(userText)) {
             return;
         }
 

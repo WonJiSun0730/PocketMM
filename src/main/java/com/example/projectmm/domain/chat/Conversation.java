@@ -74,6 +74,10 @@ public class Conversation {
 
     public void pauseProgress(String reason) { progressPauseReason = reason; }
 
+    public void clearProgressPause() {
+        progressPauseReason = null;
+    }
+
     public boolean catchUpInProgress(LocalDateTime now) {
         return catchUpOperationId != null
                 && catchUpOperationUntil != null

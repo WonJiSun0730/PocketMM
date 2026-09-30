@@ -47,6 +47,10 @@ public record DialogueRelationshipFactChange(
         String normalizedEvidence = evidence.trim();
 
         return normalizedEvidence.length() <= 240
-                && userText.contains(normalizedEvidence);
+                && userText.contains(normalizedEvidence)
+                && DialogueAgencyPolicy.supportsRelationshipFactEvidence(
+                userText,
+                normalizedEvidence
+        );
     }
 }
