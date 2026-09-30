@@ -23,6 +23,9 @@ public class WorldLoreEntry {
     @Column(nullable = false, length = 40)
     private WorldLoreCategory category;
 
+    @Column(length = 255)
+    private String title;
+
     @Lob
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
@@ -30,9 +33,10 @@ public class WorldLoreEntry {
     @Column(nullable = false)
     private int sortOrder;
 
-    public WorldLoreEntry(World world, WorldLoreCategory category, String content, int sortOrder) {
+    public WorldLoreEntry(World world, WorldLoreCategory category, String title, String content, int sortOrder) {
         this.world = world;
         this.category = category;
+        this.title = title;
         this.content = content;
         this.sortOrder = sortOrder;
     }
