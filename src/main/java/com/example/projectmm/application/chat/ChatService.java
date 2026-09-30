@@ -9,8 +9,6 @@ import com.example.projectmm.application.memory.ChatMemoryService;
 import com.example.projectmm.application.memory.ChatMemoryResult;
 import com.example.projectmm.domain.dialogue.DialogueMemoryContext;
 import com.example.projectmm.domain.character.Character;
-import com.example.projectmm.domain.character.CharacterProfile;
-import com.example.projectmm.domain.character.CharacterProfileRepository;
 import com.example.projectmm.domain.character.CharacterRepository;
 import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.dialogue.DialogueContext;
@@ -29,7 +27,6 @@ import java.util.List;
 public class ChatService {
 
     private final CharacterRepository characterRepository;
-    private final CharacterProfileRepository characterProfileRepository;
     private final ConversationRepository conversationRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final DialogueContextBuilder dialogueContextBuilder;
@@ -207,28 +204,7 @@ public class ChatService {
                                 createConversation(character)
                         );
 
-        if (!chatMessageRepository.existsByConversationId(
-                conversation.getId()
-        )) {
-            characterProfileRepository
-                    .findByCharacterId(characterId)
-                    .map(CharacterProfile::getIntro)
-                    .filter(intro ->
-                            intro != null && !intro.isBlank()
-                    )
-                    .ifPresent(intro ->
-                            chatMessageRepository.save(
-                                    new ChatMessage(
-                                            conversation,
-                                            character,
-                                            ChatRole.CHARACTER,
-                                            intro,
-                                            ContentMode.NORMAL,
-                                            LocalDateTime.now()
-                                    )
-                            )
-                    );
-        }
+
 
         List<ChatMessage> messages =
                 new ArrayList<>(
