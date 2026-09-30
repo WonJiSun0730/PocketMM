@@ -5,6 +5,8 @@ import com.example.projectmm.api.character.CharacterResponse;
 import com.example.projectmm.api.character.CharacterUpdateRequest;
 import com.example.projectmm.domain.character.*;
 import com.example.projectmm.domain.character.Character;
+import com.example.projectmm.domain.member.Member;
+import com.example.projectmm.domain.member.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,13 +27,16 @@ public class CharacterService {
     private final CharacterProfileRepository characterProfileRepository;
     private final CharacterStateRepository characterStateRepository;
     private final CharacterExampleRepository characterExampleRepository;
+    private final MemberRepository memberRepository;
 
     @Transactional
-    public CharacterResponse create(CharacterCreateRequest request) {
+    public CharacterResponse create(CharacterCreateRequest request, String loginId) {
+
+        Member owner = findMember(loginId);
 
         Character character =
                 characterRepository.save(
-                        new Character(request.name().trim())
+                        new Character(request.name().trim(), owner)
                 );
 
         CharacterProfile profile =
@@ -68,18 +73,18 @@ public class CharacterService {
     }
 
     @Transactional(readOnly = true)
-    public List<CharacterResponse> getAll() {
+    public List<CharacterResponse> getAll(String loginId) {
 
-        return characterRepository.findAll().stream()
+        return characterRepository.findAllByOwnerIdOrderByIdDesc(findMember(loginId).getId()).stream()
                 .map(this::toResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
-    public CharacterResponse getById(Long characterId) {
+    public CharacterResponse getById(Long characterId, String loginId) {
 
         Character character =
-                characterRepository.findById(characterId)
+                characterRepository.findByIdAndOwnerId(characterId, findMember(loginId).getId())
                         .orElseThrow(() ->
                                 new IllegalArgumentException(
                                         "Character not found. characterId="
@@ -93,10 +98,11 @@ public class CharacterService {
     @Transactional
     public CharacterResponse updateProfile(
             Long characterId,
-            CharacterUpdateRequest request
+            CharacterUpdateRequest request,
+            String loginId
     ) {
         Character character =
-                characterRepository.findById(characterId)
+                characterRepository.findByIdAndOwnerId(characterId, findMember(loginId).getId())
                         .orElseThrow(() ->
                                 new IllegalArgumentException(
                                         "Character not found. characterId="
@@ -132,6 +138,13 @@ public class CharacterService {
         );
 
         return toResponse(character, profile);
+    }
+
+    private Member findMember(String loginId) {
+        return memberRepository.findByLoginId(loginId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException("Member not found. loginId=" + loginId)
+                );
     }
 
     private CharacterResponse toResponse(Character character) {
