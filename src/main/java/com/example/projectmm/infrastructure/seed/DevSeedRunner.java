@@ -42,11 +42,6 @@ public class DevSeedRunner implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
-        if (characterRepository.existsByName("Millie")
-                || characterRepository.existsByName("Marbas")) {
-            return;
-        }
-
         Member devOwner = memberRepository.findByLoginId("devseed")
                 .orElseGet(() -> memberRepository.save(
                         Member.createLocal(
@@ -57,6 +52,11 @@ public class DevSeedRunner implements CommandLineRunner {
                                 passwordEncoder
                         )
                 ));
+
+        if (characterRepository.existsByName("Millie")
+                || characterRepository.existsByName("Marbas")) {
+            return;
+        }
 
         Character millie =
                 characterRepository.save(new Character("Millie", devOwner));
