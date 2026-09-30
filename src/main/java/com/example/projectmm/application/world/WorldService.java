@@ -35,6 +35,7 @@ public class WorldService {
         World world = worldRepository.save(
                 new World(owner, request.name().trim(), normalizeNullable(request.description()))
         );
+        world.updateMetadata(world.getName(), world.getDescription(), normalizeNullable(request.introduction()));
         return toResponse(world);
     }
 
@@ -48,7 +49,7 @@ public class WorldService {
     @Transactional
     public WorldResponse update(Long worldId, WorldUpdateRequest request, String loginId) {
         World world = findOwnedWorld(worldId, loginId);
-        world.updateMetadata(request.name().trim(), normalizeNullable(request.description()));
+        world.updateMetadata(request.name().trim(), normalizeNullable(request.description()), normalizeNullable(request.introduction()));
         return toResponse(world);
     }
 
@@ -109,7 +110,7 @@ public class WorldService {
     }
 
     private WorldResponse toResponse(World world) {
-        return new WorldResponse(world.getId(), world.getName(), world.getDescription());
+        return new WorldResponse(world.getId(), world.getName(), world.getDescription(), world.getIntroduction());
     }
 
     private WorldLoreResponse toLoreResponse(WorldLoreCategory category, List<WorldLoreItem> entries) {
