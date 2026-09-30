@@ -291,7 +291,8 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 "required", List.of(
                         "targetCharacterId",
                         "relation",
-                        "value"
+                        "value",
+                        "evidence"
                 ),
                 "additionalProperties", false,
                 "properties", Map.of(
@@ -306,6 +307,11 @@ public class GeminiDialogueGateway implements DialogueGateway {
                         "value", Map.of(
                                 "type", "string",
                                 "minLength", 1
+                        ),
+                        "evidence", Map.of(
+                                "type", "string",
+                                "minLength", 1,
+                                "maxLength", 240
                         )
                 )
         );
@@ -1093,12 +1099,20 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 - targetCharacterId: the affected character's ID from the supplied relationship context.
                 - relation: the factual relationship dimension being established or changed.
                 - value: the new confirmed factual value.
+                - evidence: an exact substring of the latest USER INPUT that explicitly
+                  establishes or accepts this factual relationship.
                 
                 relation and value are open narrative data. Do not restrict them to a predefined
                 relationship vocabulary.
                 
-                The generated reply must itself contain the explicit narrative evidence that
-                establishes or changes this factual relationship.
+                The latest USER INPUT must itself contain explicit evidence establishing,
+                accepting, rejecting, or otherwise confirming this factual relationship change.
+                
+                evidence must be an exact substring of the latest user input, at most 240 characters.
+                Never use your generated reply as relationship fact evidence.
+                
+                A relationship fact proposed only by your generated reply is not confirmed narrative state.
+                If the user has not explicitly established or accepted it, relationshipFactChange must be null.
                 
                 Existing confirmed relationship facts describe current state and must not be emitted
                 again merely because they remain true.
@@ -1251,19 +1265,26 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 JsonNode value =
                         relationshipFact.path("value");
 
+                JsonNode evidence =
+                        relationshipFact.path("evidence");
+
                 if (factTargetCharacterId.isIntegralNumber()
                         && factTargetCharacterId.canConvertToLong()
                         && factTargetCharacterId.asLong() > 0
                         && relation.isString()
                         && !relation.asText().isBlank()
                         && value.isString()
-                        && !value.asText().isBlank()) {
+                        && !value.asText().isBlank()
+                        && evidence.isString()
+                        && !evidence.asText().isBlank()
+                        && evidence.asText().length() <= 240) {
 
                     relationshipFactChange =
                             new DialogueRelationshipFactChange(
                                     factTargetCharacterId.asLong(),
                                     relation.asText(),
-                                    value.asText()
+                                    value.asText(),
+                                    evidence.asText()
                             );
                 }
             }

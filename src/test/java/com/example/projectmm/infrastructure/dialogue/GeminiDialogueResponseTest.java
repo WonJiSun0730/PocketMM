@@ -96,7 +96,8 @@ class GeminiDialogueResponseTest {
                 .contains(
                         "targetCharacterId",
                         "relation",
-                        "value"
+                        "value",
+                        "evidence"
                 );
 
         assertThat(relationshipFactSchema.path("properties")
@@ -104,6 +105,18 @@ class GeminiDialogueResponseTest {
                 .path("minimum")
                 .asLong())
                 .isEqualTo(1L);
+
+        assertThat(relationshipFactSchema.path("properties")
+                .path("evidence")
+                .path("type")
+                .asText())
+                .isEqualTo("string");
+
+        assertThat(relationshipFactSchema.path("properties")
+                .path("evidence")
+                .path("maxLength")
+                .asInt())
+                .isEqualTo(240);
     }
 
     @Test
@@ -280,7 +293,8 @@ class GeminiDialogueResponseTest {
           "relationshipFactChange":{
             "targetCharacterId":2,
             "relation":"relationship_status",
-            "value":"spouse"
+            "value":"spouse",
+            "evidence":"우리 이제 부부예요."
           }
         }
         """;
@@ -301,6 +315,9 @@ class GeminiDialogueResponseTest {
 
         assertThat(turn.relationshipFactChange().value())
                 .isEqualTo("spouse");
+
+        assertThat(turn.relationshipFactChange().evidence())
+                .isEqualTo("우리 이제 부부예요.");
     }
 
     @Test

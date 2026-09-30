@@ -424,6 +424,7 @@ public class ConversationProgressService {
 
         applyRelationshipFactChange(
                 room.getCharacter(),
+                userText,
                 turn,
                 characterMessage,
                 now
@@ -492,6 +493,7 @@ public class ConversationProgressService {
 
     private void applyRelationshipFactChange(
             com.example.projectmm.domain.character.Character fromCharacter,
+            String userText,
             DialogueTurn turn,
             ChatMessage sourceChatMessage,
             LocalDateTime establishedAt
@@ -500,7 +502,8 @@ public class ConversationProgressService {
                 turn.relationshipFactChange();
 
         if (change == null
-                || !change.hasChange()) {
+                || !change.hasChange()
+                || !change.validFor(userText)) {
             return;
         }
 

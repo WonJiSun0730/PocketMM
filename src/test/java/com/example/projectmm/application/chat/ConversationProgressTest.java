@@ -600,7 +600,8 @@ class ConversationProgressTest extends ConversationProgressTestSupport {
                         new com.example.projectmm.domain.dialogue.DialogueRelationshipFactChange(
                                 target.getId(),
                                 "relationship_status",
-                                "spouse"
+                                "spouse",
+                                "그럼 이제 우리 부부인 거죠?"
                         )
                 );
 
@@ -652,6 +653,92 @@ class ConversationProgressTest extends ConversationProgressTestSupport {
     }
 
     @Test
+    void dialogueRelationshipFactRejectsAiInventedCommitmentWithoutUserEvidence() {
+
+        var room = fixture(true, 70, 70);
+        Long characterId =
+                room.getCharacter().getId();
+
+        var target =
+                new Character("관계 대상");
+
+        em.persist(target);
+
+        var relationship =
+                new com.example.projectmm.domain.relationship.Relationship(
+                        room.getCharacter(),
+                        target
+                );
+
+        em.persist(relationship);
+        em.flush();
+
+        var operation =
+                liveChatFixture(room);
+
+        var turn =
+                new com.example.projectmm.domain.dialogue.DialogueTurn(
+                        "우리 이제 부부예요.",
+                        com.example.projectmm.domain.dialogue.DialogueStateChange.none(),
+                        com.example.projectmm.domain.dialogue.DialoguePlayerStateChange.none(),
+                        java.util.List.of(),
+                        com.example.projectmm.domain.dialogue.DialogueRelationshipChange.none(),
+                        new com.example.projectmm.domain.dialogue.DialogueRelationshipFactChange(
+                                target.getId(),
+                                "relationship_status",
+                                "spouse",
+                                "우리 이제 부부예요."
+                        )
+                );
+
+        service.completeChat(
+                characterId,
+                room.getId(),
+                operation.token(),
+                "안녕하세요.",
+                turn,
+                ContentMode.NORMAL
+        );
+
+        em.flush();
+        em.clear();
+
+        Long factCount =
+                em.createQuery(
+                                """
+                                select count(f)
+                                from RelationshipFact f
+                                where f.fromCharacter.id = :fromId
+                                  and f.toCharacter.id = :toId
+                                  and f.relation = :relation
+                                """,
+                                Long.class
+                        )
+                        .setParameter("fromId", characterId)
+                        .setParameter("toId", target.getId())
+                        .setParameter("relation", "relationship_status")
+                        .getSingleResult();
+
+        assertThat(factCount)
+                .isZero();
+
+        var savedMessages =
+                messages.findTop20ByConversationIdOrderByCreatedAtDesc(
+                        room.getId()
+                );
+
+        assertThat(savedMessages)
+                .hasSize(2);
+
+        assertThat(savedMessages)
+                .anyMatch(message ->
+                        message.getRole() == ChatRole.CHARACTER
+                                && message.getContent()
+                                .equals("우리 이제 부부예요.")
+                );
+    }
+
+    @Test
     void dialogueRelationshipFactIgnoresUnknownRelationshipWithoutDiscardingChat() {
 
         var room = fixture(true, 70, 70);
@@ -677,7 +764,8 @@ class ConversationProgressTest extends ConversationProgressTestSupport {
                         new com.example.projectmm.domain.dialogue.DialogueRelationshipFactChange(
                                 unrelatedTarget.getId(),
                                 "relationship_status",
-                                "spouse"
+                                "spouse",
+                                "안녕하세요."
                         )
                 );
 
