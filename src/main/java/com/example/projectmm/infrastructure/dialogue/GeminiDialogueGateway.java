@@ -5,6 +5,7 @@ import com.example.projectmm.application.policy.ContentMode;
 import com.example.projectmm.domain.chat.ChatRole;
 import com.example.projectmm.domain.dialogue.*;
 import com.example.projectmm.domain.state.CustomStateChangeProposal;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
@@ -32,6 +33,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
     private final ObjectMapper proposalPayloadMapper = tools.jackson.databind.json.JsonMapper.builder()
             .enable(tools.jackson.core.json.JsonReadFeature.ALLOW_NON_NUMERIC_NUMBERS).build();
 
+    @Autowired
     public GeminiDialogueGateway(
             @Value("${gemini.api-key}") String apiKey,
             @Value("${gemini.model}") String model,
