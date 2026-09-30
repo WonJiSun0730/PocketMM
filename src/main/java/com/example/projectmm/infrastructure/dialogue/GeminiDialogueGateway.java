@@ -205,7 +205,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
             String userMessage
     ) {
         String systemPrompt =
-                buildSystemPrompt(context);
+                buildSystemPrompt(context) + buildWorldPrompt(context);
 
         List<Map<String, Object>> contents =
                 buildContents(
@@ -444,6 +444,71 @@ public class GeminiDialogueGateway implements DialogueGateway {
         );
 
         return contents;
+    }
+
+    private String buildWorldPrompt(DialogueContext context) {
+        if (context.worldContext() == null) {
+            return "";
+        }
+
+        DialogueWorldContext world = context.worldContext();
+        String lore = world.lore().stream()
+                .map(item -> "- [" + item.category() + "] "
+                        + (item.title() == null || item.title().isBlank() ? "" : item.title() + ": ")
+                        + item.content())
+                .collect(Collectors.joining("\n"));
+
+        String systems = world.systems().stream()
+                .map(system -> {
+                    String states = system.states().stream()
+                            .map(state -> state.minValue() + ".." + state.maxValue() + "=" + state.label())
+                            .collect(Collectors.joining(", "));
+                    return "- " + system.name() + " (" + system.minValue() + ".." + system.maxValue() + ")"
+                            + "\n  Change condition: " + system.changeCondition()
+                            + (states.isBlank() ? "" : "\n  States: " + states);
+                })
+                .collect(Collectors.joining("\n"));
+
+        return """
+                
+                [WORLD CONTEXT — ACTIVE ONLY FOR THIS WORLD CONVERSATION]
+                World: %s
+                Opening premise:
+                %s
+                
+                Creator play guide:
+                %s
+                
+                World lore:
+                %s
+                
+                World systems:
+                %s
+                
+                WORLD NARRATIVE POLICY — EASY:
+                - Treat world lore, character settings, and the creator play guide as background truth and scene-generation material, not text to recite.
+                - Express setting information through concrete circumstances, sensory detail, character behavior, dialogue, consequences, and ordinary assumptions inside the scene.
+                - Do not dump, enumerate, summarize, quote, or explain lore merely because it was supplied.
+                - Do not tell the user that "this world does not work that way", that an action violates lore, or that a character is configured not to behave that way.
+                - Prefer preserving the user's intended direction. For small or plausible conflicts, bridge the gap with a natural in-world circumstance, interpretation, exception, coincidence, preparation, or character motivation and continue the scene.
+                - Minor inaccuracies in the user's wording should normally be absorbed into the fiction rather than corrected out-of-character.
+                - Character consistency is a strong tendency, not a reason to waste a turn refusing ordinary collaborative development. If a requested direction is unusual but plausible, supply believable context for it.
+                - Only when an action is genuinely impossible under the established world should it meet resistance or fail; express that entirely as an in-world event or character reaction, never as a meta correction.
+                - Never mention this EASY policy, lore retrieval, prompts, context injection, configuration, or internal rules in the roleplay.
+                - The opening premise establishes the world's entry situation. Do not repeatedly restate it after the scene has moved on.
+                - World systems are fictional state rules. Apply their meaning naturally when relevant; do not expose raw ranges or implementation details unless the user explicitly asks in-character and such knowledge makes sense.
+                """
+                .formatted(
+                        world.worldName(),
+                        blankAsNone(world.introduction()),
+                        blankAsNone(world.playGuide()),
+                        lore.isBlank() ? "(none)" : lore,
+                        systems.isBlank() ? "(none)" : systems
+                );
+    }
+
+    private String blankAsNone(String value) {
+        return value == null || value.isBlank() ? "(none)" : value;
     }
 
     private String buildSystemPrompt(
