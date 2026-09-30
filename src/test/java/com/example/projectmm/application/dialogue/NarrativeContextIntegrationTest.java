@@ -1,5 +1,6 @@
 package com.example.projectmm.application.dialogue;
 
+import com.example.projectmm.application.chat.CatchUpNarrativeComposer;
 import com.example.projectmm.application.chat.ConversationProgressService;
 import com.example.projectmm.application.chat.NarrativeEntry;
 import com.example.projectmm.application.chat.PresenceClock;
@@ -59,6 +60,9 @@ import static org.mockito.Mockito.when;
 class NarrativeContextIntegrationTest {
     @MockitoBean com.example.projectmm.application.simulation.CatchUpExecutionService execution;
 
+    @MockitoBean
+    CatchUpNarrativeComposer narrativeComposer;
+
     @Autowired
     EntityManager em;
 
@@ -89,6 +93,13 @@ class NarrativeContextIntegrationTest {
 
     @Test
     void catchUpNarrativeBecomesContextForFollowingLiveDialogue() {
+        when(narrativeComposer.compose(
+                any(Character.class),
+                anyList()
+        )).thenReturn(
+                "자리를 비운 동안 충분히 휴식을 취했다."
+        );
+
         when(clock.now())
                 .thenReturn(real);
 

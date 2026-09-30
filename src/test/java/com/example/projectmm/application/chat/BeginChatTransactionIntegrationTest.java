@@ -24,8 +24,6 @@ import static org.mockito.Mockito.when;
 @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
 class BeginChatTransactionIntegrationTest extends ConversationProgressTestSupport {
 
-    @MockitoBean
-    CatchUpNarrativeComposer narrativeComposer;
     @BeforeEach
     void catchUpNarrative() {
         when(narrativeComposer.compose(

@@ -150,7 +150,7 @@ class ConversationCatchUpExecutionTest {
         );
 
         when(clock.now()).thenReturn(
-                real.plusHours(7)
+                real.plusHours(7).plusMinutes(2)
         );
         var operation = narrative.beginLiveDialogue(room.getCharacter().getId(), room.getId());
         assertThat(operation.entry()).isEqualTo(NarrativeEntry.AFTER_CATCH_UP);
@@ -162,14 +162,16 @@ class ConversationCatchUpExecutionTest {
         assertThat(stored.getEnergy()).isEqualTo(47); // REST +30, AI -3, each once
         assertThat(stored.getMood()).isEqualTo(18);
         assertThat(stored.getSimulatedAt())
-                .isEqualTo(story.plusHours(7));
+                .isEqualTo(
+                        story.plusHours(7).plusMinutes(2)
+                );
         assertThat(stored.getChatOperationId()).isEqualTo(operation.token());
         assertThat(stored.getProgressPauseReason()).isNull();
         assertThat(events.count()).isEqualTo(2);
-        assertThat(scenes.count()).isEqualTo(1);
+        assertThat(scenes.count()).isEqualTo(2);
+
         assertThat(scenes.findAll())
-                .singleElement()
-                .satisfies(scene ->
+                .allSatisfy(scene ->
                         assertThat(scene.getConversation().getId())
                                 .isEqualTo(room.getId())
                 );
@@ -187,14 +189,21 @@ class ConversationCatchUpExecutionTest {
                 reports.findTopByConversationIdOrderByIdDesc(room.getId())
                         .orElseThrow()
                         .getAppliedSeconds()
-        ).isEqualTo(7 * 60 * 60);
-        assertThat(messages.findTop20ByConversationIdOrderByCreatedAtDesc(room.getId())).hasSize(2);
+        ).isEqualTo(
+                7 * 60 * 60 + 2 * 60
+        );
+        assertThat(
+                messages.findTop20ByConversationIdOrderByCreatedAtDesc(
+                        room.getId()
+                )
+        ).hasSize(1);
         progress.endChat(room.getCharacter().getId(), room.getId(), operation.token());
         assertThat(narrative.beginLiveDialogue(room.getCharacter().getId(), room.getId()).entry()).isEqualTo(NarrativeEntry.DIRECT);
         assertThat(events.count()).isEqualTo(2);
         assertThat(reports.count()).isEqualTo(1);
         verify(gateway, times(1)).decide(any());
-        verify(candidates, times(1)).generate(any(), any());
+        verify(candidates, times(2))
+                .generate(any(), any());
         verify(recall).recallForConversation(eq(room.getCharacter().getId()), eq(room.getId()), any(), eq(5), anyString(), eq(false));
     }
 
@@ -221,7 +230,7 @@ class ConversationCatchUpExecutionTest {
                 room.getId()
         )).isEmpty();
         assertThat(messages.findTop20ByConversationIdOrderByCreatedAtDesc(room.getId())).hasSize(1);
-        assertThat(events.count()).isZero();
+        assertThat(events.count()).isEqualTo(1);
         verifyNoInteractions(gateway);
     }
 
