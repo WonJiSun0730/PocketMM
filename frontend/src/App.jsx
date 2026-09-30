@@ -19,6 +19,7 @@ function pageFromPath(pathname) {
 export default function App() {
   const [page, setPage] = useState(() => pageFromPath(window.location.pathname))
   const [selectedCharacter, setSelectedCharacter] = useState(null)
+  const [selectedWorldChat, setSelectedWorldChat] = useState(null)
   const [member, setMember] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
 
@@ -54,7 +55,8 @@ export default function App() {
     setPage(nextPage)
   }
 
-  function openChat(character) { setSelectedCharacter(character); setPage("chat") }
+  function openChat(character) { setSelectedWorldChat(null); setSelectedCharacter(character); setPage("chat") }
+  function openWorldChat(world, character) { setSelectedWorldChat(world); setSelectedCharacter(character); setPage("worldChat") }
   function openCharacters() { setSelectedCharacter(null); navigate("characters") }
   function openEdit(character) { setSelectedCharacter(character); setPage("edit") }
   function finishEdit(character) { setSelectedCharacter(character); setPage("characters") }
@@ -71,13 +73,16 @@ export default function App() {
   }
 
   if (page === "home") return <HomePage onOpenCharacters={openCharacters} onOpenWorld={() => navigate("world")} />
-  if (page === "world") return <WorldPage onBack={() => navigate("home")} />
+  if (page === "world") return <WorldPage onBack={() => navigate("home")} onOpenWorldChat={openWorldChat} />
   if (page === "create") return <CharacterCreatePage onBack={openCharacters} onCreated={openChat} />
   if (page === "edit" && selectedCharacter) {
     return <CharacterCreatePage character={selectedCharacter} onBack={openCharacters} onUpdated={finishEdit} />
   }
   if (page === "chat" && selectedCharacter) {
     return <ChatPage character={selectedCharacter} onBack={openCharacters} />
+  }
+  if (page === "worldChat" && selectedCharacter && selectedWorldChat) {
+    return <ChatPage character={selectedCharacter} world={selectedWorldChat} onBack={() => setPage("world")} />
   }
 
   return (
