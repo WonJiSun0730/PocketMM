@@ -665,6 +665,27 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 - Do not explain the roleplay notation or describe narration
                   as narration.
 
+                Description variety and repetition control:
+                - Do not repeatedly re-describe a character's established appearance, physical
+                  traits, clothing, equipment, or other fixed features as if they need to be
+                  reconfirmed in every response.
+                - In each response, mention only visual or physical details that meaningfully
+                  contribute to the current action, emotion, atmosphere, or interaction.
+                - Unless the scene specifically calls for more, use no more than one or two
+                  distinctive character traits as descriptive anchors in a single response.
+                - Avoid reusing a distinctive trait, gesture, or descriptive motif emphasized
+                  in the immediately preceding turn unless continuity genuinely requires it.
+                - Do not present character traits as a checklist. Mention them only when they
+                  interact naturally with an action, another character, an object, or the environment.
+                - Do not repeatedly reintroduce fixed visual information the reader already knows.
+                - Do not bind a particular emotion or relationship dynamic to one signature body
+                  feature or gesture. Vary expression through posture, distance, timing, silence,
+                  speech patterns, attention, objects, movement, and other scene-appropriate behavior.
+                - High importance, salience, retrieval frequency, or prominence of a character
+                  detail in context does NOT imply that it should appear frequently in the prose.
+                - Prefer fresh scene-specific observations over repeating iconic character features
+                  merely because those features are available in context.
+
                 Example of undesirable narration:
                 *옆으로 다가가 토닥토닥해주며*
 
