@@ -18,7 +18,6 @@ export default function WorldPage({ onBack }) {
   const [selectedCategory, setSelectedCategory] = useState(categories[0])
   const [entries, setEntries] = useState([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState("")
   const [draftReady, setDraftReady] = useState(false)
   const autosaveTimer = useRef(null)
@@ -125,8 +124,7 @@ export default function WorldPage({ onBack }) {
 
   async function saveLore(silent = false, worldId = selectedWorld?.id, categoryId = selectedCategory.id, values = entries) {
     if (!worldId || values.reduce((sum, entry) => sum + entry.length, 0) > selectedCategory.maxCharacters) return
-    setSaving(true)
-    setMessage("")
+    if (!silent) setMessage("")
     try {
       const response = await fetch(
         `/api/worlds/${worldId}/lore/${categoryId}`,
@@ -144,8 +142,6 @@ export default function WorldPage({ onBack }) {
       if (!silent) setMessage("저장했어요.")
     } catch (error) {
       setMessage(error.message)
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -162,8 +158,8 @@ export default function WorldPage({ onBack }) {
           <h1>작은 세계를 정리해요</h1>
           <p>필요한 설정만 짧은 슬롯으로 나눠 두면, 관련 장면에서 꺼내 쓸 수 있어요.</p>
         </div>
-        <button className="world-save" disabled={!selectedWorld || saving || totalCharacters > selectedCategory.maxCharacters} onClick={saveLore} type="button">
-          <Save size={16} /> {saving ? "저장 중" : "저장"}
+        <button className="world-save" disabled={!selectedWorld || totalCharacters > selectedCategory.maxCharacters} onClick={() => saveLore(false)} type="button">
+          <Save size={16} /> 저장
         </button>
       </header>
 
