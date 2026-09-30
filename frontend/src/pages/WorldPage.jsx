@@ -23,6 +23,9 @@ export default function WorldPage({ onBack }) {
   const [worldDialog, setWorldDialog] = useState(null)
   const [worldForm, setWorldForm] = useState({ name: "", description: "" })
   const [worldSubmitting, setWorldSubmitting] = useState(false)
+  const [systemMode, setSystemMode] = useState(false)
+  const [playGuide, setPlayGuide] = useState("")
+  const [systems, setSystems] = useState([])
   const autosaveTimer = useRef(null)
   const loadedLoreRef = useRef(null)
   const editVersionRef = useRef(0)
@@ -35,8 +38,10 @@ export default function WorldPage({ onBack }) {
   useEffect(() => { loadWorlds() }, [])
 
   useEffect(() => {
-    if (selectedWorld) loadLore(selectedWorld.id, selectedCategory.id)
-  }, [selectedWorld, selectedCategory])
+    if (!selectedWorld) return
+    if (systemMode) loadSystems(selectedWorld.id)
+    else loadLore(selectedWorld.id, selectedCategory.id)
+  }, [selectedWorld, selectedCategory, systemMode])
 
   useEffect(() => {
     if (!selectedWorld || !draftReady || !loadedLoreRef.current) return
@@ -50,6 +55,44 @@ export default function WorldPage({ onBack }) {
     }
     return () => window.clearTimeout(autosaveTimer.current)
   }, [entries, draftReady])
+
+  async function loadSystems(worldId) {
+    setMessage("")
+    const response = await fetch(`/api/worlds/${worldId}/systems`, { credentials: "include" })
+    if (!response.ok) return setMessage("시스템을 불러오지 못했어요.")
+    const data = await response.json()
+    setPlayGuide(data.playGuide ?? "")
+    setSystems(data.systems ?? [])
+  }
+
+  async function saveSystems() {
+    if (!selectedWorld) return
+    const response = await fetch(`/api/worlds/${selectedWorld.id}/systems`, {
+      method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include",
+      body: JSON.stringify({ playGuide, systems }),
+    })
+    if (!response.ok) return setMessage("시스템을 저장하지 못했어요.")
+    const data = await response.json()
+    setPlayGuide(data.playGuide ?? "")
+    setSystems(data.systems ?? [])
+    setMessage("시스템을 저장했어요.")
+  }
+
+  function addSystem() {
+    setSystems((current) => [...current, { name: "", changeCondition: "", minValue: 0, maxValue: 100, states: [] }])
+  }
+
+  function updateSystem(index, field, value) {
+    setSystems((current) => current.map((item, i) => i === index ? { ...item, [field]: value } : item))
+  }
+
+  function addSystemState(index) {
+    setSystems((current) => current.map((item, i) => i === index ? { ...item, states: [...(item.states ?? []), { minValue: item.minValue, maxValue: item.maxValue, label: "" }] } : item))
+  }
+
+  function updateSystemState(systemIndex, stateIndex, field, value) {
+    setSystems((current) => current.map((item, i) => i === systemIndex ? { ...item, states: item.states.map((state, j) => j === stateIndex ? { ...state, [field]: value } : state) } : item))
+  }
 
   async function loadWorlds() {
     setLoading(true)
@@ -203,7 +246,7 @@ export default function WorldPage({ onBack }) {
           <h1>작은 세계를 정리해요</h1>
           <p>필요한 설정만 짧은 슬롯으로 나눠 두면, 관련 장면에서 꺼내 쓸 수 있어요.</p>
         </div>
-        <button className="world-save" disabled={!selectedWorld || totalCharacters > selectedCategory.maxCharacters} onClick={() => saveLore(false)} type="button">
+        <button className="world-save" disabled={!selectedWorld || (!systemMode && totalCharacters > selectedCategory.maxCharacters)} onClick={() => systemMode ? saveSystems() : saveLore(false)} type="button">
           <Save size={16} /> 저장
         </button>
       </header>
@@ -230,11 +273,25 @@ export default function WorldPage({ onBack }) {
           ) : (
             <>
               <div className="world-title-row"><div><span className="world-eyebrow">EDITING</span><div className="world-name-line"><h2>{selectedWorld.name}</h2><button className="world-edit-meta" onClick={openEditWorld} type="button" aria-label="월드 정보 수정"><Pencil size={14} /></button></div>{selectedWorld.description && <p className="world-private-description">{selectedWorld.description}</p>}</div>{message && <span className="world-message">{message}</span>}</div>
-              <div className="world-category-tabs">
+              <div className="world-category-tabs"><button className={systemMode ? "active" : ""} onClick={() => setSystemMode(true)} type="button">시스템</button>
                 {categories.map((category) => (
-                  <button className={selectedCategory.id === category.id ? "active" : ""} key={category.id} onClick={() => setSelectedCategory(category)} type="button">{category.label}</button>
+                  <button className={selectedCategory.id === category.id ? "active" : ""} key={category.id} onClick={() => { setSystemMode(false); setSelectedCategory(category) }} type="button">{category.label}</button>
                 ))}
               </div>
+              {systemMode ? (
+                <div className="world-system-editor">
+                  <section className="system-play-guide"><label>플레이 가이드</label><p>월드 제작자가 자유롭게 수정하는 시스템 안내예요.</p><textarea value={playGuide} onChange={(event) => setPlayGuide(event.target.value)} placeholder="상태 체계, 시스템 사용법, 플레이 팁 등을 자유롭게 작성하세요." /></section>
+                  <div className="system-list">
+                    {systems.map((system, index) => <article className="system-card" key={index}>
+                      <div className="system-card-head"><input value={system.name} onChange={(e) => updateSystem(index, "name", e.target.value)} placeholder="시스템 이름 (예: 피에타)" /><button onClick={() => setSystems((current) => current.filter((_, i) => i !== index))} type="button"><X size={16}/></button></div>
+                      <label>변동 조건<textarea value={system.changeCondition} onChange={(e) => updateSystem(index, "changeCondition", e.target.value)} placeholder="AI가 이 수치를 언제, 왜, 얼마나 변화시켜야 하는지 적어 주세요." /></label>
+                      <div className="system-bounds"><label>하한<input type="number" value={system.minValue} onChange={(e) => updateSystem(index, "minValue", Number(e.target.value))}/></label><label>상한<input type="number" value={system.maxValue} onChange={(e) => updateSystem(index, "maxValue", Number(e.target.value))}/></label></div>
+                      <div className="system-states"><strong>수치에 따른 상태</strong>{(system.states ?? []).map((state, stateIndex) => <div className="system-state-row" key={stateIndex}><input type="number" value={state.minValue} onChange={(e) => updateSystemState(index,stateIndex,"minValue",Number(e.target.value))}/><span>~</span><input type="number" value={state.maxValue} onChange={(e) => updateSystemState(index,stateIndex,"maxValue",Number(e.target.value))}/><input value={state.label} onChange={(e) => updateSystemState(index,stateIndex,"label",e.target.value)} placeholder="상태 / 설명"/><button type="button" onClick={() => setSystems((current) => current.map((item,i) => i === index ? {...item,states:item.states.filter((_,j)=>j!==stateIndex)} : item))}><X size={14}/></button></div>)}<button className="add-system-state" type="button" onClick={() => addSystemState(index)}><Plus size={14}/> 상태 추가</button></div>
+                    </article>)}
+                    <button className="add-lore-entry" onClick={addSystem} type="button"><Plus size={17}/> 시스템 추가</button>
+                  </div>
+                </div>
+              ) : (<>
               <div className="world-limit-row">
                 <span>{entries.length} / {selectedCategory.maxEntries} 슬롯</span>
                 <span className={totalCharacters > selectedCategory.maxCharacters ? "over" : ""}>{totalCharacters.toLocaleString()} / {selectedCategory.maxCharacters.toLocaleString()}자</span>
@@ -250,8 +307,8 @@ export default function WorldPage({ onBack }) {
                 {entries.length < selectedCategory.maxEntries && (
                   <button className="add-lore-entry" onClick={addEntry} type="button"><Plus size={17} /> 설정 슬롯 추가</button>
                 )}
-              </div>
-            </>
+              </div></>) }
+
           )}
         </section>
       </div>
