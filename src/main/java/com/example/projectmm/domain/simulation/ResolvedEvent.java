@@ -12,6 +12,7 @@ public record ResolvedEvent(
         LocalDateTime occurredAt,
         String eventType,
         String summary,
+        String outcome,
         int importance,
         int narrativeAnchor,
         StateDelta stateDelta,
@@ -22,8 +23,43 @@ public record ResolvedEvent(
         List<MemoryDetailCandidate> memoryDetails,
         RelationshipFactChange relationshipFactChange
 ) {
+    public ResolvedEvent(
+            LocalDateTime occurredAt,
+            String eventType,
+            String summary,
+            int importance,
+            int narrativeAnchor,
+            StateDelta stateDelta,
+            Long relationshipTargetCharacterId,
+            RelationshipDelta relationshipDelta,
+            EventSource source,
+            MemoryAccessChange memoryAccessChange,
+            List<MemoryDetailCandidate> memoryDetails,
+            RelationshipFactChange relationshipFactChange
+    ) {
+        this(
+                occurredAt,
+                eventType,
+                summary,
+                "",
+                importance,
+                narrativeAnchor,
+                stateDelta,
+                relationshipTargetCharacterId,
+                relationshipDelta,
+                source,
+                memoryAccessChange,
+                memoryDetails,
+                relationshipFactChange
+        );
+    }
 
     public ResolvedEvent {
+        outcome =
+                outcome == null
+                        ? ""
+                        : outcome.strip();
+
         memoryDetails = memoryDetails == null
                 ? List.of()
                 : List.copyOf(memoryDetails);
@@ -51,6 +87,7 @@ public record ResolvedEvent(
                 occurredAt,
                 eventType,
                 summary,
+                "",
                 importance,
                 narrativeAnchor,
                 stateDelta,

@@ -422,6 +422,7 @@ public class CatchUpOrchestrator {
                         candidate.occurredAt(),
                         decision.eventType(),
                         decision.summary(),
+                        decision.outcome(),
                         decision.importance(),
                         decision.narrativeAnchor(),
                         decision.stateDelta(),
