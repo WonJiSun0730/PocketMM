@@ -37,6 +37,48 @@ public class ChatService {
     private final ConversationProgressService progressService;
     private final NarrativeOrchestrator narrativeOrchestrator;
 
+    public ChatResponse chatInWorld(Long worldId, Long characterId, ChatRequest request) {
+        Character character = characterRepository.findById(characterId)
+                .orElseThrow(() -> new IllegalArgumentException("Character not found. characterId=" + characterId));
+        if (character.getWorld() == null || !character.getWorld().getId().equals(worldId)) {
+            throw new IllegalArgumentException("Character is not assigned to this world.");
+        }
+        Conversation conversation = conversationRepository
+                .findTopByCharacterIdAndWorldIdOrderByCreatedAtDescIdDesc(characterId, worldId)
+                .orElseGet(() -> conversationRepository.save(
+                        Conversation.forWorld(character, character.getWorld(), LocalDateTime.now())
+                ));
+        var operation = narrativeOrchestrator.beginLiveDialogue(characterId, conversation.getId());
+        conversation = operation.room();
+        try {
+            String message = request == null || request.message() == null ? "" : request.message().trim();
+            ChatRequest normalized = new ChatRequest(message, request == null ? null : request.contentMode());
+            return generateReply(character, conversation, operation.token(), normalized);
+        } finally {
+            progressService.endChat(characterId, conversation.getId(), operation.token());
+        }
+    }
+
+    public List<ChatHistoryResponse> getRecentWorldMessages(Long worldId, Long characterId) {
+        Character character = characterRepository.findById(characterId)
+                .orElseThrow(() -> new IllegalArgumentException("Character not found. characterId=" + characterId));
+        if (character.getWorld() == null || !character.getWorld().getId().equals(worldId)) {
+            throw new IllegalArgumentException("Character is not assigned to this world.");
+        }
+        Conversation conversation = conversationRepository
+                .findTopByCharacterIdAndWorldIdOrderByCreatedAtDescIdDesc(characterId, worldId)
+                .orElseGet(() -> conversationRepository.save(
+                        Conversation.forWorld(character, character.getWorld(), LocalDateTime.now())
+                ));
+        List<ChatMessage> messages = new ArrayList<>(
+                chatMessageRepository.findTop20ByConversationIdOrderByCreatedAtDesc(conversation.getId())
+        );
+        Collections.reverse(messages);
+        return messages.stream().map(message -> new ChatHistoryResponse(
+                message.getId(), message.getRole(), message.getContent(), message.getContentMode(), message.getCreatedAt()
+        )).toList();
+    }
+
     public ChatResponse chat(
             Long characterId,
             ChatRequest request
