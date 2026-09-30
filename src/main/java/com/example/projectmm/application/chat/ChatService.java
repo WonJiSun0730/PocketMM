@@ -59,6 +59,19 @@ public class ChatService {
         }
     }
 
+    public Conversation getOrCreateWorldConversation(Long worldId, Long characterId) {
+        Character character = characterRepository.findById(characterId)
+                .orElseThrow(() -> new IllegalArgumentException("Character not found. characterId=" + characterId));
+        if (character.getWorld() == null || !character.getWorld().getId().equals(worldId)) {
+            throw new IllegalArgumentException("Character is not assigned to this world.");
+        }
+        return conversationRepository
+                .findTopByCharacterIdAndWorldIdOrderByCreatedAtDescIdDesc(characterId, worldId)
+                .orElseGet(() -> conversationRepository.save(
+                        Conversation.forWorld(character, character.getWorld(), LocalDateTime.now())
+                ));
+    }
+
     public List<ChatHistoryResponse> getRecentWorldMessages(Long worldId, Long characterId) {
         Character character = characterRepository.findById(characterId)
                 .orElseThrow(() -> new IllegalArgumentException("Character not found. characterId=" + characterId));
