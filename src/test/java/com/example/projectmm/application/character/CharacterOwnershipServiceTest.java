@@ -9,6 +9,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import com.example.projectmm.application.dialogue.DialogueGateway;
 
 import java.util.List;
 
@@ -27,6 +29,7 @@ class CharacterOwnershipServiceTest {
     @Autowired CharacterRepository characterRepository;
     @Autowired MemberRepository memberRepository;
     @Autowired PasswordEncoder passwordEncoder;
+    @MockitoBean DialogueGateway dialogueGateway;
 
     @Test
     void characterLibraryIsIsolatedByOwner() {
