@@ -68,10 +68,14 @@ export default function ChatPage({
   const loadMessages = useCallback(async (resume = false) => {
     try {
       if (world) {
+        const sessionResponse = await fetch(`/api/worlds/${world.id}/characters/${character.id}/session`, { credentials: "include" })
+        if (!sessionResponse.ok) throw new Error("월드 대화방 정보를 불러오지 못했습니다.")
+        const room = await sessionResponse.json()
+        setSession(room)
+        if (!room.playerProfile) setPickerMode("select")
         const response = await fetch(`/api/worlds/${world.id}/characters/${character.id}/messages`, { credentials: "include" })
         if (!response.ok) throw new Error("월드 대화를 불러오지 못했습니다.")
         setMessages(await response.json())
-        setSession({ conversationId: null, playerProfile: { id: "world", name: "월드 플레이" } })
         setProgress(null)
         setStartError("")
         setLoading(false)
@@ -248,9 +252,11 @@ export default function ChatPage({
     setStarting(true)
     setStartError("")
     try {
-      const newRoom = pickerMode === "new"
-      const url = newRoom ? `/api/chat/${character.id}/conversations`
-        : `/api/chat/${character.id}/conversations/${session.conversationId}/player-profile`
+      const newRoom = !world && pickerMode === "new"
+      const url = world
+        ? `/api/worlds/${world.id}/characters/${character.id}/player-profile`
+        : newRoom ? `/api/chat/${character.id}/conversations`
+          : `/api/chat/${character.id}/conversations/${session.conversationId}/player-profile`
       const response = await fetch(url, {
         method: newRoom ? "POST" : "PUT",
         headers: { "Content-Type": "application/json" },
@@ -346,11 +352,13 @@ export default function ChatPage({
               {world ? `${world.name} · WORLD` : "PocketMM"}
             </p>
           </div>
-          {!world && <Button type="button" variant="ghost" disabled={loading || sending || starting || !session}
+          <Button type="button" variant="ghost" className={world ? "ml-auto shrink-0" : ""} disabled={loading || sending || starting || !session}
             onClick={() => { setStartError(""); setPickerMode("select") }}>
-            {session?.playerProfile?.avatar && <img src={session.playerProfile.avatar} alt="" className="size-6 rounded-full object-cover" />}
-            나: {session?.playerProfile?.name ?? "프로필 선택"}
-          </Button>}
+            {session?.playerProfile?.avatar
+              ? <img src={session.playerProfile.avatar} alt="" className="size-7 rounded-full object-cover" />
+              : <span className="grid size-7 place-items-center rounded-full bg-accent text-xs text-accent-foreground">{session?.playerProfile?.name?.slice(0, 1) ?? "나"}</span>}
+            {session?.playerProfile?.name ?? "프로필 선택"}
+          </Button>
           {!world && <Button type="button" variant="outline" className="ml-auto shrink-0"
             onClick={startConversation} disabled={loading || sending || starting || !session}>
             {starting ? "시작 중..." : "새 대화 시작"}
