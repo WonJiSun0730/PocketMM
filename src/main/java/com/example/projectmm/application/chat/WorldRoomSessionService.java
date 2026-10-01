@@ -28,6 +28,7 @@ public class WorldRoomSessionService {
     private final WorldRoomSessionCastRepository sessionCasts;
     private final WorldRoomVariantCastSnapshotRepository castSnapshots;
     private final WorldRoomSessionSystemStateRepository systemStates;
+    private final WorldRoomVariantSystemSnapshotRepository systemSnapshots;
     private final WorldSystemRepository worldSystems;
     private final MemberRepository members;
     private final PlayerProfileRepository players;
@@ -224,6 +225,62 @@ public class WorldRoomSessionService {
             LocalDateTime enteredAt,
             LocalDateTime leftAt
     ) {
+    }
+
+    @Transactional(readOnly = true)
+    public List<SystemState> captureSystemState(Long sessionId) {
+        session(sessionId);
+        return systemStates.findBySessionIdOrderBySystemSortOrderAscIdAsc(sessionId)
+                .stream()
+                .map(state -> new SystemState(state.getSystem().getId(), state.getCurrentValue()))
+                .toList();
+    }
+
+    @Transactional
+    public void saveSystemSnapshot(
+            WorldRoomMessageVariant variant,
+            List<SystemState> before,
+            List<SystemState> after
+    ) {
+        var afterBySystem = after.stream()
+                .collect(java.util.stream.Collectors.toMap(SystemState::systemId, state -> state));
+        for (SystemState previous : before) {
+            var next = afterBySystem.get(previous.systemId());
+            if (next == null) {
+                throw new IllegalStateException("System state missing after generation. systemId=" + previous.systemId());
+            }
+            systemSnapshots.save(new WorldRoomVariantSystemSnapshot(
+                    variant, previous.systemId(), previous.currentValue(), next.currentValue()
+            ));
+        }
+    }
+
+    @Transactional
+    public void restoreSystemsBeforeVariant(Long sessionId, WorldRoomMessageVariant variant) {
+        restoreSystemSnapshot(sessionId, variant, true);
+    }
+
+    @Transactional
+    public void restoreSystemsAfterVariant(Long sessionId, WorldRoomMessageVariant variant) {
+        restoreSystemSnapshot(sessionId, variant, false);
+    }
+
+    private void restoreSystemSnapshot(Long sessionId, WorldRoomMessageVariant variant, boolean before) {
+        session(sessionId);
+        var snapshots = systemSnapshots.findByVariantIdOrderBySystemIdAsc(variant.getId());
+        if (snapshots.isEmpty() && !systemStates.findBySessionIdOrderBySystemSortOrderAscIdAsc(sessionId).isEmpty()) {
+            throw new IllegalStateException("System snapshot not found. variantId=" + variant.getId());
+        }
+        for (var snapshot : snapshots) {
+            var state = systemStates.findBySessionIdAndSystemId(sessionId, snapshot.getSystemId())
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Room session system state not found. systemId=" + snapshot.getSystemId()
+                    ));
+            state.setCurrentValue(before ? snapshot.getBeforeValue() : snapshot.getAfterValue());
+        }
+    }
+
+    public record SystemState(Long systemId, int currentValue) {
     }
 
     @Transactional
