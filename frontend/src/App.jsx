@@ -10,9 +10,10 @@ import PocketsPage from "@/pages/PocketsPage"
 import SignupPage from "@/pages/SignupPage"
 import WorldPage from "@/pages/WorldPage"
 
-const routePaths = { home: "/", characters: "/characters", world: "/worlds" }
+const routePaths = { home: "/", characters: "/characters", world: "/worlds", pockets: "/pockets" }
 
 function pageFromPath(pathname) {
+  if (pathname.startsWith("/pockets")) return "pockets"
   if (pathname.startsWith("/worlds")) return "world"
   if (pathname.startsWith("/characters")) return "characters"
   return "home"
@@ -76,9 +77,9 @@ export default function App() {
     return <LoginPage onAuthenticated={refreshMember} onOpenSignup={() => setPage("signup")} />
   }
 
-  if (page === "home") return <HomePage onOpenCharacters={openCharacters} onOpenWorld={() => navigate("world")} onOpenPockets={() => setPage("pockets")} />
+  if (page === "home") return <HomePage onOpenCharacters={openCharacters} onOpenWorld={() => navigate("world")} onOpenPockets={() => navigate("pockets")} />
   if (page === "world") return <WorldPage onBack={() => navigate("home")} onOpenWorldChat={openWorldChat} onOpenPocket={openPocket} />
-  if (page === "pocket" && selectedPocket) return <PocketPage pocket={selectedPocket} onBack={() => setPage("pockets")} />
+  if (page === "pocket" && selectedPocket) return <PocketPage pocket={selectedPocket} onBack={() => navigate("pockets")} />
   if (page === "pockets") return <PocketsPage onBack={() => navigate("home")} onOpenPocket={openPocket} />
   if (page === "create") return <CharacterCreatePage onBack={openCharacters} onCreated={openChat} />
   if (page === "edit" && selectedCharacter) {
