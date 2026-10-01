@@ -129,6 +129,18 @@ public class WorldController {
         return toRoomResponse(room);
     }
 
+    @DeleteMapping("/{worldId}/rooms/{roomId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteRoom(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            Authentication authentication
+    ) {
+        var room = worldRoomService.get(roomId);
+        ensureRoomWorld(worldId, room.getWorld().getId());
+        worldRoomService.deleteRoom(roomId, authentication.getName());
+    }
+
     @PutMapping("/{worldId}/rooms/{roomId}")
     public WorldRoomResponse updateRoom(
             @PathVariable Long worldId,
