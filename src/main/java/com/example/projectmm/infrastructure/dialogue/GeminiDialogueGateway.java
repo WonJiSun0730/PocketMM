@@ -93,6 +93,143 @@ public class GeminiDialogueGateway implements DialogueGateway {
         );
     }
 
+    @Override
+    public String generateWorldRoom(
+            WorldRoomDialogueContext context,
+            String userMessage
+    ) {
+        String resolvedUserMessage = userMessage == null ? "" : userMessage.trim();
+        String systemPrompt = buildWorldRoomSystemPrompt(context);
+
+        Map<String, Object> request = Map.of(
+                "systemInstruction",
+                Map.of("parts", List.of(Map.of("text", systemPrompt))),
+                "contents",
+                List.of(Map.of(
+                        "role", "user",
+                        "parts", List.of(Map.of("text", resolvedUserMessage))
+                ))
+        );
+
+        String response = callGeminiWithRetry(request);
+        try {
+            JsonNode root = objectMapper.readTree(response);
+            return root.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText();
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to parse world room dialogue response", e);
+        }
+    }
+
+    private String buildWorldRoomSystemPrompt(WorldRoomDialogueContext context) {
+        var world = context.world();
+
+        String lore = world.lore().stream()
+                .map(item -> "- [" + item.category() + "] "
+                        + (item.title() == null || item.title().isBlank() ? "" : item.title() + ": ")
+                        + item.content())
+                .collect(Collectors.joining("\n"));
+
+        String systems = world.systems().stream()
+                .map(system -> "- " + system.name() + ": " + system.changeCondition()
+                        + " (" + system.minValue() + ".." + system.maxValue() + ")")
+                .collect(Collectors.joining("\n"));
+
+        String roomCast = context.roomCast().stream()
+                .map(this::buildWorldRoomCharacterPrompt)
+                .collect(Collectors.joining("\n\n"));
+
+        String activeNames = context.activeCast().stream()
+                .map(WorldRoomCharacterContext::characterName)
+                .collect(Collectors.joining(", "));
+
+        String player = context.playerProfile() == null
+                ? "(none)"
+                : context.playerProfile().name() + ": " + blankAsNone(context.playerProfile().description());
+
+        return """
+                You are running a persistent multi-character prose roleplay room in PocketMM.
+
+                Room:
+                - Title: %s
+                - Current simulation time: %s
+
+                World:
+                - Name: %s
+                - Opening premise: %s
+                - Creator play guide: %s
+
+                World lore:
+                %s
+
+                World systems:
+                %s
+
+                Current player profile:
+                %s
+
+                Characters allowed to participate in this room:
+                %s
+
+                Characters currently present in the scene:
+                %s
+
+                Multi-character room rules:
+                - The room cast is the pool of registered characters who may participate. It is NOT a list of characters who must all appear.
+                - Active cast is authoritative for who is physically present at the start of this turn.
+                - Do not make every registered character appear together merely because their profiles were supplied.
+                - Let participation follow the scene naturally. A room-cast character may enter, leave, re-enter, accompany the player, separate, or remain absent when the unfolding situation supports it.
+                - Do not force a character entrance merely to use their profile.
+                - Unregistered incidental NPCs introduced by the user or naturally required by the scene may still appear.
+                - Preserve each registered character's own profile, personality, speech style, background, and appearance.
+                - Prefix every spoken line with the speaker's name followed by a colon. Keep narration in *...* paragraphs.
+                - Do not narrate the player's meaningful choices, emotions, dangerous actions, intimacy, conflict decisions, or irreversible outcomes for them.
+                - Once the player clearly commits to a direction, routine low-consequence continuity may proceed naturally.
+                - Treat lore and profiles as background truth, not text to recite. Show them through circumstances, behavior, dialogue, and consequences.
+                - Prefer new scene-specific observations and purposeful actions over repeatedly mentioning fixed appearance or habitual gestures.
+                - Write in Korean by default unless a creator setting explicitly establishes another spoken language.
+                - Output only the roleplay response. Do not explain these rules or internal context.
+                """
+                .formatted(
+                        context.roomTitle(),
+                        context.simulatedAt(),
+                        world.worldName(),
+                        blankAsNone(world.introduction()),
+                        blankAsNone(world.playGuide()),
+                        lore.isBlank() ? "(none)" : lore,
+                        systems.isBlank() ? "(none)" : systems,
+                        player,
+                        roomCast.isBlank() ? "(none)" : roomCast,
+                        activeNames.isBlank() ? "(none)" : activeNames
+                );
+    }
+
+    private String buildWorldRoomCharacterPrompt(WorldRoomCharacterContext character) {
+        var profile = character.profile();
+        if (profile == null) {
+            return "- " + character.characterName();
+        }
+        return """
+                - %s
+                  description: %s
+                  personality: %s
+                  speechStyle: %s
+                  background: %s
+                  appearance: %s
+                  examples: %s
+                """
+                .formatted(
+                        character.characterName(),
+                        blankAsNone(profile.description()),
+                        blankAsNone(profile.personality()),
+                        blankAsNone(profile.speechStyle()),
+                        blankAsNone(profile.background()),
+                        blankAsNone(profile.appearance()),
+                        profile.examples() == null || profile.examples().isEmpty()
+                                ? "(none)"
+                                : String.join(" | ", profile.examples())
+                );
+    }
+
     private String callGeminiWithRetry(
             Map<String, Object> request
     ) {
