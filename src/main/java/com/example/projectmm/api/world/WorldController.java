@@ -10,6 +10,8 @@ import com.example.projectmm.application.chat.ChatService;
 import com.example.projectmm.application.chat.ConversationStartService;
 import com.example.projectmm.application.chat.NewConversationResponse;
 import com.example.projectmm.application.chat.WorldRoomService;
+import com.example.projectmm.application.chat.WorldRoomDialogueService;
+import com.example.projectmm.domain.dialogue.WorldRoomTurn;
 import com.example.projectmm.application.player.ConversationPlayerService;
 import com.example.projectmm.application.player.PlayerSelectionRequest;
 import com.example.projectmm.domain.world.WorldLoreCategory;
@@ -33,6 +35,7 @@ public class WorldController {
     private final ConversationStartService conversationStartService;
     private final ConversationPlayerService conversationPlayerService;
     private final WorldRoomService worldRoomService;
+    private final WorldRoomDialogueService worldRoomDialogueService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -205,6 +208,17 @@ public class WorldController {
                     "World room not found"
             );
         }
+    }
+
+    @PostMapping("/{worldId}/rooms/{roomId}/chat")
+    public WorldRoomTurn chatInRoom(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @Valid @RequestBody WorldRoomChatRequest request
+    ) {
+        var room = worldRoomService.get(roomId);
+        ensureRoomWorld(worldId, room.getWorld().getId());
+        return worldRoomDialogueService.chat(roomId, request.message());
     }
 
     @PostMapping("/{worldId}/characters/{characterId}/conversations")
