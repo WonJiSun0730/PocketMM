@@ -168,7 +168,7 @@ class WorldRoomDialogueWorldlineIntegrationTest {
                 .findFirst()
                 .orElseThrow();
 
-        dialogueService.delete(session.getId(), laterUserMessage.getId());
+        dialogueService.deleteMessageAndFollowing(session.getId(), laterUserMessage.getId());
 
         dialogueService.selectVariant(session.getId(), characterMessage.getId(), 1);
 
