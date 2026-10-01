@@ -262,7 +262,7 @@ export default function ChatPage({
       const response = await fetch(url, {
         method: newRoom ? "POST" : "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ playerProfileId: profile.id }),
+        body: JSON.stringify({ playerProfileId: profile?.id ?? null }),
       })
       if (!response.ok) throw new Error(`프로필 지정 실패: ${response.status}`)
       const data = await response.json()
@@ -271,7 +271,7 @@ export default function ChatPage({
         setMessages(data.messages)
         setInput("")
       }
-      setSession({ conversationId: data.conversationId, playerProfile: profile })
+      setSession({ conversationId: data.conversationId, playerProfile: profile ?? null })
       setDebugInfo(null)
       setPickerMode(null)
       await loadMessages(true)
@@ -317,6 +317,7 @@ export default function ChatPage({
       {startError && <p role="alert" className="mx-auto max-w-2xl px-4 py-2 text-destructive">{startError}</p>}
       <PlayerProfilePicker current={session?.playerProfile} busy={starting}
         onSelect={selectProfile}
+        onSkip={() => selectProfile(null)}
         onSaved={profile => {
           if (session?.playerProfile?.id === profile.id) setSession({ ...session, playerProfile: profile })
         }}
