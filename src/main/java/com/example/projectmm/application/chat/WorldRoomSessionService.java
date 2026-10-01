@@ -4,6 +4,7 @@ import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.dialogue.WorldRoomCastChange;
 import com.example.projectmm.domain.member.MemberRepository;
 import com.example.projectmm.domain.player.PlayerProfileRepository;
+import com.example.projectmm.domain.world.WorldSystemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,8 @@ public class WorldRoomSessionService {
     private final WorldRoomSessionRepository sessions;
     private final WorldRoomSessionCastRepository sessionCasts;
     private final WorldRoomVariantCastSnapshotRepository castSnapshots;
+    private final WorldRoomSessionSystemStateRepository systemStates;
+    private final WorldSystemRepository worldSystems;
     private final MemberRepository members;
     private final PlayerProfileRepository players;
     private final WorldRoomIntroRepository intros;
@@ -41,7 +44,14 @@ public class WorldRoomSessionService {
         }
         var intro = intros.findByIdAndRoomId(introId, roomId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room intro not found"));
-        return sessions.save(new WorldRoomSession(room, member, player, intro, now()));
+        var session = sessions.save(new WorldRoomSession(room, member, player, intro, now()));
+        worldSystems.findByWorldIdOrderBySortOrderAsc(room.getWorld().getId())
+                .forEach(system -> systemStates.save(new WorldRoomSessionSystemState(
+                        session,
+                        system,
+                        system.getInitialValue()
+                )));
+        return session;
     }
 
     @Transactional(readOnly = true)
@@ -213,6 +223,31 @@ public class WorldRoomSessionService {
             LocalDateTime enteredAt,
             LocalDateTime leftAt
     ) {
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorldRoomSessionSystemState> systemStates(Long sessionId) {
+        session(sessionId);
+        return systemStates.findBySessionIdOrderBySystemSortOrderAscIdAsc(sessionId);
+    }
+
+    @Transactional
+    public WorldRoomSessionSystemState setSystemValue(
+            Long sessionId,
+            Long systemId,
+            int value
+    ) {
+        var session = session(sessionId);
+        var state = systemStates.findBySessionIdAndSystemId(sessionId, systemId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Room session system state not found"
+                ));
+        if (!state.getSystem().getWorld().getId().equals(session.getRoom().getWorld().getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "World system does not belong to session world");
+        }
+        state.setCurrentValue(value);
+        return state;
     }
 
     @Transactional(readOnly = true)
