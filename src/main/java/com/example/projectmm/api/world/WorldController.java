@@ -213,9 +213,10 @@ public class WorldController {
     @GetMapping("/{worldId}/rooms/{roomId}/intros")
     public List<WorldRoomIntroItem> getRoomIntros(
             @PathVariable Long worldId,
-            @PathVariable Long roomId
+            @PathVariable Long roomId,
+            Authentication authentication
     ) {
-        var room = worldRoomService.get(roomId);
+        var room = worldRoomService.accessibleRoom(roomId, authentication.getName());
         ensureRoomWorld(worldId, room.getWorld().getId());
         return worldRoomService.roomIntros(roomId).stream()
                 .map(WorldRoomIntroItem::from)
@@ -225,13 +226,14 @@ public class WorldController {
     @GetMapping("/{worldId}/rooms/{roomId}")
     public WorldRoomResponse getRoom(
             @PathVariable Long worldId,
-            @PathVariable Long roomId
+            @PathVariable Long roomId,
+            Authentication authentication
     ) {
+        var room = worldRoomService.accessibleRoom(roomId, authentication.getName());
         var cast = worldRoomService.roomCast(roomId);
         if (!cast.isEmpty()) {
             ensureRoomWorld(worldId, cast.get(0).getConversation().getWorld().getId());
         }
-        var room = worldRoomService.get(roomId);
         ensureRoomWorld(worldId, room.getWorld().getId());
         return toRoomResponse(room);
     }
