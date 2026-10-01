@@ -45,6 +45,7 @@ class WorldRoomDialogueWorldlineIntegrationTest {
     @Autowired WorldSystemRepository systems;
     @Autowired CharacterRepository characters;
     @Autowired WorldConversationCastRepository roomCasts;
+    @Autowired WorldRoomMessageRepository messages;
 
     @MockitoBean DialogueGateway gateway;
 
@@ -101,15 +102,19 @@ class WorldRoomDialogueWorldlineIntegrationTest {
                 .singleElement()
                 .satisfies(state -> assertThat(state.getCurrentValue()).isEqualTo(30));
 
-        when(gateway.generateWorldRoomTurn(any(), eq("I knock on the door."),
-                eq("Sherlock Holmes: \"Come in.\"")))
-                .thenReturn(new WorldRoomTurn(
+        when(gateway.generateWorldRoomTurn(
+                any(),
+                argThat(prompt -> prompt != null
+                        && prompt.startsWith("I knock on the door.")
+                        && prompt.contains("[Previous response variant]")
+                        && prompt.contains("Sherlock Holmes: \"Come in.\""))
+        )).thenReturn(new WorldRoomTurn(
                         "Sherlock Holmes: \"You are late.\"",
                         WorldRoomCastChange.none(),
                         List.of(new WorldRoomSystemChange(tension.getId(), -5))
                 ));
 
-        var characterMessage = dialogueService.messages(session.getId(), null, 50).stream()
+        var characterMessage = messages.findTop50BySessionIdOrderByIdDesc(session.getId()).stream()
                 .filter(message -> message.getRole() == ChatRole.CHARACTER)
                 .findFirst()
                 .orElseThrow();
