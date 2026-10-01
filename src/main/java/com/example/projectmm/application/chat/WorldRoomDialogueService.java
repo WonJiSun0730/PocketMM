@@ -13,6 +13,8 @@ import com.example.projectmm.domain.chat.WorldRoomVariantSystemSnapshotRepositor
 import com.example.projectmm.domain.dialogue.WorldRoomTurn;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -272,7 +274,8 @@ public class WorldRoomDialogueService {
                 message.getSession().getId(),
                 message.getId()
         )) {
-            throw new IllegalStateException(
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
                     "Cannot " + action + " a finalized room message. messageId=" + message.getId()
             );
         }
