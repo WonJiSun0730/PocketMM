@@ -77,6 +77,41 @@ public class WorldRoomDialogueService {
     }
 
     @Transactional
+    public WorldRoomTurn continueScene(Long sessionId) {
+        var session = sessions.findById(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "World room session not found. sessionId=" + sessionId
+                ));
+
+        var context = contextBuilder.buildSession(sessionId);
+        var beforeCast = sessionService.captureCastState(sessionId);
+        var beforeSystems = sessionService.captureSystemState(sessionId);
+        var continuationPrompt = "[Continue the current scene naturally without requiring a new user action or dialogue. Do not decide important actions, emotions, or choices for the user.]";
+        var generated = dialogueGateway.generateWorldRoomTurn(context, continuationPrompt);
+        var applied = sessionService.applyCastChange(sessionId, generated.castChange());
+        var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
+        var afterCast = sessionService.captureCastState(sessionId);
+        var afterSystems = sessionService.captureSystemState(sessionId);
+
+        var characterMessage = messages.save(new WorldRoomMessage(
+                session,
+                ChatRole.CHARACTER,
+                generated.reply(),
+                now()
+        ));
+        var variant = variants.save(new WorldRoomMessageVariant(
+                characterMessage,
+                1,
+                generated.reply(),
+                now()
+        ));
+        sessionService.saveCastSnapshot(variant, beforeCast, afterCast);
+        sessionService.saveSystemSnapshot(variant, beforeSystems, afterSystems);
+
+        return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
+    }
+
+    @Transactional
     public WorldRoomMessage editMessage(Long sessionId, Long messageId, String content) {
         sessions.findById(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -131,18 +166,18 @@ public class WorldRoomDialogueService {
                         "Reroll target must be a character message. messageId=" + messageId
                 ));
         requireLatestMessage(target, "reroll");
-        var userMessage = messages.findTopBySessionIdAndIdLessThanOrderByIdDesc(sessionId, target.getId())
-                .filter(item -> item.getRole() == ChatRole.USER)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "User message for reroll not found. messageId=" + messageId
-                ));
+        var precedingMessage = messages.findTopBySessionIdAndIdLessThanOrderByIdDesc(sessionId, target.getId())
+                .orElse(null);
 
         var previousVariant = target.getContent();
         var selected = selectedVariant(target);
         sessionService.restoreCastBeforeVariant(sessionId, selected);
         sessionService.restoreSystemsBeforeVariant(sessionId, selected);
         var context = contextBuilder.buildSessionBeforeMessage(sessionId, target.getId());
-        var rerollPrompt = userMessage.getContent()
+        var rerollBase = precedingMessage != null && precedingMessage.getRole() == ChatRole.USER
+                ? precedingMessage.getContent()
+                : "[Continue the current scene naturally without requiring a new user action or dialogue. Do not decide important actions, emotions, or choices for the user.]";
+        var rerollPrompt = rerollBase
                 + "\n\n[Previous response variant]\n"
                 + previousVariant
                 + "\n\nGenerate another natural variant of this response without copying it.";
