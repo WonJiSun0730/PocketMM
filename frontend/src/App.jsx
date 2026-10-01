@@ -7,12 +7,14 @@ import HomePage from "@/pages/HomePage"
 import LoginPage from "@/pages/LoginPage"
 import PocketPage from "@/pages/PocketPage"
 import PocketsPage from "@/pages/PocketsPage"
+import PlayerProfilesPage from "@/pages/PlayerProfilesPage"
 import SignupPage from "@/pages/SignupPage"
 import WorldPage from "@/pages/WorldPage"
 
-const routePaths = { home: "/", characters: "/characters", world: "/worlds", pockets: "/pockets" }
+const routePaths = { home: "/", characters: "/characters", world: "/worlds", pockets: "/pockets", playerProfiles: "/pockets/profiles" }
 
 function pageFromPath(pathname) {
+  if (pathname.startsWith("/pockets/profiles")) return "playerProfiles"
   if (pathname.startsWith("/pockets")) return "pockets"
   if (pathname.startsWith("/worlds")) return "world"
   if (pathname.startsWith("/characters")) return "characters"
@@ -80,7 +82,8 @@ export default function App() {
   if (page === "home") return <HomePage onOpenCharacters={openCharacters} onOpenWorld={() => navigate("world")} onOpenPockets={() => navigate("pockets")} />
   if (page === "world") return <WorldPage onBack={() => navigate("home")} onOpenWorldChat={openWorldChat} onOpenPocket={openPocket} />
   if (page === "pocket" && selectedPocket) return <PocketPage pocket={selectedPocket} onBack={() => navigate("pockets")} />
-  if (page === "pockets") return <PocketsPage onBack={() => navigate("home")} onOpenPocket={openPocket} />
+  if (page === "pockets") return <PocketsPage onBack={() => navigate("home")} onOpenPocket={openPocket} onManageProfiles={() => navigate("playerProfiles")} />
+  if (page === "playerProfiles") return <PlayerProfilesPage onBack={() => navigate("pockets")} />
   if (page === "create") return <CharacterCreatePage onBack={openCharacters} onCreated={openChat} />
   if (page === "edit" && selectedCharacter) {
     return <CharacterCreatePage character={selectedCharacter} onBack={openCharacters} onUpdated={finishEdit} />
