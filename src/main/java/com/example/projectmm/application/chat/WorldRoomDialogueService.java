@@ -83,6 +83,41 @@ public class WorldRoomDialogueService {
         messages.deleteBySessionIdAndIdGreaterThanEqual(sessionId, messageId);
     }
 
+    @Transactional
+    public WorldRoomTurn regenerate(Long sessionId, Long messageId) {
+        var session = sessions.findById(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "World room session not found. sessionId=" + sessionId
+                ));
+        var target = messages.findById(messageId)
+                .filter(item -> item.getSession().getId().equals(sessionId))
+                .filter(item -> item.getRole() == ChatRole.CHARACTER)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Regeneration target must be a character message. messageId=" + messageId
+                ));
+        var userMessage = messages.findTopBySessionIdAndIdLessThanOrderByIdDesc(sessionId, target.getId())
+                .filter(item -> item.getRole() == ChatRole.USER)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "User message for regeneration not found. messageId=" + messageId
+                ));
+
+        messages.deleteBySessionIdAndIdGreaterThanEqual(sessionId, target.getId());
+        messages.flush();
+
+        var context = contextBuilder.buildSession(sessionId);
+        var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage.getContent());
+        var applied = sessionService.applyCastChange(sessionId, generated.castChange());
+
+        messages.save(new WorldRoomMessage(
+                session,
+                ChatRole.CHARACTER,
+                generated.reply(),
+                now()
+        ));
+
+        return new WorldRoomTurn(generated.reply(), applied);
+    }
+
     @Transactional(readOnly = true)
     public List<WorldRoomMessage> history(Long sessionId, Long beforeId) {
         sessions.findById(sessionId)
