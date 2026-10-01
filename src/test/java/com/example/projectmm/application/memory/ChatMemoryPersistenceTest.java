@@ -130,8 +130,8 @@ class ChatMemoryPersistenceTest {
         var state = new CharacterState(character, 12, 23, now);
         em.persist(state);
         em.persist(new Relationship(character, other));
-        em.persist(new CharacterProfile(character, "소개", "캐릭터 설정", null, "*첫 만남이다.*",
-                "안녕하세요.", null, null, null, null));
+        em.persist(new CharacterProfile(character, "소개", "캐릭터 설정", "*첫 만남이다.*",
+                "안녕하세요.", null, null, null));
         var old = new Conversation(character, now.plusDays(10));
         em.persist(old);
         var source = message(old, "내 반려묘 이름은 감자야.", now);
