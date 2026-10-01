@@ -2,6 +2,7 @@ package com.example.projectmm.domain.chat;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface WorldConversationRepository extends JpaRepository<WorldConversation, Long> {
@@ -9,4 +10,6 @@ public interface WorldConversationRepository extends JpaRepository<WorldConversa
     Optional<WorldConversation> findTopByWorldIdOrderByCreatedAtDescIdDesc(Long worldId);
 
     boolean existsByWorldId(Long worldId);
+
+    List<WorldConversation> findByWorldIdOrderByCreatedAtDescIdDesc(Long worldId);
 }
