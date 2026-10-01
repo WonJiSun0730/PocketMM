@@ -117,7 +117,8 @@ export default function PocketPage({ pocket, onBack }) {
   async function loadVariants(messageId) {
     const response = await fetch(`${base}/messages/${messageId}/variants`, { credentials: "include" })
     if (!response.ok) return
-    setVariantsByMessage(current => ({ ...current, [messageId]: await response.json() }))
+    const variants = await response.json()
+    setVariantsByMessage(current => ({ ...current, [messageId]: variants }))
   }
 
   async function selectVariant(item, variantNo) {
