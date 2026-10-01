@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface WorldRoomIntroRepository extends JpaRepository<WorldRoomIntro, Long> {
     List<WorldRoomIntro> findByRoomIdOrderBySortOrderAscIdAsc(Long roomId);
     Optional<WorldRoomIntro> findByIdAndRoomId(Long id, Long roomId);
+    void deleteByRoomId(Long roomId);
 }
