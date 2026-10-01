@@ -98,7 +98,6 @@ public class WorldRoomContextBuilder {
                 new DialogueWorldContext(
                         world.getId(),
                         world.getName(),
-                        world.getIntroduction(),
                         world.getPlayGuide(),
                         lore,
                         worldSystems
