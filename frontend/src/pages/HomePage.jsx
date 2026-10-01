@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react"
 
+import PocketIcon from "@/components/PocketIcon"
 import "./HomePage.css"
 
 function PocketIcon({ size = 18, strokeWidth = 1.8 }) {
