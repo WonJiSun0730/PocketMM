@@ -16,5 +16,6 @@ public record WorldRoomDialogueContext(
         String introContent,
         List<DialogueMessageContext> recentMessages,
         List<WorldRoomCharacterContext> roomCast,
-        List<WorldRoomCharacterContext> activeCast
+        List<WorldRoomCharacterContext> activeCast,
+        List<WorldRoomSystemContext> sessionSystems
 ) {}
