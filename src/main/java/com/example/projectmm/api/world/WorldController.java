@@ -182,13 +182,18 @@ public class WorldController {
     public WorldRoomSessionResponse startRoomSession(
             @PathVariable Long worldId,
             @PathVariable Long roomId,
-            @Valid @RequestBody PlayerSelectionRequest request,
+            @RequestBody WorldRoomSessionStartRequest request,
             Authentication authentication
     ) {
         var room = worldRoomService.get(roomId);
         ensureRoomWorld(worldId, room.getWorld().getId());
         return WorldRoomSessionResponse.from(
-                worldRoomSessionService.start(roomId, authentication.getName(), request.playerProfileId())
+                worldRoomSessionService.start(
+                        roomId,
+                        authentication.getName(),
+                        request.playerProfileId(),
+                        request.introId()
+                )
         );
     }
 
