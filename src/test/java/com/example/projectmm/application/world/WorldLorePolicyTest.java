@@ -1,5 +1,6 @@
 package com.example.projectmm.application.world;
 
+import com.example.projectmm.api.world.WorldLoreItem;
 import com.example.projectmm.domain.world.WorldLoreCategory;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +15,7 @@ class WorldLorePolicyTest {
 
     @Test
     void limitsAreSharedAcrossSlotsInsteadOfAppliedPerSlot() {
-        var entries = List.of("a".repeat(1200), "b".repeat(800));
+        var entries = List.of(new WorldLoreItem(null, "a".repeat(1200)), new WorldLoreItem(null, "b".repeat(800)));
 
         assertThat(policy.normalizeAndValidate(
                 WorldLoreCategory.ERA_REGION_BACKGROUND,
@@ -23,7 +24,7 @@ class WorldLorePolicyTest {
 
         assertThatThrownBy(() -> policy.normalizeAndValidate(
                 WorldLoreCategory.ERA_REGION_BACKGROUND,
-                List.of("a".repeat(1200), "b".repeat(801))
+                List.of(new WorldLoreItem(null, "a".repeat(1200)), new WorldLoreItem(null, "b".repeat(801)))
         )).isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("2000 characters in total");
     }
@@ -33,7 +34,7 @@ class WorldLorePolicyTest {
         assertThatThrownBy(() -> policy.normalizeAndValidate(
                 WorldLoreCategory.SOCIETY_CULTURE,
                 java.util.stream.IntStream.range(0, 11)
-                        .mapToObj(i -> "x")
+                        .mapToObj(i -> new WorldLoreItem(null, "x"))
                         .toList()
         )).isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("10");
@@ -43,7 +44,7 @@ class WorldLorePolicyTest {
     void historyAllowsAtMostTenSlotsSharingOneThousandCharacters() {
         assertThatThrownBy(() -> policy.normalizeAndValidate(
                 WorldLoreCategory.HISTORY,
-                List.of("a".repeat(600), "b".repeat(401))
+                List.of(new WorldLoreItem(null, "a".repeat(600)), new WorldLoreItem(null, "b".repeat(401)))
         )).isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("1000 characters in total");
     }
