@@ -10,4 +10,10 @@ public interface WorldRoomSessionRepository extends JpaRepository<WorldRoomSessi
             Long roomId,
             Long memberId
     );
+
+    Optional<WorldRoomSession> findByIdAndRoomIdAndMemberId(
+            Long sessionId,
+            Long roomId,
+            Long memberId
+    );
 }
