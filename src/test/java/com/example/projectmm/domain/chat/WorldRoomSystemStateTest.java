@@ -12,7 +12,7 @@ class WorldRoomSystemStateTest {
 
     @Test
     void sessionSystemStateStartsFromInitialValueAndClampsDeltas() {
-        var world = new World("테스트 월드", null);
+        var world = new World(null, "테스트 월드", null);
         var system = new WorldSystem(world, "피에타", "행동에 따라 변화", 0, 100, 100, 0);
         var state = new WorldRoomSessionSystemState(null, system, system.getInitialValue());
 
