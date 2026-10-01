@@ -8,6 +8,7 @@ import com.example.projectmm.domain.chat.WorldRoomMessageRepository;
 import com.example.projectmm.domain.chat.WorldRoomMessageVariant;
 import com.example.projectmm.domain.chat.WorldRoomMessageVariantRepository;
 import com.example.projectmm.domain.chat.WorldRoomSessionRepository;
+import com.example.projectmm.domain.chat.WorldRoomVariantCastSnapshotRepository;
 import com.example.projectmm.domain.dialogue.WorldRoomTurn;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
