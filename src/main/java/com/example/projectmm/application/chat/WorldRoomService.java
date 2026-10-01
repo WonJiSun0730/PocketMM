@@ -45,8 +45,7 @@ public class WorldRoomService {
             Long worldId,
             Member owner,
             String title,
-            WorldConversation.Visibility visibility,
-            Long playerProfileId
+            WorldConversation.Visibility visibility
     ) {
         var world = worlds.findById(worldId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "World not found"));
