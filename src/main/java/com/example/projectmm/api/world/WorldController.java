@@ -353,6 +353,25 @@ public class WorldController {
         );
     }
 
+    @PostMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/messages/{messageId}/reroll")
+    public WorldRoomTurn rerollRoomMessage(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @PathVariable Long sessionId,
+            @PathVariable Long messageId,
+            Authentication authentication
+    ) {
+        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        if (!session.getId().equals(sessionId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Room play session not found"
+            );
+        }
+        ensureRoomWorld(worldId, session.getRoom().getWorld().getId());
+        return worldRoomDialogueService.reroll(sessionId, messageId);
+    }
+
     @PostMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/messages/{messageId}/regenerate")
     public WorldRoomTurn regenerateRoomMessage(
             @PathVariable Long worldId,
