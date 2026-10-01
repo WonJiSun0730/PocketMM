@@ -135,7 +135,7 @@ public class WorldRoomDialogueService {
         var selected = selectedVariant(target);
         sessionService.restoreCastBeforeVariant(sessionId, selected);
         sessionService.restoreSystemsBeforeVariant(sessionId, selected);
-        var context = contextBuilder.buildSession(sessionId);
+        var context = contextBuilder.buildSessionBeforeMessage(sessionId, target.getId());
         var rerollPrompt = userMessage.getContent()
                 + "\n\n[Previous response variant]\n"
                 + previousVariant
