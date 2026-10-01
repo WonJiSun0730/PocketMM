@@ -86,6 +86,9 @@ public class WorldRoomDialogueService {
                         "World room message not found. messageId=" + messageId
                 ));
         message.edit(content, now());
+        if (message.getRole() == ChatRole.CHARACTER) {
+            selectedVariant(message).editContent(content);
+        }
         return message;
     }
 
