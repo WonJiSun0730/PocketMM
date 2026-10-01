@@ -9,6 +9,7 @@ import com.example.projectmm.application.chat.ChatResponse;
 import com.example.projectmm.application.chat.ChatService;
 import com.example.projectmm.application.chat.ConversationStartService;
 import com.example.projectmm.application.chat.NewConversationResponse;
+import com.example.projectmm.application.chat.WorldRoomService;
 import com.example.projectmm.application.player.ConversationPlayerService;
 import com.example.projectmm.application.player.PlayerSelectionRequest;
 import com.example.projectmm.domain.world.WorldLoreCategory;
@@ -31,6 +32,7 @@ public class WorldController {
     private final ChatService chatService;
     private final ConversationStartService conversationStartService;
     private final ConversationPlayerService conversationPlayerService;
+    private final WorldRoomService worldRoomService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -105,6 +107,106 @@ public class WorldController {
     public List<WorldCharacterItem> replaceCharacters(@PathVariable Long worldId, @RequestBody WorldCharacterUpdateRequest request, Authentication authentication) {
         return worldCharacterService.replace(worldId, request.characterIds(), authentication.getName());
     }
+    @PostMapping("/{worldId}/rooms")
+    @ResponseStatus(HttpStatus.CREATED)
+    public WorldRoomResponse createRoom(
+            @PathVariable Long worldId,
+            @Valid @RequestBody WorldRoomCreateRequest request,
+            Authentication authentication
+    ) {
+        var room = worldRoomService.create(
+                worldId,
+                authentication.getName(),
+                request.title(),
+                request.visibility(),
+                request.playerProfileId()
+        );
+        return toRoomResponse(room);
+    }
+
+    @PostMapping("/{worldId}/rooms/{roomId}/cast")
+    public WorldRoomResponse addRoomCast(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @Valid @RequestBody WorldRoomCastRequest request
+    ) {
+        var cast = worldRoomService.addCast(roomId, request.characterId());
+        ensureRoomWorld(worldId, cast.getConversation().getWorld().getId());
+        return toRoomResponse(cast.getConversation());
+    }
+
+    @PutMapping("/{worldId}/rooms/{roomId}/cast/{characterId}/active")
+    public WorldRoomResponse enterRoomScene(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @PathVariable Long characterId
+    ) {
+        var cast = worldRoomService.enter(roomId, characterId);
+        ensureRoomWorld(worldId, cast.getConversation().getWorld().getId());
+        return toRoomResponse(cast.getConversation());
+    }
+
+    @DeleteMapping("/{worldId}/rooms/{roomId}/cast/{characterId}/active")
+    public WorldRoomResponse leaveRoomScene(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @PathVariable Long characterId
+    ) {
+        var cast = worldRoomService.leave(roomId, characterId);
+        ensureRoomWorld(worldId, cast.getConversation().getWorld().getId());
+        return toRoomResponse(cast.getConversation());
+    }
+
+    @GetMapping("/{worldId}/rooms/{roomId}")
+    public WorldRoomResponse getRoom(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId
+    ) {
+        var cast = worldRoomService.roomCast(roomId);
+        if (!cast.isEmpty()) {
+            ensureRoomWorld(worldId, cast.get(0).getConversation().getWorld().getId());
+        }
+        return new WorldRoomResponse(
+                roomId,
+                worldId,
+                null,
+                null,
+                null,
+                null,
+                cast.stream().map(item -> new WorldRoomCastItem(
+                        item.getCharacter().getId(),
+                        item.getCharacter().getName(),
+                        item.isActive()
+                )).toList()
+        );
+    }
+
+    private WorldRoomResponse toRoomResponse(com.example.projectmm.domain.chat.WorldConversation room) {
+        var cast = worldRoomService.roomCast(room.getId());
+        return new WorldRoomResponse(
+                room.getId(),
+                room.getWorld().getId(),
+                room.getTitle(),
+                room.getVisibility(),
+                room.getPlayerProfile() == null ? null : room.getPlayerProfile().getId(),
+                room.getSimulatedAt(),
+                cast.stream().map(item -> new WorldRoomCastItem(
+                        item.getCharacter().getId(),
+                        item.getCharacter().getName(),
+                        item.isActive()
+                )).toList()
+        );
+    }
+
+    private void ensureRoomWorld(Long requestedWorldId, Long actualWorldId) {
+        if (!requestedWorldId.equals(actualWorldId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "World room not found"
+            );
+        }
+    }
+
     @PostMapping("/{worldId}/characters/{characterId}/conversations")
     @ResponseStatus(HttpStatus.CREATED)
     public NewConversationResponse startWorldConversation(
