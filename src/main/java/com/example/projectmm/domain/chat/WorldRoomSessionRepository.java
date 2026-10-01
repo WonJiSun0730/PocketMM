@@ -16,4 +16,5 @@ public interface WorldRoomSessionRepository extends JpaRepository<WorldRoomSessi
             Long roomId,
             Long memberId
     );
+    void deleteByRoomId(Long roomId);
 }
