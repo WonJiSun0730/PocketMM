@@ -9,14 +9,16 @@ public record WorldRoomMessageItem(
         Long id,
         ChatRole role,
         String content,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        LocalDateTime editedAt
 ) {
     public static WorldRoomMessageItem from(WorldRoomMessage message) {
         return new WorldRoomMessageItem(
                 message.getId(),
                 message.getRole(),
                 message.getContent(),
-                message.getCreatedAt()
+                message.getCreatedAt(),
+                message.getEditedAt()
         );
     }
 }
