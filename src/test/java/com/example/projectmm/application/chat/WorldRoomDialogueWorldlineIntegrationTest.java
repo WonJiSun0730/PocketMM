@@ -18,6 +18,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -170,12 +172,16 @@ class WorldRoomDialogueWorldlineIntegrationTest {
 
         assertThatThrownBy(() ->
                 dialogueService.selectVariant(session.getId(), characterMessage.getId(), 1)
-        ).isInstanceOf(IllegalStateException.class)
+        ).isInstanceOf(ResponseStatusException.class)
+                .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode())
+                        .isEqualTo(HttpStatus.CONFLICT))
                 .hasMessageContaining("finalized room message");
 
         assertThatThrownBy(() ->
                 dialogueService.reroll(session.getId(), characterMessage.getId())
-        ).isInstanceOf(IllegalStateException.class)
+        ).isInstanceOf(ResponseStatusException.class)
+                .satisfies(error -> assertThat(((ResponseStatusException) error).getStatusCode())
+                        .isEqualTo(HttpStatus.CONFLICT))
                 .hasMessageContaining("finalized room message");
 
         var laterUserMessage = messages.findTop50BySessionIdOrderByIdDesc(session.getId()).stream()
