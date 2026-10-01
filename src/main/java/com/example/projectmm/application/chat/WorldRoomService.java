@@ -33,12 +33,11 @@ public class WorldRoomService {
             Long worldId,
             String ownerLoginId,
             String title,
-            WorldConversation.Visibility visibility,
-            Long playerProfileId
+            WorldConversation.Visibility visibility
     ) {
         var owner = members.findByLoginId(ownerLoginId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
-        return create(worldId, owner, title, visibility, playerProfileId);
+        return create(worldId, owner, title, visibility);
     }
 
     @Transactional
@@ -78,8 +77,13 @@ public class WorldRoomService {
     }
 
     @Transactional
-    public WorldConversationCast addCast(Long roomId, Long characterId) {
+    public WorldConversationCast addCast(Long roomId, Long characterId, String ownerLoginId) {
         var room = room(roomId);
+        var owner = members.findByLoginId(ownerLoginId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
+        if (room.getOwner() == null || !room.getOwner().getId().equals(owner.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the room creator can change room cast");
+        }
         var character = characters.findById(characterId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Character not found"));
         if (character.getWorld() == null || !character.getWorld().getId().equals(room.getWorld().getId())) {
