@@ -36,6 +36,13 @@ public class WorldRoomMessageVariant {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    public void editContent(String content) {
+        if (content == null || content.isBlank()) {
+            throw new IllegalArgumentException("content must not be blank");
+        }
+        this.content = content;
+    }
+
     public WorldRoomMessageVariant(
             WorldRoomMessage message,
             int variantNo,
