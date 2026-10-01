@@ -96,11 +96,17 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
     const response = await fetch(`/api/worlds/${selectedWorld.id}`, { method: "DELETE", credentials: "include" })
     if (!response.ok) {
       if (response.status === 409) {
-        return setMessage("이 월드에 연결된 Room이 남아 있어 삭제할 수 없어요. Room을 먼저 삭제해 주세요.")
+        return setMessage("이 월드에 연결된 캐릭터 또는 Room이 남아 있어 삭제할 수 없어요.")
       }
       return setMessage("월드를 삭제하지 못했어요.")
     }
-    const remaining = worlds.filter((world) => world.id !== selectedWorld.id)
+    const deletedWorldId = selectedWorld.id
+    const draftPrefix = `pocketmm:world-lore-draft:${deletedWorldId}:`
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith(draftPrefix))
+      .forEach((key) => localStorage.removeItem(key))
+
+    const remaining = worlds.filter((world) => world.id !== deletedWorldId)
     setWorlds(remaining)
     setSelectedWorld(remaining[0] ?? null)
     if (remaining[0]) localStorage.setItem("pocketmm:selected-world-id", String(remaining[0].id))
