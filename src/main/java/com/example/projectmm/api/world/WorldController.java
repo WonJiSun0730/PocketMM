@@ -128,6 +128,23 @@ public class WorldController {
         return toRoomResponse(room);
     }
 
+    @PutMapping("/{worldId}/rooms/{roomId}")
+    public WorldRoomResponse updateRoom(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @Valid @RequestBody WorldRoomCreateRequest request,
+            Authentication authentication
+    ) {
+        var room = worldRoomService.get(roomId);
+        ensureRoomWorld(worldId, room.getWorld().getId());
+        return toRoomResponse(worldRoomService.updateRoom(
+                roomId,
+                authentication.getName(),
+                request.title(),
+                request.visibility()
+        ));
+    }
+
     @PostMapping("/{worldId}/rooms/{roomId}/cast")
     public WorldRoomResponse addRoomCast(
             @PathVariable Long worldId,
