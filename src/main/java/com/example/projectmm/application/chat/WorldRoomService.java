@@ -30,6 +30,13 @@ public class WorldRoomService {
     private final CharacterRepository characters;
     private final MemberRepository members;
     private final WorldRoomIntroRepository intros;
+    private final WorldRoomSessionRepository sessions;
+    private final WorldRoomMessageRepository messages;
+    private final WorldRoomMessageVariantRepository variants;
+    private final WorldRoomVariantCastSnapshotRepository castSnapshots;
+    private final WorldRoomVariantSystemSnapshotRepository systemSnapshots;
+    private final WorldRoomSessionCastRepository sessionCasts;
+    private final WorldRoomSessionSystemStateRepository sessionSystemStates;
 
     @Transactional
     public WorldConversation create(
@@ -76,6 +83,22 @@ public class WorldRoomService {
         }
         room.updateRoom(title, visibility);
         return room;
+    }
+
+    @Transactional
+    public void deleteRoom(Long roomId, String ownerLoginId) {
+        var room = ownedRoom(roomId, ownerLoginId);
+
+        systemSnapshots.deleteByVariantMessageSessionRoomId(roomId);
+        castSnapshots.deleteByVariantMessageSessionRoomId(roomId);
+        variants.deleteByMessageSessionRoomId(roomId);
+        messages.deleteBySessionRoomId(roomId);
+        sessionCasts.deleteBySessionRoomId(roomId);
+        sessionSystemStates.deleteBySessionRoomId(roomId);
+        sessions.deleteByRoomId(roomId);
+        intros.deleteByRoomId(roomId);
+        casts.deleteByConversationId(roomId);
+        rooms.delete(room);
     }
 
     @Transactional
