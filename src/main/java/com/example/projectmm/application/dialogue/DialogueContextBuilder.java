@@ -185,7 +185,6 @@ public class DialogueContextBuilder {
         return new DialogueWorldContext(
                 world.getId(),
                 world.getName(),
-                world.getIntroduction(),
                 world.getPlayGuide(),
                 lore,
                 systems
