@@ -136,15 +136,9 @@ public class WorldRoomContextBuilder {
                             ),
                             state == null ? 70 : state.getEnergy(),
                             state == null ? 70 : state.getMood(),
-                            cast.isActive()
+                            false
                     );
                 })
-                .toList();
-    }
-
-    public List<WorldRoomCharacterContext> activeCast(Long roomId) {
-        return buildCast(roomId).stream()
-                .filter(WorldRoomCharacterContext::active)
                 .toList();
     }
 
