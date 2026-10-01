@@ -64,6 +64,14 @@ public class WorldRoomSessionService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room play session not found"));
     }
 
+    @Transactional(readOnly = true)
+    public WorldRoomSession ownedSession(Long roomId, Long sessionId, String loginId) {
+        var member = members.findByLoginId(loginId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
+        return sessions.findByIdAndRoomIdAndMemberId(sessionId, roomId, member.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room play session not found"));
+    }
+
     @Transactional
     public WorldRoomCastChange applyCastChange(Long sessionId, WorldRoomCastChange proposed) {
         var session = session(sessionId);
