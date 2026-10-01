@@ -128,6 +128,18 @@ public class GeminiDialogueGateway implements DialogueGateway {
 
                 return response;
 
+            } catch (HttpClientErrorException.NotFound e) {
+                System.out.println(
+                        "[Gemini] 404 Not Found for model="
+                                + model
+                                + ", status="
+                                + e.getStatusCode()
+                                + ", body="
+                                + e.getResponseBodyAsString()
+                );
+
+                throw e;
+
             } catch (HttpClientErrorException.TooManyRequests e) {
 
                 if (isDailyQuotaExhausted(e)) {
