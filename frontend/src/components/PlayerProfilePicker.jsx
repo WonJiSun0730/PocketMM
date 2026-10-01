@@ -79,7 +79,7 @@ export default function PlayerProfilePicker({ current, busy, onSelect, onCancel,
         ))}
         {!loading && profiles.length === 0 && <p>아직 프로필이 없어요. 먼저 만들어 주세요.</p>}
         <div className="flex gap-2">
-          <Button disabled={disabled || profiles.length >= 10} onClick={() => setDraft({ name: "", description: "", avatar: null })}>프로필 만들기 ({profiles.length}/10)</Button>}
+          <Button disabled={disabled || profiles.length >= 10} onClick={() => setDraft({ name: "", description: "", avatar: null })}>프로필 만들기 ({profiles.length}/10)</Button>
           {onCancel && <Button variant="ghost" disabled={busy || saving} onClick={onCancel}>돌아가기</Button>}
         </div>
       </>}
