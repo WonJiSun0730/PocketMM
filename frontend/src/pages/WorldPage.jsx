@@ -49,7 +49,10 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
     if (!selectedWorld || !draftReady || !loadedLoreRef.current) return
     const { worldId, categoryId } = loadedLoreRef.current
     const key = draftKey(worldId, categoryId)
-    localStorage.setItem(key, JSON.stringify(entries))
+    localStorage.setItem(key, JSON.stringify({
+      worldName: selectedWorld.name,
+      entries,
+    }))
 
     window.clearTimeout(autosaveTimer.current)
     if (totalCharacters <= selectedCategory.maxCharacters) {
@@ -159,16 +162,26 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
       return
     }
     const data = await response.json()
-    const stored = localStorage.getItem(draftKey(worldId, category))
+    const key = draftKey(worldId, category)
+    const stored = localStorage.getItem(key)
     if (stored) {
       try {
-        setEntries(normalizeDraftEntries(JSON.parse(stored)))
-        setMessage("작성 중이던 내용을 복원했어요.")
+        const parsed = JSON.parse(stored)
+        const storedWorldName = parsed?.worldName
+        const storedEntries = Array.isArray(parsed) ? parsed : parsed?.entries
+        if (storedWorldName === selectedWorld?.name && Array.isArray(storedEntries)) {
+          setEntries(normalizeDraftEntries(storedEntries))
+          setMessage("작성 중이던 내용을 복원했어요.")
+        } else {
+          localStorage.removeItem(key)
+          setEntries(normalizeDraftEntries(data.entries ?? []))
+        }
       } catch {
+        localStorage.removeItem(key)
         setEntries(normalizeDraftEntries(data.entries ?? []))
       }
     } else {
-      setEntries(data.entries ?? [])
+      setEntries(normalizeDraftEntries(data.entries ?? []))
     }
     loadedLoreRef.current = { worldId, categoryId: category }
     setDraftReady(true)
