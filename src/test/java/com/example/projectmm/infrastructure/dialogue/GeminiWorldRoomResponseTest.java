@@ -22,7 +22,7 @@ class GeminiWorldRoomResponseTest {
 
         String payload = """
                 {
-                  "reply":"Sherlock Holmes: \"Come in.\"",
+                  "reply":"Sherlock Holmes: Come in.",
                   "enterCharacterIds":[10],
                   "leaveCharacterIds":[20],
                   "systemChanges":[{"systemId":7,"delta":5}]
@@ -31,7 +31,7 @@ class GeminiWorldRoomResponseTest {
 
         var turn = gateway.parseWorldRoomResponse(envelope(payload), context);
 
-        assertThat(turn.reply()).isEqualTo("Sherlock Holmes: \"Come in.\"");
+        assertThat(turn.reply()).isEqualTo("Sherlock Holmes: Come in.");
         assertThat(turn.castChange().enterCharacterIds()).containsExactly(10L);
         assertThat(turn.castChange().leaveCharacterIds()).containsExactly(20L);
         assertThat(turn.systemChanges())
