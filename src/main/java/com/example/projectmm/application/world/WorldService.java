@@ -32,6 +32,8 @@ public class WorldService {
     private final WorldLorePolicy worldLorePolicy;
     private final CharacterRepository characterRepository;
     private final WorldConversationRepository worldConversationRepository;
+    private final com.example.projectmm.domain.world.WorldSystemRepository worldSystemRepository;
+    private final com.example.projectmm.domain.world.WorldSystemStateRepository worldSystemStateRepository;
 
     @Transactional
     public WorldResponse create(WorldCreateRequest request, String loginId) {
@@ -71,6 +73,9 @@ public class WorldService {
                     "Rooms are assigned to this world."
             );
         }
+        worldSystemStateRepository.deleteBySystemWorldId(worldId);
+        worldSystemRepository.deleteByWorldId(worldId);
+        worldLoreEntryRepository.deleteByWorldId(worldId);
         worldRepository.delete(world);
     }
 
