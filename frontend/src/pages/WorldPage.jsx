@@ -30,6 +30,7 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
   const autosaveTimer = useRef(null)
   const loadedLoreRef = useRef(null)
   const editVersionRef = useRef(0)
+  const allowLoreAutosaveRef = useRef(false)
 
   const totalCharacters = useMemo(
     () => entries.reduce((sum, entry) => sum + (entry.title?.length ?? 0) + (entry.content?.length ?? 0), 0),
@@ -55,7 +56,7 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
     }))
 
     window.clearTimeout(autosaveTimer.current)
-    if (totalCharacters <= selectedCategory.maxCharacters) {
+    if (allowLoreAutosaveRef.current && totalCharacters <= selectedCategory.maxCharacters) {
       autosaveTimer.current = window.setTimeout(() => saveLore(true, worldId, categoryId, entries), 800)
     }
     return () => window.clearTimeout(autosaveTimer.current)
@@ -154,6 +155,7 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
 
   async function loadLore(worldId, category) {
     setDraftReady(false)
+    allowLoreAutosaveRef.current = false
     loadedLoreRef.current = null
     setMessage("")
     const response = await fetch(`/api/worlds/${worldId}/lore/${category}`, { credentials: "include" })
@@ -234,6 +236,7 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
 
   function markEdited() {
     editVersionRef.current += 1
+    allowLoreAutosaveRef.current = true
   }
 
   function updateEntry(index, field, value) {
