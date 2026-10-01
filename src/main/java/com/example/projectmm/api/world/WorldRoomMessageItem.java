@@ -10,7 +10,8 @@ public record WorldRoomMessageItem(
         ChatRole role,
         String content,
         LocalDateTime createdAt,
-        LocalDateTime editedAt
+        LocalDateTime editedAt,
+        Integer selectedVariantNo
 ) {
     public static WorldRoomMessageItem from(WorldRoomMessage message) {
         return new WorldRoomMessageItem(
@@ -18,7 +19,8 @@ public record WorldRoomMessageItem(
                 message.getRole(),
                 message.getContent(),
                 message.getCreatedAt(),
-                message.getEditedAt()
+                message.getEditedAt(),
+                message.getSelectedVariantNo()
         );
     }
 }
