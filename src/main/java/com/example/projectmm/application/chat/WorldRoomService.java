@@ -68,6 +68,23 @@ public class WorldRoomService {
     }
 
     @Transactional
+    public WorldConversation updateRoom(
+            Long roomId,
+            String ownerLoginId,
+            String title,
+            WorldConversation.Visibility visibility
+    ) {
+        var room = room(roomId);
+        var owner = members.findByLoginId(ownerLoginId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
+        if (room.getOwner() == null || !room.getOwner().getId().equals(owner.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the room creator can change room settings");
+        }
+        room.updateRoom(title, visibility);
+        return room;
+    }
+
+    @Transactional
     public WorldConversationCast addCast(Long roomId, Long characterId) {
         var room = room(roomId);
         var character = characters.findById(characterId)
