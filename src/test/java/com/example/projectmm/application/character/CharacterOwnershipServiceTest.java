@@ -70,8 +70,6 @@ class CharacterOwnershipServiceTest {
                 name,
                 null,
                 null,
-                null,
-                null,
                 List.of(),
                 null,
                 null,
