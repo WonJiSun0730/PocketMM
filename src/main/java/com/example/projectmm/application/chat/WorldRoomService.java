@@ -151,6 +151,18 @@ public class WorldRoomService {
     }
 
     @Transactional(readOnly = true)
+    public WorldConversation accessibleRoom(Long roomId, String loginId) {
+        var room = room(roomId);
+        var member = members.findByLoginId(loginId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
+        if (room.getVisibility() == WorldConversation.Visibility.PRIVATE
+                && (room.getOwner() == null || !room.getOwner().getId().equals(member.getId()))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "World room not found");
+        }
+        return room;
+    }
+
+    @Transactional(readOnly = true)
     public WorldConversation get(Long roomId) {
         return room(roomId);
     }
