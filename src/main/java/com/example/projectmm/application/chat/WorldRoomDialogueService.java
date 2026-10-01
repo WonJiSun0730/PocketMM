@@ -13,6 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +52,22 @@ public class WorldRoomDialogueService {
         ));
 
         return new WorldRoomTurn(generated.reply(), applied);
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorldRoomMessage> history(Long sessionId, Long beforeId) {
+        sessions.findById(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "World room session not found. sessionId=" + sessionId
+                ));
+
+        var page = beforeId == null
+                ? messages.findTop50BySessionIdOrderByIdDesc(sessionId)
+                : messages.findTop50BySessionIdAndIdLessThanOrderByIdDesc(sessionId, beforeId);
+
+        return page.stream()
+                .sorted(Comparator.comparing(WorldRoomMessage::getId))
+                .toList();
     }
 
     private LocalDateTime now() {
