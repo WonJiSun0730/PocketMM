@@ -222,6 +222,36 @@ public class Memory {
         return memory;
     }
 
+    public static Memory fromWorldRoomUserSpeech(
+            WorldRoomSession session,
+            Character character,
+            String quote,
+            int importance,
+            LocalDateTime at,
+            String fingerprint,
+            MemoryFact fact
+    ) {
+        if (session == null || character == null) {
+            throw new IllegalArgumentException("Pocket session and character are required");
+        }
+        if (fact != null && !fact.groundedIn(quote)) {
+            throw new IllegalArgumentException("Ungrounded memory structure");
+        }
+        Memory memory = new Memory(
+                character,
+                null,
+                "사용자가 캐릭터에게 말한 내용: \"" + quote + "\"",
+                importance,
+                importance * 10,
+                at
+        );
+        memory.worldRoomSession = session;
+        memory.chatFingerprint = fingerprint;
+        memory.evidenceQuote = quote;
+        memory.fact = fact;
+        return memory;
+    }
+
     public static Memory fromWorldRoom(
             WorldRoomSession session,
             Character character,
