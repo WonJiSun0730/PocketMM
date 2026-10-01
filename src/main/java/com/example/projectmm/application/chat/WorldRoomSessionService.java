@@ -39,6 +39,10 @@ public class WorldRoomSessionService {
         var room = room(roomId);
         var member = members.findByLoginId(loginId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
+        if (room.getVisibility() == WorldConversation.Visibility.PRIVATE
+                && (room.getOwner() == null || !room.getOwner().getId().equals(member.getId()))) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "World room not found");
+        }
         var player = playerProfileId == null ? null : players.findById(playerProfileId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Player profile not found"));
         if (introId == null) {
