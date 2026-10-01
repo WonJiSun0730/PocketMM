@@ -11,4 +11,5 @@ public interface WorldRoomSessionSystemStateRepository
     List<WorldRoomSessionSystemState> findBySessionIdOrderBySystemSortOrderAscIdAsc(Long sessionId);
 
     Optional<WorldRoomSessionSystemState> findBySessionIdAndSystemId(Long sessionId, Long systemId);
+    void deleteBySessionRoomId(Long roomId);
 }
