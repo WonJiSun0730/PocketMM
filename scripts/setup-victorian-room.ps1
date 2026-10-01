@@ -29,7 +29,25 @@ function Invoke-Json {
     if ($null -ne $Body) {
         $params.Body = ($Body | ConvertTo-Json -Depth 12)
     }
-    Invoke-RestMethod @params
+    try {
+        Invoke-RestMethod @params
+    } catch {
+        Write-Host ""
+        Write-Host "REQUEST FAILED: $Method $Path" -ForegroundColor Red
+        if ($_.Exception.Response) {
+            Write-Host "HTTP STATUS: $([int]$_.Exception.Response.StatusCode) $($_.Exception.Response.StatusDescription)" -ForegroundColor Red
+            try {
+                $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+                $responseBody = $reader.ReadToEnd()
+                if (-not [string]::IsNullOrWhiteSpace($responseBody)) {
+                    Write-Host "RESPONSE BODY: $responseBody" -ForegroundColor Red
+                }
+            } catch {
+                # Keep the original HTTP exception as the primary failure.
+            }
+        }
+        throw
+    }
 }
 
 Write-Host "[1/10] Logging in..."
@@ -106,11 +124,14 @@ Invoke-Json Put "/api/worlds/$($world.id)/characters" @{
 } | Out-Null
 
 Write-Host "[7/10] Creating Room and cast..."
+Write-Host "  [7.1] Creating Room..."
 $room = Invoke-Json Post "/api/worlds/$($world.id)/rooms" @{
     title = "The Baker Street Case"
     visibility = "PRIVATE"
 }
+Write-Host "  [7.2] Adding Sherlock Holmes to Room Cast..."
 Invoke-Json Post "/api/worlds/$($world.id)/rooms/$($room.id)/cast" @{ characterId = $sherlock.id } | Out-Null
+Write-Host "  [7.3] Adding Victor Hale to Room Cast..."
 Invoke-Json Post "/api/worlds/$($world.id)/rooms/$($room.id)/cast" @{ characterId = $victor.id } | Out-Null
 
 Write-Host "[8/10] Creating Intro..."
