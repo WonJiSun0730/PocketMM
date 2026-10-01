@@ -13,13 +13,6 @@ import {
 import PocketIcon from "@/components/PocketIcon"
 import "./HomePage.css"
 
-function PocketIcon({ size = 18, strokeWidth = 1.8 }) {
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M5 4.5h14l-1.2 15H6.2L5 4.5Z" />
-    <path d="M8 9.5c1.1 1.1 2.45 1.65 4 1.65s2.9-.55 4-1.65" />
-  </svg>
-}
-
 const activityItems = [
   { time: "방금", text: "작은 세계가 다음 장면을 준비하고 있어요." },
   { time: "12분 전", text: "캐릭터의 최근 행동이 정리되었어요." },
