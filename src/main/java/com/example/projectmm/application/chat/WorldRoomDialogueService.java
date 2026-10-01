@@ -69,6 +69,20 @@ public class WorldRoomDialogueService {
         return message;
     }
 
+    @Transactional
+    public void deleteMessageAndFollowing(Long sessionId, Long messageId) {
+        sessions.findById(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "World room session not found. sessionId=" + sessionId
+                ));
+        messages.findById(messageId)
+                .filter(item -> item.getSession().getId().equals(sessionId))
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "World room message not found. messageId=" + messageId
+                ));
+        messages.deleteBySessionIdAndIdGreaterThanEqual(sessionId, messageId);
+    }
+
     @Transactional(readOnly = true)
     public List<WorldRoomMessage> history(Long sessionId, Long beforeId) {
         sessions.findById(sessionId)
