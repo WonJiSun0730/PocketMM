@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react"
 import {
-  Pocket,
   Clock3,
   Home,
   MessageCircle,
@@ -12,6 +11,13 @@ import {
 } from "lucide-react"
 
 import "./HomePage.css"
+
+function PocketIcon({ size = 18, strokeWidth = 1.8 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5 4.5h14l-1.2 15H6.2L5 4.5Z" />
+    <path d="M8 9.5c1.1 1.1 2.45 1.65 4 1.65s2.9-.55 4-1.65" />
+  </svg>
+}
 
 const activityItems = [
   { time: "방금", text: "작은 세계가 다음 장면을 준비하고 있어요." },
@@ -28,7 +34,7 @@ const navItems = [
   { id: "home", label: "NOW", icon: Home },
   { id: "characters", label: "캐릭터", icon: Users },
   { id: "timeline", label: "세계", icon: Clock3 },
-  { id: "pockets", label: "포켓", icon: Pocket },
+  { id: "pockets", label: "포켓", icon: PocketIcon },
   { id: "settings", label: "설정", icon: Settings },
 ]
 
