@@ -22,7 +22,7 @@ public class WorldSystemService {
     public WorldSystemsResponse get(Long worldId, String loginId) {
         World world = owned(worldId, loginId);
         return new WorldSystemsResponse(world.getPlayGuide(), systems.findByWorldIdOrderBySortOrderAsc(worldId).stream()
-                .map(system -> new WorldSystemItem(system.getName(), system.getChangeCondition(), system.getMinValue(), system.getMaxValue(),
+                .map(system -> new WorldSystemItem(system.getName(), system.getChangeCondition(), system.getMinValue(), system.getMaxValue(), system.getInitialValue(),
                         states.findBySystemIdOrderBySortOrderAsc(system.getId()).stream()
                                 .map(state -> new WorldSystemStateItem(state.getMinValue(), state.getMaxValue(), state.getLabel())).toList()))
                 .toList());
@@ -47,7 +47,17 @@ public class WorldSystemService {
             WorldSystemItem item = requested.get(i);
             if (item.name() == null || item.name().isBlank()) continue;
             if (item.minValue() >= item.maxValue()) throw new IllegalArgumentException("System minimum must be lower than maximum.");
-            WorldSystem saved = systems.save(new WorldSystem(world, item.name().trim(), value(item.changeCondition()), item.minValue(), item.maxValue(), i));
+            if (item.initialValue() < item.minValue() || item.initialValue() > item.maxValue())
+                throw new IllegalArgumentException("System initial value is outside system bounds.");
+            WorldSystem saved = systems.save(new WorldSystem(
+                    world,
+                    item.name().trim(),
+                    value(item.changeCondition()),
+                    item.minValue(),
+                    item.maxValue(),
+                    item.initialValue(),
+                    i
+            ));
             List<WorldSystemStateItem> stateItems = item.states() == null ? List.of() : item.states();
             List<WorldSystemStateItem> kept = new ArrayList<>();
             for (int j = 0; j < stateItems.size(); j++) {
@@ -59,7 +69,14 @@ public class WorldSystemService {
                 states.save(new WorldSystemState(saved, state.minValue(), state.maxValue(), label, j));
                 kept.add(new WorldSystemStateItem(state.minValue(), state.maxValue(), label));
             }
-            normalized.add(new WorldSystemItem(saved.getName(), saved.getChangeCondition(), saved.getMinValue(), saved.getMaxValue(), kept));
+            normalized.add(new WorldSystemItem(
+                    saved.getName(),
+                    saved.getChangeCondition(),
+                    saved.getMinValue(),
+                    saved.getMaxValue(),
+                    saved.getInitialValue(),
+                    kept
+            ));
         }
         return new WorldSystemsResponse(world.getPlayGuide(), normalized);
     }
