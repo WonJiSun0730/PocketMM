@@ -58,7 +58,7 @@ public class WorldConversation {
         this.world = world;
         this.owner = owner;
         this.title = normalizeTitle(title, world.getName());
-        this.visibility = Visibility.PRIVATE;
+        this.visibility = visibility == null ? Visibility.PRIVATE : visibility;
         this.createdAt = createdAt == null ? LocalDateTime.now() : createdAt;
     }
 
