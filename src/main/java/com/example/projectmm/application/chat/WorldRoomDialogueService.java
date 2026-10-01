@@ -9,6 +9,7 @@ import com.example.projectmm.domain.chat.WorldRoomMessageVariant;
 import com.example.projectmm.domain.chat.WorldRoomMessageVariantRepository;
 import com.example.projectmm.domain.chat.WorldRoomSessionRepository;
 import com.example.projectmm.domain.chat.WorldRoomVariantCastSnapshotRepository;
+import com.example.projectmm.domain.chat.WorldRoomVariantSystemSnapshotRepository;
 import com.example.projectmm.domain.dialogue.WorldRoomTurn;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -30,6 +31,7 @@ public class WorldRoomDialogueService {
     private final WorldRoomMessageRepository messages;
     private final WorldRoomMessageVariantRepository variants;
     private final WorldRoomVariantCastSnapshotRepository castSnapshots;
+    private final WorldRoomVariantSystemSnapshotRepository systemSnapshots;
 
     @Transactional
     public WorldRoomTurn chat(Long sessionId, String userMessage) {
@@ -47,10 +49,12 @@ public class WorldRoomDialogueService {
 
         var context = contextBuilder.buildSession(sessionId);
         var beforeCast = sessionService.captureCastState(sessionId);
+        var beforeSystems = sessionService.captureSystemState(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
         var afterCast = sessionService.captureCastState(sessionId);
+        var afterSystems = sessionService.captureSystemState(sessionId);
 
         var characterMessage = messages.save(new WorldRoomMessage(
                 session,
@@ -65,6 +69,7 @@ public class WorldRoomDialogueService {
                 now()
         ));
         sessionService.saveCastSnapshot(variant, beforeCast, afterCast);
+        sessionService.saveSystemSnapshot(variant, beforeSystems, afterSystems);
 
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
     }
@@ -100,10 +105,11 @@ public class WorldRoomDialogueService {
                         messageId,
                         ChatRole.CHARACTER
                 )
-                .ifPresent(characterMessage -> sessionService.restoreCastBeforeVariant(
-                        sessionId,
-                        selectedVariant(characterMessage)
-                ));
+                .ifPresent(characterMessage -> {
+                    var variant = selectedVariant(characterMessage);
+                    sessionService.restoreCastBeforeVariant(sessionId, variant);
+                    sessionService.restoreSystemsBeforeVariant(sessionId, variant);
+                });
         deleteTimelineFrom(sessionId, messageId);
     }
 
@@ -126,17 +132,21 @@ public class WorldRoomDialogueService {
                 ));
 
         var previousVariant = target.getContent();
-        sessionService.restoreCastBeforeVariant(sessionId, selectedVariant(target));
+        var selected = selectedVariant(target);
+        sessionService.restoreCastBeforeVariant(sessionId, selected);
+        sessionService.restoreSystemsBeforeVariant(sessionId, selected);
         var context = contextBuilder.buildSession(sessionId);
         var rerollPrompt = userMessage.getContent()
                 + "\n\n[Previous response variant]\n"
                 + previousVariant
                 + "\n\nGenerate another natural variant of this response without copying it.";
         var beforeCast = sessionService.captureCastState(sessionId);
+        var beforeSystems = sessionService.captureSystemState(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, rerollPrompt);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
         var afterCast = sessionService.captureCastState(sessionId);
+        var afterSystems = sessionService.captureSystemState(sessionId);
 
         int variantNo = Math.toIntExact(variants.countByMessageId(messageId)) + 1;
         var variant = variants.save(new WorldRoomMessageVariant(
@@ -146,9 +156,10 @@ public class WorldRoomDialogueService {
                 now()
         ));
         sessionService.saveCastSnapshot(variant, beforeCast, afterCast);
+        sessionService.saveSystemSnapshot(variant, beforeSystems, afterSystems);
         target.selectVariant(variantNo, generated.reply());
 
-        return new WorldRoomTurn(generated.reply(), applied);
+        return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
     }
 
     @Transactional
@@ -169,16 +180,20 @@ public class WorldRoomDialogueService {
                         "User message for regeneration not found. messageId=" + messageId
                 ));
 
-        sessionService.restoreCastBeforeVariant(sessionId, selectedVariant(target));
+        var selected = selectedVariant(target);
+        sessionService.restoreCastBeforeVariant(sessionId, selected);
+        sessionService.restoreSystemsBeforeVariant(sessionId, selected);
         deleteTimelineFrom(sessionId, target.getId());
         messages.flush();
 
         var context = contextBuilder.buildSession(sessionId);
         var beforeCast = sessionService.captureCastState(sessionId);
+        var beforeSystems = sessionService.captureSystemState(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage.getContent());
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
         var afterCast = sessionService.captureCastState(sessionId);
+        var afterSystems = sessionService.captureSystemState(sessionId);
 
         var characterMessage = messages.save(new WorldRoomMessage(
                 session,
@@ -193,8 +208,9 @@ public class WorldRoomDialogueService {
                 now()
         ));
         sessionService.saveCastSnapshot(variant, beforeCast, afterCast);
+        sessionService.saveSystemSnapshot(variant, beforeSystems, afterSystems);
 
-        return new WorldRoomTurn(generated.reply(), applied);
+        return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
     }
 
     @Transactional(readOnly = true)
@@ -212,6 +228,7 @@ public class WorldRoomDialogueService {
                                 + ", variantNo=" + variantNo
                 ));
         sessionService.restoreCastAfterVariant(sessionId, variant);
+        sessionService.restoreSystemsAfterVariant(sessionId, variant);
         message.selectVariant(variant.getVariantNo(), variant.getContent());
         return message;
     }
@@ -233,6 +250,10 @@ public class WorldRoomDialogueService {
     }
 
     private void deleteTimelineFrom(Long sessionId, Long messageId) {
+        systemSnapshots.deleteByVariantMessageSessionIdAndVariantMessageIdGreaterThanEqual(
+                sessionId,
+                messageId
+        );
         castSnapshots.deleteByVariantMessageSessionIdAndVariantMessageIdGreaterThanEqual(
                 sessionId,
                 messageId
