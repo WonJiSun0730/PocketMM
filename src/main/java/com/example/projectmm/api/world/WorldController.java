@@ -310,6 +310,27 @@ public class WorldController {
         return worldRoomDialogueService.chat(sessionId, request.message());
     }
 
+    @GetMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/messages")
+    public List<WorldRoomMessageItem> getRoomMessages(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @PathVariable Long sessionId,
+            @RequestParam(required = false) Long before,
+            Authentication authentication
+    ) {
+        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        if (!session.getId().equals(sessionId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Room play session not found"
+            );
+        }
+        ensureRoomWorld(worldId, session.getRoom().getWorld().getId());
+        return worldRoomDialogueService.history(sessionId, before).stream()
+                .map(WorldRoomMessageItem::from)
+                .toList();
+    }
+
     @PostMapping("/{worldId}/characters/{characterId}/conversations")
     @ResponseStatus(HttpStatus.CREATED)
     public NewConversationResponse startWorldConversation(
