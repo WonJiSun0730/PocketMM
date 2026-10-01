@@ -98,26 +98,75 @@ public class GeminiDialogueGateway implements DialogueGateway {
             WorldRoomDialogueContext context,
             String userMessage
     ) {
+        return generateWorldRoomTurn(context, userMessage).reply();
+    }
+
+    @Override
+    public WorldRoomTurn generateWorldRoomTurn(
+            WorldRoomDialogueContext context,
+            String userMessage
+    ) {
         String resolvedUserMessage = userMessage == null ? "" : userMessage.trim();
         String systemPrompt = buildWorldRoomSystemPrompt(context);
 
         Map<String, Object> request = Map.of(
                 "systemInstruction",
-                Map.of("parts", List.of(Map.of("text", systemPrompt))),
+                Map.of("parts", List.of(Map.of(
+                        "text",
+                        systemPrompt + """
+
+                                Return JSON only:
+                                {
+                                  "reply": "roleplay prose",
+                                  "enterCharacterIds": [],
+                                  "leaveCharacterIds": []
+                                }
+
+                                Cast-change rules:
+                                - enterCharacterIds/leaveCharacterIds may contain ONLY registered room-cast character IDs.
+                                - Report an enter only when the generated scene actually brings an absent registered character into the current scene.
+                                - Report a leave only when the generated scene actually removes a currently active registered character from the current scene.
+                                - Do not report unchanged presence.
+                                - Incidental unregistered NPCs never belong in these ID arrays.
+                                """
+                ))),
                 "contents",
                 List.of(Map.of(
                         "role", "user",
                         "parts", List.of(Map.of("text", resolvedUserMessage))
-                ))
+                )),
+                "generationConfig",
+                Map.of("responseMimeType", "application/json")
         );
 
         String response = callGeminiWithRetry(request);
         try {
             JsonNode root = objectMapper.readTree(response);
-            return root.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText();
+            String payload = root.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText();
+            JsonNode turn = objectMapper.readTree(payload);
+            return new WorldRoomTurn(
+                    turn.path("reply").asText(),
+                    new WorldRoomCastChange(
+                            readLongArray(turn.path("enterCharacterIds")),
+                            readLongArray(turn.path("leaveCharacterIds"))
+                    )
+            );
         } catch (Exception e) {
             throw new IllegalStateException("Failed to parse world room dialogue response", e);
         }
+    }
+
+    private List<Long> readLongArray(JsonNode node) {
+        if (!node.isArray()) {
+            return List.of();
+        }
+        List<Long> values = new ArrayList<>();
+        node.forEach(item -> {
+            if (item.canConvertToLong()) {
+                values.add(item.asLong());
+            }
+        });
+        return List.copyOf(values);
     }
 
     private String buildWorldRoomSystemPrompt(WorldRoomDialogueContext context) {
