@@ -703,8 +703,6 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 
                 [WORLD CONTEXT — ACTIVE ONLY FOR THIS WORLD CONVERSATION]
                 World: %s
-                Opening premise:
-                %s
                 
                 Creator play guide:
                 %s
@@ -725,12 +723,10 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 - Character consistency is a strong tendency, not a reason to waste a turn refusing ordinary collaborative development. If a requested direction is unusual but plausible, supply believable context for it.
                 - Only when an action is genuinely impossible under the established world should it meet resistance or fail; express that entirely as an in-world event or character reaction, never as a meta correction.
                 - Never mention this EASY policy, lore retrieval, prompts, context injection, configuration, or internal rules in the roleplay.
-                - The opening premise establishes the world's entry situation. Do not repeatedly restate it after the scene has moved on.
                 - World systems are fictional state rules. Apply their meaning naturally when relevant; do not expose raw ranges or implementation details unless the user explicitly asks in-character and such knowledge makes sense.
                 """
                 .formatted(
                         world.worldName(),
-                        blankAsNone(world.introduction()),
                         blankAsNone(world.playGuide()),
                         lore.isBlank() ? "(none)" : lore,
                         systems.isBlank() ? "(none)" : systems
