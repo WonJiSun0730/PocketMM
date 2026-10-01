@@ -712,6 +712,18 @@ public class GeminiDialogueGateway implements DialogueGateway {
                   detail in context does NOT imply that it should appear frequently in the prose.
                 - Prefer fresh scene-specific observations over repeating iconic character features
                   merely because those features are available in context.
+                - Build narration primarily from what is newly happening in the current scene rather
+                  than from the character profile. Treat profile appearance and habitual gestures as
+                  optional reference material, not as the default source of descriptive motion.
+                - Draw broadly from scene-specific sources such as purposeful task actions, gaze and
+                  attention, posture, spatial distance, movement and pacing, interaction with nearby
+                  objects or people, changes in the environment, sound, weather, lighting, and the
+                  immediate consequences of what was just said or done.
+                - Prefer actions that accomplish something in the scene over decorative habitual
+                  gestures. A habitual gesture is useful when that specific gesture has meaning in
+                  the present moment; do not use it merely to fill an action beat or add character flavor.
+                - Let the descriptive focus and vocabulary change as the situation changes. Show what
+                  is newly observable now instead of repeatedly reminding the reader who the character is.
 
                 Example of undesirable narration:
                 *옆으로 다가가 토닥토닥해주며*
