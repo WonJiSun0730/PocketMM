@@ -28,6 +28,9 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
   const [systems, setSystems] = useState([])
   const [worldCharacters, setWorldCharacters] = useState([])
   const [worldRooms, setWorldRooms] = useState([])
+  const [roomIntros, setRoomIntros] = useState({})
+  const [introDialog, setIntroDialog] = useState(null)
+  const [introForm, setIntroForm] = useState({ title: "", content: "" })
   const autosaveTimer = useRef(null)
   const loadedLoreRef = useRef(null)
   const editVersionRef = useRef(0)
@@ -71,7 +74,57 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
 
   async function loadWorldRooms(worldId) {
     const response = await fetch(`/api/worlds/${worldId}/rooms`, { credentials: "include" })
-    if (response.ok) setWorldRooms(await response.json())
+    if (response.ok) {
+      const rooms = await response.json()
+      setWorldRooms(rooms)
+      await Promise.all(rooms.map((room) => loadRoomIntros(worldId, room.id)))
+    }
+  }
+
+  async function loadRoomIntros(worldId, roomId) {
+    const response = await fetch(`/api/worlds/${worldId}/rooms/${roomId}/intros`, { credentials: "include" })
+    if (!response.ok) return
+    const data = await response.json()
+    setRoomIntros((current) => ({ ...current, [roomId]: data }))
+  }
+
+  function openIntroDialog(room, intro = null) {
+    setIntroDialog({ room, intro })
+    setIntroForm({ title: intro?.title ?? "", content: intro?.content ?? "" })
+  }
+
+  async function saveRoomIntro(event) {
+    event.preventDefault()
+    if (!selectedWorld || !introDialog) return
+    const { room, intro } = introDialog
+    const response = await fetch(
+      `/api/worlds/${selectedWorld.id}/rooms/${room.id}/intros${intro ? `/${intro.id}` : ""}`,
+      {
+        method: intro ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          title: introForm.title.trim(),
+          content: introForm.content.trim(),
+          sortOrder: intro?.sortOrder ?? null,
+        }),
+      }
+    )
+    if (!response.ok) return setMessage("시작 장면을 저장하지 못했어요.")
+    await loadRoomIntros(selectedWorld.id, room.id)
+    setIntroDialog(null)
+    setMessage("시작 장면을 저장했어요.")
+  }
+
+  async function deleteRoomIntro(room, intro) {
+    if (!selectedWorld || !window.confirm(`"${intro.title}" 시작 장면을 삭제할까요?`)) return
+    const response = await fetch(
+      `/api/worlds/${selectedWorld.id}/rooms/${room.id}/intros/${intro.id}`,
+      { method: "DELETE", credentials: "include" }
+    )
+    if (!response.ok) return setMessage("시작 장면을 삭제하지 못했어요.")
+    await loadRoomIntros(selectedWorld.id, room.id)
+    setMessage("시작 장면을 삭제했어요.")
   }
 
   async function deleteRoom(room) {
@@ -357,15 +410,28 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
               <div className="world-title-row"><div><span className="world-eyebrow">EDITING</span><div className="world-name-line"><h2>{selectedWorld.name}</h2><button className="world-edit-meta" onClick={openEditWorld} type="button" aria-label="월드 정보 수정"><Pencil size={14} /></button><button className="world-delete" onClick={deleteWorld} type="button" aria-label="월드 삭제"><Trash2 size={14} /></button></div>{selectedWorld.description && <p className="world-private-description">{selectedWorld.description}</p>}</div>{message && <span className="world-message">{message}</span>}</div>
               <div className="world-cast-summary"><Users size={15}/><span>등장인물 {worldCharacters.length}명</span>{worldCharacters.length > 0 && <span className="world-cast-names">{worldCharacters.map((character) => character.name).join(" · ")}</span>}{worldCharacters.length > 0 && <div className="world-cast-actions">{worldCharacters.map((character) => <button key={character.id} type="button" onClick={() => onOpenWorldChat?.(selectedWorld, character)}><MessageCircle size={13}/>{character.name}과 대화</button>)}</div>}</div>
               <div className="world-room-summary">
-                <div className="world-room-summary-heading"><strong>Room</strong><span>{worldRooms.length}개</span></div>
+                <div className="world-room-summary-heading"><strong>시나리오</strong><span>{worldRooms.length}개</span></div>
                 {worldRooms.length === 0 ? (
-                  <p className="world-room-empty">아직 이 월드에 생성된 Room이 없어요.</p>
+                  <p className="world-room-empty">아직 이 월드에 생성된 시나리오가 없어요.</p>
                 ) : (
                   <div className="world-room-list">
                     {worldRooms.map((room) => (
                       <div className="world-room-item" key={room.id}>
-                        <span><strong>{room.title}</strong><small>{room.visibility === "PUBLIC" ? "공개" : "비공개"} · Cast {room.cast?.length ?? 0}명</small></span>
-                        <button type="button" onClick={() => deleteRoom(room)} aria-label={`${room.title} Room 삭제`}><Trash2 size={14}/></button>
+                        <div className="world-room-main">
+                          <span><strong>{room.title}</strong><small>{room.visibility === "PUBLIC" ? "공개" : "비공개"} · 등장인물 {room.cast?.length ?? 0}명 · 시작 장면 {roomIntros[room.id]?.length ?? 0}개</small></span>
+                          <div className="world-intro-list">
+                            {(roomIntros[room.id] ?? []).map((intro) => (
+                              <div className="world-intro-item" key={intro.id}>
+                                <button type="button" className="world-intro-edit" onClick={() => openIntroDialog(room, intro)}>
+                                  <strong>{intro.title}</strong><small>{intro.content}</small>
+                                </button>
+                                <button type="button" onClick={() => deleteRoomIntro(room, intro)} aria-label={`${intro.title} 시작 장면 삭제`}><Trash2 size={13}/></button>
+                              </div>
+                            ))}
+                            <button className="world-intro-add" type="button" onClick={() => openIntroDialog(room)}><Plus size={14}/> 시작 장면 추가</button>
+                          </div>
+                        </div>
+                        <button type="button" onClick={() => deleteRoom(room)} aria-label={`${room.title} 시나리오 삭제`}><Trash2 size={14}/></button>
                       </div>
                     ))}
                   </div>
@@ -410,6 +476,8 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
           )}
         </section>
       </div>
+
+      {introDialog && <div className="world-dialog-backdrop" onMouseDown={() => setIntroDialog(null)}><form className="world-dialog" onSubmit={saveRoomIntro} onMouseDown={(event) => event.stopPropagation()}><div className="world-dialog-heading"><div><span className="world-eyebrow">START SCENE</span><h2>{introDialog.intro ? "시작 장면 수정" : "새 시작 장면"}</h2></div><button type="button" onClick={() => setIntroDialog(null)} aria-label="닫기"><X size={18}/></button></div><label>장면 이름<input autoFocus required maxLength={100} value={introForm.title} onChange={(event) => setIntroForm((current) => ({ ...current, title: event.target.value }))} placeholder="예: 베이커가의 의뢰인" /></label><label>장면 내용<textarea required value={introForm.content} onChange={(event) => setIntroForm((current) => ({ ...current, content: event.target.value }))} placeholder="포켓의 첫 장면으로 표시될 내용을 작성해 주세요." /></label><div className="world-dialog-actions"><button type="button" onClick={() => setIntroDialog(null)}>취소</button><button className="primary" disabled={!introForm.title.trim() || !introForm.content.trim()} type="submit">저장</button></div></form></div>}
 
       {worldDialog && <div className="world-dialog-backdrop" onMouseDown={() => setWorldDialog(null)}><form className="world-dialog" onSubmit={submitWorld} onMouseDown={(event) => event.stopPropagation()}><div className="world-dialog-heading"><div><span className="world-eyebrow">{worldDialog === "edit" ? "EDIT WORLD" : "NEW WORLD"}</span><h2>{worldDialog === "edit" ? "세계관 정보 수정" : "새 세계관 만들기"}</h2></div><button type="button" onClick={() => setWorldDialog(null)} aria-label="닫기"><X size={18} /></button></div><label>세계관 이름<input autoFocus maxLength={100} value={worldForm.name} onChange={(event) => setWorldForm((current) => ({ ...current, name: event.target.value }))} placeholder="세계관 이름" /></label><label>설명 <small>AI에게 전달되지 않는 메모예요.</small><textarea value={worldForm.description} onChange={(event) => setWorldForm((current) => ({ ...current, description: event.target.value }))} placeholder="이 세계관을 구분하기 위한 설명이나 개인 메모를 적어 주세요." /></label><div className="world-dialog-actions"><button type="button" onClick={() => setWorldDialog(null)}>취소</button><button className="primary" disabled={!worldForm.name.trim() || worldSubmitting} type="submit">{worldSubmitting ? "처리 중..." : worldDialog === "edit" ? "수정" : "생성"}</button></div></form></div>}
     </main>
