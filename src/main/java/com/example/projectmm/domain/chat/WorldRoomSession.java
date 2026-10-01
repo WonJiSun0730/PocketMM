@@ -31,6 +31,10 @@ public class WorldRoomSession {
     @JoinColumn(name = "player_profile_id")
     private PlayerProfile playerProfile;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "intro_id", nullable = false)
+    private WorldRoomIntro intro;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -43,11 +47,16 @@ public class WorldRoomSession {
             WorldConversation room,
             Member member,
             PlayerProfile playerProfile,
+            WorldRoomIntro intro,
             LocalDateTime at
     ) {
+        if (intro == null || intro.getRoom() == null || !intro.getRoom().equals(room)) {
+            throw new IllegalArgumentException("intro must belong to the room");
+        }
         this.room = room;
         this.member = member;
         this.playerProfile = playerProfile;
+        this.intro = intro;
         this.createdAt = at;
         this.simulatedAt = at;
         this.lastPresenceAt = at;
