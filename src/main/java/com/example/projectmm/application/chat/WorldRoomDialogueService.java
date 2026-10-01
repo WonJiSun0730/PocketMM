@@ -125,6 +125,7 @@ public class WorldRoomDialogueService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Reroll target must be a character message. messageId=" + messageId
                 ));
+        requireLatestMessage(target, "reroll");
         var userMessage = messages.findTopBySessionIdAndIdLessThanOrderByIdDesc(sessionId, target.getId())
                 .filter(item -> item.getRole() == ChatRole.USER)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -222,6 +223,7 @@ public class WorldRoomDialogueService {
     @Transactional
     public WorldRoomMessage selectVariant(Long sessionId, Long messageId, int variantNo) {
         var message = requireCharacterMessage(sessionId, messageId);
+        requireLatestMessage(message, "select variant");
         var variant = variants.findByMessageIdAndVariantNo(messageId, variantNo)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "World room message variant not found. messageId=" + messageId
@@ -260,6 +262,17 @@ public class WorldRoomDialogueService {
         );
         variants.deleteByMessageSessionIdAndMessageIdGreaterThanEqual(sessionId, messageId);
         messages.deleteBySessionIdAndIdGreaterThanEqual(sessionId, messageId);
+    }
+
+    private void requireLatestMessage(WorldRoomMessage message, String action) {
+        if (messages.existsBySessionIdAndIdGreaterThan(
+                message.getSession().getId(),
+                message.getId()
+        )) {
+            throw new IllegalStateException(
+                    "Cannot " + action + " a finalized room message. messageId=" + message.getId()
+            );
+        }
     }
 
     private WorldRoomMessageVariant selectedVariant(WorldRoomMessage message) {
