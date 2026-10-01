@@ -22,7 +22,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
   const [message, setMessage] = useState("")
   const [draftReady, setDraftReady] = useState(false)
   const [worldDialog, setWorldDialog] = useState(null)
-  const [worldForm, setWorldForm] = useState({ name: "", description: "", introduction: "" })
+  const [worldForm, setWorldForm] = useState({ name: "", description: "" })
   const [worldSubmitting, setWorldSubmitting] = useState(false)
   const [systemMode, setSystemMode] = useState(false)
   const [playGuide, setPlayGuide] = useState("")
@@ -218,14 +218,6 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
 
   async function saveSystems() {
     if (!selectedWorld) return
-    const worldResponse = await fetch(`/api/worlds/${selectedWorld.id}`, {
-      method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include",
-      body: JSON.stringify({ name: selectedWorld.name, description: selectedWorld.description ?? null, introduction: selectedWorld.introduction?.trim() || null }),
-    })
-    if (!worldResponse.ok) return setMessage("인트로를 저장하지 못했어요.")
-    const savedWorld = await worldResponse.json()
-    setSelectedWorld(savedWorld)
-    setWorlds((current) => current.map((item) => item.id === savedWorld.id ? savedWorld : item))
     const response = await fetch(`/api/worlds/${selectedWorld.id}/systems`, {
       method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include",
       body: JSON.stringify({ playGuide, systems }),
@@ -317,13 +309,13 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
   }
 
   function openCreateWorld() {
-    setWorldForm({ name: "", description: "", introduction: "" })
+    setWorldForm({ name: "", description: "" })
     setWorldDialog("create")
   }
 
   function openEditWorld() {
     if (!selectedWorld) return
-    setWorldForm({ name: selectedWorld.name, description: selectedWorld.description ?? "", introduction: selectedWorld.introduction ?? "" })
+    setWorldForm({ name: selectedWorld.name, description: selectedWorld.description ?? "" })
     setWorldDialog("edit")
   }
 
@@ -338,7 +330,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
         method: editing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ name, description: worldForm.description.trim() || null, introduction: worldForm.introduction.trim() || null }),
+        body: JSON.stringify({ name, description: worldForm.description.trim() || null }),
       })
       if (!response.ok) throw new Error(editing ? "월드 정보를 수정하지 못했어요." : "월드를 만들지 못했어요.")
       const world = await response.json()
@@ -450,9 +442,9 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
               <div className="world-title-row"><div><span className="world-eyebrow">EDITING</span><div className="world-name-line"><h2>{selectedWorld.name}</h2><button className="world-edit-meta" onClick={openEditWorld} type="button" aria-label="월드 정보 수정"><Pencil size={14} /></button><button className="world-delete" onClick={deleteWorld} type="button" aria-label="월드 삭제"><Trash2 size={14} /></button></div>{selectedWorld.description && <p className="world-private-description">{selectedWorld.description}</p>}</div>{message && <span className="world-message">{message}</span>}</div>
               <div className="world-cast-summary"><Users size={15}/><span>등장인물 {worldCharacters.length}명</span>{worldCharacters.length > 0 && <span className="world-cast-names">{worldCharacters.map((character) => character.name).join(" · ")}</span>}{worldCharacters.length > 0 && <div className="world-cast-actions">{worldCharacters.map((character) => <button key={character.id} type="button" onClick={() => onOpenWorldChat?.(selectedWorld, character)}><MessageCircle size={13}/>{character.name}과 대화</button>)}</div>}</div>
               <div className="world-room-summary">
-                <div className="world-room-summary-heading"><strong>시나리오</strong><span>{worldRooms.length}개</span></div>
+                <div className="world-room-summary-heading"><strong>인트로</strong><span>{Object.values(roomIntros).reduce((sum, items) => sum + items.length, 0)}개</span></div>
                 {worldRooms.length === 0 ? (
-                  <p className="world-room-empty">아직 이 월드에 생성된 시나리오가 없어요.</p>
+                  <p className="world-room-empty">아직 이 월드에 생성된 인트로가 없어요.</p>
                 ) : (
                   <div className="world-room-list">
                     {worldRooms.map((room) => (
@@ -473,7 +465,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
                         </div>
                         <div className="world-room-actions">
                           <button className="world-pocket-start" type="button" onClick={() => beginPocket(room)}>포켓 시작</button>
-                          <button type="button" onClick={() => deleteRoom(room)} aria-label={`${room.title} 시나리오 삭제`}><Trash2 size={14}/></button>
+                          <button type="button" onClick={() => deleteRoom(room)} aria-label={`${room.title} 묶음 삭제`}><Trash2 size={14}/></button>
                         </div>
                       </div>
                     ))}
@@ -487,7 +479,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
               </div>
               {systemMode ? (
                 <div className="world-system-editor">
-                  <section className="system-play-guide"><label>인트로</label><p>월드에 처음 들어갔을 때 시작되는 장면이에요. <span>{selectedWorld?.introduction?.length ?? 0} / 2000자</span></p><textarea maxLength={2000} value={selectedWorld?.introduction ?? ""} onChange={(event) => setSelectedWorld((current) => current ? { ...current, introduction: event.target.value } : current)} placeholder="이 세계에 들어왔을 때 처음 마주하는 상황과 장면을 작성해 주세요." /><label className="system-section-label">플레이 가이드</label><p>월드 제작자가 자유롭게 수정하는 시스템 안내예요. <span>{playGuide.length} / 1000자</span></p><textarea maxLength={1000} value={playGuide} onChange={(event) => setPlayGuide(event.target.value)} placeholder="상태 체계, 시스템 사용법, 플레이 팁 등을 자유롭게 작성하세요." /></section>
+                  <section className="system-play-guide"><label>플레이 가이드</label><p>월드 제작자가 자유롭게 수정하는 시스템 안내예요. <span>{playGuide.length} / 1000자</span></p><textarea maxLength={1000} value={playGuide} onChange={(event) => setPlayGuide(event.target.value)} placeholder="상태 체계, 시스템 사용법, 플레이 팁 등을 자유롭게 작성하세요." /></section>
                   <div className="system-list">
                     {systems.map((system, index) => <article className="system-card" key={index}>
                       <div className="system-card-head"><input value={system.name} onChange={(e) => updateSystem(index, "name", e.target.value)} placeholder="시스템 이름 (예: 피에타)" /><button onClick={() => setSystems((current) => current.filter((_, i) => i !== index))} type="button"><X size={16}/></button></div>
