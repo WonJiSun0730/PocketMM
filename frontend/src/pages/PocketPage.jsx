@@ -1,7 +1,21 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ArrowLeft, Send } from "lucide-react"
 
-import "./PocketPage.css"
+import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
+
+function RpText({ text }) {
+  const parts = (text ?? "").split(/(\*[^*]+\*)/g)
+  return <div className="whitespace-pre-wrap text-[15px] leading-7 text-foreground sm:text-base sm:leading-8">
+    {parts.map((part, index) => {
+      const action = part.startsWith("*") && part.endsWith("*") && part.length > 2
+      return action
+        ? <span key={index} className="italic text-muted-foreground">{part.slice(1, -1)}</span>
+        : <span key={index}>{part}</span>
+    })}
+  </div>
+}
 
 export default function PocketPage({ pocket, onBack }) {
   const { world, room, session, playerProfile } = pocket
@@ -9,29 +23,41 @@ export default function PocketPage({ pocket, onBack }) {
   const [messages, setMessages] = useState([])
   const [cast, setCast] = useState([])
   const [systems, setSystems] = useState([])
-  const [draft, setDraft] = useState("")
-  const [busy, setBusy] = useState(false)
+  const [input, setInput] = useState("")
+  const [sending, setSending] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const bottomRef = useRef(null)
 
   async function refresh() {
-    const [messageResponse, castResponse, systemResponse] = await Promise.all([
-      fetch(`${base}/messages`, { credentials: "include" }),
-      fetch(`${base}/cast`, { credentials: "include" }),
-      fetch(`${base}/systems`, { credentials: "include" }),
-    ])
-    if (messageResponse.ok) setMessages(await messageResponse.json())
-    if (castResponse.ok) setCast(await castResponse.json())
-    if (systemResponse.ok) setSystems(await systemResponse.json())
+    try {
+      const [messageResponse, castResponse, systemResponse] = await Promise.all([
+        fetch(`${base}/messages`, { credentials: "include" }),
+        fetch(`${base}/cast`, { credentials: "include" }),
+        fetch(`${base}/systems`, { credentials: "include" }),
+      ])
+      if (!messageResponse.ok) throw new Error("포켓의 대화를 불러오지 못했어요.")
+      setMessages(await messageResponse.json())
+      if (castResponse.ok) setCast(await castResponse.json())
+      if (systemResponse.ok) setSystems(await systemResponse.json())
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { refresh() }, [session.id])
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: messages.length ? "smooth" : "auto" }) }, [messages, sending])
 
-  async function send(event) {
-    event.preventDefault()
-    const message = draft.trim()
-    if (!message || busy) return
-    setBusy(true)
+  async function sendMessage() {
+    const message = input.trim()
+    if (!message || sending || loading) return
+    setSending(true)
     setError("")
+    setInput("")
+    const pending = { id: `pending-${Date.now()}`, role: "USER", content: message }
+    setMessages(current => [...current, pending])
     try {
       const response = await fetch(`${base}/chat`, {
         method: "POST",
@@ -40,45 +66,79 @@ export default function PocketPage({ pocket, onBack }) {
         body: JSON.stringify({ message }),
       })
       if (!response.ok) throw new Error("대화를 이어가지 못했어요.")
-      setDraft("")
       await refresh()
     } catch (e) {
+      setMessages(current => current.filter(item => item.id !== pending.id))
+      setInput(message)
       setError(e.message)
     } finally {
-      setBusy(false)
+      setSending(false)
     }
   }
 
-  return <main className="pocket-page">
-    <header className="pocket-header">
-      <button type="button" onClick={onBack}><ArrowLeft size={18}/> 월드로</button>
-      <div><span>POCKET</span><h1>{room.title}</h1><p>{world.name} · {playerProfile?.name ?? "Player"}</p></div>
-      <div className="pocket-status">
-        {systems.map(system => <span key={system.id}>{system.name} <strong>{system.currentValue}</strong></span>)}
+  function handleKeyDown(event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault()
+      sendMessage()
+    }
+  }
+
+  return <main className="flex h-svh bg-background text-foreground">
+    <section className="mx-auto flex h-full w-full max-w-4xl flex-col border-x bg-card">
+      <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2 sm:px-6">
+        <Button type="button" variant="ghost" size="icon" onClick={onBack} disabled={sending} aria-label="월드로 돌아가기">
+          <ArrowLeft className="size-4" />
+        </Button>
+        <div className="min-w-0">
+          <h1 className="truncate font-medium leading-none">{room.title}</h1>
+          <p className="mt-1 text-xs text-muted-foreground">{world.name} · POCKET</p>
+        </div>
+        <div className="ml-auto flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+          <span className="rounded-full bg-accent px-2.5 py-1 text-accent-foreground">{playerProfile?.name ?? "Player"}</span>
+        </div>
+      </header>
+
+      <div className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span>현재 장면 · {cast.length ? cast.map(item => item.name).join(" · ") : "등장인물 없음"}</span>
+          {systems.map(system => <span key={system.id}>{system.name} <strong className="text-foreground">{system.currentValue}</strong></span>)}
+        </div>
       </div>
-    </header>
 
-    <section className="pocket-stage">
-      <article className="pocket-intro">
-        <span>START SCENE</span>
-        <h2>{session.introTitle}</h2>
-        <p>{session.introContent}</p>
-      </article>
+      {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}
 
-      <div className="pocket-cast">{cast.length > 0 ? <>현재 장면 · {cast.map(item => item.name).join(" · ")}</> : "현재 장면 · 등장인물 없음"}</div>
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="mx-auto flex w-full max-w-3xl flex-col p-4 pb-32 sm:p-6 sm:pb-36">
+          <article className="border-b border-border/70 py-7 sm:py-9">
+            <p className="mb-4 text-xs font-semibold tracking-[.12em] text-muted-foreground">INTRO · {session.introTitle}</p>
+            <RpText text={session.introContent} />
+          </article>
 
-      <div className="pocket-messages">
-        {messages.map(message => <article className={`pocket-message ${String(message.role).toLowerCase()}`} key={message.id}>
-          <span>{message.role === "USER" ? playerProfile?.name ?? "You" : "SCENE"}</span>
-          <p>{message.content}</p>
-        </article>)}
+          {loading && <p className="py-10 text-center text-sm text-muted-foreground">포켓을 불러오는 중...</p>}
+
+          {!loading && messages.map(item => (
+            <article key={item.id} className="border-b border-border/70 py-7 last:border-b-0 sm:py-9">
+              <RpText text={item.content ?? item.message} />
+            </article>
+          ))}
+
+          {sending && <div className="border-b border-border/70 py-7 sm:py-9">
+            <p className="animate-pulse text-sm italic text-muted-foreground">장면을 이어가는 중...</p>
+          </div>}
+          <div ref={bottomRef} />
+        </div>
+      </ScrollArea>
+
+      <div className="shrink-0 border-t bg-card p-3 sm:p-4">
+        <div className="mx-auto flex max-w-3xl items-end gap-2">
+          <Textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
+            placeholder="행동이나 대사를 입력해 주세요." disabled={loading || sending} rows={1}
+            className="max-h-36 min-h-11 resize-none text-base" />
+          <Button type="button" size="icon" className="size-11 shrink-0" disabled={loading || sending || !input.trim()}
+            onClick={sendMessage} aria-label="메시지 보내기"><Send className="size-4" /></Button>
+        </div>
+        <p className="mx-auto mt-2 max-w-3xl text-center text-xs text-muted-foreground">Enter 전송 · Shift + Enter 줄바꿈</p>
       </div>
-
-      {error && <p className="pocket-error">{error}</p>}
-      <form className="pocket-composer" onSubmit={send}>
-        <textarea value={draft} onChange={e => setDraft(e.target.value)} disabled={busy} placeholder="행동이나 대사를 입력해 주세요." />
-        <button type="submit" disabled={busy || !draft.trim()} aria-label="보내기"><Send size={18}/></button>
-      </form>
     </section>
   </main>
 }
