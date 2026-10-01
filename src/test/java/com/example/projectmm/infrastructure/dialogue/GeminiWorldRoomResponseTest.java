@@ -1,7 +1,6 @@
 package com.example.projectmm.infrastructure.dialogue;
 
 import com.example.projectmm.domain.dialogue.*;
-import com.example.projectmm.domain.world.WorldSystemState;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -80,11 +79,11 @@ class GeminiWorldRoomResponseTest {
         var system = new WorldRoomSystemContext(
                 systemId,
                 "Case Tension",
-                "Change when danger clearly escalates.",
+                20,
                 0,
                 100,
-                20,
-                List.<WorldSystemState>of()
+                "Change when danger clearly escalates.",
+                List.of()
         );
         return new WorldRoomDialogueContext(
                 1L,
