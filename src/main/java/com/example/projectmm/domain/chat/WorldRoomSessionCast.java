@@ -44,6 +44,16 @@ public class WorldRoomSessionCast {
         this.active = false;
     }
 
+    public void restore(
+            boolean active,
+            LocalDateTime enteredAt,
+            LocalDateTime leftAt
+    ) {
+        this.active = active;
+        this.enteredAt = enteredAt;
+        this.leftAt = leftAt;
+    }
+
     public void enter(LocalDateTime at) {
         active = true;
         enteredAt = at;
