@@ -317,7 +317,6 @@ export default function ChatPage({
       {startError && <p role="alert" className="mx-auto max-w-2xl px-4 py-2 text-destructive">{startError}</p>}
       <PlayerProfilePicker current={session?.playerProfile} busy={starting}
         onSelect={selectProfile}
-        onSkip={() => selectProfile(null)}
         onSaved={profile => {
           if (session?.playerProfile?.id === profile.id) setSession({ ...session, playerProfile: profile })
         }}
