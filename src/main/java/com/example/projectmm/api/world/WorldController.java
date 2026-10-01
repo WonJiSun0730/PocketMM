@@ -159,6 +159,39 @@ public class WorldController {
         ));
     }
 
+    @PutMapping("/{worldId}/rooms/{roomId}/intros/{introId}")
+    public WorldRoomIntroItem updateRoomIntro(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @PathVariable Long introId,
+            @Valid @RequestBody WorldRoomIntroRequest request,
+            Authentication authentication
+    ) {
+        var room = worldRoomService.get(roomId);
+        ensureRoomWorld(worldId, room.getWorld().getId());
+        return WorldRoomIntroItem.from(worldRoomService.updateIntro(
+                roomId,
+                introId,
+                authentication.getName(),
+                request.title(),
+                request.content(),
+                request.sortOrder()
+        ));
+    }
+
+    @DeleteMapping("/{worldId}/rooms/{roomId}/intros/{introId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteRoomIntro(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @PathVariable Long introId,
+            Authentication authentication
+    ) {
+        var room = worldRoomService.get(roomId);
+        ensureRoomWorld(worldId, room.getWorld().getId());
+        worldRoomService.deleteIntro(roomId, introId, authentication.getName());
+    }
+
     @GetMapping("/{worldId}/rooms/{roomId}/intros")
     public List<WorldRoomIntroItem> getRoomIntros(
             @PathVariable Long worldId,
