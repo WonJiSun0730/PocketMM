@@ -438,6 +438,20 @@ public class WorldController {
         return worldRoomDialogueService.regenerate(sessionId, messageId);
     }
 
+    @GetMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/cast")
+    public List<WorldRoomSessionCastItem> getRoomSessionActiveCast(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @PathVariable Long sessionId,
+            Authentication authentication
+    ) {
+        var session = worldRoomSessionService.ownedSession(roomId, sessionId, authentication.getName());
+        ensureRoomWorld(worldId, session.getRoom().getWorld().getId());
+        return worldRoomSessionService.activeCast(sessionId).stream()
+                .map(WorldRoomSessionCastItem::from)
+                .toList();
+    }
+
     @GetMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/systems")
     public List<WorldRoomSessionSystemItem> getRoomSessionSystems(
             @PathVariable Long worldId,
