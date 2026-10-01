@@ -181,6 +181,18 @@ public class WorldRoomService {
     }
 
     @Transactional(readOnly = true)
+    public List<WorldConversation> ownedRooms(Long worldId, String ownerLoginId) {
+        var world = worlds.findById(worldId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "World not found"));
+        var owner = members.findByLoginId(ownerLoginId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
+        if (!world.getOwner().getId().equals(owner.getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "World not found");
+        }
+        return rooms.findByWorldIdOrderByCreatedAtDescIdDesc(worldId);
+    }
+
+    @Transactional(readOnly = true)
     public WorldConversation accessibleRoom(Long roomId, String loginId) {
         var room = room(roomId);
         var member = members.findByLoginId(loginId)
