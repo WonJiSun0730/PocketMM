@@ -184,10 +184,14 @@ public class GeminiDialogueGateway implements DialogueGateway {
     ) {
         try {
             JsonNode root = objectMapper.readTree(response);
-            String payload = root.path("candidates").path(0).path("content").path(0).path("text").asText();
+            String payload = root.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText();
             JsonNode turn = objectMapper.readTree(payload);
+            String reply = turn.path("reply").asText();
+            if (reply.isBlank()) {
+                throw new IllegalStateException("World room dialogue reply is blank");
+            }
             return new WorldRoomTurn(
-                    turn.path("reply").asText(),
+                    reply,
                     new WorldRoomCastChange(
                             readLongArray(turn.path("enterCharacterIds")),
                             readLongArray(turn.path("leaveCharacterIds"))
