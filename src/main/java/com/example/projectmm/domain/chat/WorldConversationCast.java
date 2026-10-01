@@ -35,12 +35,6 @@ public class WorldConversationCast {
     @Column(nullable = false)
     private LocalDateTime joinedAt;
 
-    @Column(nullable = false)
-    private boolean active;
-
-    private LocalDateTime enteredAt;
-
-    private LocalDateTime leftAt;
 
     public WorldConversationCast(
             WorldConversation conversation,
@@ -50,21 +44,6 @@ public class WorldConversationCast {
         this.conversation = conversation;
         this.character = character;
         this.joinedAt = joinedAt;
-        this.active = false;
     }
 
-    public boolean isActive() {
-        return active;
-    }
-
-    public void enter(LocalDateTime at) {
-        active = true;
-        enteredAt = at;
-        leftAt = null;
-    }
-
-    public void leave(LocalDateTime at) {
-        active = false;
-        leftAt = at;
-    }
 }
