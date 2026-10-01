@@ -230,8 +230,11 @@ public class GeminiDialogueGateway implements DialogueGateway {
 
                 World:
                 - Name: %s
-                - Opening premise: %s
                 - Creator play guide: %s
+
+                Selected room intro:
+                - Title: %s
+                - Starting context: %s
 
                 World lore:
                 %s
@@ -249,6 +252,8 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 %s
 
                 Multi-character room rules:
+                - The selected room intro establishes this play session's starting situation. Treat it as initial narrative context, not as a script that must be repeatedly restated or mechanically reenacted on later turns.
+                - The player may redirect, elaborate, or freely continue from that starting situation.
                 - The room cast is the pool of registered characters who may participate. It is NOT a list of characters who must all appear.
                 - Active cast is authoritative for who is physically present at the start of this turn.
                 - Do not make every registered character appear together merely because their profiles were supplied.
@@ -268,8 +273,9 @@ public class GeminiDialogueGateway implements DialogueGateway {
                         context.roomTitle(),
                         context.simulatedAt(),
                         world.worldName(),
-                        blankAsNone(world.introduction()),
                         blankAsNone(world.playGuide()),
+                        blankAsNone(context.introTitle()),
+                        blankAsNone(context.introContent()),
                         lore.isBlank() ? "(none)" : lore,
                         systems.isBlank() ? "(none)" : systems,
                         player,
