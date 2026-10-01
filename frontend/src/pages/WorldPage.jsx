@@ -75,7 +75,12 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
     }
     if (!window.confirm(`"${selectedWorld.name}" 월드를 삭제할까요?`)) return
     const response = await fetch(`/api/worlds/${selectedWorld.id}`, { method: "DELETE", credentials: "include" })
-    if (!response.ok) return setMessage("월드를 삭제하지 못했어요.")
+    if (!response.ok) {
+      if (response.status === 409) {
+        return setMessage("이 월드에 연결된 Room이 남아 있어 삭제할 수 없어요. Room을 먼저 삭제해 주세요.")
+      }
+      return setMessage("월드를 삭제하지 못했어요.")
+    }
     const remaining = worlds.filter((world) => world.id !== selectedWorld.id)
     setWorlds(remaining)
     setSelectedWorld(remaining[0] ?? null)
