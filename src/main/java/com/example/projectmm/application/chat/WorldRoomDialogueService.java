@@ -54,6 +54,21 @@ public class WorldRoomDialogueService {
         return new WorldRoomTurn(generated.reply(), applied);
     }
 
+    @Transactional
+    public WorldRoomMessage editMessage(Long sessionId, Long messageId, String content) {
+        sessions.findById(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "World room session not found. sessionId=" + sessionId
+                ));
+        var message = messages.findById(messageId)
+                .filter(item -> item.getSession().getId().equals(sessionId))
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "World room message not found. messageId=" + messageId
+                ));
+        message.edit(content, now());
+        return message;
+    }
+
     @Transactional(readOnly = true)
     public List<WorldRoomMessage> history(Long sessionId, Long beforeId) {
         sessions.findById(sessionId)
