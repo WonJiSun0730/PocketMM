@@ -173,6 +173,24 @@ public class WorldRoomDialogueService {
     }
 
     @Transactional(readOnly = true)
+    public List<WorldRoomMessageVariant> variants(Long sessionId, Long messageId) {
+        var message = requireCharacterMessage(sessionId, messageId);
+        return variants.findByMessageIdOrderByVariantNoAsc(message.getId());
+    }
+
+    @Transactional
+    public WorldRoomMessage selectVariant(Long sessionId, Long messageId, int variantNo) {
+        var message = requireCharacterMessage(sessionId, messageId);
+        var variant = variants.findByMessageIdAndVariantNo(messageId, variantNo)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "World room message variant not found. messageId=" + messageId
+                                + ", variantNo=" + variantNo
+                ));
+        message.selectVariant(variant.getVariantNo(), variant.getContent());
+        return message;
+    }
+
+    @Transactional(readOnly = true)
     public List<WorldRoomMessage> history(Long sessionId, Long beforeId) {
         sessions.findById(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -186,6 +204,19 @@ public class WorldRoomDialogueService {
         return page.stream()
                 .sorted(Comparator.comparing(WorldRoomMessage::getId))
                 .toList();
+    }
+
+    private WorldRoomMessage requireCharacterMessage(Long sessionId, Long messageId) {
+        sessions.findById(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "World room session not found. sessionId=" + sessionId
+                ));
+        return messages.findById(messageId)
+                .filter(item -> item.getSession().getId().equals(sessionId))
+                .filter(item -> item.getRole() == ChatRole.CHARACTER)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Character message not found. messageId=" + messageId
+                ));
     }
 
     private LocalDateTime now() {
