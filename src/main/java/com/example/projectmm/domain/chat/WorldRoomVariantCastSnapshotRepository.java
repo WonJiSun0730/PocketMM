@@ -12,4 +12,5 @@ public interface WorldRoomVariantCastSnapshotRepository extends JpaRepository<Wo
             Long sessionId,
             Long messageId
     );
+    void deleteByVariantMessageSessionRoomId(Long roomId);
 }
