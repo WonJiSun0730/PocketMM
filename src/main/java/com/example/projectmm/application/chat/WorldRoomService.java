@@ -110,6 +110,22 @@ public class WorldRoomService {
         return intros.save(new WorldRoomIntro(room, title, content, resolvedSortOrder));
     }
 
+    @Transactional
+    public WorldRoomIntro updateIntro(
+            Long roomId,
+            Long introId,
+            String ownerLoginId,
+            String title,
+            String content,
+            Integer sortOrder
+    ) {
+        ownedRoom(roomId, ownerLoginId);
+        var intro = intros.findByIdAndRoomId(introId, roomId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room intro not found"));
+        intro.update(title, content, sortOrder == null ? intro.getSortOrder() : sortOrder);
+        return intro;
+    }
+
     @Transactional(readOnly = true)
     public List<WorldRoomIntro> roomIntros(Long roomId) {
         room(roomId);
