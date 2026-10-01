@@ -8,6 +8,7 @@ import com.example.projectmm.domain.chat.WorldConversationCastRepository;
 import com.example.projectmm.domain.chat.WorldConversationRepository;
 import com.example.projectmm.domain.chat.WorldRoomSessionRepository;
 import com.example.projectmm.domain.chat.WorldRoomSessionCastRepository;
+import com.example.projectmm.domain.chat.WorldRoomSessionSystemStateRepository;
 import com.example.projectmm.domain.chat.WorldRoomMessage;
 import com.example.projectmm.domain.chat.WorldRoomMessageRepository;
 import com.example.projectmm.domain.dialogue.DialogueCharacterProfile;
@@ -29,6 +30,7 @@ public class WorldRoomContextBuilder {
     private final WorldConversationCastRepository casts;
     private final WorldRoomSessionRepository sessions;
     private final WorldRoomSessionCastRepository sessionCasts;
+    private final WorldRoomSessionSystemStateRepository sessionSystemStates;
     private final WorldRoomMessageRepository messages;
     private final CharacterProfileRepository profiles;
     private final CharacterStateRepository states;
@@ -120,7 +122,26 @@ public class WorldRoomContextBuilder {
                         ))
                         .toList(),
                 roomCast,
-                activeCast
+                activeCast,
+                sessionSystemStates.findBySessionIdOrderBySystemSortOrderAscIdAsc(sessionId)
+                        .stream()
+                        .map(state -> new WorldRoomSystemContext(
+                                state.getSystem().getId(),
+                                state.getSystem().getName(),
+                                state.getCurrentValue(),
+                                state.getSystem().getMinValue(),
+                                state.getSystem().getMaxValue(),
+                                state.getSystem().getChangeCondition(),
+                                systemStates.findBySystemIdOrderBySortOrderAsc(state.getSystem().getId())
+                                        .stream()
+                                        .map(label -> new DialogueWorldSystemState(
+                                                label.getMinValue(),
+                                                label.getMaxValue(),
+                                                label.getLabel()
+                                        ))
+                                        .toList()
+                        ))
+                        .toList()
         );
     }
 
