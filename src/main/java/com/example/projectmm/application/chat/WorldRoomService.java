@@ -6,6 +6,7 @@ import com.example.projectmm.domain.chat.WorldConversationCast;
 import com.example.projectmm.domain.chat.WorldConversationCastRepository;
 import com.example.projectmm.domain.chat.WorldConversationRepository;
 import com.example.projectmm.domain.member.Member;
+import com.example.projectmm.domain.member.MemberRepository;
 import com.example.projectmm.domain.player.PlayerProfileRepository;
 import com.example.projectmm.domain.world.WorldRepository;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,20 @@ public class WorldRoomService {
     private final WorldConversationCastRepository casts;
     private final CharacterRepository characters;
     private final PlayerProfileRepository players;
+    private final MemberRepository members;
+
+    @Transactional
+    public WorldConversation create(
+            Long worldId,
+            String ownerLoginId,
+            String title,
+            WorldConversation.Visibility visibility,
+            Long playerProfileId
+    ) {
+        var owner = members.findByLoginId(ownerLoginId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
+        return create(worldId, owner, title, visibility, playerProfileId);
+    }
 
     @Transactional
     public WorldConversation create(
