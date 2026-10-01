@@ -12,4 +12,9 @@ public interface WorldRoomMessageVariantRepository extends JpaRepository<WorldRo
     Optional<WorldRoomMessageVariant> findByMessageIdAndVariantNo(Long messageId, int variantNo);
 
     long countByMessageId(Long messageId);
+
+    void deleteByMessageSessionIdAndMessageIdGreaterThanEqual(
+            Long sessionId,
+            Long messageId
+    );
 }
