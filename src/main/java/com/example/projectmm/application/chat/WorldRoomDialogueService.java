@@ -49,6 +49,7 @@ public class WorldRoomDialogueService {
         var beforeCast = sessionService.captureCastState(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
+        var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
         var afterCast = sessionService.captureCastState(sessionId);
 
         var characterMessage = messages.save(new WorldRoomMessage(
@@ -65,7 +66,7 @@ public class WorldRoomDialogueService {
         ));
         sessionService.saveCastSnapshot(variant, beforeCast, afterCast);
 
-        return new WorldRoomTurn(generated.reply(), applied);
+        return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
     }
 
     @Transactional
@@ -134,6 +135,7 @@ public class WorldRoomDialogueService {
         var beforeCast = sessionService.captureCastState(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, rerollPrompt);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
+        var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
         var afterCast = sessionService.captureCastState(sessionId);
 
         int variantNo = Math.toIntExact(variants.countByMessageId(messageId)) + 1;
@@ -175,6 +177,7 @@ public class WorldRoomDialogueService {
         var beforeCast = sessionService.captureCastState(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage.getContent());
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
+        var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
         var afterCast = sessionService.captureCastState(sessionId);
 
         var characterMessage = messages.save(new WorldRoomMessage(
