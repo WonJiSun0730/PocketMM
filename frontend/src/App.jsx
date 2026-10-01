@@ -6,6 +6,7 @@ import ChatPage from "@/pages/ChatPage"
 import HomePage from "@/pages/HomePage"
 import LoginPage from "@/pages/LoginPage"
 import PocketPage from "@/pages/PocketPage"
+import PocketsPage from "@/pages/PocketsPage"
 import SignupPage from "@/pages/SignupPage"
 import WorldPage from "@/pages/WorldPage"
 
@@ -77,7 +78,8 @@ export default function App() {
 
   if (page === "home") return <HomePage onOpenCharacters={openCharacters} onOpenWorld={() => navigate("world")} />
   if (page === "world") return <WorldPage onBack={() => navigate("home")} onOpenWorldChat={openWorldChat} onOpenPocket={openPocket} />
-  if (page === "pocket" && selectedPocket) return <PocketPage pocket={selectedPocket} onBack={() => setPage("world")} />
+  if (page === "pocket" && selectedPocket) return <PocketPage pocket={selectedPocket} onBack={() => setPage("pockets")} />
+  if (page === "pockets") return <PocketsPage onBack={() => navigate("home")} onOpenPocket={openPocket} />
   if (page === "create") return <CharacterCreatePage onBack={openCharacters} onCreated={openChat} />
   if (page === "edit" && selectedCharacter) {
     return <CharacterCreatePage character={selectedCharacter} onBack={openCharacters} onUpdated={finishEdit} />
