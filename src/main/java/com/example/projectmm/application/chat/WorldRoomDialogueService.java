@@ -93,6 +93,45 @@ public class WorldRoomDialogueService {
     }
 
     @Transactional
+    public WorldRoomTurn reroll(Long sessionId, Long messageId) {
+        sessions.findById(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "World room session not found. sessionId=" + sessionId
+                ));
+        var target = messages.findById(messageId)
+                .filter(item -> item.getSession().getId().equals(sessionId))
+                .filter(item -> item.getRole() == ChatRole.CHARACTER)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Reroll target must be a character message. messageId=" + messageId
+                ));
+        var userMessage = messages.findTopBySessionIdAndIdLessThanOrderByIdDesc(sessionId, target.getId())
+                .filter(item -> item.getRole() == ChatRole.USER)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "User message for reroll not found. messageId=" + messageId
+                ));
+
+        var previousVariant = target.getContent();
+        var context = contextBuilder.buildSession(sessionId);
+        var rerollPrompt = userMessage.getContent()
+                + "\n\n[Previous response variant]\n"
+                + previousVariant
+                + "\n\nGenerate another natural variant of this response without copying it.";
+        var generated = dialogueGateway.generateWorldRoomTurn(context, rerollPrompt);
+        var applied = sessionService.applyCastChange(sessionId, generated.castChange());
+
+        int variantNo = Math.toIntExact(variants.countByMessageId(messageId)) + 1;
+        variants.save(new WorldRoomMessageVariant(
+                target,
+                variantNo,
+                generated.reply(),
+                now()
+        ));
+        target.selectVariant(variantNo, generated.reply());
+
+        return new WorldRoomTurn(generated.reply(), applied);
+    }
+
+    @Transactional
     public WorldRoomTurn regenerate(Long sessionId, Long messageId) {
         var session = sessions.findById(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException(
