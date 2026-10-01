@@ -15,6 +15,7 @@ import com.example.projectmm.application.chat.WorldRoomSessionService;
 import com.example.projectmm.domain.dialogue.WorldRoomTurn;
 import com.example.projectmm.application.player.ConversationPlayerService;
 import com.example.projectmm.application.player.PlayerSelectionRequest;
+import com.example.projectmm.application.memory.PocketMemoryInspectorService;
 import com.example.projectmm.domain.world.WorldLoreCategory;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class WorldController {
     private final WorldRoomService worldRoomService;
     private final WorldRoomDialogueService worldRoomDialogueService;
     private final WorldRoomSessionService worldRoomSessionService;
+    private final PocketMemoryInspectorService pocketMemoryInspectorService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -503,6 +505,18 @@ public class WorldController {
         return worldRoomSessionService.activeCast(sessionId).stream()
                 .map(WorldRoomSessionCastItem::from)
                 .toList();
+    }
+
+    @GetMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/memory-inspector")
+    public List<PocketMemoryInspectorService.CharacterMemories> inspectRoomSessionMemories(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @PathVariable Long sessionId,
+            Authentication authentication
+    ) {
+        var session = worldRoomSessionService.ownedSession(roomId, sessionId, authentication.getName());
+        ensureRoomWorld(worldId, session.getRoom().getWorld().getId());
+        return pocketMemoryInspectorService.latest(sessionId);
     }
 
     @GetMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/systems")
