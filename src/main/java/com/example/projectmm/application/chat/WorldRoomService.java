@@ -5,10 +5,8 @@ import com.example.projectmm.domain.chat.WorldConversation;
 import com.example.projectmm.domain.chat.WorldConversationCast;
 import com.example.projectmm.domain.chat.WorldConversationCastRepository;
 import com.example.projectmm.domain.chat.WorldConversationRepository;
-import com.example.projectmm.domain.dialogue.WorldRoomCastChange;
 import com.example.projectmm.domain.member.Member;
 import com.example.projectmm.domain.member.MemberRepository;
-import com.example.projectmm.domain.player.PlayerProfileRepository;
 import com.example.projectmm.domain.world.WorldRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -28,7 +26,6 @@ public class WorldRoomService {
     private final WorldConversationRepository rooms;
     private final WorldConversationCastRepository casts;
     private final CharacterRepository characters;
-    private final PlayerProfileRepository players;
     private final MemberRepository members;
 
     @Transactional
@@ -60,10 +57,6 @@ public class WorldRoomService {
 
         var now = now();
         var room = new WorldConversation(world, owner, title, visibility, now);
-        if (playerProfileId != null) {
-            room.selectPlayerProfile(players.findById(playerProfileId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Player profile not found")));
-        }
         return rooms.save(room);
     }
 
@@ -96,62 +89,6 @@ public class WorldRoomService {
                 .orElseGet(() -> casts.save(new WorldConversationCast(room, character, now())));
     }
 
-    @Transactional
-    public WorldConversationCast enter(Long roomId, Long characterId) {
-        var cast = cast(roomId, characterId);
-        cast.enter(now());
-        return cast;
-    }
-
-    @Transactional
-    public WorldConversationCast leave(Long roomId, Long characterId) {
-        var cast = cast(roomId, characterId);
-        cast.leave(now());
-        return cast;
-    }
-
-    @Transactional
-    public WorldRoomCastChange applyCastChange(
-            Long roomId,
-            WorldRoomCastChange proposed
-    ) {
-        room(roomId);
-        if (proposed == null) {
-            return WorldRoomCastChange.none();
-        }
-
-        var entered = new java.util.ArrayList<Long>();
-        var left = new java.util.ArrayList<Long>();
-        var seen = new java.util.HashSet<Long>();
-
-        for (Long characterId : proposed.enterCharacterIds()) {
-            if (characterId == null || !seen.add(characterId)) {
-                continue;
-            }
-            var cast = casts.findByConversationIdAndCharacterId(roomId, characterId).orElse(null);
-            if (cast == null || cast.isActive()) {
-                continue;
-            }
-            cast.enter(now());
-            entered.add(characterId);
-        }
-
-        seen.clear();
-        for (Long characterId : proposed.leaveCharacterIds()) {
-            if (characterId == null || !seen.add(characterId) || entered.contains(characterId)) {
-                continue;
-            }
-            var cast = casts.findByConversationIdAndCharacterId(roomId, characterId).orElse(null);
-            if (cast == null || !cast.isActive()) {
-                continue;
-            }
-            cast.leave(now());
-            left.add(characterId);
-        }
-
-        return new WorldRoomCastChange(entered, left);
-    }
-
     @Transactional(readOnly = true)
     public WorldConversation get(Long roomId) {
         return room(roomId);
@@ -161,21 +98,6 @@ public class WorldRoomService {
     public List<WorldConversationCast> roomCast(Long roomId) {
         room(roomId);
         return casts.findByConversationIdOrderByJoinedAtAscIdAsc(roomId);
-    }
-
-    @Transactional(readOnly = true)
-    public List<WorldConversationCast> activeCast(Long roomId) {
-        room(roomId);
-        return casts.findByConversationIdAndActiveTrueOrderByEnteredAtAscIdAsc(roomId);
-    }
-
-    private WorldConversationCast cast(Long roomId, Long characterId) {
-        room(roomId);
-        return casts.findByConversationIdAndCharacterId(roomId, characterId)
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "Character is not part of this room"
-                ));
     }
 
     private WorldConversation room(Long roomId) {
