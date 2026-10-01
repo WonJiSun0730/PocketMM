@@ -33,7 +33,10 @@ class DialogueContextBuilderMemoryAccessTest {
                     null, // ContentModePolicy
                     null, // ConversationRepository
                     null, // CharacterExampleRepository
-                    null  // CustomStateValueRepository
+                    null, // CustomStateValueRepository
+                    null, // WorldLoreEntryRepository
+                    null, // WorldSystemRepository
+                    null  // WorldSystemStateRepository
             );
 
     @Test
@@ -133,6 +136,9 @@ class DialogueContextBuilderMemoryAccessTest {
                         null,
                         null,
                         relationshipFactRepository,
+                        null,
+                        null,
+                        null,
                         null,
                         null,
                         null,
