@@ -164,8 +164,17 @@ $play = Invoke-Json Post "/api/worlds/$($world.id)/rooms/$($room.id)/sessions" @
     introId = $intro.id
 }
 
-$cast = @(Invoke-Json Get "/api/worlds/$($world.id)/rooms/$($room.id)/sessions/$($play.id)/cast")
-$systems = @(Invoke-Json Get "/api/worlds/$($world.id)/rooms/$($room.id)/sessions/$($play.id)/systems")
+$castResponse = Invoke-Json Get "/api/worlds/$($world.id)/rooms/$($room.id)/sessions/$($play.id)/cast"
+$systemResponse = Invoke-Json Get "/api/worlds/$($world.id)/rooms/$($room.id)/sessions/$($play.id)/systems"
+
+$cast = @()
+if ($null -ne $castResponse) {
+    $cast = @($castResponse)
+}
+$systems = @()
+if ($null -ne $systemResponse) {
+    $systems = @($systemResponse)
+}
 
 Write-Host ""
 Write-Host "================ VICTORIAN ROOM READY ================"
@@ -177,6 +186,10 @@ Write-Host "INTRO_ID      = $($intro.id)"
 Write-Host "PLAYER_ID     = $($eleanor.id)"
 Write-Host "SESSION_ID    = $($play.id)"
 Write-Host "ACTIVE_CAST   = $($cast.Count) character(s)"
+if ($cast.Count -gt 0) {
+    Write-Host "ACTIVE_CAST_DETAIL:"
+    $cast | ConvertTo-Json -Depth 6 | Write-Host
+}
 if ($systems.Count -gt 0) {
     Write-Host "CASE_TENSION  = $($systems[0].currentValue)"
 }
