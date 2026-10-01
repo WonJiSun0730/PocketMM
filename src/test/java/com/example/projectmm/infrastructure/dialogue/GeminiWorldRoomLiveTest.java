@@ -66,6 +66,9 @@ class GeminiWorldRoomLiveTest {
         assertThat(turn).isNotNull();
         assertThat(turn.reply()).isNotBlank();
         assertThat(turn.castChange()).isNotNull();
+        assertThat(turn.castChange().enterCharacterIds())
+                .as("Sherlock starts absent but physically appears in this response")
+                .contains(10L);
         assertThat(turn.systemChanges()).isNotNull();
 
         System.out.println();
