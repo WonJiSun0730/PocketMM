@@ -3,6 +3,7 @@ package com.example.projectmm.application.dialogue;
 import com.example.projectmm.domain.dialogue.DialogueContext;
 import com.example.projectmm.domain.dialogue.DialogueTurn;
 import com.example.projectmm.domain.dialogue.DialogueStateChange;
+import com.example.projectmm.domain.dialogue.WorldRoomDialogueContext;
 
 public interface DialogueGateway {
 
@@ -15,4 +16,11 @@ public interface DialogueGateway {
     default DialogueTurn generateTurn(DialogueContext context, String userMessage) {
         return new DialogueTurn(generate(context, userMessage), DialogueStateChange.none());
     }
+    default String generateWorldRoom(
+            WorldRoomDialogueContext context,
+            String userMessage
+    ) {
+        throw new UnsupportedOperationException("World room dialogue is not supported by this gateway");
+    }
 }
+
