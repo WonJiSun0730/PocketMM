@@ -5,6 +5,7 @@ import CharacterPage from "@/pages/CharacterPage"
 import ChatPage from "@/pages/ChatPage"
 import HomePage from "@/pages/HomePage"
 import LoginPage from "@/pages/LoginPage"
+import PocketPage from "@/pages/PocketPage"
 import SignupPage from "@/pages/SignupPage"
 import WorldPage from "@/pages/WorldPage"
 
@@ -20,6 +21,7 @@ export default function App() {
   const [page, setPage] = useState(() => pageFromPath(window.location.pathname))
   const [selectedCharacter, setSelectedCharacter] = useState(null)
   const [selectedWorldChat, setSelectedWorldChat] = useState(null)
+  const [selectedPocket, setSelectedPocket] = useState(null)
   const [member, setMember] = useState(null)
   const [authLoading, setAuthLoading] = useState(true)
 
@@ -57,6 +59,7 @@ export default function App() {
 
   function openChat(character) { setSelectedWorldChat(null); setSelectedCharacter(character); setPage("chat") }
   function openWorldChat(world, character) { setSelectedWorldChat(world); setSelectedCharacter(character); setPage("worldChat") }
+  function openPocket(pocket) { setSelectedPocket(pocket); setPage("pocket") }
   function openCharacters() { setSelectedCharacter(null); navigate("characters") }
   function openEdit(character) { setSelectedCharacter(character); setPage("edit") }
   function finishEdit(character) { setSelectedCharacter(character); setPage("characters") }
@@ -73,7 +76,8 @@ export default function App() {
   }
 
   if (page === "home") return <HomePage onOpenCharacters={openCharacters} onOpenWorld={() => navigate("world")} />
-  if (page === "world") return <WorldPage onBack={() => navigate("home")} onOpenWorldChat={openWorldChat} />
+  if (page === "world") return <WorldPage onBack={() => navigate("home")} onOpenWorldChat={openWorldChat} onOpenPocket={openPocket} />
+  if (page === "pocket" && selectedPocket) return <PocketPage pocket={selectedPocket} onBack={() => setPage("world")} />
   if (page === "create") return <CharacterCreatePage onBack={openCharacters} onCreated={openChat} />
   if (page === "edit" && selectedCharacter) {
     return <CharacterCreatePage character={selectedCharacter} onBack={openCharacters} onUpdated={finishEdit} />
