@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -142,5 +143,40 @@ class WorldRoomDialogueWorldlineIntegrationTest {
         assertThat(sessionService.systemStates(session.getId()))
                 .singleElement()
                 .satisfies(state -> assertThat(state.getCurrentValue()).isEqualTo(15));
+
+        when(gateway.generateWorldRoomTurn(any(), eq("I step into the room.")))
+                .thenReturn(new WorldRoomTurn(
+                        "The fire crackles in the grate.",
+                        WorldRoomCastChange.none(),
+                        List.of()
+                ));
+
+        dialogueService.chat(session.getId(), "I step into the room.");
+
+        assertThatThrownBy(() ->
+                dialogueService.selectVariant(session.getId(), characterMessage.getId(), 1)
+        ).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("finalized room message");
+
+        assertThatThrownBy(() ->
+                dialogueService.reroll(session.getId(), characterMessage.getId())
+        ).isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("finalized room message");
+
+        var laterUserMessage = messages.findTop50BySessionIdOrderByIdDesc(session.getId()).stream()
+                .filter(message -> message.getRole() == ChatRole.USER)
+                .findFirst()
+                .orElseThrow();
+
+        dialogueService.delete(session.getId(), laterUserMessage.getId());
+
+        dialogueService.selectVariant(session.getId(), characterMessage.getId(), 1);
+
+        assertThat(sessionService.activeCast(session.getId()))
+                .extracting(state -> state.getCharacter().getId())
+                .containsExactly(sherlock.getId());
+        assertThat(sessionService.systemStates(session.getId()))
+                .singleElement()
+                .satisfies(state -> assertThat(state.getCurrentValue()).isEqualTo(30));
     }
 }
