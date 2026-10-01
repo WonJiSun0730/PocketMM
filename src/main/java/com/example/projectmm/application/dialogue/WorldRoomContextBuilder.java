@@ -1,0 +1,77 @@
+package com.example.projectmm.application.dialogue;
+
+import com.example.projectmm.domain.character.CharacterExample;
+import com.example.projectmm.domain.character.CharacterExampleRepository;
+import com.example.projectmm.domain.character.CharacterProfileRepository;
+import com.example.projectmm.domain.character.CharacterStateRepository;
+import com.example.projectmm.domain.chat.WorldConversationCastRepository;
+import com.example.projectmm.domain.chat.WorldConversationRepository;
+import com.example.projectmm.domain.dialogue.DialogueCharacterProfile;
+import com.example.projectmm.domain.dialogue.WorldRoomCharacterContext;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Component
+@RequiredArgsConstructor
+public class WorldRoomContextBuilder {
+
+    private final WorldConversationRepository rooms;
+    private final WorldConversationCastRepository casts;
+    private final CharacterProfileRepository profiles;
+    private final CharacterStateRepository states;
+    private final CharacterExampleRepository examples;
+
+    @Transactional(readOnly = true)
+    public List<WorldRoomCharacterContext> buildCast(Long roomId) {
+        rooms.findById(roomId)
+                .orElseThrow(() -> new IllegalArgumentException("World room not found. roomId=" + roomId));
+
+        return casts.findByConversationIdOrderByJoinedAtAscIdAsc(roomId)
+                .stream()
+                .map(cast -> {
+                    var character = cast.getCharacter();
+                    var profile = profiles.findByCharacterId(character.getId()).orElse(null);
+                    var state = states.findByCharacterId(character.getId()).orElse(null);
+                    return new WorldRoomCharacterContext(
+                            character.getId(),
+                            character.getName(),
+                            profile == null ? null : new DialogueCharacterProfile(
+                                    profile.getDescription(),
+                                    profile.getRawDescription(),
+                                    buildExamples(character.getId(), profile.getExampleDialogue()),
+                                    profile.getPersonality(),
+                                    profile.getSpeechStyle(),
+                                    profile.getBackground(),
+                                    profile.getAppearance()
+                            ),
+                            state == null ? 70 : state.getEnergy(),
+                            state == null ? 70 : state.getMood(),
+                            cast.isActive()
+                    );
+                })
+                .toList();
+    }
+
+    public List<WorldRoomCharacterContext> activeCast(Long roomId) {
+        return buildCast(roomId).stream()
+                .filter(WorldRoomCharacterContext::active)
+                .toList();
+    }
+
+    private List<String> buildExamples(Long characterId, String legacyExampleDialogue) {
+        List<String> stored = examples.findByCharacterIdOrderBySortOrderAsc(characterId)
+                .stream()
+                .map(CharacterExample::getContent)
+                .toList();
+        if (!stored.isEmpty()) {
+            return stored;
+        }
+        if (legacyExampleDialogue == null || legacyExampleDialogue.isBlank()) {
+            return List.of();
+        }
+        return List.of(legacyExampleDialogue.trim());
+    }
+}
