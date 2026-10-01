@@ -123,8 +123,7 @@ public class WorldController {
                 worldId,
                 authentication.getName(),
                 request.title(),
-                request.visibility(),
-                request.playerProfileId()
+                request.visibility()
         );
         return toRoomResponse(room);
     }
@@ -133,9 +132,10 @@ public class WorldController {
     public WorldRoomResponse addRoomCast(
             @PathVariable Long worldId,
             @PathVariable Long roomId,
-            @Valid @RequestBody WorldRoomCastRequest request
+            @Valid @RequestBody WorldRoomCastRequest request,
+            Authentication authentication
     ) {
-        var cast = worldRoomService.addCast(roomId, request.characterId());
+        var cast = worldRoomService.addCast(roomId, request.characterId(), authentication.getName());
         ensureRoomWorld(worldId, cast.getConversation().getWorld().getId());
         return toRoomResponse(cast.getConversation());
     }
@@ -149,19 +149,9 @@ public class WorldController {
         if (!cast.isEmpty()) {
             ensureRoomWorld(worldId, cast.get(0).getConversation().getWorld().getId());
         }
-        return new WorldRoomResponse(
-                roomId,
-                worldId,
-                null,
-                null,
-                null,
-                null,
-                cast.stream().map(item -> new WorldRoomCastItem(
-                        item.getCharacter().getId(),
-                        item.getCharacter().getName(),
-                        false
-                )).toList()
-        );
+        var room = worldRoomService.get(roomId);
+        ensureRoomWorld(worldId, room.getWorld().getId());
+        return toRoomResponse(room);
     }
 
     private WorldRoomResponse toRoomResponse(com.example.projectmm.domain.chat.WorldConversation room) {
@@ -171,12 +161,9 @@ public class WorldController {
                 room.getWorld().getId(),
                 room.getTitle(),
                 room.getVisibility(),
-                null,
-                null,
                 cast.stream().map(item -> new WorldRoomCastItem(
                         item.getCharacter().getId(),
-                        item.getCharacter().getName(),
-                        false
+                        item.getCharacter().getName()
                 )).toList()
         );
     }
