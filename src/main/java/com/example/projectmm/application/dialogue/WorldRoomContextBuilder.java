@@ -109,6 +109,8 @@ public class WorldRoomContextBuilder {
                                 session.getPlayerProfile().getName(),
                                 session.getPlayerProfile().getDescription()
                         ),
+                session.getIntro().getTitle(),
+                session.getIntro().getContent(),
                 messages.findTop50BySessionIdOrderByCreatedAtDescIdDesc(sessionId).stream()
                         .sorted(java.util.Comparator.comparing(WorldRoomMessage::getCreatedAt)
                                 .thenComparing(WorldRoomMessage::getId))
