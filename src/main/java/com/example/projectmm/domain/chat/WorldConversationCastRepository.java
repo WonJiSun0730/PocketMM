@@ -11,8 +11,6 @@ public interface WorldConversationCastRepository
     List<WorldConversationCast>
     findByConversationIdOrderByJoinedAtAscIdAsc(Long conversationId);
 
-    List<WorldConversationCast>
-    findByConversationIdAndActiveTrueOrderByEnteredAtAscIdAsc(Long conversationId);
 
     Optional<WorldConversationCast>
     findByConversationIdAndCharacterId(Long conversationId, Long characterId);
