@@ -61,6 +61,25 @@ public class WorldRoomSessionService {
     }
 
     @Transactional(readOnly = true)
+    public List<WorldRoomSession> pockets(String loginId) {
+        var member = members.findByLoginId(loginId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
+        return sessions.findByMemberIdOrderBySimulatedAtDescIdDesc(member.getId());
+    }
+
+    @Transactional(readOnly = true)
+    public WorldRoomSession pocket(Long sessionId, String loginId) {
+        var member = members.findByLoginId(loginId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
+        var session = sessions.findById(sessionId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pocket not found"));
+        if (!session.getMember().getId().equals(member.getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Pocket not found");
+        }
+        return session;
+    }
+
+    @Transactional(readOnly = true)
     public WorldRoomSession latest(Long roomId, String loginId) {
         var member = members.findByLoginId(loginId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
