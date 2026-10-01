@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ArrowLeft, BookOpen, ChevronRight, MessageCircle, Pencil, Plus, Save, Sparkles, Trash2, Users, X } from "lucide-react"
 
+import PlayerProfilePicker from "@/components/PlayerProfilePicker"
 import "./WorldPage.css"
 
 const categories = [
@@ -12,7 +13,7 @@ const categories = [
   { id: "HISTORY", label: "세계 사건 / 역사", maxCharacters: 1000, maxEntries: 10 },
 ]
 
-export default function WorldPage({ onBack, onOpenWorldChat }) {
+export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
   const [worlds, setWorlds] = useState([])
   const [selectedWorld, setSelectedWorld] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState(categories[0])
@@ -31,6 +32,8 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
   const [roomIntros, setRoomIntros] = useState({})
   const [introDialog, setIntroDialog] = useState(null)
   const [introForm, setIntroForm] = useState({ title: "", content: "" })
+  const [pocketSetup, setPocketSetup] = useState(null)
+  const [pocketBusy, setPocketBusy] = useState(false)
   const autosaveTimer = useRef(null)
   const loadedLoreRef = useRef(null)
   const editVersionRef = useRef(0)
@@ -125,6 +128,43 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
     if (!response.ok) return setMessage("시작 장면을 삭제하지 못했어요.")
     await loadRoomIntros(selectedWorld.id, room.id)
     setMessage("시작 장면을 삭제했어요.")
+  }
+
+  function beginPocket(room) {
+    const intros = roomIntros[room.id] ?? []
+    if (intros.length === 0) {
+      setMessage("포켓을 시작하려면 시작 장면을 하나 이상 만들어 주세요.")
+      return
+    }
+    setPocketSetup({ room, intro: null, choosingProfile: false })
+  }
+
+  async function startPocket(profile) {
+    if (!selectedWorld || !pocketSetup?.intro || pocketBusy) return
+    setPocketBusy(true)
+    try {
+      const response = await fetch(
+        `/api/worlds/${selectedWorld.id}/rooms/${pocketSetup.room.id}/sessions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ playerProfileId: profile.id, introId: pocketSetup.intro.id }),
+        }
+      )
+      if (!response.ok) throw new Error("포켓을 시작하지 못했어요.")
+      const session = await response.json()
+      onOpenPocket?.({
+        world: selectedWorld,
+        room: pocketSetup.room,
+        session,
+        playerProfile: profile,
+      })
+    } catch (error) {
+      setMessage(error.message)
+    } finally {
+      setPocketBusy(false)
+    }
   }
 
   async function deleteRoom(room) {
@@ -431,7 +471,10 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
                             <button className="world-intro-add" type="button" onClick={() => openIntroDialog(room)}><Plus size={14}/> 시작 장면 추가</button>
                           </div>
                         </div>
-                        <button type="button" onClick={() => deleteRoom(room)} aria-label={`${room.title} 시나리오 삭제`}><Trash2 size={14}/></button>
+                        <div className="world-room-actions">
+                          <button className="world-pocket-start" type="button" onClick={() => beginPocket(room)}>포켓 시작</button>
+                          <button type="button" onClick={() => deleteRoom(room)} aria-label={`${room.title} 시나리오 삭제`}><Trash2 size={14}/></button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -476,6 +519,16 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
           )}
         </section>
       </div>
+
+      {pocketSetup && <div className="world-dialog-backdrop" onMouseDown={() => !pocketBusy && setPocketSetup(null)}><div className="world-pocket-dialog" onMouseDown={(event) => event.stopPropagation()}>
+        {!pocketSetup.choosingProfile ? <>
+          <div className="world-dialog-heading"><div><span className="world-eyebrow">NEW POCKET</span><h2>어디서 시작할까요?</h2><p>{pocketSetup.room.title}</p></div><button type="button" onClick={() => setPocketSetup(null)} aria-label="닫기"><X size={18}/></button></div>
+          <div className="world-pocket-intros">
+            {(roomIntros[pocketSetup.room.id] ?? []).map((intro) => <button className={pocketSetup.intro?.id === intro.id ? "selected" : ""} key={intro.id} type="button" onClick={() => setPocketSetup((current) => ({ ...current, intro }))}><strong>{intro.title}</strong><span>{intro.content}</span></button>)}
+          </div>
+          <div className="world-dialog-actions"><button type="button" onClick={() => setPocketSetup(null)}>취소</button><button className="primary" disabled={!pocketSetup.intro} type="button" onClick={() => setPocketSetup((current) => ({ ...current, choosingProfile: true }))}>다음</button></div>
+        </> : <PlayerProfilePicker busy={pocketBusy} onSelect={startPocket} onCancel={() => setPocketSetup((current) => ({ ...current, choosingProfile: false }))} />}
+      </div></div>}
 
       {introDialog && <div className="world-dialog-backdrop" onMouseDown={() => setIntroDialog(null)}><form className="world-dialog" onSubmit={saveRoomIntro} onMouseDown={(event) => event.stopPropagation()}><div className="world-dialog-heading"><div><span className="world-eyebrow">START SCENE</span><h2>{introDialog.intro ? "시작 장면 수정" : "새 시작 장면"}</h2></div><button type="button" onClick={() => setIntroDialog(null)} aria-label="닫기"><X size={18}/></button></div><label>장면 이름<input autoFocus required maxLength={100} value={introForm.title} onChange={(event) => setIntroForm((current) => ({ ...current, title: event.target.value }))} placeholder="예: 베이커가의 의뢰인" /></label><label>장면 내용<textarea required value={introForm.content} onChange={(event) => setIntroForm((current) => ({ ...current, content: event.target.value }))} placeholder="포켓의 첫 장면으로 표시될 내용을 작성해 주세요." /></label><div className="world-dialog-actions"><button type="button" onClick={() => setIntroDialog(null)}>취소</button><button className="primary" disabled={!introForm.title.trim() || !introForm.content.trim()} type="submit">저장</button></div></form></div>}
 
