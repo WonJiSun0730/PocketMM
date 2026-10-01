@@ -38,4 +38,12 @@ public class WorldRoomIntro {
         this.content = content.trim();
         this.sortOrder = sortOrder;
     }
+
+    public void update(String title, String content, int sortOrder) {
+        if (title == null || title.isBlank()) throw new IllegalArgumentException("title is required");
+        if (content == null || content.isBlank()) throw new IllegalArgumentException("content is required");
+        this.title = title.trim();
+        this.content = content.trim();
+        this.sortOrder = sortOrder;
+    }
 }
