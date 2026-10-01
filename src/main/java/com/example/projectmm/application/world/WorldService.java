@@ -6,6 +6,7 @@ import com.example.projectmm.api.world.WorldLoreResponse;
 import com.example.projectmm.api.world.WorldResponse;
 import com.example.projectmm.api.world.WorldUpdateRequest;
 import com.example.projectmm.domain.character.CharacterRepository;
+import com.example.projectmm.domain.chat.WorldConversationRepository;
 import com.example.projectmm.domain.member.Member;
 import com.example.projectmm.domain.member.MemberRepository;
 import com.example.projectmm.domain.world.World;
@@ -14,7 +15,9 @@ import com.example.projectmm.domain.world.WorldLoreEntry;
 import com.example.projectmm.domain.world.WorldLoreEntryRepository;
 import com.example.projectmm.domain.world.WorldRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -28,6 +31,7 @@ public class WorldService {
     private final MemberRepository memberRepository;
     private final WorldLorePolicy worldLorePolicy;
     private final CharacterRepository characterRepository;
+    private final WorldConversationRepository worldConversationRepository;
 
     @Transactional
     public WorldResponse create(WorldCreateRequest request, String loginId) {
@@ -56,7 +60,16 @@ public class WorldService {
     public void delete(Long worldId, String loginId) {
         World world = findOwnedWorld(worldId, loginId);
         if (characterRepository.existsByWorldId(worldId)) {
-            throw new IllegalStateException("Characters are assigned to this world.");
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Characters are assigned to this world."
+            );
+        }
+        if (worldConversationRepository.existsByWorldId(worldId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Rooms are assigned to this world."
+            );
         }
         worldRepository.delete(world);
     }
