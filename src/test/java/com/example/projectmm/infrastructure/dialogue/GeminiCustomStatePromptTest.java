@@ -182,7 +182,8 @@ class GeminiCustomStatePromptTest {
                                         "relationship_status",
                                         "spouse"
                                 )
-                        )
+                        ),
+                        null
                 );
 
         Object rawRequest =
