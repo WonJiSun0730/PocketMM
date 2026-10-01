@@ -150,6 +150,30 @@ public class WorldRoomSessionService {
     }
 
     @Transactional
+    public void restoreCastBeforeVariant(Long sessionId, WorldRoomMessageVariant variant) {
+        var session = session(sessionId);
+        var snapshots = castSnapshots.findByVariantIdOrderByCharacterIdAsc(variant.getId());
+        if (snapshots.isEmpty()) {
+            throw new IllegalStateException("Cast snapshot not found. variantId=" + variant.getId());
+        }
+        for (var snapshot : snapshots) {
+            var roomCast = roomCasts.findByConversationIdAndCharacterId(
+                    session.getRoom().getId(), snapshot.getCharacterId()
+            ).orElseThrow();
+            var state = sessionCasts.findBySessionIdAndCharacterId(
+                    sessionId, snapshot.getCharacterId()
+            ).orElseGet(() -> sessionCasts.save(
+                    new WorldRoomSessionCast(session, roomCast.getCharacter())
+            ));
+            state.restore(
+                    snapshot.isBeforeActive(),
+                    snapshot.getBeforeEnteredAt(),
+                    snapshot.getBeforeLeftAt()
+            );
+        }
+    }
+
+    @Transactional
     public void restoreCastAfterVariant(Long sessionId, WorldRoomMessageVariant variant) {
         var session = session(sessionId);
         var snapshots = castSnapshots.findByVariantIdOrderByCharacterIdAsc(variant.getId());
