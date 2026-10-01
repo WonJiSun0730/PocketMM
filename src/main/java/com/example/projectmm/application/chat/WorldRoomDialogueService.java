@@ -12,12 +12,12 @@ public class WorldRoomDialogueService {
 
     private final WorldRoomContextBuilder contextBuilder;
     private final DialogueGateway dialogueGateway;
-    private final WorldRoomService roomService;
+    private final WorldRoomSessionService sessionService;
 
-    public WorldRoomTurn chat(Long roomId, String userMessage) {
-        var context = contextBuilder.build(roomId);
+    public WorldRoomTurn chat(Long sessionId, String userMessage) {
+        var context = contextBuilder.buildSession(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage);
-        var applied = roomService.applyCastChange(roomId, generated.castChange());
+        var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         return new WorldRoomTurn(generated.reply(), applied);
     }
 }
