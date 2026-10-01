@@ -147,6 +147,24 @@ export default function PocketPage({ pocket, onBack }) {
     finally { setSending(false) }
   }
 
+  async function continueScene() {
+    if (sending || loading) return
+    setSending(true)
+    setError("")
+    try {
+      const response = await fetch(`${base}/continue`, {
+        method: "POST",
+        credentials: "include",
+      })
+      if (!response.ok) throw new Error("장면을 이어가지 못했어요.")
+      await refresh()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setSending(false)
+    }
+  }
+
   function handleKeyDown(event) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
@@ -226,7 +244,10 @@ export default function PocketPage({ pocket, onBack }) {
           <Button type="button" size="icon" className="size-11 shrink-0" disabled={loading || sending || !input.trim()}
             onClick={sendMessage} aria-label="메시지 보내기"><Send className="size-4" /></Button>
         </div>
-        <p className="mx-auto mt-2 max-w-3xl text-center text-xs text-muted-foreground">Enter 전송 · Shift + Enter 줄바꿈</p>
+        <div className="mx-auto mt-2 flex max-w-3xl items-center justify-between gap-3 text-xs text-muted-foreground">
+          <button type="button" disabled={loading || sending} onClick={continueScene} className="rounded-md px-2 py-1 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50">대화 없이 진행하기</button>
+          <span>Enter 전송 · Shift + Enter 줄바꿈</span>
+        </div>
       </div>
     </section>
   </main>
