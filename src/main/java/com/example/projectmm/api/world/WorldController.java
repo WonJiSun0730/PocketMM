@@ -283,6 +283,23 @@ public class WorldController {
         }
     }
 
+    @GetMapping("/pockets")
+    public List<PocketListItem> pockets(Authentication authentication) {
+        return worldRoomSessionService.pockets(authentication.getName()).stream()
+                .map(PocketListItem::from)
+                .toList();
+    }
+
+    @GetMapping("/pockets/{sessionId}")
+    public WorldRoomSessionResponse pocket(
+            @PathVariable Long sessionId,
+            Authentication authentication
+    ) {
+        return WorldRoomSessionResponse.from(
+                worldRoomSessionService.pocket(sessionId, authentication.getName())
+        );
+    }
+
     @PostMapping("/{worldId}/rooms/{roomId}/sessions")
     @ResponseStatus(HttpStatus.CREATED)
     public WorldRoomSessionResponse startRoomSession(
