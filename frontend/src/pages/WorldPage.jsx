@@ -149,7 +149,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ playerProfileId: profile.id, introId: pocketSetup.intro.id }),
+          body: JSON.stringify({ playerProfileId: profile?.id ?? null, introId: pocketSetup.intro.id }),
         }
       )
       if (!response.ok) throw new Error("포켓을 시작하지 못했어요.")
@@ -158,7 +158,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
         world: selectedWorld,
         room: pocketSetup.room,
         session,
-        playerProfile: profile,
+        playerProfile: profile ?? null,
       })
     } catch (error) {
       setMessage(error.message)
@@ -519,7 +519,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
             {(roomIntros[pocketSetup.room.id] ?? []).map((intro) => <button className={pocketSetup.intro?.id === intro.id ? "selected" : ""} key={intro.id} type="button" onClick={() => setPocketSetup((current) => ({ ...current, intro }))}><strong>{intro.title}</strong><span>{intro.content}</span></button>)}
           </div>
           <div className="world-dialog-actions"><button type="button" onClick={() => setPocketSetup(null)}>취소</button><button className="primary" disabled={!pocketSetup.intro} type="button" onClick={() => setPocketSetup((current) => ({ ...current, choosingProfile: true }))}>다음</button></div>
-        </> : <PlayerProfilePicker busy={pocketBusy} onSelect={startPocket} onCancel={() => setPocketSetup((current) => ({ ...current, choosingProfile: false }))} />}
+        </> : <PlayerProfilePicker busy={pocketBusy} onSelect={startPocket} onSkip={() => startPocket(null)} onCancel={() => setPocketSetup((current) => ({ ...current, choosingProfile: false }))} />}
       </div></div>}
 
       {introDialog && <div className="world-dialog-backdrop" onMouseDown={() => setIntroDialog(null)}><form className="world-dialog world-intro-dialog" onSubmit={saveRoomIntro} onMouseDown={(event) => event.stopPropagation()}><div className="world-dialog-heading"><div><span className="world-eyebrow">INTRO</span><h2>{introDialog.intro ? "인트로 수정" : "새 인트로"}</h2><p>포켓에서 가장 먼저 보이는 실제 RP 장면이에요.</p></div><button type="button" onClick={() => setIntroDialog(null)} aria-label="닫기"><X size={18}/></button></div><label>인트로 제목<input autoFocus required maxLength={100} value={introForm.title} onChange={(event) => setIntroForm((current) => ({ ...current, title: event.target.value }))} placeholder="예: [안개 속의 의뢰인]" /></label><label>인트로 본문 <small>설정 설명이 아니라 소설/RP의 첫 장면처럼 작성해 주세요.</small><textarea className="world-intro-editor" required value={introForm.content} onChange={(event) => setIntroForm((current) => ({ ...current, content: event.target.value }))} placeholder={"*늦은 저녁, 베이커 스트리트의 창밖으로 짙은 안개가 내려앉아 있었다.*\n\nSherlock Holmes: \"들어오시죠. 문 앞에서 망설일 이유는 없을 텐데요.\"\n\n*그는 시선을 들지 않은 채 테이블 위 봉투를 가볍게 두드렸다.*"} /></label><div className="world-intro-format"><strong>작성 형식</strong><span>*행동·상황·서술* + 캐릭터의 대사를 자연스럽게 섞어 작성</span><span>필요하면 날짜·시간·장소·상태 등의 메타 정보도 본문에 포함 가능</span><span>{`{user}`}의 행동이나 감정은 미리 확정하지 않기</span></div><div className="world-dialog-actions"><button type="button" onClick={() => setIntroDialog(null)}>취소</button><button className="primary" disabled={!introForm.title.trim() || !introForm.content.trim()} type="submit">저장</button></div></form></div>}
