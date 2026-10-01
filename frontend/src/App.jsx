@@ -76,7 +76,7 @@ export default function App() {
     return <LoginPage onAuthenticated={refreshMember} onOpenSignup={() => setPage("signup")} />
   }
 
-  if (page === "home") return <HomePage onOpenCharacters={openCharacters} onOpenWorld={() => navigate("world")} />
+  if (page === "home") return <HomePage onOpenCharacters={openCharacters} onOpenWorld={() => navigate("world")} onOpenPockets={() => setPage("pockets")} />
   if (page === "world") return <WorldPage onBack={() => navigate("home")} onOpenWorldChat={openWorldChat} onOpenPocket={openPocket} />
   if (page === "pocket" && selectedPocket) return <PocketPage pocket={selectedPocket} onBack={() => setPage("pockets")} />
   if (page === "pockets") return <PocketsPage onBack={() => navigate("home")} onOpenPocket={openPocket} />
