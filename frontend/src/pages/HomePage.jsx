@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import {
-  BookOpen,
+  Pocket,
   Clock3,
   Home,
   MessageCircle,
@@ -28,11 +28,11 @@ const navItems = [
   { id: "home", label: "NOW", icon: Home },
   { id: "characters", label: "캐릭터", icon: Users },
   { id: "timeline", label: "세계", icon: Clock3 },
-  { id: "memory", label: "기억", icon: BookOpen },
+  { id: "pockets", label: "포켓", icon: Pocket },
   { id: "settings", label: "설정", icon: Settings },
 ]
 
-export default function HomePage({ onOpenCharacters, onOpenWorld }) {
+export default function HomePage({ onOpenCharacters, onOpenWorld, onOpenPockets }) {
   const [dark, setDark] = useState(() =>
     document.documentElement.classList.contains("dark")
   )
@@ -47,6 +47,9 @@ export default function HomePage({ onOpenCharacters, onOpenWorld }) {
     }
     if (id === "timeline") {
       onOpenWorld()
+    }
+    if (id === "pockets") {
+      onOpenPockets()
     }
   }
 
