@@ -84,3 +84,9 @@
 .world-pocket-intros strong { font-size:14px; }
 .world-pocket-intros span { color:var(--muted-foreground); font-size:12px; line-height:1.55; white-space:pre-wrap; }
 @media(max-width:767px){.world-room-item{align-items:flex-start}.world-room-actions{flex-direction:column;align-items:stretch}.world-room-actions .world-pocket-start{padding:7px 9px}.world-pocket-dialog{padding:16px}}
+
+.world-intro-dialog{width:min(720px,100%)}
+.world-intro-dialog .world-dialog-heading p{margin:5px 0 0;color:var(--muted-foreground);font-size:12px}
+.world-intro-dialog .world-intro-editor{min-height:300px;line-height:1.7;font-family:inherit}
+.world-intro-format{display:grid;gap:5px;padding:11px 12px;border-radius:10px;background:var(--secondary);color:var(--muted-foreground);font-size:11px;line-height:1.45}
+.world-intro-format strong{color:var(--foreground);font-size:12px}
