@@ -5,6 +5,8 @@ import com.example.projectmm.domain.chat.WorldConversation;
 import com.example.projectmm.domain.chat.WorldConversationCast;
 import com.example.projectmm.domain.chat.WorldConversationCastRepository;
 import com.example.projectmm.domain.chat.WorldConversationRepository;
+import com.example.projectmm.domain.chat.WorldRoomIntro;
+import com.example.projectmm.domain.chat.WorldRoomIntroRepository;
 import com.example.projectmm.domain.member.Member;
 import com.example.projectmm.domain.member.MemberRepository;
 import com.example.projectmm.domain.world.WorldRepository;
@@ -27,6 +29,7 @@ public class WorldRoomService {
     private final WorldConversationCastRepository casts;
     private final CharacterRepository characters;
     private final MemberRepository members;
+    private final WorldRoomIntroRepository intros;
 
     @Transactional
     public WorldConversation create(
@@ -90,6 +93,37 @@ public class WorldRoomService {
         }
         return casts.findByConversationIdAndCharacterId(roomId, characterId)
                 .orElseGet(() -> casts.save(new WorldConversationCast(room, character, now())));
+    }
+
+    @Transactional
+    public WorldRoomIntro addIntro(
+            Long roomId,
+            String ownerLoginId,
+            String title,
+            String content,
+            Integer sortOrder
+    ) {
+        var room = ownedRoom(roomId, ownerLoginId);
+        int resolvedSortOrder = sortOrder == null
+                ? intros.findByRoomIdOrderBySortOrderAscIdAsc(roomId).size()
+                : sortOrder;
+        return intros.save(new WorldRoomIntro(room, title, content, resolvedSortOrder));
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorldRoomIntro> roomIntros(Long roomId) {
+        room(roomId);
+        return intros.findByRoomIdOrderBySortOrderAscIdAsc(roomId);
+    }
+
+    private WorldConversation ownedRoom(Long roomId, String ownerLoginId) {
+        var room = room(roomId);
+        var owner = members.findByLoginId(ownerLoginId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
+        if (room.getOwner() == null || !room.getOwner().getId().equals(owner.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Only the room creator can change room intros");
+        }
+        return room;
     }
 
     @Transactional(readOnly = true)
