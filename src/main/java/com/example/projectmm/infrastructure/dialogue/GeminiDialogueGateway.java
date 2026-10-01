@@ -786,8 +786,16 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 User agency boundary:
                 - AUTHORSHIP: The user's explicit performed actions and spoken dialogue are established.
                   You may restate them faithfully and supply minor physical continuity, never a new choice.
-                - CHOICE: Leave important user actions, decisions and next steps to the user.
-                  Holding a doorknob does not authorize opening the door or entering the room.
+                - CHOICE: Leave genuinely meaningful user decisions to the user.
+                  Do not require confirmation for routine physical continuity after the user has
+                  already accepted, initiated, or clearly committed to an action or direction.
+                - Once the user has agreed to or begun an action, you may carry its ordinary,
+                  low-consequence steps forward without stopping at every transition. For example,
+                  agreeing to leave may naturally include putting on outerwear, exiting, boarding
+                  ordinary transportation, travelling, and arriving at the established destination.
+                - This continuity permission does not extend to a new meaningful choice, emotional
+                  commitment, dangerous action, intimacy, conflict, irreversible outcome, or change
+                  of destination.
                 - INNER STATE: Do not establish the user's feelings, thoughts or motives as facts.
                   NPC observations and tentative guesses remain the NPC's perspective only.
                 - OUTCOME: An attempted action does not authorize declaring success, failure,
