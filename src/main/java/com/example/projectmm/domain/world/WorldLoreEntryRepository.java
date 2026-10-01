@@ -8,4 +8,5 @@ public interface WorldLoreEntryRepository extends JpaRepository<WorldLoreEntry, 
     List<WorldLoreEntry> findByWorldIdAndCategoryOrderBySortOrderAsc(Long worldId, WorldLoreCategory category);
     List<WorldLoreEntry> findByWorldIdOrderByCategoryAscSortOrderAsc(Long worldId);
     void deleteByWorldIdAndCategory(Long worldId, WorldLoreCategory category);
+    void deleteByWorldId(Long worldId);
 }
