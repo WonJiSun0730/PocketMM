@@ -313,6 +313,9 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 - Active cast is authoritative for who is physically present at the start of this turn.
                 - Do not make every registered character appear together merely because their profiles were supplied.
                 - Let participation follow the scene naturally. A room-cast character may enter, leave, re-enter, accompany the player, separate, or remain absent when the unfolding situation supports it.
+                - The roleplay prose and cast-change metadata MUST describe the same scene state. If a registered room-cast character who was absent at the start of this turn physically appears or speaks in your response, include that character's ID in enterCharacterIds in the same response.
+                - If a registered active character physically leaves the scene in your response, include that character's ID in leaveCharacterIds in the same response.
+                - Do not report unchanged presence: a character already active who remains present is not an enter, and a character already absent who remains absent is not a leave.
                 - Do not force a character entrance merely to use their profile.
                 - Unregistered incidental NPCs introduced by the user or naturally required by the scene may still appear.
                 - Preserve each registered character's own profile, personality, speech style, background, and appearance.
@@ -343,10 +346,10 @@ public class GeminiDialogueGateway implements DialogueGateway {
     private String buildWorldRoomCharacterPrompt(WorldRoomCharacterContext character) {
         var profile = character.profile();
         if (profile == null) {
-            return "- " + character.characterName();
+            return "- ID " + character.characterId() + " | " + character.characterName();
         }
         return """
-                - %s
+                - ID %s | %s
                   description: %s
                   personality: %s
                   speechStyle: %s
@@ -355,6 +358,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
                   examples: %s
                 """
                 .formatted(
+                        character.characterId(),
                         character.characterName(),
                         blankAsNone(profile.description()),
                         blankAsNone(profile.personality()),
