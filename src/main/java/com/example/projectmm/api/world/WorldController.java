@@ -352,6 +352,18 @@ public class WorldController {
         return worldRoomDialogueService.chat(sessionId, request.message());
     }
 
+    @PostMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/continue")
+    public WorldRoomTurn continueRoomScene(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @PathVariable Long sessionId,
+            Authentication authentication
+    ) {
+        var session = worldRoomSessionService.ownedSession(roomId, sessionId, authentication.getName());
+        ensureRoomWorld(worldId, session.getRoom().getWorld().getId());
+        return worldRoomDialogueService.continueScene(sessionId);
+    }
+
     @GetMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/messages")
     public List<WorldRoomMessageItem> getRoomMessages(
             @PathVariable Long worldId,
