@@ -1,6 +1,7 @@
 package com.example.projectmm.application.world;
 
 import com.example.projectmm.api.world.WorldCreateRequest;
+import com.example.projectmm.api.world.WorldLoreItem;
 import com.example.projectmm.domain.member.Member;
 import com.example.projectmm.domain.member.MemberRepository;
 import com.example.projectmm.domain.world.WorldLoreCategory;
@@ -67,11 +68,11 @@ class WorldServiceTest {
         var saved = worldService.replaceLore(
                 world.id(),
                 WorldLoreCategory.ERA_REGION_BACKGROUND,
-                List.of("a".repeat(1200), "b".repeat(800)),
+                List.of(new WorldLoreItem(null, "a".repeat(1200)), new WorldLoreItem(null, "b".repeat(800))),
                 owner.getLoginId()
         );
 
-        assertThat(saved.entries()).containsExactly("a".repeat(1200), "b".repeat(800));
+        assertThat(saved.entries()).extracting(WorldLoreItem::content).containsExactly("a".repeat(1200), "b".repeat(800));
         assertThat(saved.totalCharacters()).isEqualTo(2000);
         assertThat(saved.maxTotalCharacters()).isEqualTo(2000);
         assertThat(saved.maxEntries()).isEqualTo(20);
@@ -87,7 +88,7 @@ class WorldServiceTest {
         assertThatThrownBy(() -> worldService.replaceLore(
                 world.id(),
                 WorldLoreCategory.ERA_REGION_BACKGROUND,
-                List.of("a".repeat(1200), "b".repeat(801)),
+                List.of(new WorldLoreItem(null, "a".repeat(1200)), new WorldLoreItem(null, "b".repeat(801))),
                 owner.getLoginId()
         ))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -113,7 +114,7 @@ class WorldServiceTest {
         assertThatThrownBy(() -> worldService.replaceLore(
                 world.id(),
                 WorldLoreCategory.WORLD_RULE,
-                List.of("침입자가 수정하면 안 되는 규칙"),
+                List.of(new WorldLoreItem(null, "침입자가 수정하면 안 되는 규칙")),
                 other.getLoginId()
         )).isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("World not found");
