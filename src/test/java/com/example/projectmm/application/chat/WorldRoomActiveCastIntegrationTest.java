@@ -129,5 +129,19 @@ class WorldRoomActiveCastIntegrationTest {
         assertThat(sessionService.activeCast(session.getId()))
                 .extracting(state -> state.getCharacter().getName())
                 .containsExactlyInAnyOrder("Sherlock Holmes", "Victor Hale");
+
+        var applied = sessionService.applyCastChange(
+                session.getId(),
+                new WorldRoomCastChange(
+                        List.of(999999L, sherlock.getId(), sherlock.getId()),
+                        List.of(888888L, victor.getId(), victor.getId())
+                )
+        );
+
+        assertThat(applied.enterCharacterIds()).isEmpty();
+        assertThat(applied.leaveCharacterIds()).containsExactly(victor.getId());
+        assertThat(sessionService.activeCast(session.getId()))
+                .extracting(state -> state.getCharacter().getName())
+                .containsExactly("Sherlock Holmes");
     }
 }
