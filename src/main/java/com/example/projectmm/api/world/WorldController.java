@@ -300,7 +300,7 @@ public class WorldController {
             @Valid @RequestBody WorldRoomChatRequest request,
             Authentication authentication
     ) {
-        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        var session = worldRoomSessionService.ownedSession(roomId, sessionId, authentication.getName());
         if (!session.getId().equals(sessionId)) {
             throw new org.springframework.web.server.ResponseStatusException(
                     HttpStatus.NOT_FOUND,
@@ -319,7 +319,7 @@ public class WorldController {
             @RequestParam(required = false) Long before,
             Authentication authentication
     ) {
-        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        var session = worldRoomSessionService.ownedSession(roomId, sessionId, authentication.getName());
         if (!session.getId().equals(sessionId)) {
             throw new org.springframework.web.server.ResponseStatusException(
                     HttpStatus.NOT_FOUND,
@@ -341,7 +341,7 @@ public class WorldController {
             @Valid @RequestBody WorldRoomMessageEditRequest request,
             Authentication authentication
     ) {
-        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        var session = worldRoomSessionService.ownedSession(roomId, sessionId, authentication.getName());
         if (!session.getId().equals(sessionId)) {
             throw new org.springframework.web.server.ResponseStatusException(
                     HttpStatus.NOT_FOUND,
@@ -362,7 +362,7 @@ public class WorldController {
             @PathVariable Long messageId,
             Authentication authentication
     ) {
-        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        var session = worldRoomSessionService.ownedSession(roomId, sessionId, authentication.getName());
         if (!session.getId().equals(sessionId)) {
             throw new org.springframework.web.server.ResponseStatusException(
                     HttpStatus.NOT_FOUND,
@@ -387,7 +387,7 @@ public class WorldController {
             @PathVariable int variantNo,
             Authentication authentication
     ) {
-        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        var session = worldRoomSessionService.ownedSession(roomId, sessionId, authentication.getName());
         if (!session.getId().equals(sessionId)) {
             throw new org.springframework.web.server.ResponseStatusException(
                     HttpStatus.NOT_FOUND,
@@ -408,7 +408,7 @@ public class WorldController {
             @PathVariable Long messageId,
             Authentication authentication
     ) {
-        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        var session = worldRoomSessionService.ownedSession(roomId, sessionId, authentication.getName());
         if (!session.getId().equals(sessionId)) {
             throw new org.springframework.web.server.ResponseStatusException(
                     HttpStatus.NOT_FOUND,
@@ -427,7 +427,7 @@ public class WorldController {
             @PathVariable Long messageId,
             Authentication authentication
     ) {
-        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        var session = worldRoomSessionService.ownedSession(roomId, sessionId, authentication.getName());
         if (!session.getId().equals(sessionId)) {
             throw new org.springframework.web.server.ResponseStatusException(
                     HttpStatus.NOT_FOUND,
@@ -445,7 +445,7 @@ public class WorldController {
             @PathVariable Long sessionId,
             Authentication authentication
     ) {
-        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        var session = worldRoomSessionService.ownedSession(roomId, sessionId, authentication.getName());
         if (!session.getId().equals(sessionId)) {
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND,
@@ -467,7 +467,7 @@ public class WorldController {
             @Valid @RequestBody WorldRoomSessionSystemValueRequest request,
             Authentication authentication
     ) {
-        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        var session = worldRoomSessionService.ownedSession(roomId, sessionId, authentication.getName());
         if (!session.getId().equals(sessionId)) {
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND,
@@ -489,7 +489,7 @@ public class WorldController {
             @PathVariable Long messageId,
             Authentication authentication
     ) {
-        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        var session = worldRoomSessionService.ownedSession(roomId, sessionId, authentication.getName());
         if (!session.getId().equals(sessionId)) {
             throw new org.springframework.web.server.ResponseStatusException(
                     HttpStatus.NOT_FOUND,
