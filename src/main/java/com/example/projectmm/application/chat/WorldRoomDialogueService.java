@@ -44,8 +44,10 @@ public class WorldRoomDialogueService {
         ));
 
         var context = contextBuilder.buildSession(sessionId);
+        var beforeCast = sessionService.captureCastState(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
+        var afterCast = sessionService.captureCastState(sessionId);
 
         var characterMessage = messages.save(new WorldRoomMessage(
                 session,
@@ -53,12 +55,13 @@ public class WorldRoomDialogueService {
                 generated.reply(),
                 now()
         ));
-        variants.save(new WorldRoomMessageVariant(
+        var variant = variants.save(new WorldRoomMessageVariant(
                 characterMessage,
                 1,
                 generated.reply(),
                 now()
         ));
+        sessionService.saveCastSnapshot(variant, beforeCast, afterCast);
 
         return new WorldRoomTurn(generated.reply(), applied);
     }
@@ -116,16 +119,19 @@ public class WorldRoomDialogueService {
                 + "\n\n[Previous response variant]\n"
                 + previousVariant
                 + "\n\nGenerate another natural variant of this response without copying it.";
+        var beforeCast = sessionService.captureCastState(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, rerollPrompt);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
+        var afterCast = sessionService.captureCastState(sessionId);
 
         int variantNo = Math.toIntExact(variants.countByMessageId(messageId)) + 1;
-        variants.save(new WorldRoomMessageVariant(
+        var variant = variants.save(new WorldRoomMessageVariant(
                 target,
                 variantNo,
                 generated.reply(),
                 now()
         ));
+        sessionService.saveCastSnapshot(variant, beforeCast, afterCast);
         target.selectVariant(variantNo, generated.reply());
 
         return new WorldRoomTurn(generated.reply(), applied);
@@ -153,8 +159,10 @@ public class WorldRoomDialogueService {
         messages.flush();
 
         var context = contextBuilder.buildSession(sessionId);
+        var beforeCast = sessionService.captureCastState(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage.getContent());
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
+        var afterCast = sessionService.captureCastState(sessionId);
 
         var characterMessage = messages.save(new WorldRoomMessage(
                 session,
@@ -162,12 +170,13 @@ public class WorldRoomDialogueService {
                 generated.reply(),
                 now()
         ));
-        variants.save(new WorldRoomMessageVariant(
+        var variant = variants.save(new WorldRoomMessageVariant(
                 characterMessage,
                 1,
                 generated.reply(),
                 now()
         ));
+        sessionService.saveCastSnapshot(variant, beforeCast, afterCast);
 
         return new WorldRoomTurn(generated.reply(), applied);
     }
