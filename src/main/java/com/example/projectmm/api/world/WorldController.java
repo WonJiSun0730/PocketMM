@@ -353,6 +353,52 @@ public class WorldController {
         );
     }
 
+    @GetMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/messages/{messageId}/variants")
+    public List<WorldRoomMessageVariantItem> getRoomMessageVariants(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @PathVariable Long sessionId,
+            @PathVariable Long messageId,
+            Authentication authentication
+    ) {
+        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        if (!session.getId().equals(sessionId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Room play session not found"
+            );
+        }
+        ensureRoomWorld(worldId, session.getRoom().getWorld().getId());
+        return worldRoomDialogueService.variants(sessionId, messageId).stream()
+                .map(variant -> WorldRoomMessageVariantItem.from(
+                        variant,
+                        variant.getMessage().getSelectedVariantNo()
+                ))
+                .toList();
+    }
+
+    @PutMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/messages/{messageId}/variants/{variantNo}")
+    public WorldRoomMessageItem selectRoomMessageVariant(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @PathVariable Long sessionId,
+            @PathVariable Long messageId,
+            @PathVariable int variantNo,
+            Authentication authentication
+    ) {
+        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        if (!session.getId().equals(sessionId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Room play session not found"
+            );
+        }
+        ensureRoomWorld(worldId, session.getRoom().getWorld().getId());
+        return WorldRoomMessageItem.from(
+                worldRoomDialogueService.selectVariant(sessionId, messageId, variantNo)
+        );
+    }
+
     @PostMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/messages/{messageId}/reroll")
     public WorldRoomTurn rerollRoomMessage(
             @PathVariable Long worldId,
