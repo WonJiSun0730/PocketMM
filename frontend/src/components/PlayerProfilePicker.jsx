@@ -10,7 +10,7 @@ async function readResponse(response) {
   return response.json()
 }
 
-export default function PlayerProfilePicker({ current, busy, onSelect, onCancel, onSaved }) {
+export default function PlayerProfilePicker({ current, busy, onSelect, onCancel, onSaved, manageOnly = false }) {
   const [profiles, setProfiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -61,7 +61,7 @@ export default function PlayerProfilePicker({ current, busy, onSelect, onCancel,
   const disabled = busy || saving || loading
   return (
     <section aria-label="유저 캐릭터 프로필 선택" className="mx-auto w-full max-w-2xl space-y-4 p-4">
-      <h2 className="text-lg font-semibold">어떤 캐릭터로 대화할까요?</h2>
+      <h2 className="text-lg font-semibold">{manageOnly ? "플레이어 프로필 관리" : "어떤 캐릭터로 대화할까요?"}</h2>
       <p className="text-sm text-muted-foreground">이름·설정 합계 500자 · 최대 10개 · 사진은 표시용</p>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {loading && <p>프로필을 불러오는 중...</p>}
@@ -74,13 +74,13 @@ export default function PlayerProfilePicker({ current, busy, onSelect, onCancel,
               <p className="line-clamp-3 whitespace-pre-wrap break-words text-sm text-muted-foreground">{profile.description}</p>
             </div>
             <Button variant="outline" disabled={disabled} onClick={() => setDraft({ ...profile })}>수정</Button>
-            <Button disabled={disabled} onClick={() => onSelect(profile)}>선택</Button>
+            {!manageOnly && <Button disabled={disabled} onClick={() => onSelect(profile)}>선택</Button>}
           </div>
         ))}
         {!loading && profiles.length === 0 && <p>아직 프로필이 없어요. 먼저 만들어 주세요.</p>}
         <div className="flex gap-2">
           <Button disabled={disabled || profiles.length >= 10} onClick={() => setDraft({ name: "", description: "", avatar: null })}>프로필 만들기 ({profiles.length}/10)</Button>
-          <Button variant="ghost" disabled={busy || saving} onClick={onCancel}>돌아가기</Button>
+          {onCancel && <Button variant="ghost" disabled={busy || saving} onClick={onCancel}>돌아가기</Button>}
         </div>
       </>}
       {draft && <form onSubmit={save} className="space-y-3">
