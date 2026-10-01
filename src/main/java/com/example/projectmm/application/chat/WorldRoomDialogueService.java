@@ -92,6 +92,15 @@ public class WorldRoomDialogueService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "World room message not found. messageId=" + messageId
                 ));
+        messages.findTopBySessionIdAndIdGreaterThanEqualAndRoleOrderByIdAsc(
+                        sessionId,
+                        messageId,
+                        ChatRole.CHARACTER
+                )
+                .ifPresent(characterMessage -> sessionService.restoreCastBeforeVariant(
+                        sessionId,
+                        selectedVariant(characterMessage)
+                ));
         messages.deleteBySessionIdAndIdGreaterThanEqual(sessionId, messageId);
     }
 
@@ -114,6 +123,7 @@ public class WorldRoomDialogueService {
                 ));
 
         var previousVariant = target.getContent();
+        sessionService.restoreCastBeforeVariant(sessionId, selectedVariant(target));
         var context = contextBuilder.buildSession(sessionId);
         var rerollPrompt = userMessage.getContent()
                 + "\n\n[Previous response variant]\n"
@@ -155,6 +165,7 @@ public class WorldRoomDialogueService {
                         "User message for regeneration not found. messageId=" + messageId
                 ));
 
+        sessionService.restoreCastBeforeVariant(sessionId, selectedVariant(target));
         messages.deleteBySessionIdAndIdGreaterThanEqual(sessionId, target.getId());
         messages.flush();
 
@@ -214,6 +225,20 @@ public class WorldRoomDialogueService {
         return page.stream()
                 .sorted(Comparator.comparing(WorldRoomMessage::getId))
                 .toList();
+    }
+
+    private WorldRoomMessageVariant selectedVariant(WorldRoomMessage message) {
+        var selectedVariantNo = message.getSelectedVariantNo();
+        if (selectedVariantNo == null) {
+            throw new IllegalStateException(
+                    "Selected variant not found. messageId=" + message.getId()
+            );
+        }
+        return variants.findByMessageIdAndVariantNo(message.getId(), selectedVariantNo)
+                .orElseThrow(() -> new IllegalStateException(
+                        "Selected variant not found. messageId=" + message.getId()
+                                + ", variantNo=" + selectedVariantNo
+                ));
     }
 
     private WorldRoomMessage requireCharacterMessage(Long sessionId, Long messageId) {
