@@ -28,6 +28,7 @@ public class WorldRoomDialogueService {
     private final WorldRoomSessionRepository sessions;
     private final WorldRoomMessageRepository messages;
     private final WorldRoomMessageVariantRepository variants;
+    private final WorldRoomVariantCastSnapshotRepository castSnapshots;
 
     @Transactional
     public WorldRoomTurn chat(Long sessionId, String userMessage) {
@@ -101,7 +102,7 @@ public class WorldRoomDialogueService {
                         sessionId,
                         selectedVariant(characterMessage)
                 ));
-        messages.deleteBySessionIdAndIdGreaterThanEqual(sessionId, messageId);
+        deleteTimelineFrom(sessionId, messageId);
     }
 
     @Transactional
@@ -166,7 +167,7 @@ public class WorldRoomDialogueService {
                 ));
 
         sessionService.restoreCastBeforeVariant(sessionId, selectedVariant(target));
-        messages.deleteBySessionIdAndIdGreaterThanEqual(sessionId, target.getId());
+        deleteTimelineFrom(sessionId, target.getId());
         messages.flush();
 
         var context = contextBuilder.buildSession(sessionId);
@@ -225,6 +226,15 @@ public class WorldRoomDialogueService {
         return page.stream()
                 .sorted(Comparator.comparing(WorldRoomMessage::getId))
                 .toList();
+    }
+
+    private void deleteTimelineFrom(Long sessionId, Long messageId) {
+        castSnapshots.deleteByVariantMessageSessionIdAndVariantMessageIdGreaterThanEqual(
+                sessionId,
+                messageId
+        );
+        variants.deleteByMessageSessionIdAndMessageIdGreaterThanEqual(sessionId, messageId);
+        messages.deleteBySessionIdAndIdGreaterThanEqual(sessionId, messageId);
     }
 
     private WorldRoomMessageVariant selectedVariant(WorldRoomMessage message) {
