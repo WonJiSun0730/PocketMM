@@ -47,6 +47,7 @@ class WorldRoomDialogueWorldlineIntegrationTest {
     @Autowired CharacterRepository characters;
     @Autowired WorldConversationCastRepository roomCasts;
     @Autowired WorldRoomMessageRepository messages;
+    @Autowired WorldRoomMessageVariantRepository variants;
 
     @MockitoBean DialogueGateway gateway;
 
@@ -152,6 +153,20 @@ class WorldRoomDialogueWorldlineIntegrationTest {
                 ));
 
         dialogueService.chat(session.getId(), "I step into the room.");
+
+        dialogueService.editMessage(
+                session.getId(),
+                characterMessage.getId(),
+                "Sherlock Holmes: \"You are very late.\""
+        );
+
+        assertThat(messages.findById(characterMessage.getId()).orElseThrow().getContent())
+                .isEqualTo("Sherlock Holmes: \"You are very late.\"");
+        assertThat(variants.findByMessageIdOrderByVariantNoAsc(characterMessage.getId()))
+                .filteredOn(variant -> variant.getVariantNo() == 2)
+                .singleElement()
+                .satisfies(variant -> assertThat(variant.getContent())
+                        .isEqualTo("Sherlock Holmes: \"You are very late.\""));
 
         assertThatThrownBy(() ->
                 dialogueService.selectVariant(session.getId(), characterMessage.getId(), 1)
