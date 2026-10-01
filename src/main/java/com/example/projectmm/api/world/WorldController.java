@@ -11,6 +11,7 @@ import com.example.projectmm.application.chat.ConversationStartService;
 import com.example.projectmm.application.chat.NewConversationResponse;
 import com.example.projectmm.application.chat.WorldRoomService;
 import com.example.projectmm.application.chat.WorldRoomDialogueService;
+import com.example.projectmm.application.chat.WorldRoomSessionService;
 import com.example.projectmm.domain.dialogue.WorldRoomTurn;
 import com.example.projectmm.application.player.ConversationPlayerService;
 import com.example.projectmm.application.player.PlayerSelectionRequest;
@@ -36,6 +37,7 @@ public class WorldController {
     private final ConversationPlayerService conversationPlayerService;
     private final WorldRoomService worldRoomService;
     private final WorldRoomDialogueService worldRoomDialogueService;
+    private final WorldRoomSessionService worldRoomSessionService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -210,15 +212,51 @@ public class WorldController {
         }
     }
 
-    @PostMapping("/{worldId}/rooms/{roomId}/chat")
-    public WorldRoomTurn chatInRoom(
+    @PostMapping("/{worldId}/rooms/{roomId}/sessions")
+    @ResponseStatus(HttpStatus.CREATED)
+    public WorldRoomSessionResponse startRoomSession(
             @PathVariable Long worldId,
             @PathVariable Long roomId,
-            @Valid @RequestBody WorldRoomChatRequest request
+            @Valid @RequestBody PlayerSelectionRequest request,
+            Authentication authentication
     ) {
         var room = worldRoomService.get(roomId);
         ensureRoomWorld(worldId, room.getWorld().getId());
-        return worldRoomDialogueService.chat(roomId, request.message());
+        return WorldRoomSessionResponse.from(
+                worldRoomSessionService.start(roomId, authentication.getName(), request.playerProfileId())
+        );
+    }
+
+    @GetMapping("/{worldId}/rooms/{roomId}/session")
+    public WorldRoomSessionResponse currentRoomSession(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            Authentication authentication
+    ) {
+        var room = worldRoomService.get(roomId);
+        ensureRoomWorld(worldId, room.getWorld().getId());
+        return WorldRoomSessionResponse.from(
+                worldRoomSessionService.latest(roomId, authentication.getName())
+        );
+    }
+
+    @PostMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/chat")
+    public WorldRoomTurn chatInRoom(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @PathVariable Long sessionId,
+            @Valid @RequestBody WorldRoomChatRequest request,
+            Authentication authentication
+    ) {
+        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        if (!session.getId().equals(sessionId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Room play session not found"
+            );
+        }
+        ensureRoomWorld(worldId, session.getRoom().getWorld().getId());
+        return worldRoomDialogueService.chat(sessionId, request.message());
     }
 
     @PostMapping("/{worldId}/characters/{characterId}/conversations")
