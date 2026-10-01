@@ -175,9 +175,16 @@ public class GeminiDialogueGateway implements DialogueGateway {
         );
 
         String response = callGeminiWithRetry(request);
+        return parseWorldRoomResponse(response, context);
+    }
+
+    WorldRoomTurn parseWorldRoomResponse(
+            String response,
+            WorldRoomDialogueContext context
+    ) {
         try {
             JsonNode root = objectMapper.readTree(response);
-            String payload = root.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText();
+            String payload = root.path("candidates").path(0).path("content").path(0).path("text").asText();
             JsonNode turn = objectMapper.readTree(payload);
             return new WorldRoomTurn(
                     turn.path("reply").asText(),
