@@ -6,6 +6,8 @@ import com.example.projectmm.domain.character.CharacterProfileRepository;
 import com.example.projectmm.domain.character.CharacterStateRepository;
 import com.example.projectmm.domain.chat.WorldConversationCastRepository;
 import com.example.projectmm.domain.chat.WorldConversationRepository;
+import com.example.projectmm.domain.chat.WorldRoomSessionRepository;
+import com.example.projectmm.domain.chat.WorldRoomSessionCastRepository;
 import com.example.projectmm.domain.dialogue.DialogueCharacterProfile;
 import com.example.projectmm.domain.dialogue.*;
 import com.example.projectmm.domain.world.WorldLoreEntryRepository;
@@ -23,6 +25,8 @@ public class WorldRoomContextBuilder {
 
     private final WorldConversationRepository rooms;
     private final WorldConversationCastRepository casts;
+    private final WorldRoomSessionRepository sessions;
+    private final WorldRoomSessionCastRepository sessionCasts;
     private final CharacterProfileRepository profiles;
     private final CharacterStateRepository states;
     private final CharacterExampleRepository examples;
@@ -31,11 +35,27 @@ public class WorldRoomContextBuilder {
     private final WorldSystemStateRepository systemStates;
 
     @Transactional(readOnly = true)
-    public WorldRoomDialogueContext build(Long roomId) {
-        var room = rooms.findById(roomId)
-                .orElseThrow(() -> new IllegalArgumentException("World room not found. roomId=" + roomId));
+    public WorldRoomDialogueContext buildSession(Long sessionId) {
+        var session = sessions.findById(sessionId)
+                .orElseThrow(() -> new IllegalArgumentException("World room session not found. sessionId=" + sessionId));
+        var room = session.getRoom();
         var world = room.getWorld();
-        var roomCast = buildCast(roomId);
+
+        var activeIds = sessionCasts.findBySessionIdAndActiveTrueOrderByEnteredAtAscIdAsc(sessionId)
+                .stream()
+                .map(state -> state.getCharacter().getId())
+                .collect(java.util.stream.Collectors.toSet());
+
+        var roomCast = buildCast(room.getId()).stream()
+                .map(character -> new WorldRoomCharacterContext(
+                        character.characterId(),
+                        character.characterName(),
+                        character.profile(),
+                        character.energy(),
+                        character.mood(),
+                        activeIds.contains(character.characterId())
+                ))
+                .toList();
         var activeCast = roomCast.stream()
                 .filter(WorldRoomCharacterContext::active)
                 .toList();
@@ -71,7 +91,7 @@ public class WorldRoomContextBuilder {
                 room.getId(),
                 room.getTitle(),
                 room.getVisibility(),
-                room.getSimulatedAt(),
+                session.getSimulatedAt(),
                 new DialogueWorldContext(
                         world.getId(),
                         world.getName(),
@@ -80,11 +100,11 @@ public class WorldRoomContextBuilder {
                         lore,
                         worldSystems
                 ),
-                room.getPlayerProfile() == null
+                session.getPlayerProfile() == null
                         ? null
                         : new DialoguePlayerProfile(
-                                room.getPlayerProfile().getName(),
-                                room.getPlayerProfile().getDescription()
+                                session.getPlayerProfile().getName(),
+                                session.getPlayerProfile().getDescription()
                         ),
                 roomCast,
                 activeCast
