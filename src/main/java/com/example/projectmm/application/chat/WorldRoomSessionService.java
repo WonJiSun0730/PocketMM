@@ -178,6 +178,10 @@ public class WorldRoomSessionService {
         var session = session(sessionId);
         var snapshots = castSnapshots.findByVariantIdOrderByCharacterIdAsc(variant.getId());
         if (snapshots.isEmpty()) {
+            var roomCast = roomCasts.findByConversationIdOrderByJoinedAtAscIdAsc(session.getRoom().getId());
+            if (roomCast.isEmpty()) {
+                return;
+            }
             throw new IllegalStateException("Cast snapshot not found. variantId=" + variant.getId());
         }
         for (var snapshot : snapshots) {
@@ -202,6 +206,10 @@ public class WorldRoomSessionService {
         var session = session(sessionId);
         var snapshots = castSnapshots.findByVariantIdOrderByCharacterIdAsc(variant.getId());
         if (snapshots.isEmpty()) {
+            var roomCast = roomCasts.findByConversationIdOrderByJoinedAtAscIdAsc(session.getRoom().getId());
+            if (roomCast.isEmpty()) {
+                return;
+            }
             throw new IllegalStateException(
                     "Cast snapshot not found. variantId=" + variant.getId()
             );
