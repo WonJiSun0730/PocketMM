@@ -27,6 +27,7 @@ public class WorldRoomContextBuilder {
     private final WorldConversationCastRepository casts;
     private final WorldRoomSessionRepository sessions;
     private final WorldRoomSessionCastRepository sessionCasts;
+    private final WorldRoomMessageRepository messages;
     private final CharacterProfileRepository profiles;
     private final CharacterStateRepository states;
     private final CharacterExampleRepository examples;
@@ -106,6 +107,15 @@ public class WorldRoomContextBuilder {
                                 session.getPlayerProfile().getName(),
                                 session.getPlayerProfile().getDescription()
                         ),
+                messages.findTop50BySessionIdOrderByCreatedAtDescIdDesc(sessionId).stream()
+                        .sorted(java.util.Comparator.comparing(WorldRoomMessage::getCreatedAt)
+                                .thenComparing(WorldRoomMessage::getId))
+                        .map(message -> new DialogueMessageContext(
+                                message.getRole(),
+                                message.getContent(),
+                                message.getCreatedAt()
+                        ))
+                        .toList(),
                 roomCast,
                 activeCast
         );
