@@ -2,6 +2,7 @@ package com.example.projectmm.application.chat;
 
 import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.dialogue.WorldRoomCastChange;
+import com.example.projectmm.domain.dialogue.WorldRoomSystemChange;
 import com.example.projectmm.domain.member.MemberRepository;
 import com.example.projectmm.domain.player.PlayerProfileRepository;
 import com.example.projectmm.domain.world.WorldSystemRepository;
@@ -223,6 +224,40 @@ public class WorldRoomSessionService {
             LocalDateTime enteredAt,
             LocalDateTime leftAt
     ) {
+    }
+
+    @Transactional
+    public List<WorldRoomSystemChange> applySystemChanges(
+            Long sessionId,
+            List<WorldRoomSystemChange> proposed
+    ) {
+        session(sessionId);
+        if (proposed == null || proposed.isEmpty()) {
+            return List.of();
+        }
+
+        var applied = new ArrayList<WorldRoomSystemChange>();
+        var seen = new HashSet<Long>();
+        for (WorldRoomSystemChange change : proposed) {
+            if (change == null
+                    || change.systemId() == null
+                    || change.delta() == 0
+                    || !seen.add(change.systemId())) {
+                continue;
+            }
+            var state = systemStates.findBySessionIdAndSystemId(sessionId, change.systemId())
+                    .orElse(null);
+            if (state == null) {
+                continue;
+            }
+            int before = state.getCurrentValue();
+            state.applyDelta(change.delta());
+            int actualDelta = state.getCurrentValue() - before;
+            if (actualDelta != 0) {
+                applied.add(new WorldRoomSystemChange(change.systemId(), actualDelta));
+            }
+        }
+        return List.copyOf(applied);
     }
 
     @Transactional(readOnly = true)
