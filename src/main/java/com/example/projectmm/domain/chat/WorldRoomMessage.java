@@ -31,6 +31,8 @@ public class WorldRoomMessage {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    private LocalDateTime editedAt;
+
     public WorldRoomMessage(
             WorldRoomSession session,
             ChatRole role,
@@ -53,5 +55,16 @@ public class WorldRoomMessage {
         this.role = role;
         this.content = content;
         this.createdAt = createdAt;
+    }
+
+    public void edit(String content, LocalDateTime editedAt) {
+        if (content == null || content.isBlank()) {
+            throw new IllegalArgumentException("content must not be blank");
+        }
+        if (editedAt == null) {
+            throw new IllegalArgumentException("editedAt must not be null");
+        }
+        this.content = content;
+        this.editedAt = editedAt;
     }
 }
