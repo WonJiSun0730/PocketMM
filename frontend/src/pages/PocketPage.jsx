@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { ArrowLeft, ChevronLeft, ChevronRight, Pencil, RefreshCw, Send, Trash2, X } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Pencil, RefreshCw, Send, Trash2, Wrench, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -30,6 +30,9 @@ export default function PocketPage({ pocket, onBack }) {
   const [editing, setEditing] = useState(null)
   const [editText, setEditText] = useState("")
   const [variantsByMessage, setVariantsByMessage] = useState({})
+  const [isDeveloper, setIsDeveloper] = useState(false)
+  const [devOpen, setDevOpen] = useState(false)
+  const [devSystemValues, setDevSystemValues] = useState({})
   const bottomRef = useRef(null)
 
   async function refresh() {
@@ -51,6 +54,14 @@ export default function PocketPage({ pocket, onBack }) {
   }
 
   useEffect(() => { refresh() }, [session.id])
+  useEffect(() => {
+    let active = true
+    fetch("/api/auth/me", { credentials: "include" })
+      .then(response => response.ok ? response.json() : null)
+      .then(member => { if (active) setIsDeveloper(member?.role === "DEVELOPER") })
+      .catch(() => { if (active) setIsDeveloper(false) })
+    return () => { active = false }
+  }, [])
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: messages.length ? "smooth" : "auto" }) }, [messages, sending])
 
   async function sendMessage() {
@@ -169,6 +180,27 @@ export default function PocketPage({ pocket, onBack }) {
     }
   }
 
+  async function setDevSystemValue(system) {
+    const raw = devSystemValues[system.systemId] ?? system.currentValue
+    const value = Number(raw)
+    if (!Number.isInteger(value) || value < system.minValue || value > system.maxValue) {
+      setError(`${system.name} 값은 ${system.minValue}~${system.maxValue} 사이의 정수여야 해요.`)
+      return
+    }
+    setError("")
+    const response = await fetch(`${base}/systems/${system.systemId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ value }),
+    })
+    if (!response.ok) {
+      setError("개발자 상태 값을 저장하지 못했어요.")
+      return
+    }
+    await refresh()
+  }
+
   function handleKeyDown(event) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
@@ -199,6 +231,43 @@ export default function PocketPage({ pocket, onBack }) {
       </div>
 
       {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}
+
+      {isDeveloper && <section className="shrink-0 border-b bg-muted/20">
+        <button type="button" onClick={() => setDevOpen(open => !open)}
+          className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-muted-foreground sm:px-6">
+          <Wrench className="size-3.5" />
+          개발자 도구
+          <ChevronDown className={`ml-auto size-3.5 transition-transform ${devOpen ? "rotate-180" : ""}`} />
+        </button>
+        {devOpen && <div className="border-t px-4 py-3 sm:px-6">
+          <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
+            <span>SESSION #{session.id}</span>
+            <span>시뮬레이션 시각 {session.simulatedAt ?? "-"}</span>
+          </div>
+          <div className="rounded-lg border bg-background p-3">
+            <p className="mb-2 text-xs font-semibold">Pocket 상태 치트</p>
+            {systems.length === 0
+              ? <p className="text-xs text-muted-foreground">등록된 World System이 없습니다.</p>
+              : <div className="grid gap-2 sm:grid-cols-2">
+                {systems.map(system => <div key={system.systemId} className="flex items-center gap-2 rounded-md border p-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium">{system.name}</p>
+                    <p className="text-[11px] text-muted-foreground">{system.minValue} ~ {system.maxValue} · 현재 {system.currentValue}</p>
+                  </div>
+                  <input type="number" min={system.minValue} max={system.maxValue}
+                    value={devSystemValues[system.systemId] ?? system.currentValue}
+                    onChange={event => setDevSystemValues(current => ({ ...current, [system.systemId]: event.target.value }))}
+                    className="h-8 w-20 rounded-md border bg-background px-2 text-sm" />
+                  <Button type="button" size="sm" variant="outline" className="h-8"
+                    onClick={() => setDevSystemValue(system)}>저장</Button>
+                </div>)}
+              </div>}
+          </div>
+          <div className="mt-3 rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+            Memory Inspector · 최신 5개 / 턴별 Diff 연결 예정
+          </div>
+        </div>}
+      </section>}
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto flex w-full max-w-3xl flex-col p-4 pb-32 sm:p-6 sm:pb-36">
