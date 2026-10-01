@@ -30,7 +30,14 @@ class WorldRoomSystemStateTest {
 
     @Test
     void variantSystemSnapshotKeepsIndependentBeforeAndAfterValues() throws Exception {
-        var variant = new WorldRoomMessageVariant(null, 1, "응답", java.time.LocalDateTime.now());
+        var session = allocate(WorldRoomSession.class);
+        var message = new WorldRoomMessage(
+                session,
+                ChatRole.CHARACTER,
+                "응답",
+                java.time.LocalDateTime.now()
+        );
+        var variant = new WorldRoomMessageVariant(message, 1, "응답", java.time.LocalDateTime.now());
         setId(variant, 10L);
 
         var snapshot = new WorldRoomVariantSystemSnapshot(
@@ -44,6 +51,14 @@ class WorldRoomSystemStateTest {
         assertThat(snapshot.getSystemId()).isEqualTo(3L);
         assertThat(snapshot.getBeforeValue()).isEqualTo(100);
         assertThat(snapshot.getAfterValue()).isEqualTo(92);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> T allocate(Class<T> type) throws Exception {
+        var field = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+        field.setAccessible(true);
+        var unsafe = (sun.misc.Unsafe) field.get(null);
+        return (T) unsafe.allocateInstance(type);
     }
 
     private static void setId(Object target, Long id) throws Exception {
