@@ -437,6 +437,48 @@ public class WorldController {
         return worldRoomDialogueService.regenerate(sessionId, messageId);
     }
 
+    @GetMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/systems")
+    public List<WorldRoomSessionSystemItem> getRoomSessionSystems(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @PathVariable Long sessionId,
+            Authentication authentication
+    ) {
+        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        if (!session.getId().equals(sessionId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Room play session not found"
+            );
+        }
+        ensureRoomWorld(worldId, session.getRoom().getWorld().getId());
+        return worldRoomSessionService.systemStates(sessionId).stream()
+                .map(WorldRoomSessionSystemItem::from)
+                .toList();
+    }
+
+    @PutMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/systems/{systemId}")
+    public WorldRoomSessionSystemItem setRoomSessionSystemValue(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @PathVariable Long sessionId,
+            @PathVariable Long systemId,
+            @Valid @RequestBody WorldRoomSessionSystemValueRequest request,
+            Authentication authentication
+    ) {
+        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        if (!session.getId().equals(sessionId)) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Room play session not found"
+            );
+        }
+        ensureRoomWorld(worldId, session.getRoom().getWorld().getId());
+        return WorldRoomSessionSystemItem.from(
+                worldRoomSessionService.setSystemValue(sessionId, systemId, request.value())
+        );
+    }
+
     @DeleteMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/messages/{messageId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteRoomMessage(
