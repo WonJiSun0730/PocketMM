@@ -12,6 +12,8 @@ public record WorldRoomDialogueContext(
         LocalDateTime simulatedAt,
         DialogueWorldContext world,
         DialoguePlayerProfile playerProfile,
+        String introTitle,
+        String introContent,
         List<DialogueMessageContext> recentMessages,
         List<WorldRoomCharacterContext> roomCast,
         List<WorldRoomCharacterContext> activeCast
