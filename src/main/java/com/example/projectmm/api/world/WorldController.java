@@ -140,6 +140,37 @@ public class WorldController {
         return toRoomResponse(cast.getConversation());
     }
 
+    @PostMapping("/{worldId}/rooms/{roomId}/intros")
+    @ResponseStatus(HttpStatus.CREATED)
+    public WorldRoomIntroItem addRoomIntro(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @Valid @RequestBody WorldRoomIntroRequest request,
+            Authentication authentication
+    ) {
+        var room = worldRoomService.get(roomId);
+        ensureRoomWorld(worldId, room.getWorld().getId());
+        return WorldRoomIntroItem.from(worldRoomService.addIntro(
+                roomId,
+                authentication.getName(),
+                request.title(),
+                request.content(),
+                request.sortOrder()
+        ));
+    }
+
+    @GetMapping("/{worldId}/rooms/{roomId}/intros")
+    public List<WorldRoomIntroItem> getRoomIntros(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId
+    ) {
+        var room = worldRoomService.get(roomId);
+        ensureRoomWorld(worldId, room.getWorld().getId());
+        return worldRoomService.roomIntros(roomId).stream()
+                .map(WorldRoomIntroItem::from)
+                .toList();
+    }
+
     @GetMapping("/{worldId}/rooms/{roomId}")
     public WorldRoomResponse getRoom(
             @PathVariable Long worldId,
