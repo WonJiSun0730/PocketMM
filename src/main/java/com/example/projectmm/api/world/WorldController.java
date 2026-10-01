@@ -140,28 +140,6 @@ public class WorldController {
         return toRoomResponse(cast.getConversation());
     }
 
-    @PutMapping("/{worldId}/rooms/{roomId}/cast/{characterId}/active")
-    public WorldRoomResponse enterRoomScene(
-            @PathVariable Long worldId,
-            @PathVariable Long roomId,
-            @PathVariable Long characterId
-    ) {
-        var cast = worldRoomService.enter(roomId, characterId);
-        ensureRoomWorld(worldId, cast.getConversation().getWorld().getId());
-        return toRoomResponse(cast.getConversation());
-    }
-
-    @DeleteMapping("/{worldId}/rooms/{roomId}/cast/{characterId}/active")
-    public WorldRoomResponse leaveRoomScene(
-            @PathVariable Long worldId,
-            @PathVariable Long roomId,
-            @PathVariable Long characterId
-    ) {
-        var cast = worldRoomService.leave(roomId, characterId);
-        ensureRoomWorld(worldId, cast.getConversation().getWorld().getId());
-        return toRoomResponse(cast.getConversation());
-    }
-
     @GetMapping("/{worldId}/rooms/{roomId}")
     public WorldRoomResponse getRoom(
             @PathVariable Long worldId,
@@ -181,7 +159,7 @@ public class WorldController {
                 cast.stream().map(item -> new WorldRoomCastItem(
                         item.getCharacter().getId(),
                         item.getCharacter().getName(),
-                        item.isActive()
+                        false
                 )).toList()
         );
     }
@@ -193,8 +171,8 @@ public class WorldController {
                 room.getWorld().getId(),
                 room.getTitle(),
                 room.getVisibility(),
-                room.getPlayerProfile() == null ? null : room.getPlayerProfile().getId(),
-                room.getSimulatedAt(),
+                null,
+                null,
                 cast.stream().map(item -> new WorldRoomCastItem(
                         item.getCharacter().getId(),
                         item.getCharacter().getName(),
