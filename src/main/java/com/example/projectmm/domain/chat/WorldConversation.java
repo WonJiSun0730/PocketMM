@@ -1,7 +1,6 @@
 package com.example.projectmm.domain.chat;
 
 import com.example.projectmm.domain.member.Member;
-import com.example.projectmm.domain.player.PlayerProfile;
 import com.example.projectmm.domain.world.World;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
@@ -40,20 +39,13 @@ public class WorldConversation {
     @Column(nullable = false, length = 20)
     private Visibility visibility = Visibility.PRIVATE;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "player_profile_id")
-    private PlayerProfile playerProfile;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(nullable = false)
-    private LocalDateTime simulatedAt;
 
-    private LocalDateTime lastPresenceAt;
-
-    public WorldConversation(World world, LocalDateTime simulatedAt) {
-        this(world, null, world.getName(), Visibility.PRIVATE, simulatedAt);
+    public WorldConversation(World world, LocalDateTime createdAt) {
+        this(world, null, world.getName(), Visibility.PRIVATE, createdAt);
     }
 
     public WorldConversation(
@@ -61,15 +53,13 @@ public class WorldConversation {
             Member owner,
             String title,
             Visibility visibility,
-            LocalDateTime simulatedAt
+            LocalDateTime createdAt
     ) {
         this.world = world;
         this.owner = owner;
         this.title = normalizeTitle(title, world.getName());
         this.visibility = Visibility.PRIVATE;
-        this.createdAt = LocalDateTime.now();
-        this.simulatedAt = simulatedAt;
-        this.lastPresenceAt = simulatedAt;
+        this.createdAt = createdAt == null ? LocalDateTime.now() : createdAt;
     }
 
     public void updateRoom(String title, Visibility visibility) {
@@ -85,17 +75,5 @@ public class WorldConversation {
         return normalized.length() <= 100 ? normalized : normalized.substring(0, 100);
     }
 
-    public void selectPlayerProfile(PlayerProfile profile) {
-        this.playerProfile = profile;
-    }
-
-    public void updateSimulatedAt(LocalDateTime simulatedAt) {
-        this.simulatedAt = simulatedAt;
-    }
-
-    public void markPresent(LocalDateTime now) {
-        if (lastPresenceAt == null || now.isAfter(lastPresenceAt)) {
-            lastPresenceAt = now;
-        }
     }
 }
