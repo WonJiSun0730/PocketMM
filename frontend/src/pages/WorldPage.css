@@ -67,9 +67,9 @@
 /* Scenario start scenes */
 .world-room-main { min-width: 0; flex: 1; }
 .world-intro-list { display: grid; gap: 8px; margin-top: 12px; }
-.world-intro-item { display: flex; align-items: stretch; gap: 6px; }
-.world-intro-edit { min-width: 0; flex: 1; display: grid; gap: 3px; padding: 9px 11px; text-align: left; border: 1px solid var(--border); border-radius: 10px; background: var(--background); }
-.world-intro-edit strong { font-size: 13px; }
-.world-intro-edit small { overflow: hidden; color: var(--muted-foreground); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.world-intro-item { min-width: 0; display: flex; align-items: stretch; gap: 6px; overflow: hidden; }
+.world-intro-edit { min-width: 0; max-width: 100%; flex: 1 1 0; display: grid; grid-template-columns: minmax(0,1fr); gap: 3px; overflow: hidden; padding: 9px 11px; text-align: left; border: 1px solid var(--border); border-radius: 10px; background: var(--background); }
+.world-intro-edit strong { min-width: 0; overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.world-intro-edit small { min-width: 0; overflow: hidden; color: var(--muted-foreground); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .world-intro-item > button:last-child { align-self: center; }
 .world-intro-add { display: inline-flex; width: fit-content; align-items: center; gap: 5px; padding: 7px 10px; border: 1px dashed var(--border); border-radius: 9px; color: var(--muted-foreground); font-size: 12px; }
