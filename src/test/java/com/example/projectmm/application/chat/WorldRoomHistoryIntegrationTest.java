@@ -1,5 +1,6 @@
 package com.example.projectmm.application.chat;
 
+import com.example.projectmm.application.dialogue.DialogueGateway;
 import com.example.projectmm.application.dialogue.WorldRoomContextBuilder;
 import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.member.Member;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
 
@@ -34,6 +36,8 @@ class WorldRoomHistoryIntegrationTest {
     @Autowired WorldConversationRepository rooms;
     @Autowired WorldRoomIntroRepository intros;
     @Autowired WorldRoomMessageRepository messages;
+
+    @MockitoBean DialogueGateway gateway;
 
     @Test
     void aiContextUsesLatestFiftyMessagesWhileUiCanPageOlderHistory() {
