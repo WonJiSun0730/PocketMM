@@ -4,6 +4,7 @@ import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.event.Event;
 import com.example.projectmm.domain.chat.ChatMessage;
 import com.example.projectmm.domain.chat.Conversation;
+import com.example.projectmm.domain.chat.WorldRoomSession;
 import jakarta.persistence.*;
 import lombok.Getter;
 
@@ -41,6 +42,11 @@ public class Memory {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "source_chat_message_id")
     private ChatMessage sourceChatMessage;
+
+    // Pocket 기억은 기존 Conversation 기억 사이클을 공유하되 세션 귀속만 분리한다.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "world_room_session_id")
+    private WorldRoomSession worldRoomSession;
 
     @Column(length = 64, unique = true)
     private String chatFingerprint;
@@ -213,6 +219,28 @@ public class Memory {
         memory.chatFingerprint = fingerprint;
         memory.evidenceQuote = quote;
         memory.fact = fact;
+        return memory;
+    }
+
+    public static Memory fromWorldRoom(
+            WorldRoomSession session,
+            Character character,
+            String summary,
+            int importance,
+            LocalDateTime at
+    ) {
+        if (session == null || character == null) {
+            throw new IllegalArgumentException("Pocket session and character are required");
+        }
+        Memory memory = new Memory(
+                character,
+                null,
+                summary,
+                importance,
+                importance * 10,
+                at
+        );
+        memory.worldRoomSession = session;
         return memory;
     }
 
