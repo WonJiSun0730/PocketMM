@@ -148,8 +148,17 @@ public class GeminiDialogueGateway implements DialogueGateway {
                                 {
                                   "reply": "roleplay prose",
                                   "enterCharacterIds": [],
-                                  "leaveCharacterIds": []
+                                  "leaveCharacterIds": [],
+                                  "systemChanges": []
                                 }
+
+                                World-system change rules:
+                                - Current session world-system values are authoritative.
+                                - Return deltas only, never target/final values.
+                                - Use only supplied systemId values.
+                                - Propose a nonzero delta only for a clear new event satisfying its change condition.
+                                - If uncertain or unchanged, omit it from systemChanges.
+                                - The server applies validated deltas to the latest DB value and clamps to min/max.
 
                                 Cast-change rules:
                                 - enterCharacterIds/leaveCharacterIds may contain ONLY registered room-cast character IDs.
@@ -175,11 +184,35 @@ public class GeminiDialogueGateway implements DialogueGateway {
                     new WorldRoomCastChange(
                             readLongArray(turn.path("enterCharacterIds")),
                             readLongArray(turn.path("leaveCharacterIds"))
-                    )
+                    ),
+                    readWorldRoomSystemChanges(turn.path("systemChanges"), context)
             );
         } catch (Exception e) {
             throw new IllegalStateException("Failed to parse world room dialogue response", e);
         }
+    }
+
+    private List<WorldRoomSystemChange> readWorldRoomSystemChanges(
+            JsonNode node,
+            WorldRoomDialogueContext context
+    ) {
+        if (!node.isArray()) return List.of();
+        var allowedIds = context.sessionSystems().stream()
+                .map(WorldRoomSystemContext::systemId)
+                .collect(Collectors.toSet());
+        var seen = new HashSet<Long>();
+        var result = new ArrayList<WorldRoomSystemChange>();
+        for (JsonNode item : node) {
+            JsonNode id = item.path("systemId");
+            JsonNode delta = item.path("delta");
+            if (!item.isObject() || item.size() != 2
+                    || !id.isIntegralNumber() || !id.canConvertToLong()
+                    || !delta.isIntegralNumber() || !delta.canConvertToInt()) return List.of();
+            long systemId = id.asLong();
+            if (!allowedIds.contains(systemId) || !seen.add(systemId)) return List.of();
+            if (delta.asInt() != 0) result.add(new WorldRoomSystemChange(systemId, delta.asInt()));
+        }
+        return List.copyOf(result);
     }
 
     private List<Long> readLongArray(JsonNode node) {
@@ -207,6 +240,14 @@ public class GeminiDialogueGateway implements DialogueGateway {
         String systems = world.systems().stream()
                 .map(system -> "- " + system.name() + ": " + system.changeCondition()
                         + " (" + system.minValue() + ".." + system.maxValue() + ")")
+                .collect(Collectors.joining("\n"));
+
+        String currentSystems = context.sessionSystems().stream()
+                .map(system -> "- ID " + system.systemId()
+                        + " | " + system.name()
+                        + " | current=" + system.currentValue()
+                        + " | range=" + system.minValue() + ".." + system.maxValue()
+                        + " | change condition=" + system.changeCondition())
                 .collect(Collectors.joining("\n"));
 
         String roomCast = context.roomCast().stream()
@@ -240,6 +281,9 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 %s
 
                 World systems:
+                %s
+
+                Current session world-system values:
                 %s
 
                 Current player profile:
@@ -278,6 +322,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
                         blankAsNone(context.introContent()),
                         lore.isBlank() ? "(none)" : lore,
                         systems.isBlank() ? "(none)" : systems,
+                        currentSystems.isBlank() ? "(none)" : currentSystems,
                         player,
                         roomCast.isBlank() ? "(none)" : roomCast,
                         activeNames.isBlank() ? "(none)" : activeNames
