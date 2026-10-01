@@ -5,6 +5,7 @@ import com.example.projectmm.domain.chat.WorldConversation;
 import com.example.projectmm.domain.chat.WorldConversationCast;
 import com.example.projectmm.domain.chat.WorldConversationCastRepository;
 import com.example.projectmm.domain.chat.WorldConversationRepository;
+import com.example.projectmm.domain.dialogue.WorldRoomCastChange;
 import com.example.projectmm.domain.member.Member;
 import com.example.projectmm.domain.member.MemberRepository;
 import com.example.projectmm.domain.player.PlayerProfileRepository;
@@ -90,6 +91,48 @@ public class WorldRoomService {
         var cast = cast(roomId, characterId);
         cast.leave(now());
         return cast;
+    }
+
+    @Transactional
+    public WorldRoomCastChange applyCastChange(
+            Long roomId,
+            WorldRoomCastChange proposed
+    ) {
+        room(roomId);
+        if (proposed == null) {
+            return WorldRoomCastChange.none();
+        }
+
+        var entered = new java.util.ArrayList<Long>();
+        var left = new java.util.ArrayList<Long>();
+        var seen = new java.util.HashSet<Long>();
+
+        for (Long characterId : proposed.enterCharacterIds()) {
+            if (characterId == null || !seen.add(characterId)) {
+                continue;
+            }
+            var cast = casts.findByConversationIdAndCharacterId(roomId, characterId).orElse(null);
+            if (cast == null || cast.isActive()) {
+                continue;
+            }
+            cast.enter(now());
+            entered.add(characterId);
+        }
+
+        seen.clear();
+        for (Long characterId : proposed.leaveCharacterIds()) {
+            if (characterId == null || !seen.add(characterId) || entered.contains(characterId)) {
+                continue;
+            }
+            var cast = casts.findByConversationIdAndCharacterId(roomId, characterId).orElse(null);
+            if (cast == null || !cast.isActive()) {
+                continue;
+            }
+            cast.leave(now());
+            left.add(characterId);
+        }
+
+        return new WorldRoomCastChange(entered, left);
     }
 
     @Transactional(readOnly = true)
