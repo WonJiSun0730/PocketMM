@@ -75,5 +75,4 @@ public class WorldConversation {
         return normalized.length() <= 100 ? normalized : normalized.substring(0, 100);
     }
 
-    }
 }
