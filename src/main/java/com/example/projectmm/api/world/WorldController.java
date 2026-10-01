@@ -176,7 +176,7 @@ public class WorldController {
                 cast.stream().map(item -> new WorldRoomCastItem(
                         item.getCharacter().getId(),
                         item.getCharacter().getName(),
-                        item.isActive()
+                        false
                 )).toList()
         );
     }
