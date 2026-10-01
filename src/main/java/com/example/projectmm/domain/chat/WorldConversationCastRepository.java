@@ -14,4 +14,5 @@ public interface WorldConversationCastRepository
 
     Optional<WorldConversationCast>
     findByConversationIdAndCharacterId(Long conversationId, Long characterId);
+    void deleteByConversationId(Long conversationId);
 }
