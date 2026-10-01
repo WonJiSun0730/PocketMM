@@ -13,4 +13,6 @@ public interface WorldRoomMessageRepository extends JpaRepository<WorldRoomMessa
     List<WorldRoomMessage> findTop50BySessionIdAndIdLessThanOrderByIdDesc(Long sessionId, Long beforeId);
 
     void deleteBySessionIdAndIdGreaterThanEqual(Long sessionId, Long messageId);
+
+    java.util.Optional<WorldRoomMessage> findTopBySessionIdAndIdLessThanOrderByIdDesc(Long sessionId, Long messageId);
 }
