@@ -7,4 +7,6 @@ import java.util.Optional;
 public interface WorldConversationRepository extends JpaRepository<WorldConversation, Long> {
 
     Optional<WorldConversation> findTopByWorldIdOrderByCreatedAtDescIdDesc(Long worldId);
+
+    boolean existsByWorldId(Long worldId);
 }
