@@ -195,6 +195,7 @@ public class WorldRoomDialogueService {
                         "World room message variant not found. messageId=" + messageId
                                 + ", variantNo=" + variantNo
                 ));
+        sessionService.restoreCastAfterVariant(sessionId, variant);
         message.selectVariant(variant.getVariantNo(), variant.getContent());
         return message;
     }
