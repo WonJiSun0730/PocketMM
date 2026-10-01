@@ -24,6 +24,7 @@ public class WorldRoomSessionService {
     private final WorldConversationCastRepository roomCasts;
     private final WorldRoomSessionRepository sessions;
     private final WorldRoomSessionCastRepository sessionCasts;
+    private final WorldRoomVariantCastSnapshotRepository castSnapshots;
     private final MemberRepository members;
     private final PlayerProfileRepository players;
     private final WorldRoomIntroRepository intros;
@@ -98,6 +99,62 @@ public class WorldRoomSessionService {
         }
 
         return new WorldRoomCastChange(entered, left);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CastState> captureCastState(Long sessionId) {
+        var session = session(sessionId);
+        return roomCasts.findByConversationIdOrderByJoinedAtAscIdAsc(session.getRoom().getId())
+                .stream()
+                .map(cast -> {
+                    var state = sessionCasts.findBySessionIdAndCharacterId(
+                            sessionId,
+                            cast.getCharacter().getId()
+                    ).orElse(null);
+                    return new CastState(
+                            cast.getCharacter().getId(),
+                            state != null && state.isActive(),
+                            state == null ? null : state.getEnteredAt(),
+                            state == null ? null : state.getLeftAt()
+                    );
+                })
+                .toList();
+    }
+
+    @Transactional
+    public void saveCastSnapshot(
+            WorldRoomMessageVariant variant,
+            List<CastState> before,
+            List<CastState> after
+    ) {
+        var afterByCharacter = after.stream()
+                .collect(java.util.stream.Collectors.toMap(CastState::characterId, state -> state));
+        for (CastState previous : before) {
+            var next = afterByCharacter.get(previous.characterId());
+            if (next == null) {
+                throw new IllegalStateException(
+                        "Cast state missing after generation. characterId=" + previous.characterId()
+                );
+            }
+            castSnapshots.save(new WorldRoomVariantCastSnapshot(
+                    variant,
+                    previous.characterId(),
+                    previous.active(),
+                    previous.enteredAt(),
+                    previous.leftAt(),
+                    next.active(),
+                    next.enteredAt(),
+                    next.leftAt()
+            ));
+        }
+    }
+
+    public record CastState(
+            Long characterId,
+            boolean active,
+            LocalDateTime enteredAt,
+            LocalDateTime leftAt
+    ) {
     }
 
     @Transactional(readOnly = true)
