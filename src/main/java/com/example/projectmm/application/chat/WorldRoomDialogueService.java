@@ -5,6 +5,8 @@ import com.example.projectmm.application.dialogue.WorldRoomContextBuilder;
 import com.example.projectmm.domain.chat.ChatRole;
 import com.example.projectmm.domain.chat.WorldRoomMessage;
 import com.example.projectmm.domain.chat.WorldRoomMessageRepository;
+import com.example.projectmm.domain.chat.WorldRoomMessageVariant;
+import com.example.projectmm.domain.chat.WorldRoomMessageVariantRepository;
 import com.example.projectmm.domain.chat.WorldRoomSessionRepository;
 import com.example.projectmm.domain.dialogue.WorldRoomTurn;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +27,7 @@ public class WorldRoomDialogueService {
     private final WorldRoomSessionService sessionService;
     private final WorldRoomSessionRepository sessions;
     private final WorldRoomMessageRepository messages;
+    private final WorldRoomMessageVariantRepository variants;
 
     @Transactional
     public WorldRoomTurn chat(Long sessionId, String userMessage) {
@@ -44,9 +47,15 @@ public class WorldRoomDialogueService {
         var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
 
-        messages.save(new WorldRoomMessage(
+        var characterMessage = messages.save(new WorldRoomMessage(
                 session,
                 ChatRole.CHARACTER,
+                generated.reply(),
+                now()
+        ));
+        variants.save(new WorldRoomMessageVariant(
+                characterMessage,
+                1,
                 generated.reply(),
                 now()
         ));
@@ -108,9 +117,15 @@ public class WorldRoomDialogueService {
         var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage.getContent());
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
 
-        messages.save(new WorldRoomMessage(
+        var characterMessage = messages.save(new WorldRoomMessage(
                 session,
                 ChatRole.CHARACTER,
+                generated.reply(),
+                now()
+        ));
+        variants.save(new WorldRoomMessageVariant(
+                characterMessage,
+                1,
                 generated.reply(),
                 now()
         ));
