@@ -126,6 +126,14 @@ public class WorldRoomService {
         return intro;
     }
 
+    @Transactional
+    public void deleteIntro(Long roomId, Long introId, String ownerLoginId) {
+        ownedRoom(roomId, ownerLoginId);
+        var intro = intros.findByIdAndRoomId(introId, roomId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room intro not found"));
+        intros.delete(intro);
+    }
+
     @Transactional(readOnly = true)
     public List<WorldRoomIntro> roomIntros(Long roomId) {
         room(roomId);
