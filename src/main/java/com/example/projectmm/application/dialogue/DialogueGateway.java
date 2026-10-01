@@ -4,6 +4,7 @@ import com.example.projectmm.domain.dialogue.DialogueContext;
 import com.example.projectmm.domain.dialogue.DialogueTurn;
 import com.example.projectmm.domain.dialogue.DialogueStateChange;
 import com.example.projectmm.domain.dialogue.WorldRoomDialogueContext;
+import com.example.projectmm.domain.dialogue.WorldRoomTurn;
 
 public interface DialogueGateway {
 
@@ -17,6 +18,13 @@ public interface DialogueGateway {
         return new DialogueTurn(generate(context, userMessage), DialogueStateChange.none());
     }
     default String generateWorldRoom(
+            WorldRoomDialogueContext context,
+            String userMessage
+    ) {
+        return generateWorldRoomTurn(context, userMessage).reply();
+    }
+
+    default WorldRoomTurn generateWorldRoomTurn(
             WorldRoomDialogueContext context,
             String userMessage
     ) {
