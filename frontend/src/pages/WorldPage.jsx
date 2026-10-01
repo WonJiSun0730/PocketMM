@@ -27,6 +27,7 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
   const [playGuide, setPlayGuide] = useState("")
   const [systems, setSystems] = useState([])
   const [worldCharacters, setWorldCharacters] = useState([])
+  const [worldRooms, setWorldRooms] = useState([])
   const autosaveTimer = useRef(null)
   const loadedLoreRef = useRef(null)
   const editVersionRef = useRef(0)
@@ -42,6 +43,7 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
   useEffect(() => {
     if (!selectedWorld) return
     loadWorldCharacters(selectedWorld.id)
+    loadWorldRooms(selectedWorld.id)
     if (systemMode) loadSystems(selectedWorld.id)
     else loadLore(selectedWorld.id, selectedCategory.id)
   }, [selectedWorld, selectedCategory, systemMode])
@@ -65,6 +67,23 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
   async function loadWorldCharacters(worldId) {
     const response = await fetch(`/api/worlds/${worldId}/characters`, { credentials: "include" })
     if (response.ok) setWorldCharacters(await response.json())
+  }
+
+  async function loadWorldRooms(worldId) {
+    const response = await fetch(`/api/worlds/${worldId}/rooms`, { credentials: "include" })
+    if (response.ok) setWorldRooms(await response.json())
+  }
+
+  async function deleteRoom(room) {
+    if (!selectedWorld || !room) return
+    if (!window.confirm(`"${room.title}" Room을 삭제할까요? 이 Room의 플레이 기록과 세션이 함께 삭제됩니다.`)) return
+    const response = await fetch(
+      `/api/worlds/${selectedWorld.id}/rooms/${room.id}`,
+      { method: "DELETE", credentials: "include" }
+    )
+    if (!response.ok) return setMessage("Room을 삭제하지 못했어요.")
+    setWorldRooms((current) => current.filter((item) => item.id !== room.id))
+    setMessage(`"${room.title}" Room을 삭제했어요.`)
   }
 
   async function deleteWorld() {
@@ -331,6 +350,21 @@ export default function WorldPage({ onBack, onOpenWorldChat }) {
             <>
               <div className="world-title-row"><div><span className="world-eyebrow">EDITING</span><div className="world-name-line"><h2>{selectedWorld.name}</h2><button className="world-edit-meta" onClick={openEditWorld} type="button" aria-label="월드 정보 수정"><Pencil size={14} /></button><button className="world-delete" onClick={deleteWorld} type="button" aria-label="월드 삭제"><Trash2 size={14} /></button></div>{selectedWorld.description && <p className="world-private-description">{selectedWorld.description}</p>}</div>{message && <span className="world-message">{message}</span>}</div>
               <div className="world-cast-summary"><Users size={15}/><span>등장인물 {worldCharacters.length}명</span>{worldCharacters.length > 0 && <span className="world-cast-names">{worldCharacters.map((character) => character.name).join(" · ")}</span>}{worldCharacters.length > 0 && <div className="world-cast-actions">{worldCharacters.map((character) => <button key={character.id} type="button" onClick={() => onOpenWorldChat?.(selectedWorld, character)}><MessageCircle size={13}/>{character.name}과 대화</button>)}</div>}</div>
+              <div className="world-room-summary">
+                <div className="world-room-summary-heading"><strong>Room</strong><span>{worldRooms.length}개</span></div>
+                {worldRooms.length === 0 ? (
+                  <p className="world-room-empty">아직 이 월드에 생성된 Room이 없어요.</p>
+                ) : (
+                  <div className="world-room-list">
+                    {worldRooms.map((room) => (
+                      <div className="world-room-item" key={room.id}>
+                        <span><strong>{room.title}</strong><small>{room.visibility === "PUBLIC" ? "공개" : "비공개"} · Cast {room.cast?.length ?? 0}명</small></span>
+                        <button type="button" onClick={() => deleteRoom(room)} aria-label={`${room.title} Room 삭제`}><Trash2 size={14}/></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="world-category-tabs"><button className={systemMode ? "active" : ""} onClick={() => setSystemMode(true)} type="button">시스템</button>
                 {categories.map((category) => (
                   <button className={selectedCategory.id === category.id ? "active" : ""} key={category.id} onClick={() => { setSystemMode(false); setSelectedCategory(category) }} type="button">{category.label}</button>
