@@ -2,6 +2,7 @@ package com.example.projectmm.application.chat;
 
 import com.example.projectmm.application.dialogue.DialogueGateway;
 import com.example.projectmm.application.dialogue.WorldRoomContextBuilder;
+import com.example.projectmm.application.memory.PocketUserSpeechCommitted;
 import com.example.projectmm.domain.chat.ChatRole;
 import com.example.projectmm.domain.chat.WorldRoomMessage;
 import com.example.projectmm.domain.chat.WorldRoomMessageRepository;
@@ -13,6 +14,7 @@ import com.example.projectmm.domain.chat.WorldRoomVariantSystemSnapshotRepositor
 import com.example.projectmm.domain.dialogue.WorldRoomTurn;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,7 @@ public class WorldRoomDialogueService {
     private final WorldRoomMessageVariantRepository variants;
     private final WorldRoomVariantCastSnapshotRepository castSnapshots;
     private final WorldRoomVariantSystemSnapshotRepository systemSnapshots;
+    private final ApplicationEventPublisher events;
 
     @Transactional
     public WorldRoomTurn chat(Long sessionId, String userMessage) {
@@ -72,6 +75,11 @@ public class WorldRoomDialogueService {
         ));
         sessionService.saveCastSnapshot(variant, beforeCast, afterCast);
         sessionService.saveSystemSnapshot(variant, beforeSystems, afterSystems);
+        events.publishEvent(new PocketUserSpeechCommitted(
+                sessionId,
+                userMessage,
+                context.simulatedAt()
+        ));
 
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
     }
