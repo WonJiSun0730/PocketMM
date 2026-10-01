@@ -22,6 +22,13 @@ public interface MemoryRepository
 
     boolean existsByChatFingerprint(String chatFingerprint);
 
+    List<Memory> findTop5ByWorldRoomSessionIdAndCharacterIdOrderByRememberedAtDescIdDesc(
+            Long sessionId,
+            Long characterId
+    );
+
+    List<Memory> findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(Long sessionId);
+
     @Query("select m from Memory m where m.character.id = :characterId "
             + "and (m.conversation is null or m.conversation.id = :conversationId) "
             + "order by m.rememberedAt desc")
