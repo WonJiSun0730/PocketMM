@@ -33,6 +33,7 @@ export default function PocketPage({ pocket, onBack }) {
   const [isDeveloper, setIsDeveloper] = useState(false)
   const [devOpen, setDevOpen] = useState(false)
   const [devSystemValues, setDevSystemValues] = useState({})
+  const [memoryInspector, setMemoryInspector] = useState([])
   const bottomRef = useRef(null)
 
   async function refresh() {
@@ -46,6 +47,10 @@ export default function PocketPage({ pocket, onBack }) {
       setMessages(await messageResponse.json())
       if (castResponse.ok) setCast(await castResponse.json())
       if (systemResponse.ok) setSystems(await systemResponse.json())
+      if (isDeveloper) {
+        const memoryResponse = await fetch(`${base}/memory-inspector`, { credentials: "include" })
+        if (memoryResponse.ok) setMemoryInspector(await memoryResponse.json())
+      }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -62,6 +67,13 @@ export default function PocketPage({ pocket, onBack }) {
       .catch(() => { if (active) setIsDeveloper(false) })
     return () => { active = false }
   }, [])
+  useEffect(() => {
+    if (!isDeveloper) return
+    fetch(`${base}/memory-inspector`, { credentials: "include" })
+      .then(response => response.ok ? response.json() : [])
+      .then(setMemoryInspector)
+      .catch(() => setMemoryInspector([]))
+  }, [isDeveloper, session.id])
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: messages.length ? "smooth" : "auto" }) }, [messages, sending])
 
   async function sendMessage() {
@@ -263,8 +275,36 @@ export default function PocketPage({ pocket, onBack }) {
                 </div>)}
               </div>}
           </div>
-          <div className="mt-3 rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
-            Memory Inspector · 최신 5개 / 턴별 Diff 연결 예정
+          <div className="mt-3 rounded-lg border p-3">
+            <p className="mb-3 text-xs font-semibold">Memory Inspector · 캐릭터별 최신 5개</p>
+            {memoryInspector.length === 0
+              ? <p className="text-xs text-muted-foreground">이 Pocket에 저장된 캐릭터 기억이 아직 없습니다.</p>
+              : <div className="space-y-4">
+                {memoryInspector.map(group => <div key={group.characterId}>
+                  <div className="mb-1.5 flex items-center gap-2 text-xs">
+                    <strong>{group.characterName}</strong>
+                    <span className="text-muted-foreground">{group.active ? "ACTIVE" : "INACTIVE"}</span>
+                  </div>
+                  {group.memories.length === 0
+                    ? <p className="rounded-md border border-dashed p-2 text-xs text-muted-foreground">저장된 기억 없음</p>
+                    : <div className="overflow-x-auto rounded-md border">
+                      <table className="w-full min-w-[680px] text-left text-[11px]">
+                        <thead className="bg-muted/40 text-muted-foreground">
+                          <tr><th className="px-2 py-1.5">ID</th><th className="px-2 py-1.5">단계</th><th className="px-2 py-1.5">중요도</th><th className="px-2 py-1.5">기억</th><th className="px-2 py-1.5">근거</th></tr>
+                        </thead>
+                        <tbody>
+                          {group.memories.map(memory => <tr key={memory.id} className="border-t align-top">
+                            <td className="whitespace-nowrap px-2 py-2">{memory.id}</td>
+                            <td className="whitespace-nowrap px-2 py-2">{memory.detailLevel}</td>
+                            <td className="px-2 py-2">{memory.importance}</td>
+                            <td className="max-w-72 px-2 py-2">{memory.summary}</td>
+                            <td className="max-w-64 px-2 py-2 text-muted-foreground">{memory.evidenceQuote ?? "-"}</td>
+                          </tr>)}
+                        </tbody>
+                      </table>
+                    </div>}
+                </div>)}
+              </div>}
           </div>
         </div>}
       </section>}
