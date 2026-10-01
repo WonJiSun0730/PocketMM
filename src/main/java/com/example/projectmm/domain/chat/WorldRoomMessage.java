@@ -33,6 +33,8 @@ public class WorldRoomMessage {
 
     private LocalDateTime editedAt;
 
+    private Integer selectedVariantNo;
+
     public WorldRoomMessage(
             WorldRoomSession session,
             ChatRole role,
@@ -55,6 +57,21 @@ public class WorldRoomMessage {
         this.role = role;
         this.content = content;
         this.createdAt = createdAt;
+        this.selectedVariantNo = role == ChatRole.CHARACTER ? 1 : null;
+    }
+
+    public void selectVariant(int variantNo, String content) {
+        if (role != ChatRole.CHARACTER) {
+            throw new IllegalStateException("Only character messages can select variants");
+        }
+        if (variantNo < 1) {
+            throw new IllegalArgumentException("variantNo must be at least 1");
+        }
+        if (content == null || content.isBlank()) {
+            throw new IllegalArgumentException("content must not be blank");
+        }
+        this.selectedVariantNo = variantNo;
+        this.content = content;
     }
 
     public void edit(String content, LocalDateTime editedAt) {
