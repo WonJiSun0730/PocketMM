@@ -86,7 +86,7 @@ public class WorldRoomDialogueService {
         var context = contextBuilder.buildSession(sessionId);
         var beforeCast = sessionService.captureCastState(sessionId);
         var beforeSystems = sessionService.captureSystemState(sessionId);
-        var continuationPrompt = "[Continue the current scene naturally without requiring a new user action or dialogue. Do not decide important actions, emotions, or choices for the user.]";
+        var continuationPrompt = "[Continue the current scene naturally for one turn. The player character may actively participate: give them plausible small actions, immediate reactions, observations, movement, or brief dialogue consistent with their PlayerProfile, established relationships, and the current situation. This mode is used when the user wants the story to move forward without deciding the next beat themselves. Keep major decisions, irreversible actions, major relationship changes, high-risk commitments, and other consequential choices open for the user.]";
         var generated = dialogueGateway.generateWorldRoomTurn(context, continuationPrompt);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
@@ -176,7 +176,7 @@ public class WorldRoomDialogueService {
         var context = contextBuilder.buildSessionBeforeMessage(sessionId, target.getId());
         var rerollBase = precedingMessage != null && precedingMessage.getRole() == ChatRole.USER
                 ? precedingMessage.getContent()
-                : "[Continue the current scene naturally without requiring a new user action or dialogue. Do not decide important actions, emotions, or choices for the user.]";
+                : "[Continue the current scene naturally for one turn. The player character may actively participate: give them plausible small actions, immediate reactions, observations, movement, or brief dialogue consistent with their PlayerProfile, established relationships, and the current situation. This mode is used when the user wants the story to move forward without deciding the next beat themselves. Keep major decisions, irreversible actions, major relationship changes, high-risk commitments, and other consequential choices open for the user.]";
         var rerollPrompt = rerollBase
                 + "\n\n[Previous response variant]\n"
                 + previousVariant
