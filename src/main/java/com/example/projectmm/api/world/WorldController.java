@@ -113,6 +113,16 @@ public class WorldController {
     public List<WorldCharacterItem> replaceCharacters(@PathVariable Long worldId, @RequestBody WorldCharacterUpdateRequest request, Authentication authentication) {
         return worldCharacterService.replace(worldId, request.characterIds(), authentication.getName());
     }
+    @GetMapping("/{worldId}/rooms")
+    public List<WorldRoomResponse> getRooms(
+            @PathVariable Long worldId,
+            Authentication authentication
+    ) {
+        return worldRoomService.ownedRooms(worldId, authentication.getName()).stream()
+                .map(this::toRoomResponse)
+                .toList();
+    }
+
     @PostMapping("/{worldId}/rooms")
     @ResponseStatus(HttpStatus.CREATED)
     public WorldRoomResponse createRoom(
