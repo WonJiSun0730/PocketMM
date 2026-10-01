@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { ArrowLeft, Send } from "lucide-react"
+import { ArrowLeft, ChevronLeft, ChevronRight, Pencil, RefreshCw, Send, Trash2, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -27,6 +27,9 @@ export default function PocketPage({ pocket, onBack }) {
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [editing, setEditing] = useState(null)
+  const [editText, setEditText] = useState("")
+  const [variantsByMessage, setVariantsByMessage] = useState({})
   const bottomRef = useRef(null)
 
   async function refresh() {
@@ -76,6 +79,73 @@ export default function PocketPage({ pocket, onBack }) {
     }
   }
 
+
+  async function editMessage(item) {
+    const content = editText.trim()
+    if (!content || sending) return
+    setSending(true)
+    setError("")
+    try {
+      const response = await fetch(`${base}/messages/${item.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content }),
+      })
+      if (!response.ok) throw new Error("메시지를 수정하지 못했어요.")
+      setEditing(null)
+      setEditText("")
+      await refresh()
+    } catch (e) { setError(e.message) }
+    finally { setSending(false) }
+  }
+
+  async function reroll(item) {
+    if (sending) return
+    setSending(true)
+    setError("")
+    try {
+      const response = await fetch(`${base}/messages/${item.id}/reroll`, { method: "POST", credentials: "include" })
+      if (response.status === 409) throw new Error("이 응답은 이미 이어진 과거 장면이라 리롤할 수 없어요.")
+      if (!response.ok) throw new Error("리롤하지 못했어요.")
+      await refresh()
+      await loadVariants(item.id)
+    } catch (e) { setError(e.message) }
+    finally { setSending(false) }
+  }
+
+  async function loadVariants(messageId) {
+    const response = await fetch(`${base}/messages/${messageId}/variants`, { credentials: "include" })
+    if (!response.ok) return
+    setVariantsByMessage(current => ({ ...current, [messageId]: await response.json() }))
+  }
+
+  async function selectVariant(item, variantNo) {
+    if (sending) return
+    setSending(true)
+    setError("")
+    try {
+      const response = await fetch(`${base}/messages/${item.id}/variants/${variantNo}`, { method: "PUT", credentials: "include" })
+      if (response.status === 409) throw new Error("이 응답은 이미 이어진 과거 장면이라 다른 버전으로 바꿀 수 없어요.")
+      if (!response.ok) throw new Error("다른 버전을 선택하지 못했어요.")
+      await refresh()
+      await loadVariants(item.id)
+    } catch (e) { setError(e.message) }
+    finally { setSending(false) }
+  }
+
+  async function deleteFrom(item) {
+    if (sending || !window.confirm("이 메시지부터 이후의 대화를 삭제할까요?")) return
+    setSending(true)
+    setError("")
+    try {
+      const response = await fetch(`${base}/messages/${item.id}`, { method: "DELETE", credentials: "include" })
+      if (!response.ok) throw new Error("메시지를 삭제하지 못했어요.")
+      await refresh()
+    } catch (e) { setError(e.message) }
+    finally { setSending(false) }
+  }
+
   function handleKeyDown(event) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault()
@@ -116,11 +186,29 @@ export default function PocketPage({ pocket, onBack }) {
 
           {loading && <p className="py-10 text-center text-sm text-muted-foreground">포켓을 불러오는 중...</p>}
 
-          {!loading && messages.map(item => (
-            <article key={item.id} className="border-b border-border/70 py-7 last:border-b-0 sm:py-9">
-              <RpText text={item.content ?? item.message} />
+          {!loading && messages.map((item, index) => {
+            const isCharacter = item.role === "CHARACTER"
+            const isLatest = index === messages.length - 1
+            const variants = variantsByMessage[item.id] ?? []
+            const selectedIndex = variants.findIndex(variant => variant.selected)
+            return <article key={item.id} className="group border-b border-border/70 py-7 last:border-b-0 sm:py-9">
+              {editing === item.id ? <div className="space-y-2">
+                <Textarea autoFocus value={editText} onChange={e => setEditText(e.target.value)} className="min-h-32 resize-y text-base leading-7" />
+                <div className="flex justify-end gap-2"><Button size="sm" variant="ghost" onClick={() => setEditing(null)}><X className="mr-1 size-3.5"/>취소</Button><Button size="sm" onClick={() => editMessage(item)}>저장</Button></div>
+              </div> : <RpText text={item.content ?? item.message} />}
+              {editing !== item.id && <div className="mt-4 flex min-h-7 flex-wrap items-center gap-1 text-xs text-muted-foreground opacity-40 transition-opacity group-hover:opacity-100">
+                <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { setEditing(item.id); setEditText(item.content ?? item.message ?? "") }} disabled={sending}><Pencil className="mr-1 size-3"/>수정</Button>
+                {isCharacter && isLatest && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => reroll(item)} disabled={sending}><RefreshCw className="mr-1 size-3"/>리롤</Button>}
+                {isCharacter && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => loadVariants(item.id)} disabled={sending}>버전 {item.selectedVariantNo ?? 1}</Button>}
+                {variants.length > 1 && <div className="flex items-center gap-1">
+                  <Button size="icon" variant="ghost" className="size-7" disabled={sending || selectedIndex <= 0 || !isLatest} onClick={() => selectVariant(item, variants[selectedIndex - 1].variantNo)}><ChevronLeft className="size-3"/></Button>
+                  <span>{selectedIndex + 1} / {variants.length}</span>
+                  <Button size="icon" variant="ghost" className="size-7" disabled={sending || selectedIndex < 0 || selectedIndex >= variants.length - 1 || !isLatest} onClick={() => selectVariant(item, variants[selectedIndex + 1].variantNo)}><ChevronRight className="size-3"/></Button>
+                </div>}
+                <Button size="sm" variant="ghost" className="ml-auto h-7 px-2 text-destructive hover:text-destructive" onClick={() => deleteFrom(item)} disabled={sending}><Trash2 className="mr-1 size-3"/>이후 삭제</Button>
+              </div>}
             </article>
-          ))}
+          })}
 
           {sending && <div className="border-b border-border/70 py-7 sm:py-9">
             <p className="animate-pulse text-sm italic text-muted-foreground">장면을 이어가는 중...</p>
