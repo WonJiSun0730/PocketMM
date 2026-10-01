@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react"
-import { ArrowLeft, Pocket } from "lucide-react"
+import { ArrowLeft } from "lucide-react"
+
+function PocketIcon({ size = 28, strokeWidth = 1.4 }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5 4.5h14l-1.2 15H6.2L5 4.5Z" />
+    <path d="M8 9.5c1.1 1.1 2.45 1.65 4 1.65s2.9-.55 4-1.65" />
+  </svg>
+}
 
 export default function PocketsPage({ onBack, onOpenPocket }) {
   const [pockets, setPockets] = useState([])
@@ -45,7 +52,7 @@ export default function PocketsPage({ onBack, onOpenPocket }) {
       </header>
       {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
       {loading ? <p className="py-16 text-center text-sm text-muted-foreground">포켓을 불러오는 중...</p> :
-        pockets.length === 0 ? <div className="grid place-items-center gap-3 rounded-2xl border bg-card py-20 text-center"><Pocket size={28} strokeWidth={1.4}/><strong>아직 포켓이 없어요.</strong><span className="text-sm text-muted-foreground">월드에서 인트로를 선택해 첫 포켓을 시작해 보세요.</span></div> :
+        pockets.length === 0 ? <div className="grid place-items-center gap-3 rounded-2xl border bg-card py-20 text-center"><PocketIcon /><strong>아직 포켓이 없어요.</strong><span className="text-sm text-muted-foreground">월드에서 인트로를 선택해 첫 포켓을 시작해 보세요.</span></div> :
         <div className="grid gap-3">{pockets.map(item => <button key={item.sessionId} type="button" onClick={() => openPocket(item)} className="grid w-full gap-2 rounded-2xl border bg-card p-5 text-left transition hover:bg-accent/50">
           <div className="flex items-start justify-between gap-4"><strong className="text-lg">{item.roomTitle}</strong><span className="shrink-0 text-xs text-muted-foreground">{item.playerProfileName ?? "프로필 없음"}</span></div>
           <span className="text-sm text-muted-foreground">{item.worldName}</span>
