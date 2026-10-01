@@ -9,6 +9,8 @@ public interface WorldRoomSessionCastRepository extends JpaRepository<WorldRoomS
 
     List<WorldRoomSessionCast> findBySessionIdAndActiveTrueOrderByEnteredAtAscIdAsc(Long sessionId);
 
+    List<WorldRoomSessionCast> findBySessionIdOrderByIdAsc(Long sessionId);
+
     Optional<WorldRoomSessionCast> findBySessionIdAndCharacterId(Long sessionId, Long characterId);
     void deleteBySessionRoomId(Long roomId);
 }
