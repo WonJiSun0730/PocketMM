@@ -14,5 +14,11 @@ public interface WorldRoomMessageRepository extends JpaRepository<WorldRoomMessa
 
     void deleteBySessionIdAndIdGreaterThanEqual(Long sessionId, Long messageId);
 
+    java.util.Optional<WorldRoomMessage> findTopBySessionIdAndIdGreaterThanEqualAndRoleOrderByIdAsc(
+            Long sessionId,
+            Long messageId,
+            ChatRole role
+    );
+
     java.util.Optional<WorldRoomMessage> findTopBySessionIdAndIdLessThanOrderByIdDesc(Long sessionId, Long messageId);
 }
