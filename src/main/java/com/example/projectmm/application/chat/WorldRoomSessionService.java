@@ -26,15 +26,21 @@ public class WorldRoomSessionService {
     private final WorldRoomSessionCastRepository sessionCasts;
     private final MemberRepository members;
     private final PlayerProfileRepository players;
+    private final WorldRoomIntroRepository intros;
 
     @Transactional
-    public WorldRoomSession start(Long roomId, String loginId, Long playerProfileId) {
+    public WorldRoomSession start(Long roomId, String loginId, Long playerProfileId, Long introId) {
         var room = room(roomId);
         var member = members.findByLoginId(loginId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
         var player = playerProfileId == null ? null : players.findById(playerProfileId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Player profile not found"));
-        return sessions.save(new WorldRoomSession(room, member, player, now()));
+        if (introId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Room intro is required");
+        }
+        var intro = intros.findByIdAndRoomId(introId, roomId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room intro not found"));
+        return sessions.save(new WorldRoomSession(room, member, player, intro, now()));
     }
 
     @Transactional(readOnly = true)
