@@ -29,11 +29,30 @@ public class WorldSystem {
     @Column(name = "max_value", nullable = false)
     private int maxValue;
 
+    @Column(name = "initial_value", nullable = false)
+    private int initialValue;
+
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
-    public WorldSystem(World world, String name, String changeCondition, int minValue, int maxValue, int sortOrder) {
-        this.world = world; this.name = name; this.changeCondition = changeCondition;
-        this.minValue = minValue; this.maxValue = maxValue; this.sortOrder = sortOrder;
+    public WorldSystem(
+            World world,
+            String name,
+            String changeCondition,
+            int minValue,
+            int maxValue,
+            int initialValue,
+            int sortOrder
+    ) {
+        if (initialValue < minValue || initialValue > maxValue) {
+            throw new IllegalArgumentException("System initial value is outside system bounds.");
+        }
+        this.world = world;
+        this.name = name;
+        this.changeCondition = changeCondition;
+        this.minValue = minValue;
+        this.maxValue = maxValue;
+        this.initialValue = initialValue;
+        this.sortOrder = sortOrder;
     }
 }
