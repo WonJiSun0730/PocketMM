@@ -331,6 +331,28 @@ public class WorldController {
                 .toList();
     }
 
+    @PutMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/messages/{messageId}")
+    public WorldRoomMessageItem editRoomMessage(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @PathVariable Long sessionId,
+            @PathVariable Long messageId,
+            @Valid @RequestBody WorldRoomMessageEditRequest request,
+            Authentication authentication
+    ) {
+        var session = worldRoomSessionService.latest(roomId, authentication.getName());
+        if (!session.getId().equals(sessionId)) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Room play session not found"
+            );
+        }
+        ensureRoomWorld(worldId, session.getRoom().getWorld().getId());
+        return WorldRoomMessageItem.from(
+                worldRoomDialogueService.editMessage(sessionId, messageId, request.content())
+        );
+    }
+
     @PostMapping("/{worldId}/characters/{characterId}/conversations")
     @ResponseStatus(HttpStatus.CREATED)
     public NewConversationResponse startWorldConversation(
