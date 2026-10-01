@@ -4,3 +4,61 @@
 .world-cast-actions{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}.world-cast-actions button{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);border-radius:8px;background:var(--card);padding:5px 8px;color:var(--foreground);font-size:11px;cursor:pointer}.world-cast-actions button:hover{background:var(--secondary)}
 
 .system-section-label{display:block;margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}
+
+
+.world-room-summary {
+  margin: 12px 0 18px;
+  padding: 14px;
+  border: 1px solid var(--line, rgba(127, 127, 127, 0.22));
+  border-radius: 14px;
+}
+
+.world-room-summary-heading,
+.world-room-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.world-room-summary-heading span,
+.world-room-item small,
+.world-room-empty {
+  opacity: 0.65;
+  font-size: 0.82rem;
+}
+
+.world-room-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.world-room-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(127, 127, 127, 0.08);
+}
+
+.world-room-item > span {
+  display: grid;
+  gap: 3px;
+}
+
+.world-room-item button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.world-room-item button:hover {
+  opacity: 1;
+}
+
+.world-room-empty {
+  margin: 10px 0 0;
+}
