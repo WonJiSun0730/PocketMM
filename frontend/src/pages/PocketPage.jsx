@@ -55,7 +55,11 @@ export default function PocketPage({ pocket, onBack }) {
 
   async function sendMessage() {
     const message = input.trim()
-    if (!message || sending || loading) return
+    if (sending || loading) return
+    if (!message) {
+      await continueScene()
+      return
+    }
     setSending(true)
     setError("")
     setInput("")
@@ -241,13 +245,10 @@ export default function PocketPage({ pocket, onBack }) {
           <Textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
             placeholder="행동이나 대사를 입력해 주세요." disabled={loading || sending} rows={1}
             className="max-h-36 min-h-11 resize-none text-base" />
-          <Button type="button" size="icon" className="size-11 shrink-0" disabled={loading || sending || !input.trim()}
+          <Button type="button" size="icon" className="size-11 shrink-0" disabled={loading || sending}
             onClick={sendMessage} aria-label="메시지 보내기"><Send className="size-4" /></Button>
         </div>
-        <div className="mx-auto mt-2 flex max-w-3xl items-center justify-between gap-3 text-xs text-muted-foreground">
-          <button type="button" disabled={loading || sending} onClick={continueScene} className="rounded-md px-2 py-1 transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50">대화 없이 진행하기</button>
-          <span>Enter 전송 · Shift + Enter 줄바꿈</span>
-        </div>
+        <p className="mx-auto mt-2 max-w-3xl text-center text-xs text-muted-foreground">Enter 전송 · 빈 입력으로 전송 시 장면 진행 · Shift + Enter 줄바꿈</p>
       </div>
     </section>
   </main>
