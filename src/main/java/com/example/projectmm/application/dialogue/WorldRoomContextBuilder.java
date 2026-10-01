@@ -41,6 +41,18 @@ public class WorldRoomContextBuilder {
 
     @Transactional(readOnly = true)
     public WorldRoomDialogueContext buildSession(Long sessionId) {
+        return buildSession(sessionId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public WorldRoomDialogueContext buildSessionBeforeMessage(Long sessionId, Long beforeMessageId) {
+        if (beforeMessageId == null) {
+            throw new IllegalArgumentException("beforeMessageId must not be null");
+        }
+        return buildSession(sessionId, beforeMessageId);
+    }
+
+    private WorldRoomDialogueContext buildSession(Long sessionId, Long beforeMessageId) {
         var session = sessions.findById(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("World room session not found. sessionId=" + sessionId));
         var room = session.getRoom();
@@ -112,7 +124,10 @@ public class WorldRoomContextBuilder {
                         ),
                 session.getIntro().getTitle(),
                 session.getIntro().getContent(),
-                messages.findTop50BySessionIdOrderByCreatedAtDescIdDesc(sessionId).stream()
+                (beforeMessageId == null
+                        ? messages.findTop50BySessionIdOrderByCreatedAtDescIdDesc(sessionId)
+                        : messages.findTop50BySessionIdAndIdLessThanOrderByIdDesc(sessionId, beforeMessageId))
+                        .stream()
                         .sorted(java.util.Comparator.comparing(WorldRoomMessage::getCreatedAt)
                                 .thenComparing(WorldRoomMessage::getId))
                         .map(message -> new DialogueMessageContext(
