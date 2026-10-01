@@ -136,6 +136,11 @@ public class WorldRoomService {
     }
 
     @Transactional(readOnly = true)
+    public WorldConversation get(Long roomId) {
+        return room(roomId);
+    }
+
+    @Transactional(readOnly = true)
     public List<WorldConversationCast> roomCast(Long roomId) {
         room(roomId);
         return casts.findByConversationIdOrderByJoinedAtAscIdAsc(roomId);
