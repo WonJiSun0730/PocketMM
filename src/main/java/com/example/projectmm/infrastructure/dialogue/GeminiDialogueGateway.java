@@ -109,6 +109,35 @@ public class GeminiDialogueGateway implements DialogueGateway {
         String resolvedUserMessage = userMessage == null ? "" : userMessage.trim();
         String systemPrompt = buildWorldRoomSystemPrompt(context);
 
+        List<Map<String, Object>> contents = new ArrayList<>();
+        var history = context.recentMessages();
+        int historySize = history == null ? 0 : history.size();
+        int lastHistoryIndex = historySize - 1;
+
+        for (int i = 0; i < historySize; i++) {
+            var message = history.get(i);
+
+            // The chat service saves the current USER message before building this context.
+            // Skip that final persisted copy and append the current turn exactly once below.
+            if (i == lastHistoryIndex
+                    && message.role() == com.example.projectmm.domain.chat.ChatRole.USER
+                    && message.content().trim().equals(resolvedUserMessage)) {
+                continue;
+            }
+
+            contents.add(Map.of(
+                    "role", message.role() == com.example.projectmm.domain.chat.ChatRole.USER
+                            ? "user"
+                            : "model",
+                    "parts", List.of(Map.of("text", message.content()))
+            ));
+        }
+
+        contents.add(Map.of(
+                "role", "user",
+                "parts", List.of(Map.of("text", resolvedUserMessage))
+        ));
+
         Map<String, Object> request = Map.of(
                 "systemInstruction",
                 Map.of("parts", List.of(Map.of(
@@ -131,10 +160,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
                                 """
                 ))),
                 "contents",
-                List.of(Map.of(
-                        "role", "user",
-                        "parts", List.of(Map.of("text", resolvedUserMessage))
-                )),
+                contents,
                 "generationConfig",
                 Map.of("responseMimeType", "application/json")
         );
