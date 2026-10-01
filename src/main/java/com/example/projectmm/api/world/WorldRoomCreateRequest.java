@@ -6,6 +6,5 @@ import jakarta.validation.constraints.Size;
 
 public record WorldRoomCreateRequest(
         @NotBlank @Size(max = 100) String title,
-        WorldConversation.Visibility visibility,
-        Long playerProfileId
+        WorldConversation.Visibility visibility
 ) {}
