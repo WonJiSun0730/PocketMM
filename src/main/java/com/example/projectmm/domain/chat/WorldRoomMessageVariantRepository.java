@@ -18,4 +18,6 @@ public interface WorldRoomMessageVariantRepository extends JpaRepository<WorldRo
             Long messageId
     );
     void deleteByMessageSessionRoomId(Long roomId);
+
+    void deleteByMessageSessionId(Long sessionId);
 }
