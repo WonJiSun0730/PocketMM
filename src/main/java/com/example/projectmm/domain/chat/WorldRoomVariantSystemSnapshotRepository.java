@@ -14,4 +14,6 @@ public interface WorldRoomVariantSystemSnapshotRepository
             Long messageId
     );
     void deleteByVariantMessageSessionRoomId(Long roomId);
+
+    void deleteByVariantMessageSessionId(Long sessionId);
 }
