@@ -36,6 +36,16 @@ export default function PocketPage({ pocket, onBack }) {
   const [memoryInspector, setMemoryInspector] = useState([])
   const bottomRef = useRef(null)
 
+  async function refreshMemoryInspector() {
+    if (!isDeveloper) return
+    try {
+      const response = await fetch(`${base}/memory-inspector`, { credentials: "include" })
+      if (response.ok) setMemoryInspector(await response.json())
+    } catch {
+      setMemoryInspector([])
+    }
+  }
+
   async function refresh() {
     try {
       const [messageResponse, castResponse, systemResponse] = await Promise.all([
@@ -47,10 +57,6 @@ export default function PocketPage({ pocket, onBack }) {
       setMessages(await messageResponse.json())
       if (castResponse.ok) setCast(await castResponse.json())
       if (systemResponse.ok) setSystems(await systemResponse.json())
-      if (isDeveloper) {
-        const memoryResponse = await fetch(`${base}/memory-inspector`, { credentials: "include" })
-        if (memoryResponse.ok) setMemoryInspector(await memoryResponse.json())
-      }
     } catch (e) {
       setError(e.message)
     } finally {
@@ -68,11 +74,11 @@ export default function PocketPage({ pocket, onBack }) {
     return () => { active = false }
   }, [])
   useEffect(() => {
-    if (!isDeveloper) return
-    fetch(`${base}/memory-inspector`, { credentials: "include" })
-      .then(response => response.ok ? response.json() : [])
-      .then(setMemoryInspector)
-      .catch(() => setMemoryInspector([]))
+    if (!isDeveloper) {
+      setMemoryInspector([])
+      return
+    }
+    refreshMemoryInspector()
   }, [isDeveloper, session.id])
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: messages.length ? "smooth" : "auto" }) }, [messages, sending])
 
@@ -97,6 +103,7 @@ export default function PocketPage({ pocket, onBack }) {
       })
       if (!response.ok) throw new Error("대화를 이어가지 못했어요.")
       await refresh()
+      await refreshMemoryInspector()
     } catch (e) {
       setMessages(current => current.filter(item => item.id !== pending.id))
       setInput(message)
@@ -185,6 +192,7 @@ export default function PocketPage({ pocket, onBack }) {
       })
       if (!response.ok) throw new Error("장면을 이어가지 못했어요.")
       await refresh()
+      await refreshMemoryInspector()
     } catch (e) {
       setError(e.message)
     } finally {
