@@ -183,9 +183,51 @@ public class GeminiDialogueGateway implements DialogueGateway {
             WorldRoomDialogueContext context
     ) {
         try {
-            JsonNode root = objectMapper.readTree(response);
-            String payload = root.path("candidates").path(0).path("content").path("parts").path(0).path("text").asText();
-            JsonNode turn = objectMapper.readTree(payload);
+            JsonNode candidate = objectMapper.readTree(response).path("candidates").path(0);
+            if (!"STOP".equals(candidate.path("finishReason").asText())) {
+                throw new IllegalArgumentException("Incomplete world room dialogue response");
+            }
+
+            StringBuilder body = new StringBuilder();
+            for (JsonNode part : candidate.path("content").path("parts")) {
+                if (!part.path("thought").asBoolean(false)) {
+                    body.append(part.path("text").asText(""));
+                }
+            }
+
+            String payload = body.toString().strip();
+            if (payload.startsWith("```json\n") && payload.endsWith("```")) {
+                payload = payload.substring(8, payload.length() - 3).strip();
+            }
+
+            JsonNode turn;
+            try {
+                turn = objectMapper.readTree(payload);
+            } catch (tools.jackson.core.exc.StreamReadException malformed) {
+                // Keep a valid prose turn even when Gemini ignores responseMimeType.
+                // Metadata is discarded because cast/system changes cannot be trusted
+                // without the structured JSON envelope.
+                if (isPlainRp(payload)) {
+                    return new WorldRoomTurn(
+                            payload,
+                            new WorldRoomCastChange(List.of(), List.of()),
+                            List.of()
+                    );
+                }
+                throw malformed;
+            }
+
+            if (turn != null && turn.isString() && isPlainRp(turn.asText())) {
+                return new WorldRoomTurn(
+                        turn.asText(),
+                        new WorldRoomCastChange(List.of(), List.of()),
+                        List.of()
+                );
+            }
+            if (turn == null) {
+                throw new IllegalArgumentException("Empty world room dialogue payload");
+            }
+
             String reply = turn.path("reply").asText();
             if (reply.isBlank()) {
                 throw new IllegalStateException("World room dialogue reply is blank");
