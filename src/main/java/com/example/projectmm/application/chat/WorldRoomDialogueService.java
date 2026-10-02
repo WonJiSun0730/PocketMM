@@ -3,6 +3,7 @@ package com.example.projectmm.application.chat;
 import com.example.projectmm.application.dialogue.DialogueGateway;
 import com.example.projectmm.application.dialogue.WorldRoomContextBuilder;
 import com.example.projectmm.application.memory.PocketUserSpeechCommitted;
+import com.example.projectmm.application.time.TimeInterpreter;
 import com.example.projectmm.domain.memory.MemoryRepository;
 import com.example.projectmm.domain.memory.ProtectedMemoryDetailRepository;
 import com.example.projectmm.domain.chat.ChatRole;
@@ -41,6 +42,7 @@ public class WorldRoomDialogueService {
     private final ApplicationEventPublisher events;
     private final MemoryRepository memories;
     private final ProtectedMemoryDetailRepository memoryDetails;
+    private final TimeInterpreter timeInterpreter;
 
     @Transactional
     public WorldRoomTurn chat(Long sessionId, String userMessage) {
@@ -56,6 +58,7 @@ public class WorldRoomDialogueService {
                 now()
         ));
 
+        applyExplicitTimeChange(session, userMessage);
         var context = contextBuilder.buildSession(sessionId);
         var beforeCast = sessionService.captureCastState(sessionId);
         var beforeSystems = sessionService.captureSystemState(sessionId);
@@ -87,6 +90,21 @@ public class WorldRoomDialogueService {
         ));
 
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
+    }
+
+    private void applyExplicitTimeChange(
+            com.example.projectmm.domain.chat.WorldRoomSession session,
+            String userMessage
+    ) {
+        var interpretation = timeInterpreter.interpret(userMessage, session.getSimulatedAt());
+        if (!interpretation.matched() || interpretation.timeChange() == null) {
+            return;
+        }
+
+        var change = interpretation.timeChange();
+        if (change.changed() && change.newTime() != null) {
+            session.updateSimulatedAt(change.newTime());
+        }
     }
 
     @Transactional
