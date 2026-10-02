@@ -296,8 +296,8 @@ public class WorldRoomDialogueService {
                 ));
 
         var page = beforeId == null
-                ? messages.findTop50BySessionIdOrderByIdDesc(sessionId)
-                : messages.findTop50BySessionIdAndIdLessThanOrderByIdDesc(sessionId, beforeId);
+                ? messages.findTop15BySessionIdOrderByIdDesc(sessionId)
+                : messages.findTop15BySessionIdAndIdLessThanOrderByIdDesc(sessionId, beforeId);
 
         return page.stream()
                 .sorted(Comparator.comparing(WorldRoomMessage::getId))
