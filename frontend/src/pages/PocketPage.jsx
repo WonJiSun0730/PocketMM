@@ -52,15 +52,36 @@ export default function PocketPage({ pocket, onBack }) {
     }
   }
 
+  async function loadAllMessages() {
+    const all = []
+    let before = null
+
+    while (true) {
+      const url = before == null
+        ? `${base}/messages`
+        : `${base}/messages?before=${before}`
+      const response = await fetch(url, { credentials: "include" })
+      if (!response.ok) throw new Error("포켓의 대화를 불러오지 못했어요.")
+
+      const page = await response.json()
+      if (page.length === 0) break
+
+      all.unshift(...page)
+      if (page.length < 50) break
+      before = page[0].id
+    }
+
+    return all
+  }
+
   async function refresh() {
     try {
-      const [messageResponse, castResponse, systemResponse] = await Promise.all([
-        fetch(`${base}/messages`, { credentials: "include" }),
+      const [loadedMessages, castResponse, systemResponse] = await Promise.all([
+        loadAllMessages(),
         fetch(`${base}/cast`, { credentials: "include" }),
         fetch(`${base}/systems`, { credentials: "include" }),
       ])
-      if (!messageResponse.ok) throw new Error("포켓의 대화를 불러오지 못했어요.")
-      setMessages(await messageResponse.json())
+      setMessages(loadedMessages)
       if (castResponse.ok) setCast(await castResponse.json())
       if (systemResponse.ok) setSystems(await systemResponse.json())
     } catch (e) {
