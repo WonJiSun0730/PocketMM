@@ -12,4 +12,6 @@ public interface WorldRoomSessionSystemStateRepository
 
     Optional<WorldRoomSessionSystemState> findBySessionIdAndSystemId(Long sessionId, Long systemId);
     void deleteBySessionRoomId(Long roomId);
+
+    void deleteBySessionId(Long sessionId);
 }
