@@ -14,4 +14,6 @@ public interface ProtectedMemoryDetailRepository
     findByMemoryIdOrderByIdAsc(
             Long memoryId
     );
+
+    void deleteByMemoryIdIn(List<Long> memoryIds);
 }
