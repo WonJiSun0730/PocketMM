@@ -4,6 +4,7 @@ import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, Pencil
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
+import PlayerProfilePicker from "@/components/PlayerProfilePicker"
 
 function RpText({ text }) {
   const parts = (text ?? "").split(/(\*[^*]+\*)/g)
@@ -21,7 +22,7 @@ export default function PocketPage({ pocket, onBack }) {
   const { world, room, session, playerProfile } = pocket
   const base = `/api/worlds/${world.id}/rooms/${room.id}/sessions/${session.id}`
   const [selectedPlayerProfile, setSelectedPlayerProfile] = useState(playerProfile ?? null)
-  const [playerProfiles, setPlayerProfiles] = useState([])
+  const [pickerMode, setPickerMode] = useState(false)
   const [changingPlayerProfile, setChangingPlayerProfile] = useState(false)
   const [messages, setMessages] = useState([])
   const [cast, setCast] = useState([])
@@ -110,15 +111,6 @@ export default function PocketPage({ pocket, onBack }) {
   }, [session.id])
   useEffect(() => {
     let active = true
-    fetch("/api/player-profiles", { credentials: "include" })
-      .then(response => response.ok ? response.json() : [])
-      .then(items => { if (active) setPlayerProfiles(items) })
-      .catch(() => { if (active) setPlayerProfiles([]) })
-    return () => { active = false }
-  }, [session.id])
-
-  useEffect(() => {
-    let active = true
     fetch("/api/auth/me", { credentials: "include" })
       .then(response => response.ok ? response.json() : null)
       .then(member => { if (active) setIsDeveloper(member?.role === "DEVELOPER") })
@@ -163,9 +155,8 @@ export default function PocketPage({ pocket, onBack }) {
     return () => observer.disconnect()
   }, [hasOlderMessages, loadingOlder, loading, messages[0]?.id])
 
-  async function changePlayerProfile(event) {
-    const value = event.target.value
-    const profileId = value === "" ? null : Number(value)
+  async function selectPlayerProfile(profile) {
+    if (changingPlayerProfile) return
     setChangingPlayerProfile(true)
     setError("")
     try {
@@ -173,12 +164,11 @@ export default function PocketPage({ pocket, onBack }) {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ playerProfileId: profileId }),
+        body: JSON.stringify({ playerProfileId: profile?.id ?? null }),
       })
       if (!response.ok) throw new Error("플레이어 프로필을 변경하지 못했어요.")
-      setSelectedPlayerProfile(profileId == null
-        ? null
-        : playerProfiles.find(profile => profile.id === profileId) ?? null)
+      setSelectedPlayerProfile(profile ?? null)
+      setPickerMode(false)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -333,6 +323,22 @@ export default function PocketPage({ pocket, onBack }) {
     }
   }
 
+  if (pickerMode) {
+    return <main className="min-h-svh bg-background text-foreground">
+      <p className="mx-auto max-w-2xl px-4 pt-6 text-sm text-muted-foreground">{room.title} · 유저 프로필 선택</p>
+      {error && <p role="alert" className="mx-auto max-w-2xl px-4 py-2 text-destructive">{error}</p>}
+      <PlayerProfilePicker
+        current={selectedPlayerProfile}
+        busy={changingPlayerProfile}
+        onSelect={selectPlayerProfile}
+        onSaved={profile => {
+          if (selectedPlayerProfile?.id === profile.id) setSelectedPlayerProfile(profile)
+        }}
+        onCancel={() => setPickerMode(false)}
+      />
+    </main>
+  }
+
   return <main className="flex h-svh bg-background text-foreground">
     <section className="mx-auto flex h-full w-full max-w-4xl flex-col border-x bg-card">
       <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2 sm:px-6">
@@ -343,12 +349,18 @@ export default function PocketPage({ pocket, onBack }) {
           <h1 className="truncate font-medium leading-none">{room.title}</h1>
           <p className="mt-1 text-xs text-muted-foreground">{world.name} · POCKET</p>
         </div>
-        <div className="ml-auto flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-          <select aria-label="플레이어 프로필" value={selectedPlayerProfile?.id ?? ""} onChange={changePlayerProfile} disabled={changingPlayerProfile} className="max-w-44 rounded-full border-0 bg-accent px-2.5 py-1 text-xs text-accent-foreground outline-none disabled:opacity-60">
-            <option value="">프로필 없음</option>
-            {playerProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
-          </select>
-        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          className="ml-auto shrink-0"
+          disabled={loading || sending || changingPlayerProfile}
+          onClick={() => { setError(""); setPickerMode(true) }}
+        >
+          {selectedPlayerProfile?.avatar
+            ? <img src={selectedPlayerProfile.avatar} alt="" className="size-7 rounded-full object-cover" />
+            : <span className="grid size-7 place-items-center rounded-full bg-accent text-xs text-accent-foreground">{selectedPlayerProfile?.name?.slice(0, 1) ?? "나"}</span>}
+          {selectedPlayerProfile?.name ?? "프로필 선택"}
+        </Button>
       </header>
 
       <div className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
