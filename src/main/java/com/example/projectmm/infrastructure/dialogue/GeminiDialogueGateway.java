@@ -315,6 +315,20 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 ? "(none)"
                 : context.playerProfile().name() + ": " + blankAsNone(context.playerProfile().description());
 
+        String recalledMemories = context.recalledMemories() == null
+                ? ""
+                : context.recalledMemories().stream()
+                .map(group -> {
+                    String items = group.memories().stream()
+                            .map(memory -> "- " + blankAsNone(memory.summary())
+                                    + (memory.evidenceQuote() == null || memory.evidenceQuote().isBlank()
+                                    ? ""
+                                    : " | remembered evidence: " + memory.evidenceQuote()))
+                            .collect(Collectors.joining("\n"));
+                    return "[" + group.characterName() + " remembers]\n" + items;
+                })
+                .collect(Collectors.joining("\n\n"));
+
         return """
                 You are running a persistent multi-character prose roleplay room in PocketMM.
 
@@ -347,6 +361,17 @@ public class GeminiDialogueGateway implements DialogueGateway {
 
                 Characters currently present in the scene:
                 %s
+
+                Relevant recalled memories of currently active characters:
+                %s
+
+                Memory-use rules:
+                - These are character-specific past memories selected for relevance to the current scene.
+                - A memory belongs only to the character named in its section. Do not transfer private knowledge between characters.
+                - Use memories naturally for continuity, inference, recognition, or reaction when relevant. Do not force a memory into dialogue merely because it was supplied.
+                - Current scene facts and the latest user input override an older memory when they conflict.
+                - Treat remembered evidence as past observed/reported context, not as a new event occurring this turn.
+                - Memories must not by themselves justify cast changes or world-system changes.
 
                 Multi-character room rules:
                 - The selected room intro establishes this play session's starting situation. Treat it as initial narrative context, not as a script that must be repeatedly restated or mechanically reenacted on later turns.
@@ -381,7 +406,8 @@ public class GeminiDialogueGateway implements DialogueGateway {
                         currentSystems.isBlank() ? "(none)" : currentSystems,
                         player,
                         roomCast.isBlank() ? "(none)" : roomCast,
-                        activeNames.isBlank() ? "(none)" : activeNames
+                        activeNames.isBlank() ? "(none)" : activeNames,
+                        recalledMemories.isBlank() ? "(none)" : recalledMemories
                 );
     }
 
