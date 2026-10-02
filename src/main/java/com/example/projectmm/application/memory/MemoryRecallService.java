@@ -181,6 +181,49 @@ public class MemoryRecallService {
         return recalled;
     }
 
+    public List<EffectiveMemory> recallForWorldRoomSession(
+            Long characterId,
+            Long sessionId,
+            LocalDateTime currentTime,
+            int limit,
+            String query
+    ) {
+        if (limit <= 0 || sessionId == null) {
+            return List.of();
+        }
+
+        int recallThreshold = recallThreshold(characterId);
+        var memories = memoryRepository
+                .findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(sessionId)
+                .stream()
+                .filter(memory -> characterId.equals(memory.getCharacter().getId()))
+                .filter(memory -> !memory.getRememberedAt().isAfter(currentTime))
+                .toList();
+
+        var restrictions = provenanceAccess.restrictions(
+                memories.stream().map(Memory::getId).toList()
+        );
+
+        List<EffectiveMemory> candidates = memories.stream()
+                .filter(memory -> accessLevel(memory, restrictions) != MemoryAccessLevel.BLOCKED)
+                .map(memory -> prepareMemory(memory, currentTime, restrictions))
+                .filter(memory -> recallable(memory, recallThreshold))
+                .toList();
+
+        List<EffectiveMemory> recalled = memoryRetriever.retrieve(
+                query,
+                candidates,
+                limit
+        );
+
+        memoryLifecycleService.markAccessed(
+                recalled.stream().map(EffectiveMemory::memoryId).toList(),
+                currentTime
+        );
+
+        return recalled;
+    }
+
     private EffectiveMemory prepareMemory(
             Memory memory,
             LocalDateTime currentTime, java.util.Map<Long, MemoryAccessLevel> restrictions
