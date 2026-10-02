@@ -38,8 +38,23 @@ public class PocketMemoryService {
                     .filter(message -> message.getSession().getId().equals(sessionId))
                     .orElseThrow(() -> new IllegalArgumentException("Pocket source message not found: " + sourceMessageId));
             var candidates = extractor.extract(userMessage);
-            for (var cast : casts.findBySessionIdAndActiveTrueOrderByEnteredAtAscIdAsc(sessionId)) {
-                writer.saveUserSpeech(session, source, cast.getCharacter(), userMessage, candidates, at);
+            var activeCasts = casts.findBySessionIdAndActiveTrueOrderByEnteredAtAscIdAsc(sessionId);
+            log.info("Pocket memory capture session={} sourceMessage={} candidates={} activeCasts={}",
+                    sessionId, sourceMessageId, candidates.size(), activeCasts.size());
+            for (var cast : activeCasts) {
+                var result = writer.saveUserSpeech(
+                        session,
+                        source,
+                        cast.getCharacter(),
+                        userMessage,
+                        candidates,
+                        at
+                );
+                log.info("Pocket memory write session={} character={} status={} saved={}",
+                        sessionId,
+                        cast.getCharacter().getId(),
+                        result.status(),
+                        result.saved().size());
             }
         } catch (RuntimeException ex) {
             // Pocket chat is already durable; memory capture must never turn it into a failed/retried turn.
