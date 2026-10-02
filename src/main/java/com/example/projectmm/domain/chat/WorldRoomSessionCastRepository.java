@@ -13,4 +13,6 @@ public interface WorldRoomSessionCastRepository extends JpaRepository<WorldRoomS
 
     Optional<WorldRoomSessionCast> findBySessionIdAndCharacterId(Long sessionId, Long characterId);
     void deleteBySessionRoomId(Long roomId);
+
+    void deleteBySessionId(Long sessionId);
 }
