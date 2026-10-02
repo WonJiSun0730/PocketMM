@@ -35,7 +35,10 @@ export default function PocketPage({ pocket, onBack }) {
   const [devSystemValues, setDevSystemValues] = useState({})
   const [memoryInspector, setMemoryInspector] = useState([])
   const [memoryDiff, setMemoryDiff] = useState(null)
+  const [hasOlderMessages, setHasOlderMessages] = useState(false)
+  const [loadingOlder, setLoadingOlder] = useState(false)
   const bottomRef = useRef(null)
+  const initialScrollDoneRef = useRef(false)
 
   async function refreshMemoryInspector() {
     if (!isDeveloper) return
@@ -52,36 +55,24 @@ export default function PocketPage({ pocket, onBack }) {
     }
   }
 
-  async function loadAllMessages() {
-    const all = []
-    let before = null
-
-    while (true) {
-      const url = before == null
-        ? `${base}/messages`
-        : `${base}/messages?before=${before}`
-      const response = await fetch(url, { credentials: "include" })
-      if (!response.ok) throw new Error("포켓의 대화를 불러오지 못했어요.")
-
-      const page = await response.json()
-      if (page.length === 0) break
-
-      all.unshift(...page)
-      if (page.length < 50) break
-      before = page[0].id
-    }
-
-    return all
+  async function loadMessagePage(before = null) {
+    const url = before == null
+      ? `${base}/messages`
+      : `${base}/messages?before=${before}`
+    const response = await fetch(url, { credentials: "include" })
+    if (!response.ok) throw new Error("포켓의 대화를 불러오지 못했어요.")
+    return response.json()
   }
 
   async function refresh() {
     try {
       const [loadedMessages, castResponse, systemResponse] = await Promise.all([
-        loadAllMessages(),
+        loadMessagePage(),
         fetch(`${base}/cast`, { credentials: "include" }),
         fetch(`${base}/systems`, { credentials: "include" }),
       ])
       setMessages(loadedMessages)
+      setHasOlderMessages(loadedMessages.length === 15)
       if (castResponse.ok) setCast(await castResponse.json())
       if (systemResponse.ok) setSystems(await systemResponse.json())
     } catch (e) {
@@ -91,7 +82,25 @@ export default function PocketPage({ pocket, onBack }) {
     }
   }
 
-  useEffect(() => { refresh() }, [session.id])
+  async function loadOlderMessages() {
+    if (loadingOlder || !hasOlderMessages || messages.length === 0) return
+    setLoadingOlder(true)
+    try {
+      const page = await loadMessagePage(messages[0].id)
+      setMessages(current => [...page, ...current])
+      setHasOlderMessages(page.length === 15)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoadingOlder(false)
+    }
+  }
+
+  useEffect(() => {
+    initialScrollDoneRef.current = false
+    setLoading(true)
+    refresh()
+  }, [session.id])
   useEffect(() => {
     let active = true
     fetch("/api/auth/me", { credentials: "include" })
@@ -108,7 +117,11 @@ export default function PocketPage({ pocket, onBack }) {
     }
     refreshMemoryInspector()
   }, [isDeveloper, session.id])
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: messages.length ? "smooth" : "auto" }) }, [messages, sending])
+  useEffect(() => {
+    if (loading || initialScrollDoneRef.current || messages.length === 0) return
+    bottomRef.current?.scrollIntoView({ behavior: "auto" })
+    initialScrollDoneRef.current = true
+  }, [loading, messages.length])
 
   async function sendMessage() {
     const message = input.trim()
@@ -375,6 +388,12 @@ export default function PocketPage({ pocket, onBack }) {
           </article>
 
           {loading && <p className="py-10 text-center text-sm text-muted-foreground">포켓을 불러오는 중...</p>}
+
+          {!loading && hasOlderMessages && <div className="flex justify-center border-b border-border/70 py-4">
+            <Button type="button" size="sm" variant="ghost" onClick={loadOlderMessages} disabled={loadingOlder}>
+              {loadingOlder ? "이전 대화를 불러오는 중..." : "이전 대화 불러오기"}
+            </Button>
+          </div>}
 
           {!loading && messages.map((item, index) => {
             const isCharacter = item.role === "CHARACTER"
