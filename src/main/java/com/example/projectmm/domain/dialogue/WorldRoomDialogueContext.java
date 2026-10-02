@@ -18,6 +18,7 @@ public record WorldRoomDialogueContext(
         List<WorldRoomCharacterContext> roomCast,
         List<WorldRoomCharacterContext> activeCast,
         List<WorldRoomSystemContext> sessionSystems,
+        WorldRoomPlayerStateContext playerState,
         List<CharacterMemories> recalledMemories
 ) {
     public WorldRoomDialogueContext(
@@ -47,6 +48,7 @@ public record WorldRoomDialogueContext(
                 roomCast,
                 activeCast,
                 sessionSystems,
+                WorldRoomPlayerStateContext.empty(),
                 List.of()
         );
     }
