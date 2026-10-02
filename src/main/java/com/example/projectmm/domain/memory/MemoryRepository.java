@@ -34,6 +34,11 @@ public interface MemoryRepository
             java.time.LocalDateTime rememberedAt
     );
 
+    List<Memory> findByWorldRoomSessionIdAndSourceWorldRoomMessageIdGreaterThanEqual(
+            Long sessionId,
+            Long messageId
+    );
+
     @Query("select m from Memory m where m.character.id = :characterId "
             + "and (m.conversation is null or m.conversation.id = :conversationId) "
             + "order by m.rememberedAt desc")
