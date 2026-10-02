@@ -2,6 +2,7 @@ package com.example.projectmm.application.chat;
 
 import com.example.projectmm.application.dialogue.DialogueGateway;
 import com.example.projectmm.application.dialogue.WorldRoomContextBuilder;
+import com.example.projectmm.application.time.TimeInterpreter;
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.character.CharacterRepository;
 import com.example.projectmm.domain.chat.*;
@@ -9,6 +10,8 @@ import com.example.projectmm.domain.dialogue.WorldRoomCastChange;
 import com.example.projectmm.domain.dialogue.WorldRoomSystemChange;
 import com.example.projectmm.domain.dialogue.WorldRoomTurn;
 import com.example.projectmm.domain.member.Member;
+import com.example.projectmm.domain.time.TimeInterpretation;
+import com.example.projectmm.domain.time.TimeChange;
 import com.example.projectmm.domain.member.MemberRepository;
 import com.example.projectmm.domain.world.World;
 import com.example.projectmm.domain.world.WorldRepository;
@@ -52,6 +55,59 @@ class WorldRoomDialogueWorldlineIntegrationTest {
     @Autowired WorldRoomMessageVariantRepository variants;
 
     @MockitoBean DialogueGateway gateway;
+    @MockitoBean TimeInterpreter timeInterpreter;
+
+    @Test
+    void explicitUserTimeChangeUpdatesPocketClockBeforeDialogueGeneration() {
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        when(encoder.encode("password")).thenReturn("encoded");
+
+        Member member = members.save(Member.createLocal(
+                "time-user", "password", "Time User",
+                "time-user@example.test", encoder
+        ));
+        World world = worlds.save(new World(member, "Time World", "Time test."));
+        WorldConversation room = rooms.save(new WorldConversation(
+                world, member, "Time Room",
+                WorldConversation.Visibility.PRIVATE,
+                LocalDateTime.of(2026, 10, 2, 1, 47)
+        ));
+        WorldRoomIntro intro = intros.save(new WorldRoomIntro(
+                room, "Start", "Start scene.", 0
+        ));
+        var session = sessionService.start(
+                room.getId(), member.getLoginId(), null, intro.getId()
+        );
+
+        var before = session.getSimulatedAt();
+        var after = before.plusDays(3);
+        when(timeInterpreter.interpret(anyString(), eq(before)))
+                .thenReturn(TimeInterpretation.matched(
+                        TimeInterpretation.Interpreter.RULE,
+                        null,
+                        TimeChange.changed(before, after, "3일 후")
+                ));
+        when(gateway.generateWorldRoomTurn(
+                argThat(context -> context != null && after.equals(context.simulatedAt())),
+                anyString()
+        )).thenReturn(new WorldRoomTurn(
+                "*3일 후의 장면이 시작된다.*",
+                WorldRoomCastChange.none(),
+                List.of()
+        ));
+
+        dialogueService.chat(
+                session.getId(),
+                "[OOC] 3일 후의 다른 시점부터 이야기를 재시작하라."
+        );
+
+        assertThat(sessions.findById(session.getId()).orElseThrow().getSimulatedAt())
+                .isEqualTo(after);
+        verify(gateway).generateWorldRoomTurn(
+                argThat(context -> after.equals(context.simulatedAt())),
+                anyString()
+        );
+    }
 
     @Test
     void rerollAndVariantSelectionRestoreTextCastAndSystemAsOneWorldline() {
