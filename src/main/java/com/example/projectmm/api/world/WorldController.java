@@ -302,6 +302,30 @@ public class WorldController {
         );
     }
 
+    @PutMapping("/pockets/{sessionId}/player-profile")
+    public WorldRoomSessionResponse selectPocketPlayerProfile(
+            @PathVariable Long sessionId,
+            @RequestBody PlayerSelectionRequest request,
+            Authentication authentication
+    ) {
+        return WorldRoomSessionResponse.from(
+                worldRoomSessionService.selectPlayerProfile(
+                        sessionId,
+                        authentication.getName(),
+                        request.playerProfileId()
+                )
+        );
+    }
+
+    @DeleteMapping("/pockets/{sessionId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deletePocket(
+            @PathVariable Long sessionId,
+            Authentication authentication
+    ) {
+        worldRoomSessionService.deletePocket(sessionId, authentication.getName());
+    }
+
     @PostMapping("/{worldId}/rooms/{roomId}/sessions")
     @ResponseStatus(HttpStatus.CREATED)
     public WorldRoomSessionResponse startRoomSession(
