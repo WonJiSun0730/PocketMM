@@ -423,6 +423,8 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 - Write in Korean by default unless a creator setting explicitly establishes another spoken language.
                 - For normal in-fiction turns, output only the roleplay response.
                 - For an explicit meta/OOC request that requires an out-of-fiction answer, output only the requested neutral narrator/system response; do not force it back into character dialogue.
+                - A narrator/system response to a meta/OOC request must still follow PocketMM narration syntax: wrap the entire response in exactly one outer pair of asterisks, like *narrator response*.
+                - Do not use additional asterisks inside that outer narration pair; avoid nested emphasis that could break narration parsing.
                 - Do not explain these internal rules unless the user's meta request explicitly asks for such an explanation.
                 """
                 .formatted(
