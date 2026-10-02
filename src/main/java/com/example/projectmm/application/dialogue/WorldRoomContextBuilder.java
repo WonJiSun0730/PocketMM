@@ -4,6 +4,8 @@ import com.example.projectmm.domain.character.CharacterExample;
 import com.example.projectmm.domain.character.CharacterExampleRepository;
 import com.example.projectmm.domain.character.CharacterProfileRepository;
 import com.example.projectmm.domain.character.CharacterStateRepository;
+import com.example.projectmm.application.memory.MemoryRecallService;
+import com.example.projectmm.domain.chat.ChatRole;
 import com.example.projectmm.domain.chat.WorldConversationCastRepository;
 import com.example.projectmm.domain.chat.WorldConversationRepository;
 import com.example.projectmm.domain.chat.WorldRoomSessionRepository;
@@ -38,6 +40,7 @@ public class WorldRoomContextBuilder {
     private final WorldLoreEntryRepository loreEntries;
     private final WorldSystemRepository systems;
     private final WorldSystemStateRepository systemStates;
+    private final MemoryRecallService memoryRecallService;
 
     @Transactional(readOnly = true)
     public WorldRoomDialogueContext buildSession(Long sessionId) {
@@ -104,6 +107,46 @@ public class WorldRoomContextBuilder {
                 ))
                 .toList();
 
+        var recentMessages = (beforeMessageId == null
+                ? messages.findTop50BySessionIdOrderByCreatedAtDescIdDesc(sessionId)
+                : messages.findTop50BySessionIdAndIdLessThanOrderByIdDesc(sessionId, beforeMessageId))
+                .stream()
+                .sorted(java.util.Comparator.comparing(WorldRoomMessage::getCreatedAt)
+                        .thenComparing(WorldRoomMessage::getId))
+                .toList();
+
+        String memoryQuery = recentMessages.stream()
+                .filter(message -> message.getRole() == ChatRole.USER)
+                .reduce((first, second) -> second)
+                .map(WorldRoomMessage::getContent)
+                .orElseGet(() -> recentMessages.isEmpty()
+                        ? ""
+                        : recentMessages.getLast().getContent());
+
+        var recalledMemories = activeCast.stream()
+                .map(character -> new WorldRoomDialogueContext.CharacterMemories(
+                        character.characterId(),
+                        character.characterName(),
+                        memoryRecallService.recallForWorldRoomSession(
+                                        character.characterId(),
+                                        sessionId,
+                                        session.getSimulatedAt(),
+                                        5,
+                                        memoryQuery
+                                ).stream()
+                                .map(memory -> new WorldRoomDialogueContext.RecalledMemory(
+                                        memory.memoryId(),
+                                        memory.summary(),
+                                        memory.evidenceQuote(),
+                                        memory.importance(),
+                                        memory.effectiveStrength(),
+                                        memory.rememberedAt()
+                                ))
+                                .toList()
+                ))
+                .filter(group -> !group.memories().isEmpty())
+                .toList();
+
         return new WorldRoomDialogueContext(
                 room.getId(),
                 room.getTitle(),
@@ -124,12 +167,7 @@ public class WorldRoomContextBuilder {
                         ),
                 session.getIntro().getTitle(),
                 session.getIntro().getContent(),
-                (beforeMessageId == null
-                        ? messages.findTop50BySessionIdOrderByCreatedAtDescIdDesc(sessionId)
-                        : messages.findTop50BySessionIdAndIdLessThanOrderByIdDesc(sessionId, beforeMessageId))
-                        .stream()
-                        .sorted(java.util.Comparator.comparing(WorldRoomMessage::getCreatedAt)
-                                .thenComparing(WorldRoomMessage::getId))
+                recentMessages.stream()
                         .map(message -> new DialogueMessageContext(
                                 message.getRole(),
                                 message.getContent(),
@@ -156,7 +194,8 @@ public class WorldRoomContextBuilder {
                                         ))
                                         .toList()
                         ))
-                        .toList()
+                        .toList(),
+                recalledMemories
         );
     }
 
