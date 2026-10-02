@@ -45,7 +45,7 @@ public class WorldRoomDialogueService {
                         "World room session not found. sessionId=" + sessionId
                 ));
 
-        messages.save(new WorldRoomMessage(
+        var userSourceMessage = messages.save(new WorldRoomMessage(
                 session,
                 ChatRole.USER,
                 userMessage,
@@ -77,6 +77,7 @@ public class WorldRoomDialogueService {
         sessionService.saveSystemSnapshot(variant, beforeSystems, afterSystems);
         events.publishEvent(new PocketUserSpeechCommitted(
                 sessionId,
+                userSourceMessage.getId(),
                 userMessage,
                 context.simulatedAt()
         ));
