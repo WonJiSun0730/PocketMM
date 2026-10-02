@@ -184,6 +184,7 @@ export default function PocketPage({ pocket, onBack }) {
       const response = await fetch(`${base}/messages/${item.id}`, { method: "DELETE", credentials: "include" })
       if (!response.ok) throw new Error("메시지를 삭제하지 못했어요.")
       await refresh()
+      await refreshMemoryInspector()
     } catch (e) { setError(e.message) }
     finally { setSending(false) }
   }
