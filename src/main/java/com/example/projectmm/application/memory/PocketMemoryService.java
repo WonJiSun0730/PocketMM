@@ -7,6 +7,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -24,6 +26,7 @@ public class PocketMemoryService {
     @Value("${chat.memory.enabled:true}")
     private boolean enabled = true;
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void rememberUserSpeech(Long sessionId, String userMessage, LocalDateTime at) {
         if (!enabled || userMessage == null || userMessage.isBlank() || userMessage.length() > 4000) return;
         try {
@@ -35,7 +38,10 @@ public class PocketMemoryService {
             }
         } catch (RuntimeException ex) {
             // Pocket chat is already durable; memory capture must never turn it into a failed/retried turn.
-            log.warn("Pocket memory capture failed ({})", ex.getClass().getSimpleName());
+            log.warn("Pocket memory capture failed for session {} ({})",
+                    sessionId,
+                    ex.getClass().getSimpleName(),
+                    ex);
         }
     }
 }
