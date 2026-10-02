@@ -37,8 +37,6 @@ public class WorldRoomSessionService {
     private final WorldRoomIntroRepository intros;
     private final WorldRoomMessageRepository messages;
     private final WorldRoomMessageVariantRepository variants;
-    private final WorldRoomVariantCastSnapshotRepository castSnapshots;
-    private final WorldRoomVariantSystemSnapshotRepository systemSnapshots;
     private final MemoryRepository memories;
     private final ProtectedMemoryDetailRepository protectedMemoryDetails;
 
