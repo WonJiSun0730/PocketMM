@@ -5,6 +5,7 @@ import com.example.projectmm.domain.event.Event;
 import com.example.projectmm.domain.chat.ChatMessage;
 import com.example.projectmm.domain.chat.Conversation;
 import com.example.projectmm.domain.chat.WorldRoomSession;
+import com.example.projectmm.domain.chat.WorldRoomMessage;
 import jakarta.persistence.*;
 import lombok.Getter;
 
@@ -47,6 +48,10 @@ public class Memory {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "world_room_session_id")
     private WorldRoomSession worldRoomSession;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_world_room_message_id")
+    private WorldRoomMessage sourceWorldRoomMessage;
 
     @Column(length = 64, unique = true)
     private String chatFingerprint;
@@ -224,6 +229,7 @@ public class Memory {
 
     public static Memory fromWorldRoomUserSpeech(
             WorldRoomSession session,
+            WorldRoomMessage source,
             Character character,
             String quote,
             int importance,
@@ -231,8 +237,8 @@ public class Memory {
             String fingerprint,
             MemoryFact fact
     ) {
-        if (session == null || character == null) {
-            throw new IllegalArgumentException("Pocket session and character are required");
+        if (session == null || source == null || character == null) {
+            throw new IllegalArgumentException("Pocket session, source message, and character are required");
         }
         if (fact != null && !fact.groundedIn(quote)) {
             throw new IllegalArgumentException("Ungrounded memory structure");
@@ -246,6 +252,7 @@ public class Memory {
                 at
         );
         memory.worldRoomSession = session;
+        memory.sourceWorldRoomMessage = source;
         memory.chatFingerprint = fingerprint;
         memory.evidenceQuote = quote;
         memory.fact = fact;
