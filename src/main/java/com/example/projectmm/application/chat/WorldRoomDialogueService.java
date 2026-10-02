@@ -3,6 +3,8 @@ package com.example.projectmm.application.chat;
 import com.example.projectmm.application.dialogue.DialogueGateway;
 import com.example.projectmm.application.dialogue.WorldRoomContextBuilder;
 import com.example.projectmm.application.memory.PocketUserSpeechCommitted;
+import com.example.projectmm.domain.memory.MemoryRepository;
+import com.example.projectmm.domain.memory.ProtectedMemoryDetailRepository;
 import com.example.projectmm.domain.chat.ChatRole;
 import com.example.projectmm.domain.chat.WorldRoomMessage;
 import com.example.projectmm.domain.chat.WorldRoomMessageRepository;
@@ -37,6 +39,8 @@ public class WorldRoomDialogueService {
     private final WorldRoomVariantCastSnapshotRepository castSnapshots;
     private final WorldRoomVariantSystemSnapshotRepository systemSnapshots;
     private final ApplicationEventPublisher events;
+    private final MemoryRepository memories;
+    private final ProtectedMemoryDetailRepository memoryDetails;
 
     @Transactional
     public WorldRoomTurn chat(Long sessionId, String userMessage) {
@@ -301,6 +305,19 @@ public class WorldRoomDialogueService {
     }
 
     private void deleteTimelineFrom(Long sessionId, Long messageId) {
+        var derivedMemories = memories.findByWorldRoomSessionIdAndSourceWorldRoomMessageIdGreaterThanEqual(
+                sessionId,
+                messageId
+        );
+        if (!derivedMemories.isEmpty()) {
+            var memoryIds = derivedMemories.stream()
+                    .map(com.example.projectmm.domain.memory.Memory::getId)
+                    .toList();
+            memoryDetails.deleteByMemoryIdIn(memoryIds);
+            memories.deleteAll(derivedMemories);
+            memories.flush();
+        }
+
         systemSnapshots.deleteByVariantMessageSessionIdAndVariantMessageIdGreaterThanEqual(
                 sessionId,
                 messageId
