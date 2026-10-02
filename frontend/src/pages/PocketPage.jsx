@@ -34,15 +34,21 @@ export default function PocketPage({ pocket, onBack }) {
   const [devOpen, setDevOpen] = useState(false)
   const [devSystemValues, setDevSystemValues] = useState({})
   const [memoryInspector, setMemoryInspector] = useState([])
+  const [memoryDiff, setMemoryDiff] = useState(null)
   const bottomRef = useRef(null)
 
   async function refreshMemoryInspector() {
     if (!isDeveloper) return
     try {
-      const response = await fetch(`${base}/memory-inspector`, { credentials: "include" })
+      const [response, diffResponse] = await Promise.all([
+        fetch(`${base}/memory-inspector`, { credentials: "include" }),
+        fetch(`${base}/memory-inspector/diff`, { credentials: "include" }),
+      ])
       if (response.ok) setMemoryInspector(await response.json())
+      if (diffResponse.ok) setMemoryDiff(await diffResponse.json())
     } catch {
       setMemoryInspector([])
+      setMemoryDiff(null)
     }
   }
 
@@ -76,6 +82,7 @@ export default function PocketPage({ pocket, onBack }) {
   useEffect(() => {
     if (!isDeveloper) {
       setMemoryInspector([])
+      setMemoryDiff(null)
       return
     }
     refreshMemoryInspector()
@@ -282,6 +289,27 @@ export default function PocketPage({ pocket, onBack }) {
                     onClick={() => setDevSystemValue(system)}>저장</Button>
                 </div>)}
               </div>}
+          </div>
+          <div className="mt-3 rounded-lg border bg-background p-3">
+            <p className="mb-2 text-xs font-semibold">이번 턴 Memory Diff</p>
+            {!memoryDiff || !memoryDiff.turnAt
+              ? <p className="text-xs text-muted-foreground">아직 기록된 Memory 변화가 없습니다.</p>
+              : <>
+                <div className="mb-2 flex flex-wrap gap-3 text-xs">
+                  <span>+ ADDED <strong>{memoryDiff.added}</strong></span>
+                  <span>~ UPDATED <strong>{memoryDiff.updated}</strong></span>
+                  <span>⇣ COMPRESSED <strong>{memoryDiff.compressed}</strong></span>
+                  <span>- DELETED <strong>{memoryDiff.deleted}</strong></span>
+                </div>
+                <div className="space-y-1 text-[11px] text-muted-foreground">
+                  {memoryDiff.items.map(item =>
+                    <p key={`${item.type}-${item.memoryId}`}>
+                      <span className="font-medium text-foreground">+ {item.characterName} · ID {item.memoryId}</span>
+                      {" · "}{item.summary}
+                    </p>
+                  )}
+                </div>
+              </>}
           </div>
           <div className="mt-3 rounded-lg border p-3">
             <p className="mb-3 text-xs font-semibold">Memory Inspector · 캐릭터별 최신 5개</p>
