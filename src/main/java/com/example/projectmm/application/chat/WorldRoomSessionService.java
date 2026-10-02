@@ -4,6 +4,8 @@ import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.dialogue.WorldRoomCastChange;
 import com.example.projectmm.domain.dialogue.WorldRoomSystemChange;
 import com.example.projectmm.domain.member.MemberRepository;
+import com.example.projectmm.domain.memory.MemoryRepository;
+import com.example.projectmm.domain.memory.ProtectedMemoryDetailRepository;
 import com.example.projectmm.domain.player.PlayerProfileRepository;
 import com.example.projectmm.domain.world.WorldSystemRepository;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +35,12 @@ public class WorldRoomSessionService {
     private final MemberRepository members;
     private final PlayerProfileRepository players;
     private final WorldRoomIntroRepository intros;
+    private final WorldRoomMessageRepository messages;
+    private final WorldRoomMessageVariantRepository variants;
+    private final WorldRoomVariantCastSnapshotRepository castSnapshots;
+    private final WorldRoomVariantSystemSnapshotRepository systemSnapshots;
+    private final MemoryRepository memories;
+    private final ProtectedMemoryDetailRepository protectedMemoryDetails;
 
     @Transactional
     public WorldRoomSession start(Long roomId, String loginId, Long playerProfileId, Long introId) {
@@ -77,6 +85,37 @@ public class WorldRoomSessionService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Pocket not found");
         }
         return session;
+    }
+
+    @Transactional
+    public WorldRoomSession selectPlayerProfile(Long sessionId, String loginId, Long playerProfileId) {
+        var session = pocket(sessionId, loginId);
+        var player = playerProfileId == null ? null : players.findById(playerProfileId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Player profile not found"));
+        session.selectPlayerProfile(player);
+        return session;
+    }
+
+    @Transactional
+    public void deletePocket(Long sessionId, String loginId) {
+        var session = pocket(sessionId, loginId);
+
+        var memoryIds = memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(sessionId)
+                .stream()
+                .map(com.example.projectmm.domain.memory.Memory::getId)
+                .toList();
+        if (!memoryIds.isEmpty()) {
+            protectedMemoryDetails.deleteByMemoryIdIn(memoryIds);
+        }
+        memories.deleteByWorldRoomSessionId(sessionId);
+
+        systemSnapshots.deleteByVariantMessageSessionId(sessionId);
+        castSnapshots.deleteByVariantMessageSessionId(sessionId);
+        variants.deleteByMessageSessionId(sessionId);
+        messages.deleteBySessionId(sessionId);
+        sessionCasts.deleteBySessionId(sessionId);
+        systemStates.deleteBySessionId(sessionId);
+        sessions.delete(session);
     }
 
     @Transactional(readOnly = true)
