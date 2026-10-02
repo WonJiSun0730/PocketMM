@@ -38,6 +38,7 @@ export default function PocketPage({ pocket, onBack }) {
   const [hasOlderMessages, setHasOlderMessages] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const scrollAreaRef = useRef(null)
+  const historySentinelRef = useRef(null)
   const bottomRef = useRef(null)
   const initialScrollDoneRef = useRef(false)
   const historyAnchorIdRef = useRef(null)
@@ -136,17 +137,19 @@ export default function PocketPage({ pocket, onBack }) {
 
   useEffect(() => {
     const viewport = scrollAreaRef.current?.querySelector('[data-slot="scroll-area-viewport"]')
-    if (!viewport) return
+    const sentinel = historySentinelRef.current
+    if (!viewport || !sentinel || !hasOlderMessages || loadingOlder || loading) return
 
-    const handleScroll = () => {
-      if (viewport.scrollTop <= 24 && hasOlderMessages && !loadingOlder && !loading) {
-        loadOlderMessages()
-      }
-    }
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0]?.isIntersecting) loadOlderMessages()
+      },
+      { root: viewport, rootMargin: "24px 0px 0px 0px", threshold: 0 }
+    )
 
-    viewport.addEventListener("scroll", handleScroll, { passive: true })
-    return () => viewport.removeEventListener("scroll", handleScroll)
-  }, [hasOlderMessages, loadingOlder, loading, messages])
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasOlderMessages, loadingOlder, loading, messages[0]?.id])
 
   async function sendMessage() {
     const message = input.trim()
@@ -409,7 +412,7 @@ export default function PocketPage({ pocket, onBack }) {
         <div className="mx-auto flex w-full max-w-3xl flex-col p-4 pb-32 sm:p-6 sm:pb-36">
           {loading && <p className="py-10 text-center text-sm text-muted-foreground">포켓을 불러오는 중...</p>}
 
-          {!loading && hasOlderMessages && <div className="flex min-h-12 items-center justify-center border-b border-border/70 py-3 text-xs text-muted-foreground">
+          {!loading && hasOlderMessages && <div ref={historySentinelRef} className="flex min-h-12 items-center justify-center border-b border-border/70 py-3 text-xs text-muted-foreground">
             {loadingOlder
               ? <span className="flex items-center gap-2"><LoaderCircle className="size-4 animate-spin" />이전 대화를 불러오는 중...</span>
               : <span>위로 스크롤하면 이전 대화를 불러옵니다.</span>}
