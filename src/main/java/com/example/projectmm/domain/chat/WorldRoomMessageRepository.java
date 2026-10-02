@@ -8,6 +8,8 @@ public interface WorldRoomMessageRepository extends JpaRepository<WorldRoomMessa
 
     List<WorldRoomMessage> findTop50BySessionIdOrderByCreatedAtDescIdDesc(Long sessionId);
 
+    List<WorldRoomMessage> findTop50BySessionIdOrderByIdDesc(Long sessionId);
+
     List<WorldRoomMessage> findTop15BySessionIdOrderByIdDesc(Long sessionId);
 
     List<WorldRoomMessage> findTop15BySessionIdAndIdLessThanOrderByIdDesc(Long sessionId, Long beforeId);
