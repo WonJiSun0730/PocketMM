@@ -33,6 +33,7 @@ public class WorldRoomContextBuilder {
     private final WorldRoomSessionRepository sessions;
     private final WorldRoomSessionCastRepository sessionCasts;
     private final WorldRoomSessionSystemStateRepository sessionSystemStates;
+    private final WorldRoomPlayerStateRepository playerStates;
     private final WorldRoomMessageRepository messages;
     private final CharacterProfileRepository profiles;
     private final CharacterStateRepository states;
@@ -195,6 +196,13 @@ public class WorldRoomContextBuilder {
                                         .toList()
                         ))
                         .toList(),
+                playerStates.findBySessionId(sessionId)
+                        .map(state -> new WorldRoomPlayerStateContext(
+                                state.getLocation(),
+                                state.getConditions(),
+                                state.getInventory()
+                        ))
+                        .orElseGet(WorldRoomPlayerStateContext::empty),
                 recalledMemories
         );
     }
