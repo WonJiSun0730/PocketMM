@@ -28,4 +28,6 @@ public interface WorldRoomMessageRepository extends JpaRepository<WorldRoomMessa
 
     java.util.Optional<WorldRoomMessage> findTopBySessionIdAndIdLessThanOrderByIdDesc(Long sessionId, Long messageId);
     void deleteBySessionRoomId(Long roomId);
+
+    void deleteBySessionId(Long sessionId);
 }
