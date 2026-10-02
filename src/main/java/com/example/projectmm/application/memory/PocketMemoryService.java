@@ -37,7 +37,7 @@ public class PocketMemoryService {
             var source = messages.findById(sourceMessageId)
                     .filter(message -> message.getSession().getId().equals(sessionId))
                     .orElseThrow(() -> new IllegalArgumentException("Pocket source message not found: " + sourceMessageId));
-            var candidates = extractor.extract(userMessage);
+            var candidates = extractor.extractNarrative(userMessage);
             var activeCasts = casts.findBySessionIdAndActiveTrueOrderByEnteredAtAscIdAsc(sessionId);
             log.info("Pocket memory capture session={} sourceMessage={} candidates={} activeCasts={}",
                     sessionId, sourceMessageId, candidates.size(), activeCasts.size());
