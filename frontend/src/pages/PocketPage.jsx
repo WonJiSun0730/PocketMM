@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react"
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, Pencil, RefreshCw, Send, Trash2, Wrench, X } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, Pencil, RefreshCw, Send, Trash2, Wrench, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -37,6 +37,7 @@ export default function PocketPage({ pocket, onBack }) {
   const [memoryDiff, setMemoryDiff] = useState(null)
   const [hasOlderMessages, setHasOlderMessages] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
+  const scrollAreaRef = useRef(null)
   const bottomRef = useRef(null)
   const initialScrollDoneRef = useRef(false)
   const historyAnchorIdRef = useRef(null)
@@ -132,6 +133,20 @@ export default function PocketPage({ pocket, onBack }) {
       ?.scrollIntoView({ block: "start", behavior: "auto" })
     historyAnchorIdRef.current = null
   }, [loadingOlder, messages.length])
+
+  useEffect(() => {
+    const viewport = scrollAreaRef.current?.querySelector('[data-slot="scroll-area-viewport"]')
+    if (!viewport) return
+
+    const handleScroll = () => {
+      if (viewport.scrollTop <= 24 && hasOlderMessages && !loadingOlder && !loading) {
+        loadOlderMessages()
+      }
+    }
+
+    viewport.addEventListener("scroll", handleScroll, { passive: true })
+    return () => viewport.removeEventListener("scroll", handleScroll)
+  }, [hasOlderMessages, loadingOlder, loading, messages])
 
   async function sendMessage() {
     const message = input.trim()
@@ -390,14 +405,14 @@ export default function PocketPage({ pocket, onBack }) {
         </div>}
       </section>}
 
-      <ScrollArea className="min-h-0 flex-1">
+      <ScrollArea ref={scrollAreaRef} className="min-h-0 flex-1">
         <div className="mx-auto flex w-full max-w-3xl flex-col p-4 pb-32 sm:p-6 sm:pb-36">
           {loading && <p className="py-10 text-center text-sm text-muted-foreground">포켓을 불러오는 중...</p>}
 
-          {!loading && hasOlderMessages && <div className="flex justify-center border-b border-border/70 py-4">
-            <Button type="button" size="sm" variant="ghost" onClick={loadOlderMessages} disabled={loadingOlder}>
-              {loadingOlder ? "이전 대화를 불러오는 중..." : "이전 대화 불러오기"}
-            </Button>
+          {!loading && hasOlderMessages && <div className="flex min-h-12 items-center justify-center border-b border-border/70 py-3 text-xs text-muted-foreground">
+            {loadingOlder
+              ? <span className="flex items-center gap-2"><LoaderCircle className="size-4 animate-spin" />이전 대화를 불러오는 중...</span>
+              : <span>위로 스크롤하면 이전 대화를 불러옵니다.</span>}
           </div>}
 
           {!loading && !hasOlderMessages && <article className="border-b border-border/70 py-7 sm:py-9">
