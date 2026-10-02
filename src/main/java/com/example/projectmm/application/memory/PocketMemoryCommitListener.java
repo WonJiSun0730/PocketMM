@@ -15,6 +15,7 @@ public class PocketMemoryCommitListener {
     public void onUserSpeechCommitted(PocketUserSpeechCommitted event) {
         pocketMemoryService.rememberUserSpeech(
                 event.sessionId(),
+                event.sourceMessageId(),
                 event.userMessage(),
                 event.at()
         );
