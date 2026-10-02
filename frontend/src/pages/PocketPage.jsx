@@ -20,6 +20,9 @@ function RpText({ text }) {
 export default function PocketPage({ pocket, onBack }) {
   const { world, room, session, playerProfile } = pocket
   const base = `/api/worlds/${world.id}/rooms/${room.id}/sessions/${session.id}`
+  const [selectedPlayerProfile, setSelectedPlayerProfile] = useState(playerProfile ?? null)
+  const [playerProfiles, setPlayerProfiles] = useState([])
+  const [changingPlayerProfile, setChangingPlayerProfile] = useState(false)
   const [messages, setMessages] = useState([])
   const [cast, setCast] = useState([])
   const [systems, setSystems] = useState([])
@@ -107,6 +110,15 @@ export default function PocketPage({ pocket, onBack }) {
   }, [session.id])
   useEffect(() => {
     let active = true
+    fetch("/api/player-profiles", { credentials: "include" })
+      .then(response => response.ok ? response.json() : [])
+      .then(items => { if (active) setPlayerProfiles(items) })
+      .catch(() => { if (active) setPlayerProfiles([]) })
+    return () => { active = false }
+  }, [session.id])
+
+  useEffect(() => {
+    let active = true
     fetch("/api/auth/me", { credentials: "include" })
       .then(response => response.ok ? response.json() : null)
       .then(member => { if (active) setIsDeveloper(member?.role === "DEVELOPER") })
@@ -150,6 +162,29 @@ export default function PocketPage({ pocket, onBack }) {
     observer.observe(sentinel)
     return () => observer.disconnect()
   }, [hasOlderMessages, loadingOlder, loading, messages[0]?.id])
+
+  async function changePlayerProfile(event) {
+    const value = event.target.value
+    const profileId = value === "" ? null : Number(value)
+    setChangingPlayerProfile(true)
+    setError("")
+    try {
+      const response = await fetch(`/api/worlds/pockets/${session.id}/player-profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ playerProfileId: profileId }),
+      })
+      if (!response.ok) throw new Error("플레이어 프로필을 변경하지 못했어요.")
+      setSelectedPlayerProfile(profileId == null
+        ? null
+        : playerProfiles.find(profile => profile.id === profileId) ?? null)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setChangingPlayerProfile(false)
+    }
+  }
 
   async function sendMessage() {
     const message = input.trim()
@@ -309,7 +344,10 @@ export default function PocketPage({ pocket, onBack }) {
           <p className="mt-1 text-xs text-muted-foreground">{world.name} · POCKET</p>
         </div>
         <div className="ml-auto flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-          <span className="rounded-full bg-accent px-2.5 py-1 text-accent-foreground">{playerProfile?.name ?? "Player"}</span>
+          <select aria-label="플레이어 프로필" value={selectedPlayerProfile?.id ?? ""} onChange={changePlayerProfile} disabled={changingPlayerProfile} className="max-w-44 rounded-full border-0 bg-accent px-2.5 py-1 text-xs text-accent-foreground outline-none disabled:opacity-60">
+            <option value="">프로필 없음</option>
+            {playerProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+          </select>
         </div>
       </header>
 
