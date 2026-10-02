@@ -34,6 +34,47 @@ public class PocketMemoryInspectorService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public TurnDiff latestTurnDiff(Long sessionId) {
+        var sessionMemories = memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(sessionId);
+        if (sessionMemories.isEmpty()) {
+            return TurnDiff.empty();
+        }
+        LocalDateTime turnAt = sessionMemories.getFirst().getRememberedAt();
+        var added = memories.findByWorldRoomSessionIdAndRememberedAtOrderByCharacterIdAscIdAsc(sessionId, turnAt)
+                .stream()
+                .map(memory -> new DiffItem(
+                        "ADDED",
+                        memory.getId(),
+                        memory.getCharacter().getId(),
+                        memory.getCharacter().getName(),
+                        memory.getSummary()
+                ))
+                .toList();
+        return new TurnDiff(turnAt, added.size(), 0, 0, 0, added);
+    }
+
+    public record TurnDiff(
+            LocalDateTime turnAt,
+            int added,
+            int updated,
+            int compressed,
+            int deleted,
+            List<DiffItem> items
+    ) {
+        static TurnDiff empty() {
+            return new TurnDiff(null, 0, 0, 0, 0, List.of());
+        }
+    }
+
+    public record DiffItem(
+            String type,
+            Long memoryId,
+            Long characterId,
+            String characterName,
+            String summary
+    ) {}
+
     public record CharacterMemories(
             Long characterId,
             String characterName,
