@@ -20,6 +20,37 @@ public record WorldRoomDialogueContext(
         List<WorldRoomSystemContext> sessionSystems,
         List<CharacterMemories> recalledMemories
 ) {
+    public WorldRoomDialogueContext(
+            Long roomId,
+            String roomTitle,
+            WorldConversation.Visibility visibility,
+            LocalDateTime simulatedAt,
+            DialogueWorldContext world,
+            DialoguePlayerProfile playerProfile,
+            String introTitle,
+            String introContent,
+            List<DialogueMessageContext> recentMessages,
+            List<WorldRoomCharacterContext> roomCast,
+            List<WorldRoomCharacterContext> activeCast,
+            List<WorldRoomSystemContext> sessionSystems
+    ) {
+        this(
+                roomId,
+                roomTitle,
+                visibility,
+                simulatedAt,
+                world,
+                playerProfile,
+                introTitle,
+                introContent,
+                recentMessages,
+                roomCast,
+                activeCast,
+                sessionSystems,
+                List.of()
+        );
+    }
+
     public record CharacterMemories(
             Long characterId,
             String characterName,
