@@ -519,6 +519,18 @@ public class WorldController {
         return pocketMemoryInspectorService.latest(sessionId);
     }
 
+    @GetMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/memory-inspector/diff")
+    public PocketMemoryInspectorService.TurnDiff inspectRoomSessionMemoryDiff(
+            @PathVariable Long worldId,
+            @PathVariable Long roomId,
+            @PathVariable Long sessionId,
+            Authentication authentication
+    ) {
+        var session = worldRoomSessionService.ownedSession(roomId, sessionId, authentication.getName());
+        ensureRoomWorld(worldId, session.getRoom().getWorld().getId());
+        return pocketMemoryInspectorService.latestTurnDiff(sessionId);
+    }
+
     @GetMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/systems")
     public List<WorldRoomSessionSystemItem> getRoomSessionSystems(
             @PathVariable Long worldId,
