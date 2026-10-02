@@ -1,6 +1,7 @@
 package com.example.projectmm.application.memory;
 
 import com.example.projectmm.domain.chat.WorldRoomSession;
+import com.example.projectmm.domain.chat.WorldRoomMessage;
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.memory.ChatMemoryCandidate;
 import com.example.projectmm.domain.memory.Memory;
@@ -27,6 +28,7 @@ public class PocketMemoryWriter {
     @Transactional
     public ChatMemoryResult saveUserSpeech(
             WorldRoomSession session,
+            WorldRoomMessage source,
             Character character,
             String spoken,
             List<ChatMemoryCandidate> candidates,
@@ -54,6 +56,7 @@ public class PocketMemoryWriter {
 
             Memory memory = Memory.fromWorldRoomUserSpeech(
                     session,
+                    source,
                     character,
                     quote,
                     candidate.importance(),
