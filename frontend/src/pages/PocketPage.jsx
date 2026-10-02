@@ -39,6 +39,7 @@ export default function PocketPage({ pocket, onBack }) {
   const [loadingOlder, setLoadingOlder] = useState(false)
   const bottomRef = useRef(null)
   const initialScrollDoneRef = useRef(false)
+  const historyAnchorIdRef = useRef(null)
 
   async function refreshMemoryInspector() {
     if (!isDeveloper) return
@@ -86,6 +87,7 @@ export default function PocketPage({ pocket, onBack }) {
     if (loadingOlder || !hasOlderMessages || messages.length === 0) return
     setLoadingOlder(true)
     try {
+      historyAnchorIdRef.current = messages[0].id
       const page = await loadMessagePage(messages[0].id)
       setMessages(current => [...page, ...current])
       setHasOlderMessages(page.length === 15)
@@ -122,6 +124,14 @@ export default function PocketPage({ pocket, onBack }) {
     bottomRef.current?.scrollIntoView({ behavior: "auto" })
     initialScrollDoneRef.current = true
   }, [loading, messages.length])
+
+  useEffect(() => {
+    const anchorId = historyAnchorIdRef.current
+    if (anchorId == null || loadingOlder) return
+    document.querySelector(`[data-pocket-message-id="${anchorId}"]`)
+      ?.scrollIntoView({ block: "start", behavior: "auto" })
+    historyAnchorIdRef.current = null
+  }, [loadingOlder, messages.length])
 
   async function sendMessage() {
     const message = input.trim()
@@ -382,11 +392,6 @@ export default function PocketPage({ pocket, onBack }) {
 
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto flex w-full max-w-3xl flex-col p-4 pb-32 sm:p-6 sm:pb-36">
-          <article className="border-b border-border/70 py-7 sm:py-9">
-            <p className="mb-4 text-xs font-semibold tracking-[.12em] text-muted-foreground">INTRO · {session.introTitle}</p>
-            <RpText text={session.introContent} />
-          </article>
-
           {loading && <p className="py-10 text-center text-sm text-muted-foreground">포켓을 불러오는 중...</p>}
 
           {!loading && hasOlderMessages && <div className="flex justify-center border-b border-border/70 py-4">
@@ -395,12 +400,17 @@ export default function PocketPage({ pocket, onBack }) {
             </Button>
           </div>}
 
+          {!loading && !hasOlderMessages && <article className="border-b border-border/70 py-7 sm:py-9">
+            <p className="mb-4 text-xs font-semibold tracking-[.12em] text-muted-foreground">INTRO · {session.introTitle}</p>
+            <RpText text={session.introContent} />
+          </article>}
+
           {!loading && messages.map((item, index) => {
             const isCharacter = item.role === "CHARACTER"
             const isLatest = index === messages.length - 1
             const variants = variantsByMessage[item.id] ?? []
             const selectedIndex = variants.findIndex(variant => variant.selected)
-            return <article key={item.id} className="group border-b border-border/70 py-7 last:border-b-0 sm:py-9">
+            return <article key={item.id} data-pocket-message-id={item.id} className="group border-b border-border/70 py-7 last:border-b-0 sm:py-9">
               {editing === item.id ? <div className="space-y-2">
                 <Textarea autoFocus value={editText} onChange={e => setEditText(e.target.value)} className="min-h-32 resize-y text-base leading-7" />
                 <div className="flex justify-end gap-2"><Button size="sm" variant="ghost" onClick={() => setEditing(null)}><X className="mr-1 size-3.5"/>취소</Button><Button size="sm" onClick={() => editMessage(item)}>저장</Button></div>
