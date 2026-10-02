@@ -315,6 +315,13 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 ? "(none)"
                 : context.playerProfile().name() + ": " + blankAsNone(context.playerProfile().description());
 
+        var playerState = context.playerState();
+        String currentPlayerState = playerState == null
+                ? "(none)"
+                : "- location: " + blankAsNone(playerState.location())
+                + "\n- conditions: " + (playerState.conditions().isEmpty() ? "(none)" : String.join(" | ", playerState.conditions()))
+                + "\n- inventory: " + (playerState.inventory().isEmpty() ? "(none)" : String.join(" | ", playerState.inventory()));
+
         String recalledMemories = context.recalledMemories() == null
                 ? ""
                 : context.recalledMemories().stream()
@@ -356,6 +363,9 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 Current player profile:
                 %s
 
+                Current authoritative player runtime state:
+                %s
+
                 Characters allowed to participate in this room:
                 %s
 
@@ -364,6 +374,12 @@ public class GeminiDialogueGateway implements DialogueGateway {
 
                 Relevant recalled memories of currently active characters:
                 %s
+
+                Player runtime-state rules:
+                - The runtime state above is the player's current authoritative state for this Pocket.
+                - Respect the current location, conditions, and inventory when continuing the scene.
+                - Do not invent that the player possesses an item that is absent from inventory merely to solve the scene.
+                - If older dialogue or memory conflicts with this runtime state, treat the runtime state as the latest truth.
 
                 Memory-use rules:
                 - These are character-specific past memories selected for relevance to the current scene.
@@ -405,6 +421,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
                         systems.isBlank() ? "(none)" : systems,
                         currentSystems.isBlank() ? "(none)" : currentSystems,
                         player,
+                        currentPlayerState,
                         roomCast.isBlank() ? "(none)" : roomCast,
                         activeNames.isBlank() ? "(none)" : activeNames,
                         recalledMemories.isBlank() ? "(none)" : recalledMemories
