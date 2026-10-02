@@ -29,6 +29,8 @@ public interface MemoryRepository
 
     List<Memory> findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(Long sessionId);
 
+    void deleteByWorldRoomSessionId(Long sessionId);
+
     List<Memory> findByWorldRoomSessionIdAndRememberedAtOrderByCharacterIdAscIdAsc(
             Long sessionId,
             java.time.LocalDateTime rememberedAt
