@@ -6,8 +6,6 @@ import com.example.projectmm.domain.memory.ChatMemoryCandidate;
 import com.example.projectmm.domain.memory.MemoryDetailSalience;
 import com.example.projectmm.domain.memory.MemoryFact;
 import com.example.projectmm.domain.memory.SemanticMemory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -25,8 +23,6 @@ import java.util.Map;
 @Component
 @Profile("gemini")
 public class GeminiChatMemoryExtractor implements ChatMemoryExtractor {
-    private static final Logger log = LoggerFactory.getLogger(GeminiChatMemoryExtractor.class);
-
     private final String apiKey;
     private final String model;
     private final ObjectMapper mapper;
@@ -52,11 +48,7 @@ public class GeminiChatMemoryExtractor implements ChatMemoryExtractor {
 
     @Override
     public List<ChatMemoryCandidate> extractNarrative(String spokenText) {
-        var request = createNarrativeRequest(spokenText);
-        String response = client.post().uri("/v1beta/models/{model}:generateContent", model)
-                .header("x-goog-api-key", apiKey).body(request).retrieve().body(String.class);
-        log.info("Pocket narrative memory raw response: {}", response);
-        return parseResponse(response);
+        return extractWithRequest(createNarrativeRequest(spokenText));
     }
 
     private List<ChatMemoryCandidate> extractWithRequest(Map<String, Object> request) {
@@ -358,8 +350,12 @@ public class GeminiChatMemoryExtractor implements ChatMemoryExtractor {
                 try {
                     fact = new MemoryFact(MemoryFact.Kind.valueOf(structure.path("kind").asText()),
                             structure.path("subject").asText(), structure.path("relation").asText(), structure.path("value").asText());
-                } catch (IllegalArgumentException invalidKind) { continue; }
-                if (!fact.groundedIn(quote)) continue;
+                    if (!fact.groundedIn(quote)) {
+                        fact = null;
+                    }
+                } catch (IllegalArgumentException invalidFact) {
+                    fact = null;
+                }
             }
             SemanticMemory semanticMemory =
                     parseSemanticMemory(
