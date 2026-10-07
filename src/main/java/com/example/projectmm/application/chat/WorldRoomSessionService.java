@@ -100,10 +100,12 @@ public class WorldRoomSessionService {
             String loginId,
             String userNote,
             String pocketPlayGuide,
-            boolean noControlPlayer
+            boolean noControlPlayer,
+            String aiProvider,
+            String aiModel
     ) {
         var session = pocket(sessionId, loginId);
-        session.updatePocketSettings(userNote, pocketPlayGuide, noControlPlayer);
+        session.updatePocketSettings(userNote, pocketPlayGuide, noControlPlayer, aiProvider, aiModel);
         return session;
     }
 
