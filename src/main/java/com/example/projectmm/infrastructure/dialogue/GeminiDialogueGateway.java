@@ -7,7 +7,6 @@ import com.example.projectmm.domain.dialogue.*;
 import com.example.projectmm.domain.state.CustomStateChangeProposal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
@@ -22,7 +21,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
-@Profile("gemini")
 public class GeminiDialogueGateway implements DialogueGateway {
 
     private final String apiKey;
@@ -302,7 +300,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
         return List.copyOf(values);
     }
 
-    private String buildWorldRoomSystemPrompt(WorldRoomDialogueContext context) {
+    String buildWorldRoomSystemPrompt(WorldRoomDialogueContext context) {
         var world = context.world();
 
         String lore = world.lore().stream()
