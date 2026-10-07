@@ -95,6 +95,19 @@ public class WorldRoomSessionService {
     }
 
     @Transactional
+    public WorldRoomSession updatePocketSettings(
+            Long sessionId,
+            String loginId,
+            String userNote,
+            String pocketPlayGuide,
+            boolean noControlPlayer
+    ) {
+        var session = pocket(sessionId, loginId);
+        session.updatePocketSettings(userNote, pocketPlayGuide, noControlPlayer);
+        return session;
+    }
+
+    @Transactional
     public void deletePocket(Long sessionId, String loginId) {
         var session = pocket(sessionId, loginId);
 
