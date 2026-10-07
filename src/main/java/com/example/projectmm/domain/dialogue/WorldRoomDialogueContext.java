@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 public record WorldRoomDialogueContext(
+        Long sessionId,
         Long roomId,
         String roomTitle,
         WorldConversation.Visibility visibility,
@@ -22,7 +23,9 @@ public record WorldRoomDialogueContext(
         List<CharacterMemories> recalledMemories,
         String userNote,
         String pocketPlayGuide,
-        boolean noControlPlayer
+        boolean noControlPlayer,
+        String aiProvider,
+        String aiModel
 ) {
     public WorldRoomDialogueContext(
             Long roomId,
@@ -39,6 +42,7 @@ public record WorldRoomDialogueContext(
             List<WorldRoomSystemContext> sessionSystems
     ) {
         this(
+                null,
                 roomId,
                 roomTitle,
                 visibility,
@@ -55,7 +59,9 @@ public record WorldRoomDialogueContext(
                 List.of(),
                 null,
                 null,
-                false
+                false,
+                "GEMINI",
+                null
         );
     }
 
