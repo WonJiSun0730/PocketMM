@@ -382,6 +382,11 @@ export default function PocketPage({ pocket, onBack }) {
 
   return <main className="pocket-page flex h-svh bg-background text-foreground">
     <aside className="pocket-desktop-tools">
+      <div className="pocket-side-scene">
+        <span>현재 장면</span>
+        <strong>{cast.length ? cast.map(item => item.characterName ?? item.name).join(" · ") : "등장인물 없음"}</strong>
+        {systems.length > 0 && <div>{systems.map(system => <span key={system.id}>{system.name} <strong>{system.currentValue}</strong></span>)}</div>}
+      </div>
       <PocketPlayerStatePanel
         sessionId={session.id}
         onError={setError}
@@ -392,65 +397,6 @@ export default function PocketPage({ pocket, onBack }) {
         })}
       />
       <PocketSettingsPanel sessionId={session.id} onError={setError} />
-    </aside>
-    <section className="pocket-main mx-auto flex h-full w-full max-w-4xl flex-col border-x bg-card">
-      <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2 sm:px-6">
-        <Button type="button" variant="ghost" size="icon" onClick={onBack} disabled={sending} aria-label="월드로 돌아가기">
-          <ArrowLeft className="size-4" />
-        </Button>
-        <div className="min-w-0">
-          <h1 className="truncate font-medium leading-none">{room.title}</h1>
-          <p className="mt-1 text-xs text-muted-foreground">{world.name} · POCKET</p>
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          className="ml-auto shrink-0"
-          disabled={loading || sending || changingPlayerProfile}
-          onClick={() => { setError(""); setPickerMode(true) }}
-        >
-          {selectedPlayerProfile?.avatar
-            ? <img src={selectedPlayerProfile.avatar} alt="" className="size-7 rounded-full object-cover" />
-            : <span className="grid size-7 place-items-center rounded-full bg-accent text-xs text-accent-foreground">{selectedPlayerProfile?.name?.slice(0, 1) ?? "나"}</span>}
-          {selectedPlayerProfile?.name ?? "프로필 선택"}
-        </Button>
-      </header>
-
-      <div className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <span>현재 장면 · {cast.length ? cast.map(item => item.characterName ?? item.name).join(" · ") : "등장인물 없음"}</span>
-          {systems.map(system => <span key={system.id}>{system.name} <strong className="text-foreground">{system.currentValue}</strong></span>)}
-        </div>
-      </div>
-
-      <section className="shrink-0 border-b bg-muted/10 px-4 py-3 sm:px-6">
-        {sceneModels.ready
-          ? <PocketScene
-              simulatedAt={sceneRuntimeState.simulatedAt}
-              location={sceneRuntimeState.location}
-              playerModel={sceneModels.playerModel}
-              characterModels={sceneModels.castModels}
-            />
-          : <div className="flex min-h-24 items-center justify-center rounded-md border border-dashed px-4 text-center text-xs text-muted-foreground">
-              3D 장면은 선택한 플레이어 프로필과 이 Pocket의 모든 캐릭터에 모델이 등록된 경우에만 사용할 수 있어요.
-            </div>}
-      </section>
-
-      {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}
-
-      <div className="pocket-inline-tools">
-        <PocketPlayerStatePanel
-          sessionId={session.id}
-          onError={setError}
-          refreshKey={playerStateRefreshKey}
-          onStateChange={state => setSceneRuntimeState({
-            simulatedAt: state.simulatedAt,
-            location: state.location,
-          })}
-        />
-        <PocketSettingsPanel sessionId={session.id} onError={setError} />
-      </div>
-
       {isDeveloper && <section className="shrink-0 border-b bg-muted/20">
         <button type="button" onClick={() => setDevOpen(open => !open)}
           className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-muted-foreground sm:px-6">
@@ -549,12 +495,173 @@ export default function PocketPage({ pocket, onBack }) {
         </div>}
       </section>}
 
-      <ScrollArea ref={scrollAreaRef} className="min-h-0 flex-1">
-        <div className="mx-auto flex w-full max-w-3xl flex-col p-4 pb-32 sm:p-6 sm:pb-36">
-          {loading && <p className="py-10 text-center text-sm text-muted-foreground">포켓을 불러오는 중...</p>}
+    </aside>
+    <section className="pocket-main mx-auto flex h-full w-full max-w-4xl flex-col border-x bg-card">
+      <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2 sm:px-6">
+        <Button type="button" variant="ghost" size="icon" onClick={onBack} disabled={sending} aria-label="월드로 돌아가기">
+          <ArrowLeft className="size-4" />
+        </Button>
+        <div className="min-w-0">
+          <h1 className="truncate font-medium leading-none">{room.title}</h1>
+          <p className="mt-1 text-xs text-muted-foreground">{world.name} · POCKET</p>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          className="ml-auto shrink-0"
+          disabled={loading || sending || changingPlayerProfile}
+          onClick={() => { setError(""); setPickerMode(true) }}
+        >
+          {selectedPlayerProfile?.avatar
+            ? <img src={selectedPlayerProfile.avatar} alt="" className="size-7 rounded-full object-cover" />
+            : <span className="grid size-7 place-items-center rounded-full bg-accent text-xs text-accent-foreground">{selectedPlayerProfile?.name?.slice(0, 1) ?? "나"}</span>}
+          {selectedPlayerProfile?.name ?? "프로필 선택"}
+        </Button>
+      </header>
 
-          {!loading && hasOlderMessages && <div ref={historySentinelRef} className="flex min-h-12 items-center justify-center border-b border-border/70 py-3 text-xs text-muted-foreground">
-            {loadingOlder
+      <div className="pocket-inline-tools shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span>현재 장면 · {cast.length ? cast.map(item => item.characterName ?? item.name).join(" · ") : "등장인물 없음"}</span>
+          {systems.map(system => <span key={system.id}>{system.name} <strong className="text-foreground">{system.currentValue}</strong></span>)}
+        </div>
+      </div>
+
+      <section className="shrink-0 border-b bg-muted/10 px-4 py-3 sm:px-6">
+        {sceneModels.ready
+          ? <PocketScene
+              simulatedAt={sceneRuntimeState.simulatedAt}
+              location={sceneRuntimeState.location}
+              playerModel={sceneModels.playerModel}
+              characterModels={sceneModels.castModels}
+            />
+          : <div className="flex min-h-24 items-center justify-center rounded-md border border-dashed px-4 text-center text-xs text-muted-foreground">
+              3D 장면은 선택한 플레이어 프로필과 이 Pocket의 모든 캐릭터에 모델이 등록된 경우에만 사용할 수 있어요.
+            </div>}
+      </section>
+
+      {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}
+
+      <div className="pocket-inline-tools">
+        <PocketPlayerStatePanel
+          sessionId={session.id}
+          onError={setError}
+          refreshKey={playerStateRefreshKey}
+          onStateChange={state => setSceneRuntimeState({
+            simulatedAt: state.simulatedAt,
+            location: state.location,
+          })}
+        />
+        <PocketSettingsPanel sessionId={session.id} onError={setError} />
+      </div>
+
+      <div className="pocket-inline-tools">
+      {isDeveloper && <section className="shrink-0 border-b bg-muted/20">
+        <button type="button" onClick={() => setDevOpen(open => !open)}
+          className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-muted-foreground sm:px-6">
+          <Wrench className="size-3.5" />
+          개발자 도구
+          <ChevronDown className={`ml-auto size-3.5 transition-transform ${devOpen ? "rotate-180" : ""}`} />
+        </button>
+        {devOpen && <div className="border-t px-4 py-3 sm:px-6">
+          <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
+            <span>SESSION #{session.id}</span>
+            <span>시뮬레이션 시각 {session.simulatedAt ?? "-"}</span>
+          </div>
+          <div className="rounded-lg border bg-background p-3">
+            <p className="mb-2 text-xs font-semibold">AI 사용량 · 최근 OpenAI 턴</p>
+            {aiUsage
+              ? <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span>{aiUsage.model}</span>
+                  <span>입력 <strong className="text-foreground">{aiUsage.inputTokens?.toLocaleString()}</strong></span>
+                  <span>캐시 <strong className="text-foreground">{aiUsage.cachedInputTokens?.toLocaleString()}</strong></span>
+                  <span>출력 <strong className="text-foreground">{aiUsage.outputTokens?.toLocaleString()}</strong></span>
+                  <span>총 <strong className="text-foreground">{aiUsage.totalTokens?.toLocaleString()}</strong></span>
+                </div>
+              : <p className="text-xs text-muted-foreground">아직 기록된 OpenAI 토큰 사용량이 없습니다.</p>}
+          </div>
+          <div className="mt-3 rounded-lg border bg-background p-3">
+            <p className="mb-2 text-xs font-semibold">Pocket 상태 치트</p>
+            {systems.length === 0
+              ? <p className="text-xs text-muted-foreground">등록된 World System이 없습니다.</p>
+              : <div className="grid gap-2 sm:grid-cols-2">
+                {systems.map(system => <div key={system.systemId} className="flex items-center gap-2 rounded-md border p-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium">{system.name}</p>
+                    <p className="text-[11px] text-muted-foreground">{system.minValue} ~ {system.maxValue} · 현재 {system.currentValue}</p>
+                  </div>
+                  <input type="number" min={system.minValue} max={system.maxValue}
+                    value={devSystemValues[system.systemId] ?? system.currentValue}
+                    onChange={event => setDevSystemValues(current => ({ ...current, [system.systemId]: event.target.value }))}
+                    className="h-8 w-20 rounded-md border bg-background px-2 text-sm" />
+                  <Button type="button" size="sm" variant="outline" className="h-8"
+                    onClick={() => setDevSystemValue(system)}>저장</Button>
+                </div>)}
+              </div>}
+          </div>
+          <div className="mt-3 rounded-lg border bg-background p-3">
+            <p className="mb-2 text-xs font-semibold">이번 턴 Memory Diff</p>
+            {!memoryDiff || !memoryDiff.turnAt
+              ? <p className="text-xs text-muted-foreground">아직 기록된 Memory 변화가 없습니다.</p>
+              : <>
+                <div className="mb-2 flex flex-wrap gap-3 text-xs">
+                  <span>+ ADDED <strong>{memoryDiff.added}</strong></span>
+                  <span>~ UPDATED <strong>{memoryDiff.updated}</strong></span>
+                  <span>⇣ COMPRESSED <strong>{memoryDiff.compressed}</strong></span>
+                  <span>- DELETED <strong>{memoryDiff.deleted}</strong></span>
+                </div>
+                <div className="space-y-1 text-[11px] text-muted-foreground">
+                  {memoryDiff.items.map(item =>
+                    <p key={`${item.type}-${item.memoryId}`}>
+                      <span className="font-medium text-foreground">+ {item.characterName} · ID {item.memoryId}</span>
+                      {" · "}{item.summary}
+                    </p>
+                  )}
+                </div>
+              </>}
+          </div>
+          <div className="mt-3 rounded-lg border p-3">
+            <p className="mb-3 text-xs font-semibold">Memory Inspector · 캐릭터별 최신 5개</p>
+            {memoryInspector.length === 0
+              ? <p className="text-xs text-muted-foreground">이 Pocket에 저장된 캐릭터 기억이 아직 없습니다.</p>
+              : <div className="space-y-4">
+                {memoryInspector.map(group => <div key={group.characterId}>
+                  <div className="mb-1.5 flex items-center gap-2 text-xs">
+                    <strong>{group.characterName}</strong>
+                    <span className="text-muted-foreground">{group.active ? "ACTIVE" : "INACTIVE"}</span>
+                  </div>
+                  {group.memories.length === 0
+                    ? <p className="rounded-md border border-dashed p-2 text-xs text-muted-foreground">저장된 기억 없음</p>
+                    : <div className="overflow-x-auto rounded-md border">
+                      <table className="w-full min-w-[680px] text-left text-[11px]">
+                        <thead className="bg-muted/40 text-muted-foreground">
+                          <tr><th className="px-2 py-1.5">ID</th><th className="px-2 py-1.5">단계</th><th className="px-2 py-1.5">중요도</th><th className="px-2 py-1.5">기억</th><th className="px-2 py-1.5">근거</th></tr>
+                        </thead>
+                        <tbody>
+                          {group.memories.map(memory => <tr key={memory.id} className="border-t align-top">
+                            <td className="whitespace-nowrap px-2 py-2">{memory.id}</td>
+                            <td className="whitespace-nowrap px-2 py-2">{memory.detailLevel}</td>
+                            <td className="px-2 py-2">{memory.importance}</td>
+                            <td className="max-w-72 px-2 py-2">{memory.summary}</td>
+                            <td className="max-w-64 px-2 py-2 text-muted-foreground">{memory.evidenceQuote ?? "-"}</td>
+                          </tr>)}
+                        </tbody>
+                      </table>
+                    </div>}
+                </div>)}
+              </div>}
+          </div>
+        </div>}
+      </section>}
+
+      </div>
+
+      {isDeveloper && <section className="shrink-0 border-b bg-muted/20">
+        <button type="button" onClick={() => setDevOpen(open => !open)}
+          className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-muted-foreground sm:px-6">
+          <Wrench className="size-3.5" />
+          개발자 도구
+          <ChevronDown className={`ml-auto size-3.5 transition-transform ${devOpen ? "rotate-180" : ""}`} />
+        </button>        {loadingOlder
               ? <span className="flex items-center gap-2"><LoaderCircle className="size-4 animate-spin" />이전 대화를 불러오는 중...</span>
               : <span>위로 스크롤하면 이전 대화를 불러옵니다.</span>}
           </div>}
