@@ -9,6 +9,7 @@ import PocketPlayerStatePanel from "@/components/PocketPlayerStatePanel"
 import PocketSettingsPanel from "@/components/PocketSettingsPanel"
 import PocketScene from "@/components/PocketScene"
 import { resolvePocketSceneModels } from "@/lib/pocketCharacterModels"
+import "./PocketPage.css"
 
 function RpText({ text }) {
   const parts = (text ?? "").split(/(\*[^*]+\*)/g)
