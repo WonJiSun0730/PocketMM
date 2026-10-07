@@ -154,8 +154,10 @@ export default function PocketScene({ className = "" }) {
     }
   }, [zoom, sceneHeight])
 
-  return <div className={`pocket-scene ${className}`} style={{ height: `${sceneHeight}px` }}>
-    <div ref={hostRef} className="pocket-scene__viewport" aria-label="Pocket 3D scene preview" />
+  return <div className={`pocket-scene-shell ${className}`}>
+    <div className="pocket-scene" style={{ height: `${sceneHeight}px` }}>
+      <div ref={hostRef} className="pocket-scene__viewport" aria-label="Pocket 3D scene preview" />
+    </div>
     <div className="pocket-scene__controls">
       <div className="pocket-scene__control" aria-label="장면 확대 배율">
         <span className="pocket-scene__control-label">배율</span>
