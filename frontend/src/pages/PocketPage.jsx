@@ -41,6 +41,7 @@ export default function PocketPage({ pocket, onBack }) {
   const [devSystemValues, setDevSystemValues] = useState({})
   const [memoryInspector, setMemoryInspector] = useState([])
   const [memoryDiff, setMemoryDiff] = useState(null)
+  const [aiUsage, setAiUsage] = useState(null)
   const [hasOlderMessages, setHasOlderMessages] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [playerStateRefreshKey, setPlayerStateRefreshKey] = useState(0)
@@ -62,6 +63,16 @@ export default function PocketPage({ pocket, onBack }) {
     } catch {
       setMemoryInspector([])
       setMemoryDiff(null)
+    }
+  }
+
+  async function refreshAiUsage() {
+    if (!isDeveloper) return
+    try {
+      const response = await fetch(`/api/worlds/pockets/${session.id}/ai-usage`, { credentials: "include" })
+      if (response.ok) setAiUsage(await response.json())
+    } catch {
+      setAiUsage(null)
     }
   }
 
@@ -127,6 +138,7 @@ export default function PocketPage({ pocket, onBack }) {
       return
     }
     refreshMemoryInspector()
+    refreshAiUsage()
   }, [isDeveloper, session.id])
   useEffect(() => {
     if (loading || initialScrollDoneRef.current || messages.length === 0) return
@@ -206,6 +218,7 @@ export default function PocketPage({ pocket, onBack }) {
       await refresh()
       refreshPlayerState()
       await refreshMemoryInspector()
+      await refreshAiUsage()
     } catch (e) {
       setMessages(current => current.filter(item => item.id !== pending.id))
       setInput(message)
@@ -283,6 +296,7 @@ export default function PocketPage({ pocket, onBack }) {
       await refresh()
       refreshPlayerState()
       await refreshMemoryInspector()
+      await refreshAiUsage()
     } catch (e) { setError(e.message) }
     finally { setSending(false) }
   }
@@ -300,6 +314,7 @@ export default function PocketPage({ pocket, onBack }) {
       await refresh()
       refreshPlayerState()
       await refreshMemoryInspector()
+      await refreshAiUsage()
     } catch (e) {
       setError(e.message)
     } finally {
@@ -400,6 +415,18 @@ export default function PocketPage({ pocket, onBack }) {
             <span>시뮬레이션 시각 {session.simulatedAt ?? "-"}</span>
           </div>
           <div className="rounded-lg border bg-background p-3">
+            <p className="mb-2 text-xs font-semibold">AI 사용량 · 최근 OpenAI 턴</p>
+            {aiUsage
+              ? <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                  <span>{aiUsage.model}</span>
+                  <span>입력 <strong className="text-foreground">{aiUsage.inputTokens?.toLocaleString()}</strong></span>
+                  <span>캐시 <strong className="text-foreground">{aiUsage.cachedInputTokens?.toLocaleString()}</strong></span>
+                  <span>출력 <strong className="text-foreground">{aiUsage.outputTokens?.toLocaleString()}</strong></span>
+                  <span>총 <strong className="text-foreground">{aiUsage.totalTokens?.toLocaleString()}</strong></span>
+                </div>
+              : <p className="text-xs text-muted-foreground">아직 기록된 OpenAI 토큰 사용량이 없습니다.</p>}
+          </div>
+          <div className="mt-3 rounded-lg border bg-background p-3">
             <p className="mb-2 text-xs font-semibold">Pocket 상태 치트</p>
             {systems.length === 0
               ? <p className="text-xs text-muted-foreground">등록된 World System이 없습니다.</p>
