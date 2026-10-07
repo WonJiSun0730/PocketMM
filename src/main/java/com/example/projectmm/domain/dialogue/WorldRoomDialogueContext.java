@@ -39,6 +39,31 @@ public record WorldRoomDialogueContext(
             List<DialogueMessageContext> recentMessages,
             List<WorldRoomCharacterContext> roomCast,
             List<WorldRoomCharacterContext> activeCast,
+            List<WorldRoomSystemContext> sessionSystems,
+            WorldRoomPlayerStateContext playerState,
+            List<CharacterMemories> recalledMemories,
+            String userNote,
+            String pocketPlayGuide,
+            boolean noControlPlayer
+    ) {
+        this(null, roomId, roomTitle, visibility, simulatedAt, world, playerProfile,
+                introTitle, introContent, recentMessages, roomCast, activeCast,
+                sessionSystems, playerState, recalledMemories, userNote, pocketPlayGuide,
+                noControlPlayer, "GEMINI", null);
+    }
+
+    public WorldRoomDialogueContext(
+            Long roomId,
+            String roomTitle,
+            WorldConversation.Visibility visibility,
+            LocalDateTime simulatedAt,
+            DialogueWorldContext world,
+            DialoguePlayerProfile playerProfile,
+            String introTitle,
+            String introContent,
+            List<DialogueMessageContext> recentMessages,
+            List<WorldRoomCharacterContext> roomCast,
+            List<WorldRoomCharacterContext> activeCast,
             List<WorldRoomSystemContext> sessionSystems
     ) {
         this(
