@@ -2,6 +2,7 @@ package com.example.projectmm.application.chat;
 
 import com.example.projectmm.application.dialogue.DialogueGateway;
 import com.example.projectmm.application.dialogue.WorldRoomContextBuilder;
+import com.example.projectmm.application.memory.MemoryRecallService;
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.character.CharacterRepository;
 import com.example.projectmm.domain.chat.*;
@@ -44,6 +45,7 @@ class WorldRoomActiveCastIntegrationTest {
     @Autowired WorldConversationCastRepository roomCasts;
 
     @MockitoBean DialogueGateway gateway;
+    @MockitoBean MemoryRecallService memoryRecallService;
 
     @Test
     void castCanEnterLeaveReenterAndOverlapWithinOneSession() {
