@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
 import * as THREE from "three"
 
-const INTERNAL_HEIGHT = 180
+const INTERNAL_HEIGHT = 96
 
 export default function PocketScene({ className = "" }) {
   const hostRef = useRef(null)
