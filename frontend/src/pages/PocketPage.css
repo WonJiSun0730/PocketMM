@@ -69,3 +69,27 @@
   padding-left: 0.55rem;
   color: rgb(255 255 255 / 65%);
 }
+
+
+@media (min-width: 1280px) {
+  .pocket-page {
+    position: relative;
+  }
+
+  .pocket-main {
+    position: relative;
+  }
+
+  .pocket-aux-tools {
+    position: relative;
+    width: 18rem;
+    margin-left: -19.25rem;
+    margin-right: 0;
+    z-index: 2;
+    background: var(--card);
+  }
+
+  .pocket-aux-tools + .pocket-aux-tools {
+    margin-top: 0;
+  }
+}
