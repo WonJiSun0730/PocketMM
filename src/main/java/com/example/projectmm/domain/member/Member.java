@@ -68,4 +68,8 @@ public class Member {
                 Role.USER
         );
     }
+
+    public void changeRole(Role role) {
+        this.role = role;
+    }
 }
