@@ -3,6 +3,7 @@ package com.example.projectmm.application.chat;
 import com.example.projectmm.application.dialogue.DialogueGateway;
 import com.example.projectmm.application.dialogue.WorldRoomContextBuilder;
 import com.example.projectmm.application.time.TimeInterpreter;
+import com.example.projectmm.application.memory.MemoryRecallService;
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.character.CharacterRepository;
 import com.example.projectmm.domain.chat.*;
@@ -58,6 +59,7 @@ class WorldRoomDialogueWorldlineIntegrationTest {
 
     @MockitoBean DialogueGateway gateway;
     @MockitoBean TimeInterpreter timeInterpreter;
+    @MockitoBean MemoryRecallService memoryRecallService;
 
     @BeforeEach
     void defaultTimeInterpretation() {
