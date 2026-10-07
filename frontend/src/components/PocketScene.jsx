@@ -151,7 +151,7 @@ export default function PocketScene({ className = "" }) {
         }
       })
     }
-  }, [zoom])
+  }, [zoom, sceneHeight])
 
   return <div className={`pocket-scene ${className}`} style={{ height: `${sceneHeight}px` }}>
     <div ref={hostRef} className="pocket-scene__viewport" aria-label="Pocket 3D scene preview" />
