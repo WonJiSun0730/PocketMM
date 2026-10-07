@@ -415,15 +415,31 @@ public class GeminiChatMemoryExtractor implements ChatMemoryExtractor {
                         )
                 );
             }
-            result.add(
-                    new ChatMemoryCandidate(
-                            quote,
-                            memory.path("importance").asInt(),
-                            fact,
-                            semanticMemory,
-                            details
-                    )
+            var parsed = new ChatMemoryCandidate(
+                    quote,
+                    memory.path("importance").asInt(),
+                    fact,
+                    semanticMemory,
+                    details
             );
+            int duplicateIndex = -1;
+            for (int i = 0; i < result.size(); i++) {
+                if (result.get(i).quote().equals(quote)) {
+                    duplicateIndex = i;
+                    break;
+                }
+            }
+            if (duplicateIndex < 0) {
+                result.add(parsed);
+            } else {
+                var existing = result.get(duplicateIndex);
+                boolean parsedHasMoreStructure =
+                        (parsed.fact() != null && existing.fact() == null)
+                                || (parsed.semanticMemory() != null && existing.semanticMemory() == null);
+                if (parsedHasMoreStructure) {
+                    result.set(duplicateIndex, parsed);
+                }
+            }
         }
         return List.copyOf(result);
     }
