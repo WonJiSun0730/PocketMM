@@ -226,6 +226,71 @@ class WorldRoomDialogueWorldlineIntegrationTest {
     }
 
     @Test
+    void rerollVariantSelectionAndDeletionRestorePocketTimeWorldline() {
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        when(encoder.encode("password")).thenReturn("encoded");
+
+        Member member = members.save(Member.createLocal(
+                "time-worldline-user", "password", "Time Worldline User",
+                "time-worldline-user@example.test", encoder
+        ));
+        World world = worlds.save(new World(member, "Time Worldline", "Time test."));
+        WorldConversation room = rooms.save(new WorldConversation(
+                world, member, "Time Worldline Room",
+                WorldConversation.Visibility.PRIVATE,
+                LocalDateTime.of(2026, 10, 7, 20, 0)
+        ));
+        WorldRoomIntro intro = intros.save(new WorldRoomIntro(room, "Start", "Start scene.", 0));
+        var session = sessionService.start(room.getId(), member.getLoginId(), null, intro.getId());
+        var baseline = session.getSimulatedAt();
+
+        when(gateway.generateWorldRoomTurn(any(), eq("이야기를 이어간다.")))
+                .thenReturn(new WorldRoomTurn(
+                        "*잠시 이야기가 이어진다.*",
+                        WorldRoomCastChange.none(),
+                        List.of(),
+                        120
+                ));
+
+        dialogueService.chat(session.getId(), "이야기를 이어간다.");
+        assertThat(sessions.findById(session.getId()).orElseThrow().getSimulatedAt())
+                .isEqualTo(baseline.plusMinutes(2));
+
+        var characterMessage = messages.findTop50BySessionIdOrderByIdDesc(session.getId()).stream()
+                .filter(message -> message.getRole() == ChatRole.CHARACTER)
+                .findFirst()
+                .orElseThrow();
+
+        when(gateway.generateWorldRoomTurn(
+                any(),
+                argThat(prompt -> prompt != null && prompt.contains("[Previous response variant]"))
+        )).thenReturn(new WorldRoomTurn(
+                "*이번에는 긴 대화를 나눈다.*",
+                WorldRoomCastChange.none(),
+                List.of(),
+                600
+        ));
+
+        dialogueService.reroll(session.getId(), characterMessage.getId());
+
+        assertThat(sessions.findById(session.getId()).orElseThrow().getSimulatedAt())
+                .isEqualTo(baseline.plusMinutes(10));
+
+        dialogueService.selectVariant(session.getId(), characterMessage.getId(), 1);
+        assertThat(sessions.findById(session.getId()).orElseThrow().getSimulatedAt())
+                .isEqualTo(baseline.plusMinutes(2));
+
+        dialogueService.selectVariant(session.getId(), characterMessage.getId(), 2);
+        assertThat(sessions.findById(session.getId()).orElseThrow().getSimulatedAt())
+                .isEqualTo(baseline.plusMinutes(10));
+
+        dialogueService.deleteMessageAndFollowing(session.getId(), characterMessage.getId());
+
+        assertThat(sessions.findById(session.getId()).orElseThrow().getSimulatedAt())
+                .isEqualTo(baseline);
+    }
+
+    @Test
     void rerollAndVariantSelectionRestoreTextCastAndSystemAsOneWorldline() {
         PasswordEncoder encoder = mock(PasswordEncoder.class);
         when(encoder.encode("password")).thenReturn("encoded");
