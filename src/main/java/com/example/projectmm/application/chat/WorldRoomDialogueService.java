@@ -58,6 +58,7 @@ public class WorldRoomDialogueService {
                 now()
         ));
 
+        var beforeTime = session.getSimulatedAt();
         boolean explicitTimeChanged = applyExplicitTimeChange(session, userMessage);
         var context = contextBuilder.buildSession(sessionId);
         var beforeCast = sessionService.captureCastState(sessionId);
@@ -85,6 +86,7 @@ public class WorldRoomDialogueService {
         ));
         sessionService.saveCastSnapshot(variant, beforeCast, afterCast);
         sessionService.saveSystemSnapshot(variant, beforeSystems, afterSystems);
+        sessionService.saveTimeSnapshot(variant, beforeTime, session.getSimulatedAt());
         events.publishEvent(new PocketUserSpeechCommitted(
                 sessionId,
                 userSourceMessage.getId(),
@@ -132,6 +134,7 @@ public class WorldRoomDialogueService {
         var context = contextBuilder.buildSession(sessionId);
         var beforeCast = sessionService.captureCastState(sessionId);
         var beforeSystems = sessionService.captureSystemState(sessionId);
+        var beforeTime = session.getSimulatedAt();
         var continuationPrompt = "[Continue the current scene naturally for one turn. The player character may actively participate: give them plausible small actions, immediate reactions, observations, movement, or brief dialogue consistent with their PlayerProfile, established relationships, and the current situation. This mode is used when the user wants the story to move forward without deciding the next beat themselves. Keep major decisions, irreversible actions, major relationship changes, high-risk commitments, and other consequential choices open for the user.]";
         var generated = dialogueGateway.generateWorldRoomTurn(context, continuationPrompt);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
@@ -154,6 +157,7 @@ public class WorldRoomDialogueService {
         ));
         sessionService.saveCastSnapshot(variant, beforeCast, afterCast);
         sessionService.saveSystemSnapshot(variant, beforeSystems, afterSystems);
+        sessionService.saveTimeSnapshot(variant, beforeTime, session.getSimulatedAt());
 
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
     }
@@ -196,6 +200,7 @@ public class WorldRoomDialogueService {
                     var variant = selectedVariant(characterMessage);
                     sessionService.restoreCastBeforeVariant(sessionId, variant);
                     sessionService.restoreSystemsBeforeVariant(sessionId, variant);
+                    sessionService.restoreTimeBeforeVariant(sessionId, variant);
                 });
         deleteTimelineFrom(sessionId, messageId);
     }
@@ -220,6 +225,7 @@ public class WorldRoomDialogueService {
         var selected = selectedVariant(target);
         sessionService.restoreCastBeforeVariant(sessionId, selected);
         sessionService.restoreSystemsBeforeVariant(sessionId, selected);
+        sessionService.restoreTimeBeforeVariant(sessionId, selected);
         var context = contextBuilder.buildSessionBeforeMessage(sessionId, target.getId());
         var rerollBase = precedingMessage != null && precedingMessage.getRole() == ChatRole.USER
                 ? precedingMessage.getContent()
@@ -230,9 +236,11 @@ public class WorldRoomDialogueService {
                 + "\n\nGenerate another natural variant of this response without copying it.";
         var beforeCast = sessionService.captureCastState(sessionId);
         var beforeSystems = sessionService.captureSystemState(sessionId);
+        var beforeTime = sessionService.captureSimulatedAt(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, rerollPrompt);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
+        applyNarrativeElapsedTime(sessions.findById(sessionId).orElseThrow(), generated.elapsedSeconds());
         var afterCast = sessionService.captureCastState(sessionId);
         var afterSystems = sessionService.captureSystemState(sessionId);
 
@@ -245,6 +253,7 @@ public class WorldRoomDialogueService {
         ));
         sessionService.saveCastSnapshot(variant, beforeCast, afterCast);
         sessionService.saveSystemSnapshot(variant, beforeSystems, afterSystems);
+        sessionService.saveTimeSnapshot(variant, beforeTime, sessionService.captureSimulatedAt(sessionId));
         target.selectVariant(variantNo, generated.reply());
 
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
@@ -271,15 +280,18 @@ public class WorldRoomDialogueService {
         var selected = selectedVariant(target);
         sessionService.restoreCastBeforeVariant(sessionId, selected);
         sessionService.restoreSystemsBeforeVariant(sessionId, selected);
+        sessionService.restoreTimeBeforeVariant(sessionId, selected);
         deleteTimelineFrom(sessionId, target.getId());
         messages.flush();
 
         var context = contextBuilder.buildSession(sessionId);
         var beforeCast = sessionService.captureCastState(sessionId);
         var beforeSystems = sessionService.captureSystemState(sessionId);
+        var beforeTime = sessionService.captureSimulatedAt(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage.getContent());
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
+        applyNarrativeElapsedTime(session, generated.elapsedSeconds());
         var afterCast = sessionService.captureCastState(sessionId);
         var afterSystems = sessionService.captureSystemState(sessionId);
 
@@ -297,6 +309,7 @@ public class WorldRoomDialogueService {
         ));
         sessionService.saveCastSnapshot(variant, beforeCast, afterCast);
         sessionService.saveSystemSnapshot(variant, beforeSystems, afterSystems);
+        sessionService.saveTimeSnapshot(variant, beforeTime, session.getSimulatedAt());
 
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
     }
@@ -318,6 +331,7 @@ public class WorldRoomDialogueService {
                 ));
         sessionService.restoreCastAfterVariant(sessionId, variant);
         sessionService.restoreSystemsAfterVariant(sessionId, variant);
+        sessionService.restoreTimeAfterVariant(sessionId, variant);
         message.selectVariant(variant.getVariantNo(), variant.getContent());
         return message;
     }
