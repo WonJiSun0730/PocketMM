@@ -7,4 +7,8 @@ public record PlayerProfileRequest(@NotBlank @Size(max = 40) String name,
                                    @NotBlank @Size(max = 500) String description,
                                    @Size(max = 400000) String avatar,
                                    @Size(max = 500) String modelUrl,
-                                   Double modelHeight) {}
+                                   Double modelHeight) {
+    public PlayerProfileRequest(String name, String description, String avatar) {
+        this(name, description, avatar, null, null);
+    }
+}
