@@ -204,7 +204,10 @@ public class WorldRoomContextBuilder {
                                 state.getInventory()
                         ))
                         .orElseGet(WorldRoomPlayerStateContext::empty),
-                recalledMemories
+                recalledMemories,
+                session.getUserNote(),
+                session.getPocketPlayGuide(),
+                session.isNoControlPlayer()
         );
     }
 
