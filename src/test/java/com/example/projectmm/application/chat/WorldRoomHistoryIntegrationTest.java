@@ -86,15 +86,15 @@ class WorldRoomHistoryIntegrationTest {
 
         var firstPage = dialogueService.history(session.getId(), null);
 
-        assertThat(firstPage).hasSize(50);
-        assertThat(firstPage.get(0).getContent()).isEqualTo("message-11");
-        assertThat(firstPage.get(49).getContent()).isEqualTo("message-60");
+        assertThat(firstPage).hasSize(15);
+        assertThat(firstPage.get(0).getContent()).isEqualTo("message-46");
+        assertThat(firstPage.get(14).getContent()).isEqualTo("message-60");
 
         Long beforeId = firstPage.get(0).getId();
         var olderPage = dialogueService.history(session.getId(), beforeId);
 
-        assertThat(olderPage).hasSize(10);
-        assertThat(olderPage.get(0).getContent()).isEqualTo("message-1");
-        assertThat(olderPage.get(9).getContent()).isEqualTo("message-10");
+        assertThat(olderPage).hasSize(15);
+        assertThat(olderPage.get(0).getContent()).isEqualTo("message-31");
+        assertThat(olderPage.get(14).getContent()).isEqualTo("message-45");
     }
 }
