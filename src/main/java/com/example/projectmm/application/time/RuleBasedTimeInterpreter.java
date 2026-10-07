@@ -27,7 +27,7 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
                             + "\\s*(분|시간|일|주|달|개월)"
                             + "\\s*(?:정도|쯤|가량)?"
                             + "(?=[^.!?\\n]{0,40}"
-                            + "(?:했|하였다|지냈|보냈|살았|머물렀|계속했|이어졌|지속됐|지속되었|흘렀|지났))"
+                            + "(?:했|하였다|지냈|보냈|살았|머물렀|계속했|이어졌|지속됐|지속되었))"
             );
 
     private static final Pattern APPROXIMATE_TIME_PATTERN =
