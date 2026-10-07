@@ -21,6 +21,15 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
                             + "\\s*(?:뒤|후|지났|지난|흘렀|흐른)"
             );
 
+    private static final Pattern ELAPSED_DURATION_PATTERN =
+            Pattern.compile(
+                    "([0-9]+|한|두|세|네|다섯|여섯|일곱|여덟|아홉|열|열한|열두)"
+                            + "\\s*(분|시간|일|주|달|개월)"
+                            + "\\s*(?:정도|쯤|가량)?"
+                            + "(?=[^.!?\\n]{0,40}"
+                            + "(?:했|하였다|지냈|보냈|살았|머물렀|계속했|이어졌|지속됐|지속되었|흘렀|지났))"
+            );
+
     private static final Pattern APPROXIMATE_TIME_PATTERN =
             Pattern.compile(
                     "(정도|쯤|가량|"
@@ -41,6 +50,30 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
     ) {
         if (userInput == null || userInput.isBlank()) {
             return TimeInterpretation.noMatch();
+        }
+
+        Matcher elapsedDurationMatcher =
+                ELAPSED_DURATION_PATTERN.matcher(userInput);
+
+        if (elapsedDurationMatcher.find()) {
+            long amount =
+                    parseAmount(elapsedDurationMatcher.group(1));
+
+            String unit =
+                    elapsedDurationMatcher.group(2);
+
+            LocalDateTime newTime =
+                    addDuration(currentTime, amount, unit);
+
+            return TimeInterpretation.matched(
+                    TimeInterpretation.Interpreter.RULE,
+                    TimePrecision.EXACT,
+                    TimeChange.changed(
+                            currentTime,
+                            newTime,
+                            elapsedDurationMatcher.group()
+                    )
+            );
         }
 
         if (APPROXIMATE_TIME_PATTERN.matcher(userInput).find()) {
@@ -106,19 +139,7 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
                 matcher.group(2);
 
         LocalDateTime newTime =
-                switch (unit) {
-                    case "분" ->
-                            currentTime.plusMinutes(amount);
-
-                    case "시간" ->
-                            currentTime.plusHours(amount);
-
-                    case "일" ->
-                            currentTime.plusDays(amount);
-
-                    default ->
-                            currentTime;
-                };
+                addDuration(currentTime, amount, unit);
 
         return TimeInterpretation.matched(
                 TimeInterpretation.Interpreter.RULE,
@@ -129,6 +150,32 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
                         matcher.group()
                 )
         );
+    }
+
+    private LocalDateTime addDuration(
+            LocalDateTime currentTime,
+            long amount,
+            String unit
+    ) {
+        return switch (unit) {
+            case "분" ->
+                    currentTime.plusMinutes(amount);
+
+            case "시간" ->
+                    currentTime.plusHours(amount);
+
+            case "일" ->
+                    currentTime.plusDays(amount);
+
+            case "주" ->
+                    currentTime.plusWeeks(amount);
+
+            case "달", "개월" ->
+                    currentTime.plusMonths(amount);
+
+            default ->
+                    currentTime;
+        };
     }
 
     private long parseAmount(String value) {
