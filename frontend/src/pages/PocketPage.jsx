@@ -381,7 +381,7 @@ export default function PocketPage({ pocket, onBack }) {
   }
 
   return <main className="pocket-page flex h-svh bg-background text-foreground">
-    <section className="pocket-main mx-auto flex h-full w-full max-w-6xl flex-col border-x bg-card">
+    <section className="pocket-main mx-auto flex h-full w-full max-w-4xl flex-col border-x bg-card">
       <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2 sm:px-6">
         <Button type="button" variant="ghost" size="icon" onClick={onBack} disabled={sending} aria-label="월드로 돌아가기">
           <ArrowLeft className="size-4" />
@@ -404,7 +404,7 @@ export default function PocketPage({ pocket, onBack }) {
         </Button>
       </header>
 
-      <div className="pocket-inline-tools shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
+      <div className="pocket-inline-tools pocket-aux-tools shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span>현재 장면 · {cast.length ? cast.map(item => item.characterName ?? item.name).join(" · ") : "등장인물 없음"}</span>
           {systems.map(system => <span key={system.id}>{system.name} <strong className="text-foreground">{system.currentValue}</strong></span>)}
@@ -426,7 +426,7 @@ export default function PocketPage({ pocket, onBack }) {
 
       {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}
 
-      <div className="pocket-inline-tools">
+      <div className="pocket-inline-tools pocket-aux-tools">
         <PocketPlayerStatePanel
           sessionId={session.id}
           onError={setError}
