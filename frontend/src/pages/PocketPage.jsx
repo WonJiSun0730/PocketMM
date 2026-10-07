@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, Pencil, RefreshCw, Send, Trash2, Wrench, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -8,7 +8,7 @@ import PlayerProfilePicker from "@/components/PlayerProfilePicker"
 import PocketPlayerStatePanel from "@/components/PocketPlayerStatePanel"
 import PocketSettingsPanel from "@/components/PocketSettingsPanel"
 import PocketScene from "@/components/PocketScene"
-import { resolvePocketCharacterModels } from "@/lib/pocketCharacterModels"
+import { resolvePocketSceneModels } from "@/lib/pocketCharacterModels"
 
 function RpText({ text }) {
   const parts = (text ?? "").split(/(\*[^*]+\*)/g)
@@ -30,6 +30,7 @@ export default function PocketPage({ pocket, onBack }) {
   const [changingPlayerProfile, setChangingPlayerProfile] = useState(false)
   const [messages, setMessages] = useState([])
   const [cast, setCast] = useState([])
+  const [worldCharacters, setWorldCharacters] = useState([])
   const [systems, setSystems] = useState([])
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
@@ -51,7 +52,11 @@ export default function PocketPage({ pocket, onBack }) {
     simulatedAt: session.simulatedAt ?? "",
     location: "",
   })
-  const sceneCharacters = resolvePocketCharacterModels(cast)
+  const sceneModels = useMemo(() => resolvePocketSceneModels({
+    playerProfile: selectedPlayerProfile,
+    worldCharacters,
+    cast,
+  }), [selectedPlayerProfile, worldCharacters, cast])
   const scrollAreaRef = useRef(null)
   const historySentinelRef = useRef(null)
   const bottomRef = useRef(null)
@@ -94,15 +99,17 @@ export default function PocketPage({ pocket, onBack }) {
 
   async function refresh() {
     try {
-      const [loadedMessages, castResponse, systemResponse] = await Promise.all([
+      const [loadedMessages, castResponse, systemResponse, worldCharactersResponse] = await Promise.all([
         loadMessagePage(),
         fetch(`${base}/cast`, { credentials: "include" }),
         fetch(`${base}/systems`, { credentials: "include" }),
+        fetch(`/api/worlds/${world.id}/characters`, { credentials: "include" }),
       ])
       setMessages(loadedMessages)
       setHasOlderMessages(loadedMessages.length === 15)
       if (castResponse.ok) setCast(await castResponse.json())
       if (systemResponse.ok) setSystems(await systemResponse.json())
+      if (worldCharactersResponse.ok) setWorldCharacters(await worldCharactersResponse.json())
     } catch (e) {
       setError(e.message)
     } finally {
@@ -405,14 +412,15 @@ export default function PocketPage({ pocket, onBack }) {
       </div>
 
       <section className="shrink-0 border-b bg-muted/10 px-4 py-3 sm:px-6">
-        {sceneCharacters.ready
+        {sceneModels.ready
           ? <PocketScene
               simulatedAt={sceneRuntimeState.simulatedAt}
               location={sceneRuntimeState.location}
-              characterModels={sceneCharacters.models}
+              playerModel={sceneModels.playerModel}
+              characterModels={sceneModels.castModels}
             />
           : <div className="flex min-h-24 items-center justify-center rounded-md border border-dashed px-4 text-center text-xs text-muted-foreground">
-              3D 장면은 현재 등장 캐릭터 모두에게 모델이 등록된 경우에만 사용할 수 있어요.
+              3D 장면은 선택한 플레이어 프로필과 이 Pocket의 모든 캐릭터에 모델이 등록된 경우에만 사용할 수 있어요.
             </div>}
       </section>
 
