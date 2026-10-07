@@ -21,6 +21,8 @@ public record CharacterCreateRequest(
         String personality,
         String speechStyle,
         String background,
-        String appearance
+        String appearance,
+        @Size(max = 500) String modelUrl,
+        Double modelHeight
 ) {
 }
