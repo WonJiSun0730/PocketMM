@@ -29,6 +29,57 @@ export default function PocketScene({ className = "" }) {
     renderer.domElement.className = "pocket-scene__canvas"
     host.appendChild(renderer.domElement)
 
+    const renderTarget = new THREE.WebGLRenderTarget(1, 1, {
+      minFilter: THREE.NearestFilter,
+      magFilter: THREE.NearestFilter,
+      depthBuffer: true,
+    })
+    renderTarget.texture.colorSpace = THREE.SRGBColorSpace
+
+    const postScene = new THREE.Scene()
+    const postCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
+    const postMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        tScene: { value: renderTarget.texture },
+        resolution: { value: new THREE.Vector2(1, 1) },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position.xy, 0.0, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tScene;
+        uniform vec2 resolution;
+        varying vec2 vUv;
+
+        void main() {
+          vec2 texel = 1.0 / resolution;
+          vec4 center = texture2D(tScene, vUv);
+          vec3 left = texture2D(tScene, vUv - vec2(texel.x, 0.0)).rgb;
+          vec3 right = texture2D(tScene, vUv + vec2(texel.x, 0.0)).rgb;
+          vec3 up = texture2D(tScene, vUv + vec2(0.0, texel.y)).rgb;
+          vec3 down = texture2D(tScene, vUv - vec2(0.0, texel.y)).rgb;
+
+          // Preserve authored color. Only add a restrained pixel-scale edge
+          // accent where neighboring low-res texels differ strongly.
+          float edge = max(
+            max(length(center.rgb - left), length(center.rgb - right)),
+            max(length(center.rgb - up), length(center.rgb - down))
+          );
+          float edgeMask = smoothstep(0.20, 0.48, edge);
+          vec3 outlined = mix(center.rgb, center.rgb * 0.72, edgeMask * 0.38);
+          gl_FragColor = vec4(outlined, center.a);
+        }
+      `,
+      depthTest: false,
+      depthWrite: false,
+    })
+    const postQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), postMaterial)
+    postScene.add(postQuad)
+
     scene.add(new THREE.HemisphereLight(0xfff4dd, 0x4c526b, 1.45))
     const key = new THREE.DirectionalLight(0xffffff, 2.8)
     key.position.set(4, 7, 5)
@@ -102,7 +153,11 @@ export default function PocketScene({ className = "" }) {
     }
 
     function render() {
-      if (!disposed) renderer.render(scene, camera)
+      if (disposed) return
+      renderer.setRenderTarget(renderTarget)
+      renderer.render(scene, camera)
+      renderer.setRenderTarget(null)
+      renderer.render(postScene, postCamera)
     }
 
     function loadVrm(url, position, facingY = 0) {
@@ -148,6 +203,8 @@ export default function PocketScene({ className = "" }) {
       const height = Math.max(1, sceneHeight)
       const internalWidth = Math.max(1, Math.round(INTERNAL_HEIGHT * width / height))
       renderer.setSize(internalWidth, INTERNAL_HEIGHT, false)
+      renderTarget.setSize(internalWidth, INTERNAL_HEIGHT)
+      postMaterial.uniforms.resolution.value.set(internalWidth, INTERNAL_HEIGHT)
       renderer.domElement.style.width = "100%"
       renderer.domElement.style.height = "100%"
 
@@ -168,6 +225,9 @@ export default function PocketScene({ className = "" }) {
     return () => {
       disposed = true
       observer.disconnect()
+      renderTarget.dispose()
+      postMaterial.dispose()
+      postQuad.geometry.dispose()
       renderer.dispose()
       renderer.domElement.remove()
       scene.traverse(object => {
