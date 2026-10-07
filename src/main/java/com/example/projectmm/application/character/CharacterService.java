@@ -34,10 +34,9 @@ public class CharacterService {
 
         Member owner = findMember(loginId);
 
-        Character character =
-                characterRepository.save(
-                        new Character(request.name().trim(), owner)
-                );
+        Character character = new Character(request.name().trim(), owner);
+        character.updateModel(request.modelUrl(), request.modelHeight());
+        character = characterRepository.save(character);
 
         CharacterProfile profile =
                 characterProfileRepository.save(
@@ -127,6 +126,7 @@ public class CharacterService {
                 request.background(),
                 request.appearance()
         );
+        character.updateModel(request.modelUrl(), request.modelHeight());
 
         replaceExamples(
                 character,
@@ -161,7 +161,9 @@ public class CharacterService {
                     null, // personality
                     null, // speechStyle
                     null, // background
-                    null  // appearance
+                    null, // appearance
+                    character.getModelUrl(),
+                    character.getModelHeight()
             );
         }
 
@@ -182,7 +184,9 @@ public class CharacterService {
                 profile.getPersonality(),
                 profile.getSpeechStyle(),
                 profile.getBackground(),
-                profile.getAppearance()
+                profile.getAppearance(),
+                character.getModelUrl(),
+                character.getModelHeight()
         );
     }
 
