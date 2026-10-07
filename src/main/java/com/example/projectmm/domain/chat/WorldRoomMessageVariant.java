@@ -36,6 +36,10 @@ public class WorldRoomMessageVariant {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    private LocalDateTime beforeSimulatedAt;
+
+    private LocalDateTime afterSimulatedAt;
+
     public void editContent(String content) {
         if (content == null || content.isBlank()) {
             throw new IllegalArgumentException("content must not be blank");
@@ -48,6 +52,17 @@ public class WorldRoomMessageVariant {
             int variantNo,
             String content,
             LocalDateTime createdAt
+    ) {
+        this(message, variantNo, content, createdAt, null, null);
+    }
+
+    public WorldRoomMessageVariant(
+            WorldRoomMessage message,
+            int variantNo,
+            String content,
+            LocalDateTime createdAt,
+            LocalDateTime beforeSimulatedAt,
+            LocalDateTime afterSimulatedAt
     ) {
         if (message == null) {
             throw new IllegalArgumentException("message must not be null");
@@ -65,5 +80,18 @@ public class WorldRoomMessageVariant {
         this.variantNo = variantNo;
         this.content = content;
         this.createdAt = createdAt;
+        this.beforeSimulatedAt = beforeSimulatedAt;
+        this.afterSimulatedAt = afterSimulatedAt;
+    }
+
+    public void captureTimeWorldline(
+            LocalDateTime beforeSimulatedAt,
+            LocalDateTime afterSimulatedAt
+    ) {
+        if (beforeSimulatedAt == null || afterSimulatedAt == null) {
+            throw new IllegalArgumentException("Pocket time snapshot must not be null");
+        }
+        this.beforeSimulatedAt = beforeSimulatedAt;
+        this.afterSimulatedAt = afterSimulatedAt;
     }
 }
