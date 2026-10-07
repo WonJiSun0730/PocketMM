@@ -4,7 +4,7 @@ import com.example.projectmm.application.dialogue.DialogueGateway;
 import com.example.projectmm.application.dialogue.WorldRoomContextBuilder;
 import com.example.projectmm.application.memory.MemoryRecallService;
 import com.example.projectmm.application.time.TimeInterpreter;
-import com.example.projectmm.application.time.TimeInterpretation;
+import com.example.projectmm.domain.time.TimeInterpretation;
 import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.member.Member;
 import com.example.projectmm.domain.member.MemberRepository;
