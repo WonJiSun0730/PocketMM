@@ -135,7 +135,9 @@ public class WorldRoomDialogueService {
         var beforeCast = sessionService.captureCastState(sessionId);
         var beforeSystems = sessionService.captureSystemState(sessionId);
         var beforeTime = session.getSimulatedAt();
-        var continuationPrompt = "[Continue the current scene naturally for one turn. The player character may actively participate: give them plausible small actions, immediate reactions, observations, movement, or brief dialogue consistent with their PlayerProfile, established relationships, and the current situation. This mode is used when the user wants the story to move forward without deciding the next beat themselves. Keep major decisions, irreversible actions, major relationship changes, high-risk commitments, and other consequential choices open for the user.]";
+        var continuationPrompt = session.isNoControlPlayer()
+                ? "[Continue the current scene naturally for one turn without controlling the player character. Advance only NPC actions, dialogue, environment, events, and other story elements. Do not invent any player dialogue, action, thought, feeling, reaction, decision, or movement. End with room for the user to respond.]"
+                : "[Continue the current scene naturally for one turn. The player character may actively participate: give them plausible small actions, immediate reactions, observations, movement, or brief dialogue consistent with their PlayerProfile, established relationships, and the current situation. This mode is used when the user wants the story to move forward without deciding the next beat themselves. Keep major decisions, irreversible actions, major relationship changes, high-risk commitments, and other consequential choices open for the user.]";
         var generated = dialogueGateway.generateWorldRoomTurn(context, continuationPrompt);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
