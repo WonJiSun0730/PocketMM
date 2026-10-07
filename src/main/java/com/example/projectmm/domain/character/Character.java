@@ -44,7 +44,17 @@ public class Character {
     @JoinColumn(name = "world_id")
     private World world;
 
+    @Column(length = 500)
+    private String modelUrl;
+
+    private Double modelHeight;
+
     public void assignWorld(World world) {
         this.world = world;
+    }
+
+    public void updateModel(String modelUrl, Double modelHeight) {
+        this.modelUrl = modelUrl == null || modelUrl.isBlank() ? null : modelUrl.trim();
+        this.modelHeight = this.modelUrl == null ? null : modelHeight;
     }
 }
