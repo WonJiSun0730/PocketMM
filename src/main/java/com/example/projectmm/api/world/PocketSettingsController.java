@@ -34,7 +34,9 @@ public class PocketSettingsController {
                         authentication.getName(),
                         request.userNote(),
                         request.playGuide(),
-                        request.noControlPlayer()
+                        request.noControlPlayer(),
+                        request.aiProvider(),
+                        request.aiModel()
                 )
         );
     }
