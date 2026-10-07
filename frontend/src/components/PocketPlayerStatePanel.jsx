@@ -40,7 +40,7 @@ function EditableList({ title, values, onChange, placeholder }) {
   </div>
 }
 
-export default function PocketPlayerStatePanel({ sessionId, onError, refreshKey = 0 }) {
+export default function PocketPlayerStatePanel({ sessionId, onError, refreshKey = 0, onStateChange }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -59,12 +59,14 @@ export default function PocketPlayerStatePanel({ sessionId, onError, refreshKey 
       })
       if (!response.ok) throw new Error("캐릭터 현재 상태를 불러오지 못했어요.")
       const data = await response.json()
-      setState({
+      const nextState = {
         simulatedAt: normalizeDateTimeLocal(data.simulatedAt),
         location: data.location ?? "",
         conditions: data.conditions ?? [],
         inventory: data.inventory ?? [],
-      })
+      }
+      setState(nextState)
+      onStateChange?.(nextState)
     } catch (error) {
       onError?.(error.message)
     } finally {
@@ -94,12 +96,14 @@ export default function PocketPlayerStatePanel({ sessionId, onError, refreshKey 
       })
       if (!response.ok) throw new Error("캐릭터 현재 상태를 저장하지 못했어요.")
       const data = await response.json()
-      setState({
+      const nextState = {
         simulatedAt: normalizeDateTimeLocal(data.simulatedAt),
         location: data.location ?? "",
         conditions: data.conditions ?? [],
         inventory: data.inventory ?? [],
-      })
+      }
+      setState(nextState)
+      onStateChange?.(nextState)
     } catch (error) {
       onError?.(error.message)
     } finally {
