@@ -46,7 +46,7 @@ public class WorldCharacterService {
 
     private WorldCharacterItem item(Character character) {
         String description = profiles.findByCharacterId(character.getId()).map(profile -> profile.getDescription()).orElse(null);
-        return new WorldCharacterItem(character.getId(), character.getName(), description);
+        return new WorldCharacterItem(character.getId(), character.getName(), description, character.getModelUrl(), character.getModelHeight());
     }
 
     private World ownedWorld(Long worldId, String loginId) {
