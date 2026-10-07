@@ -2,6 +2,8 @@ package com.example.projectmm.application.chat;
 
 import com.example.projectmm.application.dialogue.DialogueGateway;
 import com.example.projectmm.application.dialogue.WorldRoomContextBuilder;
+import com.example.projectmm.application.time.TimeInterpreter;
+import com.example.projectmm.domain.time.TimeInterpretation;
 import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.dialogue.WorldRoomCastChange;
 import com.example.projectmm.domain.dialogue.WorldRoomSystemChange;
@@ -11,6 +13,7 @@ import com.example.projectmm.domain.world.World;
 import com.example.projectmm.domain.world.WorldRepository;
 import com.example.projectmm.domain.world.WorldSystem;
 import com.example.projectmm.domain.world.WorldSystemRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -43,6 +46,13 @@ class WorldRoomRegenerateIntegrationTest {
     @Autowired WorldRoomMessageRepository messages;
 
     @MockitoBean DialogueGateway gateway;
+    @MockitoBean TimeInterpreter timeInterpreter;
+
+    @BeforeEach
+    void defaultTimeInterpretation() {
+        when(timeInterpreter.interpret(anyString(), any(LocalDateTime.class)))
+                .thenReturn(TimeInterpretation.noMatch());
+    }
 
     @Test
     void regenerateRemovesOldWorldlineFromContextAndAppliesReplacementState() {
