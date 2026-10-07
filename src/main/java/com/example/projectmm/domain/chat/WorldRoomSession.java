@@ -85,6 +85,10 @@ public class WorldRoomSession {
         this.simulatedAt = at;
     }
 
+    public void updatePocketSettings(String userNote, String pocketPlayGuide, boolean noControlPlayer) {
+        updatePocketSettings(userNote, pocketPlayGuide, noControlPlayer, aiProvider, aiModel);
+    }
+
     public void updatePocketSettings(
             String userNote,
             String pocketPlayGuide,
