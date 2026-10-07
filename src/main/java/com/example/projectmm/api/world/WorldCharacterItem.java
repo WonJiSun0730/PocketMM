@@ -1,2 +1,9 @@
 package com.example.projectmm.api.world;
-public record WorldCharacterItem(Long id, String name, String description) {}
+
+public record WorldCharacterItem(
+        Long id,
+        String name,
+        String description,
+        String modelUrl,
+        Double modelHeight
+) {}
