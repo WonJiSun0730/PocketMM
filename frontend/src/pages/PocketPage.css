@@ -2,7 +2,7 @@
 
 .pocket-scene {
   width: 100%;
-  height: clamp(180px, 28vh, 300px);
+  height: 260px;
   position: relative;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -23,10 +23,17 @@
   height: 100%;
 }
 
-.pocket-scene__zoom {
+.pocket-scene__controls {
   position: absolute;
   right: 0.6rem;
   bottom: 0.6rem;
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.pocket-scene__control {
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -39,19 +46,24 @@
   backdrop-filter: blur(4px);
 }
 
-.pocket-scene__zoom button {
+.pocket-scene__control button {
   width: 1.8rem;
   height: 1.8rem;
   font-size: 1rem;
   cursor: pointer;
 }
 
-.pocket-scene__zoom button:hover {
+.pocket-scene__control button:hover {
   background: rgb(255 255 255 / 10%);
 }
 
-.pocket-scene__zoom span {
-  min-width: 2.9rem;
+.pocket-scene__control span:not(.pocket-scene__control-label) {
+  min-width: 3.2rem;
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+.pocket-scene__control-label {
+  padding-left: 0.55rem;
+  color: rgb(255 255 255 / 65%);
 }
