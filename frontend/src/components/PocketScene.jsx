@@ -3,7 +3,7 @@ import * as THREE from "three"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { VRMLoaderPlugin } from "@pixiv/three-vrm"
 
-export default function PocketScene({ className = "" }) {
+export default function PocketScene({ className = "", simulatedAt = "", location = "" }) {
   const hostRef = useRef(null)
   const [zoom, setZoom] = useState(1.35)
   const [sceneHeight, setSceneHeight] = useState(260)
@@ -17,6 +17,13 @@ export default function PocketScene({ className = "" }) {
     let disposed = false
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0x171821)
+
+    // Runtime hooks are intentionally simple for the first linkage pass.
+    // Scene selection comes next; for now location is exposed to the renderer
+    // and authoritative Pocket time drives the room's daypart.
+    const hour = simulatedAt ? Number(simulatedAt.slice(11, 13)) : 12
+    const daypart = hour >= 6 && hour < 17 ? "day" : hour < 21 ? "evening" : "night"
+    scene.userData.runtime = { simulatedAt, location, daypart }
 
     const camera = new THREE.OrthographicCamera(-4, 4, 2.25, -2.25, 0.1, 100)
     camera.position.set(4.2, 3.8, 6)
@@ -82,9 +89,16 @@ export default function PocketScene({ className = "" }) {
     postScene.add(postQuad)
 
     // Keep a soft ambient base, then let local lights define the room.
-    scene.add(new THREE.HemisphereLight(0xfffbf2, 0x596071, 1.35))
+    scene.add(new THREE.HemisphereLight(
+      daypart === "day" ? 0xffffff : daypart === "evening" ? 0xfffbf2 : 0xd9e2ff,
+      daypart === "night" ? 0x30364b : 0x596071,
+      daypart === "day" ? 1.55 : daypart === "evening" ? 1.35 : 0.95,
+    ))
 
-    const key = new THREE.DirectionalLight(0xfffdf8, 2.35)
+    const key = new THREE.DirectionalLight(
+      daypart === "day" ? 0xffffff : daypart === "evening" ? 0xfffdf8 : 0xc9d5ff,
+      daypart === "day" ? 2.6 : daypart === "evening" ? 2.35 : 1.55,
+    )
     key.position.set(4, 7, 5)
     key.castShadow = true
     key.shadow.mapSize.set(128, 128)
@@ -422,7 +436,7 @@ export default function PocketScene({ className = "" }) {
         }
       })
     }
-  }, [zoom, sceneHeight, pixelHeight])
+  }, [zoom, sceneHeight, pixelHeight, simulatedAt, location])
 
   return <div className={`pocket-scene-shell ${className}`}>
     <div className="pocket-scene" style={{ height: `${sceneHeight}px` }}>
