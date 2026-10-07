@@ -95,7 +95,10 @@ export default function PocketScene({ className = "" }) {
     key.shadow.bias = -0.001
     scene.add(key)
 
-    const lampLight = new THREE.PointLight(0xffb56a, 2.4, 3.2, 2)
+    // The real PointLight stays intentionally subtle. The visible lamp pool is
+    // built from stepped emissive patches below so it reads as pixel lighting
+    // instead of a smooth high-resolution radial gradient.
+    const lampLight = new THREE.PointLight(0xffc184, 0.75, 2.4, 2)
     lampLight.position.set(-2.15, 1.45, -1.25)
     lampLight.castShadow = true
     lampLight.shadow.mapSize.set(64, 64)
@@ -187,6 +190,27 @@ export default function PocketScene({ className = "" }) {
     )
     backWall.position.set(0, 1.5, -2)
     scene.add(backWall)
+
+    // Blocky lamp glow: three nested low-poly patches with hard boundaries.
+    // Slightly offset from the wall to avoid z-fighting.
+    const glowBands = [
+      { radius: 0.92, color: 0x8a4d25, opacity: 0.22 },
+      { radius: 0.62, color: 0xc87932, opacity: 0.28 },
+      { radius: 0.34, color: 0xf2b45f, opacity: 0.34 },
+    ]
+    for (const band of glowBands) {
+      const glow = new THREE.Mesh(
+        new THREE.CircleGeometry(band.radius, 12),
+        new THREE.MeshBasicMaterial({
+          color: band.color,
+          transparent: true,
+          opacity: band.opacity,
+          depthWrite: false,
+        }),
+      )
+      glow.position.set(-2.15, 1.48, -1.905)
+      scene.add(glow)
+    }
 
     const sideWall = new THREE.Mesh(
       new THREE.BoxGeometry(0.16, 3.2, 4.2),
