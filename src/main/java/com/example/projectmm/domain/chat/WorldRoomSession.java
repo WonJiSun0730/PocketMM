@@ -43,6 +43,15 @@ public class WorldRoomSession {
 
     private LocalDateTime lastPresenceAt;
 
+    @Column(columnDefinition = "TEXT")
+    private String userNote;
+
+    @Column(columnDefinition = "TEXT")
+    private String pocketPlayGuide;
+
+    @Column(nullable = false)
+    private boolean noControlPlayer = false;
+
     public WorldRoomSession(
             WorldConversation room,
             Member member,
@@ -68,6 +77,19 @@ public class WorldRoomSession {
 
     public void updateSimulatedAt(LocalDateTime at) {
         this.simulatedAt = at;
+    }
+
+    public void updatePocketSettings(String userNote, String pocketPlayGuide, boolean noControlPlayer) {
+        this.userNote = normalizeOptionalText(userNote);
+        this.pocketPlayGuide = normalizeOptionalText(pocketPlayGuide);
+        this.noControlPlayer = noControlPlayer;
+    }
+
+    private String normalizeOptionalText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     public void markPresent(LocalDateTime at) {
