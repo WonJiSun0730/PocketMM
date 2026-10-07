@@ -25,4 +25,18 @@ public record CharacterCreateRequest(
         @Size(max = 500) String modelUrl,
         Double modelHeight
 ) {
+    public CharacterCreateRequest(
+            String name,
+            String description,
+            String rawDescription,
+            List<String> examples,
+            String exampleDialogue,
+            String personality,
+            String speechStyle,
+            String background,
+            String appearance
+    ) {
+        this(name, description, rawDescription, examples, exampleDialogue, personality, speechStyle,
+                background, appearance, null, null);
+    }
 }
