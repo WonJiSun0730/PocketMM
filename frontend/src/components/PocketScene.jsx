@@ -25,6 +25,8 @@ export default function PocketScene({ className = "" }) {
     const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false })
     renderer.setPixelRatio(1)
     renderer.outputColorSpace = THREE.SRGBColorSpace
+    renderer.shadowMap.enabled = true
+    renderer.shadowMap.type = THREE.BasicShadowMap
     renderer.domElement.className = "pocket-scene__canvas"
     host.appendChild(renderer.domElement)
 
@@ -79,10 +81,30 @@ export default function PocketScene({ className = "" }) {
     const postQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), postMaterial)
     postScene.add(postQuad)
 
-    scene.add(new THREE.HemisphereLight(0xfff4dd, 0x4c526b, 1.45))
-    const key = new THREE.DirectionalLight(0xffffff, 2.8)
+    // Keep a soft ambient base, then let local lights define the room.
+    scene.add(new THREE.HemisphereLight(0xfff3dc, 0x343746, 0.72))
+
+    const key = new THREE.DirectionalLight(0xfff4e5, 1.35)
     key.position.set(4, 7, 5)
+    key.castShadow = true
+    key.shadow.mapSize.set(512, 512)
+    key.shadow.camera.left = -4
+    key.shadow.camera.right = 4
+    key.shadow.camera.top = 4
+    key.shadow.camera.bottom = -4
+    key.shadow.bias = -0.001
     scene.add(key)
+
+    const lampLight = new THREE.PointLight(0xffa24a, 8.5, 4.6, 2)
+    lampLight.position.set(-2.15, 1.45, -1.25)
+    lampLight.castShadow = true
+    lampLight.shadow.mapSize.set(256, 256)
+    lampLight.shadow.bias = -0.002
+    scene.add(lampLight)
+
+    const roomFill = new THREE.PointLight(0xffe2bd, 1.5, 5.5, 2)
+    roomFill.position.set(1.8, 2.7, 1.5)
+    scene.add(roomFill)
 
     function makePixelTexture(width, height, paint, repeatX = 1, repeatY = 1) {
       const canvas = document.createElement("canvas")
@@ -228,6 +250,12 @@ export default function PocketScene({ className = "" }) {
       scene.add(leaf)
     }
 
+    scene.traverse(object => {
+      if (!object.isMesh) return
+      object.castShadow = true
+      object.receiveShadow = true
+    })
+
     const loader = new GLTFLoader()
     loader.register(parser => new VRMLoaderPlugin(parser))
 
@@ -239,6 +267,11 @@ export default function PocketScene({ className = "" }) {
         const sofa = gltf.scene
         sofa.position.set(0.15, 0, -1.35)
         sofa.rotation.y = 0
+        sofa.traverse(object => {
+          if (!object.isMesh) return
+          object.castShadow = true
+          object.receiveShadow = true
+        })
         scene.add(sofa)
         render()
       },
@@ -304,6 +337,10 @@ export default function PocketScene({ className = "" }) {
           vrm.scene.rotation.y = facingY
           vrm.scene.traverse(object => {
             object.frustumCulled = false
+            if (object.isMesh || object.isSkinnedMesh) {
+              object.castShadow = true
+              object.receiveShadow = true
+            }
           })
           pixelizeModel(vrm.scene)
           scene.add(vrm.scene)
