@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 
 export default function PocketSettingsPanel({ sessionId, onError }) {
-  const empty = { userNote: "", playGuide: "", noControlPlayer: false }
+  const empty = { userNote: "", playGuide: "", noControlPlayer: false, aiProvider: "GEMINI", aiModel: "" }
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -26,6 +26,8 @@ export default function PocketSettingsPanel({ sessionId, onError }) {
           userNote: data.userNote ?? "",
           playGuide: data.playGuide ?? "",
           noControlPlayer: Boolean(data.noControlPlayer),
+          aiProvider: data.aiProvider ?? "GEMINI",
+          aiModel: data.aiModel ?? "",
         }
         setSaved(next)
         setDraft(next)
@@ -54,6 +56,8 @@ export default function PocketSettingsPanel({ sessionId, onError }) {
         userNote: data.userNote ?? "",
         playGuide: data.playGuide ?? "",
         noControlPlayer: Boolean(data.noControlPlayer),
+        aiProvider: data.aiProvider ?? "GEMINI",
+        aiModel: data.aiModel ?? "",
       }
       setSaved(next)
       setDraft(next)
@@ -77,6 +81,36 @@ export default function PocketSettingsPanel({ sessionId, onError }) {
     {open && <div className="border-t px-4 py-4 sm:px-6">
       {loading ? <p className="text-xs text-muted-foreground">설정을 불러오는 중...</p> :
         <div className="mx-auto grid max-w-2xl gap-5">
+          <div className="grid gap-3 rounded-lg border bg-card p-3.5 sm:grid-cols-2">
+            <label className="grid gap-1.5">
+              <span className="text-sm font-medium">AI API</span>
+              <span className="text-xs text-muted-foreground">이 Pocket의 다음 응답부터 사용할 provider예요.</span>
+              <select value={draft.aiProvider}
+                onChange={event => setDraft(current => ({
+                  ...current,
+                  aiProvider: event.target.value,
+                  aiModel: event.target.value === "OPENAI" ? "gpt-5.6-luna" : "",
+                }))}
+                className="h-9 rounded-md border bg-background px-3 text-sm">
+                <option value="GEMINI">Gemini</option>
+                <option value="OPENAI">OpenAI</option>
+              </select>
+            </label>
+            <label className="grid gap-1.5">
+              <span className="text-sm font-medium">모델</span>
+              <span className="text-xs text-muted-foreground">API 안에서 사용할 모델을 선택해요.</span>
+              {draft.aiProvider === "OPENAI"
+                ? <select value={draft.aiModel || "gpt-5.6-luna"}
+                    onChange={event => setDraft(current => ({ ...current, aiModel: event.target.value }))}
+                    className="h-9 rounded-md border bg-background px-3 text-sm">
+                    <option value="gpt-5.6-luna">GPT-5.6 Luna · 저비용</option>
+                    <option value="gpt-5.6-terra">GPT-5.6 Terra · 균형</option>
+                    <option value="gpt-5.6-sol">GPT-5.6 Sol · 고품질</option>
+                  </select>
+                : <div className="flex h-9 items-center rounded-md border bg-muted/30 px-3 text-sm text-muted-foreground">서버 기본 Gemini 모델</div>}
+            </label>
+          </div>
+
           <label className="grid gap-1.5">
             <span className="text-sm font-medium">유저 노트</span>
             <span className="text-xs text-muted-foreground">이 Pocket에서 AI가 계속 참고할 메모예요.</span>
