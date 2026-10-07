@@ -125,6 +125,7 @@ class GeminiWorldRoomResponseTest {
     private String envelope(String payload) {
         return mapper.writeValueAsString(Map.of(
                 "candidates", List.of(Map.of(
+                        "finishReason", "STOP",
                         "content", Map.of(
                                 "parts", List.of(Map.of("text", payload))
                         )
