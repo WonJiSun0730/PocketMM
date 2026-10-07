@@ -146,8 +146,7 @@ class ChatMemoryPersistenceTest {
 
         assertThat(fresh.simulatedAt()).isBetween(before, LocalDateTime.now());
         assertThat(fresh.conversationId()).isNotEqualTo(old.getId());
-        assertThat(fresh.messages()).hasSize(1);
-        assertThat(fresh.messages().getFirst().message()).isEqualTo("*첫 만남이다.*");
+        assertThat(fresh.messages()).isEmpty();
         assertThat(conversations.findTopByCharacterIdOrderByCreatedAtDescIdDesc(character.getId()).orElseThrow().getId())
                 .isEqualTo(fresh.conversationId());
         assertThat(messages.findTop20ByConversationIdOrderByCreatedAtDesc(old.getId())).hasSize(1);
