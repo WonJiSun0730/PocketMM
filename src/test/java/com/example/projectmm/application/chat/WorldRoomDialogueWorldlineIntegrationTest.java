@@ -17,6 +17,7 @@ import com.example.projectmm.domain.world.World;
 import com.example.projectmm.domain.world.WorldRepository;
 import com.example.projectmm.domain.world.WorldSystem;
 import com.example.projectmm.domain.world.WorldSystemRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -53,9 +54,16 @@ class WorldRoomDialogueWorldlineIntegrationTest {
     @Autowired WorldConversationCastRepository roomCasts;
     @Autowired WorldRoomMessageRepository messages;
     @Autowired WorldRoomMessageVariantRepository variants;
+    @Autowired WorldRoomSessionRepository sessions;
 
     @MockitoBean DialogueGateway gateway;
     @MockitoBean TimeInterpreter timeInterpreter;
+
+    @BeforeEach
+    void defaultTimeInterpretation() {
+        when(timeInterpreter.interpret(anyString(), any(LocalDateTime.class)))
+                .thenReturn(TimeInterpretation.noMatch());
+    }
 
     @Test
     void explicitUserTimeChangeUpdatesPocketClockBeforeDialogueGeneration() {
