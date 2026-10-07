@@ -404,7 +404,8 @@ export default function PocketPage({ pocket, onBack }) {
         </Button>
       </header>
 
-      <div className="pocket-inline-tools pocket-aux-tools shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
+      <div className="pocket-aux-rail">
+      <div className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span>현재 장면 · {cast.length ? cast.map(item => item.characterName ?? item.name).join(" · ") : "등장인물 없음"}</span>
           {systems.map(system => <span key={system.id}>{system.name} <strong className="text-foreground">{system.currentValue}</strong></span>)}
@@ -426,7 +427,7 @@ export default function PocketPage({ pocket, onBack }) {
 
       {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}
 
-      <div className="pocket-inline-tools pocket-aux-tools">
+      <div>
         <PocketPlayerStatePanel
           sessionId={session.id}
           onError={setError}
@@ -439,7 +440,7 @@ export default function PocketPage({ pocket, onBack }) {
         <PocketSettingsPanel sessionId={session.id} onError={setError} />
       </div>
 
-      <div className="pocket-inline-tools">
+      <div>
       {isDeveloper && <section className="shrink-0 border-b bg-muted/20">
         <button type="button" onClick={() => setDevOpen(open => !open)}
           className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-muted-foreground sm:px-6">
@@ -538,6 +539,7 @@ export default function PocketPage({ pocket, onBack }) {
         </div>}
       </section>}
 
+      </div>
       </div>
 
       <ScrollArea ref={scrollAreaRef} className="min-h-0 flex-1">
