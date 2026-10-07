@@ -40,7 +40,7 @@ function EditableList({ title, values, onChange, placeholder }) {
   </div>
 }
 
-export default function PocketPlayerStatePanel({ sessionId, onError }) {
+export default function PocketPlayerStatePanel({ sessionId, onError, refreshKey = 0 }) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -74,7 +74,7 @@ export default function PocketPlayerStatePanel({ sessionId, onError }) {
 
   useEffect(() => {
     load()
-  }, [sessionId])
+  }, [sessionId, refreshKey])
 
   async function save() {
     if (!state.simulatedAt || saving) return
@@ -107,12 +107,19 @@ export default function PocketPlayerStatePanel({ sessionId, onError }) {
     }
   }
 
+  const summary = loading
+    ? "불러오는 중..."
+    : [
+        state.simulatedAt ? state.simulatedAt.replace("T", " ") : "",
+        state.location,
+      ].filter(Boolean).join(" · ")
+
   return <section className="shrink-0 border-b bg-muted/10">
     <button type="button" onClick={() => setOpen(value => !value)}
       className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-muted-foreground sm:px-6">
       내 캐릭터 현재 상태
       <span className="truncate font-normal">
-        {loading ? "불러오는 중..." : state.location ? "· " + state.location : ""}
+        {summary ? "· " + summary : ""}
       </span>
       <ChevronDown className={"ml-auto size-3.5 transition-transform " + (open ? "rotate-180" : "")} />
     </button>
