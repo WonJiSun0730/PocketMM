@@ -17,8 +17,8 @@ export default function PocketScene({ className = "" }) {
     scene.background = new THREE.Color(0x171821)
 
     const camera = new THREE.OrthographicCamera(-4, 4, 2.25, -2.25, 0.1, 100)
-    camera.position.set(5, 5, 7)
-    camera.lookAt(0, 0.9, 0)
+    camera.position.set(4.2, 3.8, 6)
+    camera.lookAt(0, 1.05, 0)
 
     const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false })
     renderer.setPixelRatio(1)
@@ -113,7 +113,7 @@ export default function PocketScene({ className = "" }) {
       renderer.domElement.style.height = `${height}px`
 
       const aspect = width / height
-      const viewHeight = 4.5
+      const viewHeight = 2.7
       camera.left = -(viewHeight * aspect) / 2
       camera.right = (viewHeight * aspect) / 2
       camera.top = viewHeight / 2
