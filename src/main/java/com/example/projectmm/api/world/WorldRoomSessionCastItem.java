@@ -7,14 +7,16 @@ import java.time.LocalDateTime;
 public record WorldRoomSessionCastItem(
         Long characterId,
         String characterName,
-        String characterAvatar,
+        String modelUrl,
+        Double modelHeight,
         LocalDateTime enteredAt
 ) {
     public static WorldRoomSessionCastItem from(WorldRoomSessionCast state) {
         return new WorldRoomSessionCastItem(
                 state.getCharacter().getId(),
                 state.getCharacter().getName(),
-                state.getCharacter().getAvatar(),
+                state.getCharacter().getModelUrl(),
+                state.getCharacter().getModelHeight(),
                 state.getEnteredAt()
         );
     }
