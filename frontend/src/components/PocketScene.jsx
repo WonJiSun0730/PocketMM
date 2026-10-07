@@ -84,39 +84,105 @@ export default function PocketScene({ className = "" }) {
     key.position.set(4, 7, 5)
     scene.add(key)
 
+    function makePixelTexture(width, height, paint, repeatX = 1, repeatY = 1) {
+      const canvas = document.createElement("canvas")
+      canvas.width = width
+      canvas.height = height
+      const context = canvas.getContext("2d")
+      paint(context, width, height)
+      const texture = new THREE.CanvasTexture(canvas)
+      texture.colorSpace = THREE.SRGBColorSpace
+      texture.magFilter = THREE.NearestFilter
+      texture.minFilter = THREE.NearestFilter
+      texture.generateMipmaps = false
+      texture.wrapS = THREE.RepeatWrapping
+      texture.wrapT = THREE.RepeatWrapping
+      texture.repeat.set(repeatX, repeatY)
+      return texture
+    }
+
+    const floorTexture = makePixelTexture(32, 32, (ctx, w, h) => {
+      ctx.fillStyle = "#76533c"
+      ctx.fillRect(0, 0, w, h)
+      for (let y = 0; y < h; y += 8) {
+        ctx.fillStyle = y % 16 === 0 ? "#8a6347" : "#684733"
+        ctx.fillRect(0, y, w, 1)
+        for (let x = (y / 8) % 2 ? 8 : 0; x < w; x += 16) ctx.fillRect(x, y, 1, 8)
+      }
+      ctx.fillStyle = "#967052"
+      for (const [x, y] of [[3,4],[12,11],[25,6],[19,22],[6,27],[29,17]]) ctx.fillRect(x, y, 4, 1)
+    }, 4, 3)
+
+    const wallTexture = makePixelTexture(24, 24, (ctx, w, h) => {
+      ctx.fillStyle = "#d8c9ae"
+      ctx.fillRect(0, 0, w, h)
+      ctx.fillStyle = "#c8b99e"
+      for (const [x, y] of [[3,4],[16,2],[8,13],[20,17],[2,21],[13,8]]) {
+        ctx.fillRect(x, y, 2, 3)
+        ctx.fillRect(x + 2, y + 1, 1, 1)
+      }
+      ctx.fillStyle = "#e2d4bc"
+      for (const [x, y] of [[10,3],[5,17],[18,11]]) ctx.fillRect(x, y, 3, 2)
+    }, 5, 3)
+
+    const rugTexture = makePixelTexture(32, 24, (ctx, w, h) => {
+      ctx.fillStyle = "#5f7259"
+      ctx.fillRect(0, 0, w, h)
+      ctx.fillStyle = "#9b916b"
+      ctx.fillRect(1, 1, w - 2, 1)
+      ctx.fillRect(1, h - 2, w - 2, 1)
+      ctx.fillRect(1, 1, 1, h - 2)
+      ctx.fillRect(w - 2, 1, 1, h - 2)
+      ctx.fillStyle = "#748267"
+      for (let y = 4; y < h - 3; y += 4) {
+        for (let x = 4; x < w - 3; x += 4) {
+          if ((x + y) % 8 === 0) ctx.fillRect(x, y, 2, 2)
+        }
+      }
+    }, 2, 2)
+
+    const woodTexture = makePixelTexture(24, 16, (ctx, w, h) => {
+      ctx.fillStyle = "#76513b"
+      ctx.fillRect(0, 0, w, h)
+      ctx.fillStyle = "#8b6247"
+      for (let y = 3; y < h; y += 5) ctx.fillRect(0, y, w, 1)
+      ctx.fillStyle = "#5e402f"
+      for (const [x, y] of [[3,6],[14,2],[18,12]]) ctx.fillRect(x, y, 5, 1)
+    }, 3, 2)
+
     // Warm temporary counseling room. Furniture GLBs can replace these
     // primitives incrementally without touching the VRM pipeline.
     const floor = new THREE.Mesh(
       new THREE.BoxGeometry(6.4, 0.16, 4.2),
-      new THREE.MeshStandardMaterial({ color: 0x7b6048, roughness: 0.96 }),
+      new THREE.MeshStandardMaterial({ map: floorTexture, roughness: 0.96 }),
     )
     floor.position.y = -0.08
     scene.add(floor)
 
     const backWall = new THREE.Mesh(
       new THREE.BoxGeometry(6.4, 3.2, 0.16),
-      new THREE.MeshStandardMaterial({ color: 0xd8cbb5, roughness: 1 }),
+      new THREE.MeshStandardMaterial({ map: wallTexture, roughness: 1 }),
     )
     backWall.position.set(0, 1.5, -2)
     scene.add(backWall)
 
     const sideWall = new THREE.Mesh(
       new THREE.BoxGeometry(0.16, 3.2, 4.2),
-      new THREE.MeshStandardMaterial({ color: 0xcbbda6, roughness: 1 }),
+      new THREE.MeshStandardMaterial({ map: wallTexture, color: 0xeee5d4, roughness: 1 }),
     )
     sideWall.position.set(-3.1, 1.5, 0)
     scene.add(sideWall)
 
     const rug = new THREE.Mesh(
       new THREE.BoxGeometry(3.4, 0.035, 2.15),
-      new THREE.MeshStandardMaterial({ color: 0x71806a, roughness: 1 }),
+      new THREE.MeshStandardMaterial({ map: rugTexture, roughness: 1 }),
     )
     rug.position.set(0.15, 0.02, 0.15)
     scene.add(rug)
 
     const coffeeTable = new THREE.Mesh(
       new THREE.BoxGeometry(1.45, 0.12, 0.72),
-      new THREE.MeshStandardMaterial({ color: 0x76513b, roughness: 0.9 }),
+      new THREE.MeshStandardMaterial({ map: woodTexture, roughness: 0.9 }),
     )
     coffeeTable.position.set(0.25, 0.48, 0.05)
     scene.add(coffeeTable)
@@ -278,6 +344,10 @@ export default function PocketScene({ className = "" }) {
     return () => {
       disposed = true
       observer.disconnect()
+      floorTexture.dispose()
+      wallTexture.dispose()
+      rugTexture.dispose()
+      woodTexture.dispose()
       renderTarget.dispose()
       postMaterial.dispose()
       postQuad.geometry.dispose()
