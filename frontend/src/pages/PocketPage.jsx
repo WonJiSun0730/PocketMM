@@ -8,6 +8,7 @@ import PlayerProfilePicker from "@/components/PlayerProfilePicker"
 import PocketPlayerStatePanel from "@/components/PocketPlayerStatePanel"
 import PocketSettingsPanel from "@/components/PocketSettingsPanel"
 import PocketScene from "@/components/PocketScene"
+import { resolvePocketCharacterModels } from "@/lib/pocketCharacterModels"
 
 function RpText({ text }) {
   const parts = (text ?? "").split(/(\*[^*]+\*)/g)
@@ -50,6 +51,7 @@ export default function PocketPage({ pocket, onBack }) {
     simulatedAt: session.simulatedAt ?? "",
     location: "",
   })
+  const sceneCharacters = resolvePocketCharacterModels(cast)
   const scrollAreaRef = useRef(null)
   const historySentinelRef = useRef(null)
   const bottomRef = useRef(null)
@@ -403,7 +405,15 @@ export default function PocketPage({ pocket, onBack }) {
       </div>
 
       <section className="shrink-0 border-b bg-muted/10 px-4 py-3 sm:px-6">
-        <PocketScene simulatedAt={sceneRuntimeState.simulatedAt} location={sceneRuntimeState.location} />
+        {sceneCharacters.ready
+          ? <PocketScene
+              simulatedAt={sceneRuntimeState.simulatedAt}
+              location={sceneRuntimeState.location}
+              characterModels={sceneCharacters.models}
+            />
+          : <div className="flex min-h-24 items-center justify-center rounded-md border border-dashed px-4 text-center text-xs text-muted-foreground">
+              3D 장면은 현재 등장 캐릭터 모두에게 모델이 등록된 경우에만 사용할 수 있어요.
+            </div>}
       </section>
 
       {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}
