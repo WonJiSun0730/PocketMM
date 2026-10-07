@@ -120,6 +120,112 @@ class WorldRoomDialogueWorldlineIntegrationTest {
     }
 
     @Test
+    void ordinaryUserTurnAdvancesPocketClockByGeneratedNarrativeElapsedTime() {
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        when(encoder.encode("password")).thenReturn("encoded");
+
+        Member member = members.save(Member.createLocal(
+                "natural-time-user", "password", "Natural Time User",
+                "natural-time-user@example.test", encoder
+        ));
+        World world = worlds.save(new World(member, "Natural Time World", "Time test."));
+        WorldConversation room = rooms.save(new WorldConversation(
+                world, member, "Natural Time Room",
+                WorldConversation.Visibility.PRIVATE,
+                LocalDateTime.of(2026, 10, 7, 12, 0)
+        ));
+        WorldRoomIntro intro = intros.save(new WorldRoomIntro(room, "Start", "Start scene.", 0));
+        var session = sessionService.start(room.getId(), member.getLoginId(), null, intro.getId());
+        var before = session.getSimulatedAt();
+
+        when(gateway.generateWorldRoomTurn(any(), eq("차를 한 모금 마시며 이야기를 이어간다.")))
+                .thenReturn(new WorldRoomTurn(
+                        "*짧은 대화가 이어진다.*",
+                        WorldRoomCastChange.none(),
+                        List.of(),
+                        95
+                ));
+
+        dialogueService.chat(session.getId(), "차를 한 모금 마시며 이야기를 이어간다.");
+
+        assertThat(sessions.findById(session.getId()).orElseThrow().getSimulatedAt())
+                .isEqualTo(before.plusSeconds(95));
+    }
+
+    @Test
+    void continueSceneAdvancesPocketClockByNarrativeDevelopment() {
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        when(encoder.encode("password")).thenReturn("encoded");
+
+        Member member = members.save(Member.createLocal(
+                "continue-time-user", "password", "Continue Time User",
+                "continue-time-user@example.test", encoder
+        ));
+        World world = worlds.save(new World(member, "Continue Time World", "Time test."));
+        WorldConversation room = rooms.save(new WorldConversation(
+                world, member, "Continue Time Room",
+                WorldConversation.Visibility.PRIVATE,
+                LocalDateTime.of(2026, 10, 7, 18, 0)
+        ));
+        WorldRoomIntro intro = intros.save(new WorldRoomIntro(room, "Start", "Start scene.", 0));
+        var session = sessionService.start(room.getId(), member.getLoginId(), null, intro.getId());
+        var before = session.getSimulatedAt();
+
+        when(gateway.generateWorldRoomTurn(any(), contains("Continue the current scene naturally")))
+                .thenReturn(new WorldRoomTurn(
+                        "*식사를 마친 뒤 일행은 역까지 걸어간다.*",
+                        WorldRoomCastChange.none(),
+                        List.of(),
+                        1_800
+                ));
+
+        dialogueService.continueScene(session.getId());
+
+        assertThat(sessions.findById(session.getId()).orElseThrow().getSimulatedAt())
+                .isEqualTo(before.plusMinutes(30));
+    }
+
+    @Test
+    void explicitUserTimeChangeDoesNotAlsoApplyGeneratedNarrativeElapsedTime() {
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        when(encoder.encode("password")).thenReturn("encoded");
+
+        Member member = members.save(Member.createLocal(
+                "explicit-only-user", "password", "Explicit Only User",
+                "explicit-only-user@example.test", encoder
+        ));
+        World world = worlds.save(new World(member, "Explicit Only World", "Time test."));
+        WorldConversation room = rooms.save(new WorldConversation(
+                world, member, "Explicit Only Room",
+                WorldConversation.Visibility.PRIVATE,
+                LocalDateTime.of(2026, 10, 7, 9, 0)
+        ));
+        WorldRoomIntro intro = intros.save(new WorldRoomIntro(room, "Start", "Start scene.", 0));
+        var session = sessionService.start(room.getId(), member.getLoginId(), null, intro.getId());
+
+        var before = session.getSimulatedAt();
+        var after = before.plusDays(3);
+        when(timeInterpreter.interpret(anyString(), eq(before)))
+                .thenReturn(TimeInterpretation.matched(
+                        TimeInterpretation.Interpreter.RULE,
+                        null,
+                        TimeChange.changed(before, after, "3일 후")
+                ));
+        when(gateway.generateWorldRoomTurn(any(), anyString()))
+                .thenReturn(new WorldRoomTurn(
+                        "*3일 뒤의 장면으로 넘어간다.*",
+                        WorldRoomCastChange.none(),
+                        List.of(),
+                        3_600
+                ));
+
+        dialogueService.chat(session.getId(), "[OOC] 3일 후로 진행.");
+
+        assertThat(sessions.findById(session.getId()).orElseThrow().getSimulatedAt())
+                .isEqualTo(after);
+    }
+
+    @Test
     void rerollAndVariantSelectionRestoreTextCastAndSystemAsOneWorldline() {
         PasswordEncoder encoder = mock(PasswordEncoder.class);
         when(encoder.encode("password")).thenReturn("encoded");
