@@ -496,7 +496,7 @@ export default function PocketPage({ pocket, onBack }) {
       </section>}
 
     </aside>
-    <section className="pocket-main mx-auto flex h-full w-full max-w-4xl flex-col border-x bg-card">
+    <section className="pocket-main flex h-full w-full max-w-4xl flex-col border-x bg-card">
       <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2 sm:px-6">
         <Button type="button" variant="ghost" size="icon" onClick={onBack} disabled={sending} aria-label="월드로 돌아가기">
           <ArrowLeft className="size-4" />
