@@ -19,7 +19,10 @@ public record WorldRoomDialogueContext(
         List<WorldRoomCharacterContext> activeCast,
         List<WorldRoomSystemContext> sessionSystems,
         WorldRoomPlayerStateContext playerState,
-        List<CharacterMemories> recalledMemories
+        List<CharacterMemories> recalledMemories,
+        String userNote,
+        String pocketPlayGuide,
+        boolean noControlPlayer
 ) {
     public WorldRoomDialogueContext(
             Long roomId,
@@ -49,7 +52,10 @@ public record WorldRoomDialogueContext(
                 activeCast,
                 sessionSystems,
                 WorldRoomPlayerStateContext.empty(),
-                List.of()
+                List.of(),
+                null,
+                null,
+                false
         );
     }
 
