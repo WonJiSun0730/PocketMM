@@ -46,6 +46,10 @@ export default function PocketPage({ pocket, onBack }) {
   const [hasOlderMessages, setHasOlderMessages] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [playerStateRefreshKey, setPlayerStateRefreshKey] = useState(0)
+  const [sceneRuntimeState, setSceneRuntimeState] = useState({
+    simulatedAt: session.simulatedAt ?? "",
+    location: "",
+  })
   const scrollAreaRef = useRef(null)
   const historySentinelRef = useRef(null)
   const bottomRef = useRef(null)
@@ -399,12 +403,20 @@ export default function PocketPage({ pocket, onBack }) {
       </div>
 
       <section className="shrink-0 border-b bg-muted/10 px-4 py-3 sm:px-6">
-        <PocketScene />
+        <PocketScene simulatedAt={sceneRuntimeState.simulatedAt} location={sceneRuntimeState.location} />
       </section>
 
       {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}
 
-      <PocketPlayerStatePanel sessionId={session.id} onError={setError} refreshKey={playerStateRefreshKey} />
+      <PocketPlayerStatePanel
+        sessionId={session.id}
+        onError={setError}
+        refreshKey={playerStateRefreshKey}
+        onStateChange={state => setSceneRuntimeState({
+          simulatedAt: state.simulatedAt,
+          location: state.location,
+        })}
+      />
       <PocketSettingsPanel sessionId={session.id} onError={setError} />
 
       {isDeveloper && <section className="shrink-0 border-b bg-muted/20">
