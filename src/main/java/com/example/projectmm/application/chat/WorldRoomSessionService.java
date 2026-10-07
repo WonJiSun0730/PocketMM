@@ -100,6 +100,19 @@ public class WorldRoomSessionService {
             String loginId,
             String userNote,
             String pocketPlayGuide,
+            boolean noControlPlayer
+    ) {
+        var session = pocket(sessionId, loginId);
+        session.updatePocketSettings(userNote, pocketPlayGuide, noControlPlayer);
+        return session;
+    }
+
+    @Transactional
+    public WorldRoomSession updatePocketSettings(
+            Long sessionId,
+            String loginId,
+            String userNote,
+            String pocketPlayGuide,
             boolean noControlPlayer,
             String aiProvider,
             String aiModel
