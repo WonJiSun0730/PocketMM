@@ -35,7 +35,7 @@ export default function PlayerProfilePicker({ current, busy, onSelect, onCancel,
       const profile = await fetch(`/api/player-profiles${draft.id ? `/${draft.id}` : ""}`, {
         method: draft.id ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: draft.name, description: draft.description, avatar: draft.avatar || null }),
+        body: JSON.stringify({ name: draft.name, description: draft.description, avatar: draft.avatar || null, modelUrl: draft.modelUrl?.trim() || null, modelHeight: draft.modelUrl?.trim() && draft.modelHeight ? Number(draft.modelHeight) : null }),
       }).then(readResponse)
       setProfiles(items => draft.id ? items.map(p => p.id === profile.id ? profile : p) : [...items, profile])
       onSaved?.(profile)
@@ -79,7 +79,7 @@ export default function PlayerProfilePicker({ current, busy, onSelect, onCancel,
         ))}
         {!loading && profiles.length === 0 && <p>아직 프로필이 없어요. 먼저 만들어 주세요.</p>}
         <div className="flex gap-2">
-          <Button disabled={disabled || profiles.length >= 10} onClick={() => setDraft({ name: "", description: "", avatar: null })}>프로필 만들기 ({profiles.length}/10)</Button>
+          <Button disabled={disabled || profiles.length >= 10} onClick={() => setDraft({ name: "", description: "", avatar: null, modelUrl: "", modelHeight: "" })}>프로필 만들기 ({profiles.length}/10)</Button>
           {onCancel && <Button variant="ghost" disabled={busy || saving} onClick={onCancel}>돌아가기</Button>}
         </div>
       </>}
@@ -102,6 +102,18 @@ export default function PlayerProfilePicker({ current, busy, onSelect, onCancel,
           <img src={draft.avatar} alt="프로필 미리보기" className="size-16 rounded-full object-cover" />
           <Button type="button" variant="ghost" disabled={disabled} onClick={() => setDraft({ ...draft, avatar: null })}>사진 제거</Button>
         </div>}
+        <label className="block text-sm">3D VRM 모델 경로 (선택)
+          <input maxLength={500} value={draft.modelUrl ?? ""} disabled={disabled}
+            onChange={e => setDraft({ ...draft, modelUrl: e.target.value })}
+            placeholder="/models/milieponygood.vrm"
+            className="mt-1 w-full rounded-md border bg-background p-2" />
+        </label>
+        <label className="block text-sm">3D 모델 키 (m)
+          <input type="number" min="0.1" max="3" step="0.01" value={draft.modelHeight ?? ""} disabled={disabled}
+            onChange={e => setDraft({ ...draft, modelHeight: e.target.value })}
+            placeholder="1.60"
+            className="mt-1 w-full rounded-md border bg-background p-2" />
+        </label>
         {draft.id && <p className="text-sm text-muted-foreground">수정한 설정은 이 프로필을 사용하는 다른 대화에도 반영됩니다.</p>}
         <div className="flex gap-2">
           <Button type="submit" disabled={disabled || !draft.name.trim() || !draft.description.trim() || draft.name.length + draft.description.length > 500}>{saving ? "저장 중..." : "저장"}</Button>
