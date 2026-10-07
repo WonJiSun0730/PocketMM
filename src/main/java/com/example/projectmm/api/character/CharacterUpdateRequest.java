@@ -10,6 +10,8 @@ public record CharacterUpdateRequest(
         String personality,
         String speechStyle,
         String background,
-        String appearance
+        String appearance,
+        String modelUrl,
+        Double modelHeight
 ) {
 }
