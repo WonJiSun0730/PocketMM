@@ -19,6 +19,8 @@ export default function CharacterCreatePage({
   const [speechStyle, setSpeechStyle] = useState("")
   const [background, setBackground] = useState("")
   const [appearance, setAppearance] = useState("")
+  const [modelUrl, setModelUrl] = useState("")
+  const [modelHeight, setModelHeight] = useState("")
   const [worlds, setWorlds] = useState([])
   const [worldId, setWorldId] = useState("")
 
@@ -46,6 +48,8 @@ export default function CharacterCreatePage({
     setSpeechStyle(character.speechStyle ?? "")
     setBackground(character.background ?? "")
     setAppearance(character.appearance ?? "")
+    setModelUrl(character.modelUrl ?? "")
+    setModelHeight(character.modelHeight ? String(character.modelHeight) : "")
     setWorldId(character.worldId ? String(character.worldId) : "")
   }, [character])
 
@@ -114,6 +118,8 @@ export default function CharacterCreatePage({
       speechStyle: speechStyle.trim() || null,
       background: background.trim() || null,
       appearance: appearance.trim() || null,
+      modelUrl: modelUrl.trim() || null,
+      modelHeight: modelUrl.trim() && modelHeight ? Number(modelHeight) : null,
     }
 
     try {
@@ -402,6 +408,36 @@ export default function CharacterCreatePage({
                 </Field>
               </div>
             )}
+          </section>
+
+          <section className="space-y-5 rounded-2xl border bg-card p-5 sm:p-6">
+            <div>
+              <h2 className="font-semibold">3D 모델</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                선택 사항입니다. VRM 모델 경로와 실제 키를 등록하면 Pocket 3D 장면에서 사용할 수 있어요.
+              </p>
+            </div>
+            <Field label="VRM 모델 경로">
+              <input
+                value={modelUrl}
+                onChange={(event) => setModelUrl(event.target.value)}
+                maxLength={500}
+                placeholder="/models/marbas.vrm"
+                className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-ring"
+              />
+            </Field>
+            <Field label="모델 키 (m)">
+              <input
+                type="number"
+                min="0.1"
+                max="3"
+                step="0.01"
+                value={modelHeight}
+                onChange={(event) => setModelHeight(event.target.value)}
+                placeholder="2.23"
+                className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-ring"
+              />
+            </Field>
           </section>
 
           <section className="rounded-2xl border bg-card p-5 sm:p-6">
