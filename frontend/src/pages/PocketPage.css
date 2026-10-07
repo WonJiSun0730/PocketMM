@@ -79,6 +79,10 @@
   display: block;
 }
 
+.pocket-desktop-tools {
+  visibility: hidden;
+}
+
 @media (min-width: 1280px) {
   .pocket-page {
     display: grid;
@@ -93,6 +97,7 @@
 
   .pocket-desktop-tools {
     display: block;
+    visibility: visible;
     grid-column: 1;
     align-self: start;
     margin-top: 4.5rem;
@@ -104,8 +109,13 @@
     background: var(--card);
   }
 
-  .pocket-page > .pocket-main .pocket-inline-tools {
+  .pocket-main > .pocket-inline-tools {
     display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+    border: 0 !important;
+    padding: 0 !important;
   }
 }
 
