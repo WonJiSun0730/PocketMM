@@ -39,12 +39,14 @@ import static org.mockito.Mockito.*;
 @DataJpaTest
 @Import({
         WorldRoomSessionService.class,
+        WorldRoomPlayerStateService.class,
         WorldRoomContextBuilder.class,
         WorldRoomDialogueService.class
 })
 class WorldRoomDialogueWorldlineIntegrationTest {
 
     @Autowired WorldRoomSessionService sessionService;
+    @Autowired WorldRoomPlayerStateService playerStateService;
     @Autowired WorldRoomDialogueService dialogueService;
     @Autowired MemberRepository members;
     @Autowired WorldRepository worlds;
@@ -288,6 +290,54 @@ class WorldRoomDialogueWorldlineIntegrationTest {
 
         assertThat(sessions.findById(session.getId()).orElseThrow().getSimulatedAt())
                 .isEqualTo(baseline);
+    }
+
+    @Test
+    void manualRuntimeTimeEditAndNarrativeProgressionShareOnePocketClock() {
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        when(encoder.encode("password")).thenReturn("encoded");
+
+        Member member = members.save(Member.createLocal(
+                "single-clock-user", "password", "Single Clock User",
+                "single-clock-user@example.test", encoder
+        ));
+        World world = worlds.save(new World(member, "Single Clock World", "Time test."));
+        WorldConversation room = rooms.save(new WorldConversation(
+                world, member, "Single Clock Room",
+                WorldConversation.Visibility.PRIVATE,
+                LocalDateTime.of(2026, 10, 7, 9, 0)
+        ));
+        WorldRoomIntro intro = intros.save(new WorldRoomIntro(room, "Start", "Start scene.", 0));
+        var session = sessionService.start(room.getId(), member.getLoginId(), null, intro.getId());
+
+        var manuallySet = LocalDateTime.of(2027, 1, 15, 14, 30);
+        playerStateService.update(
+                session.getId(),
+                member.getLoginId(),
+                manuallySet,
+                "도서관",
+                List.of("피곤함"),
+                List.of("책")
+        );
+
+        when(gateway.generateWorldRoomTurn(
+                argThat(context -> context != null && manuallySet.equals(context.simulatedAt())),
+                eq("조금 더 이야기를 나눈다.")
+        )).thenReturn(new WorldRoomTurn(
+                "*몇 분 동안 대화가 이어진다.*",
+                WorldRoomCastChange.none(),
+                List.of(),
+                300
+        ));
+
+        dialogueService.chat(session.getId(), "조금 더 이야기를 나눈다.");
+
+        assertThat(sessions.findById(session.getId()).orElseThrow().getSimulatedAt())
+                .isEqualTo(manuallySet.plusMinutes(5));
+        verify(gateway).generateWorldRoomTurn(
+                argThat(context -> manuallySet.equals(context.simulatedAt())),
+                eq("조금 더 이야기를 나눈다.")
+        );
     }
 
     @Test
