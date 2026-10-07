@@ -79,6 +79,18 @@ export default function PocketScene({ className = "" }) {
     function pixelizeMaterial(material) {
       if (!material) return
       material.flatShading = true
+
+      material.onBeforeCompile = shader => {
+        shader.fragmentShader = shader.fragmentShader.replace(
+          "#include <dithering_fragment>",
+          `
+            #include <dithering_fragment>
+            float pocketLevels = 4.0;
+            gl_FragColor.rgb = floor(gl_FragColor.rgb * pocketLevels + 0.5) / pocketLevels;
+          `,
+        )
+      }
+      material.customProgramCacheKey = () => "pocket-quantized-v1"
       material.needsUpdate = true
 
       for (const key of ["map", "emissiveMap", "normalMap", "roughnessMap", "metalnessMap"]) {
