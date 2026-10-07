@@ -655,13 +655,12 @@ export default function PocketPage({ pocket, onBack }) {
 
       </div>
 
-      {isDeveloper && <section className="shrink-0 border-b bg-muted/20">
-        <button type="button" onClick={() => setDevOpen(open => !open)}
-          className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-muted-foreground sm:px-6">
-          <Wrench className="size-3.5" />
-          개발자 도구
-          <ChevronDown className={`ml-auto size-3.5 transition-transform ${devOpen ? "rotate-180" : ""}`} />
-        </button>        {loadingOlder
+      <ScrollArea ref={scrollAreaRef} className="min-h-0 flex-1">
+        <div className="mx-auto flex w-full max-w-3xl flex-col p-4 pb-32 sm:p-6 sm:pb-36">
+          {loading && <p className="py-10 text-center text-sm text-muted-foreground">포켓을 불러오는 중...</p>}
+
+          {!loading && hasOlderMessages && <div ref={historySentinelRef} className="flex min-h-12 items-center justify-center border-b border-border/70 py-3 text-xs text-muted-foreground">
+            {loadingOlder
               ? <span className="flex items-center gap-2"><LoaderCircle className="size-4 animate-spin" />이전 대화를 불러오는 중...</span>
               : <span>위로 스크롤하면 이전 대화를 불러옵니다.</span>}
           </div>}
