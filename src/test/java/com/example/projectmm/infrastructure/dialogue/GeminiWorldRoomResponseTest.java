@@ -25,7 +25,8 @@ class GeminiWorldRoomResponseTest {
                   "reply":"Sherlock Holmes: Come in.",
                   "enterCharacterIds":[10],
                   "leaveCharacterIds":[20],
-                  "systemChanges":[{"systemId":7,"delta":5}]
+                  "systemChanges":[{"systemId":7,"delta":5}],
+                  "elapsedSeconds":95
                 }
                 """;
 
@@ -36,6 +37,26 @@ class GeminiWorldRoomResponseTest {
         assertThat(turn.castChange().leaveCharacterIds()).containsExactly(20L);
         assertThat(turn.systemChanges())
                 .containsExactly(new WorldRoomSystemChange(7L, 5));
+        assertThat(turn.elapsedSeconds()).isEqualTo(95);
+    }
+
+
+    @Test
+    void discardsInvalidNarrativeElapsedTime() {
+        var context = contextWithSystem(7L);
+
+        String payload = """
+                {
+                  "reply":"*A moment hangs in the air.*",
+                  "enterCharacterIds":[],
+                  "leaveCharacterIds":[],
+                  "systemChanges":[],
+                  "elapsedSeconds":-30
+                }
+                """;
+
+        assertThat(gateway.parseWorldRoomResponse(envelope(payload), context).elapsedSeconds())
+                .isZero();
     }
 
     @Test
