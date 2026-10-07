@@ -3,7 +3,7 @@ import * as THREE from "three"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { VRMLoaderPlugin } from "@pixiv/three-vrm"
 
-export default function PocketScene({ className = "", simulatedAt = "", location = "" }) {
+export default function PocketScene({ className = "", simulatedAt = "", location = "", characterModels = [] }) {
   const hostRef = useRef(null)
   const [zoom, setZoom] = useState(1.35)
   const [sceneHeight, setSceneHeight] = useState(260)
@@ -350,7 +350,8 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       renderer.render(postScene, postCamera)
     }
 
-    function loadVrm(url, position, facingY = 0) {
+    function loadVrm(model, position, facingY = 0) {
+      const { url, height: targetHeight } = model
       loader.load(
         url,
         gltf => {
@@ -363,7 +364,6 @@ export default function PocketScene({ className = "", simulatedAt = "", location
 
           const box = new THREE.Box3().setFromObject(vrm.scene)
           const height = box.max.y - box.min.y
-          const targetHeight = url.includes("marbas") ? 2.23 : 1.6
           if (height > 0) {
             const scale = targetHeight / height
             vrm.scene.scale.setScalar(scale)
@@ -389,8 +389,14 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       )
     }
 
-    loadVrm("/models/milieponygood.vrm", new THREE.Vector3(-0.9, 0, 0.65), Math.PI * 0.1)
-    loadVrm("/models/marbas.vrm", new THREE.Vector3(1.15, 0, 0.45), -Math.PI * 0.2)
+    const spacing = 1.65
+    const startX = -((characterModels.length - 1) * spacing) / 2
+    characterModels.forEach((model, index) => {
+      const x = startX + index * spacing
+      const z = 0.55 - Math.abs(index - (characterModels.length - 1) / 2) * 0.08
+      const facing = x <= 0 ? Math.PI * 0.1 : -Math.PI * 0.2
+      loadVrm(model, new THREE.Vector3(x, 0, z), facing)
+    })
 
     function resize() {
       const width = Math.max(1, host.getBoundingClientRect().width)
@@ -436,7 +442,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
         }
       })
     }
-  }, [zoom, sceneHeight, pixelHeight, simulatedAt, location])
+  }, [zoom, sceneHeight, pixelHeight, simulatedAt, location, characterModels])
 
   return <div className={`pocket-scene-shell ${className}`}>
     <div className="pocket-scene" style={{ height: `${sceneHeight}px` }}>
