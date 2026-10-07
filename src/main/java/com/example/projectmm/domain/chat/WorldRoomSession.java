@@ -52,6 +52,12 @@ public class WorldRoomSession {
     @Column(nullable = false)
     private boolean noControlPlayer = false;
 
+    @Column(nullable = false, length = 20)
+    private String aiProvider = "GEMINI";
+
+    @Column(length = 80)
+    private String aiModel;
+
     public WorldRoomSession(
             WorldConversation room,
             Member member,
@@ -79,10 +85,27 @@ public class WorldRoomSession {
         this.simulatedAt = at;
     }
 
-    public void updatePocketSettings(String userNote, String pocketPlayGuide, boolean noControlPlayer) {
+    public void updatePocketSettings(
+            String userNote,
+            String pocketPlayGuide,
+            boolean noControlPlayer,
+            String aiProvider,
+            String aiModel
+    ) {
         this.userNote = normalizeOptionalText(userNote);
         this.pocketPlayGuide = normalizeOptionalText(pocketPlayGuide);
         this.noControlPlayer = noControlPlayer;
+        this.aiProvider = normalizeProvider(aiProvider);
+        this.aiModel = normalizeOptionalText(aiModel);
+    }
+
+    private String normalizeProvider(String value) {
+        if (value == null || value.isBlank()) return "GEMINI";
+        String normalized = value.trim().toUpperCase(java.util.Locale.ROOT);
+        if (!normalized.equals("GEMINI") && !normalized.equals("OPENAI")) {
+            throw new IllegalArgumentException("Unsupported AI provider: " + value);
+        }
+        return normalized;
     }
 
     private String normalizeOptionalText(String value) {
