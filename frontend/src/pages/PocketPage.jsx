@@ -404,14 +404,6 @@ export default function PocketPage({ pocket, onBack }) {
         </Button>
       </header>
 
-      <div className="pocket-aux-rail">
-      <div className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <span>현재 장면 · {cast.length ? cast.map(item => item.characterName ?? item.name).join(" · ") : "등장인물 없음"}</span>
-          {systems.map(system => <span key={system.id}>{system.name} <strong className="text-foreground">{system.currentValue}</strong></span>)}
-        </div>
-      </div>
-
       <section className="shrink-0 border-b bg-muted/10 px-4 py-3 sm:px-6">
         {sceneModels.ready
           ? <PocketScene
@@ -426,6 +418,14 @@ export default function PocketPage({ pocket, onBack }) {
       </section>
 
       {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}
+
+      <div className="pocket-aux-rail">
+        <div className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <span>현재 장면 · {cast.length ? cast.map(item => item.characterName ?? item.name).join(" · ") : "등장인물 없음"}</span>
+            {systems.map(system => <span key={system.id}>{system.name} <strong className="text-foreground">{system.currentValue}</strong></span>)}
+          </div>
+        </div>
 
       <div>
         <PocketPlayerStatePanel
