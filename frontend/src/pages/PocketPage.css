@@ -81,22 +81,22 @@
 
 @media (min-width: 1280px) {
   .pocket-page {
-    position: relative;
+    display: grid;
+    grid-template-columns: minmax(16rem, 20rem) minmax(0, 56rem);
     justify-content: center;
+    gap: 1.25rem;
   }
 
   .pocket-main {
-    margin-left: auto;
-    margin-right: auto;
+    grid-column: 2;
   }
 
   .pocket-desktop-tools {
     display: block;
-    position: absolute;
-    top: 4.5rem;
-    right: calc(50% + 28rem);
-    width: min(20rem, calc(50vw - 30rem));
-    min-width: 16rem;
+    grid-column: 1;
+    align-self: start;
+    margin-top: 4.5rem;
+    width: 100%;
     max-height: calc(100vh - 6rem);
     overflow-y: auto;
     border: 1px solid var(--border);
