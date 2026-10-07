@@ -359,6 +359,44 @@ public class WorldRoomSessionService {
     public record SystemState(Long systemId, int currentValue) {
     }
 
+    @Transactional(readOnly = true)
+    public LocalDateTime captureSimulatedAt(Long sessionId) {
+        return session(sessionId).getSimulatedAt();
+    }
+
+    @Transactional
+    public void saveTimeSnapshot(
+            WorldRoomMessageVariant variant,
+            LocalDateTime before,
+            LocalDateTime after
+    ) {
+        variant.captureTimeWorldline(before, after);
+    }
+
+    @Transactional
+    public void restoreTimeBeforeVariant(Long sessionId, WorldRoomMessageVariant variant) {
+        restoreTimeSnapshot(sessionId, variant, true);
+    }
+
+    @Transactional
+    public void restoreTimeAfterVariant(Long sessionId, WorldRoomMessageVariant variant) {
+        restoreTimeSnapshot(sessionId, variant, false);
+    }
+
+    private void restoreTimeSnapshot(
+            Long sessionId,
+            WorldRoomMessageVariant variant,
+            boolean before
+    ) {
+        var at = before ? variant.getBeforeSimulatedAt() : variant.getAfterSimulatedAt();
+        if (at == null) {
+            // Legacy variants created before time snapshots existed cannot safely
+            // reconstruct historical Pocket time. Leave the current clock unchanged.
+            return;
+        }
+        session(sessionId).updateSimulatedAt(at);
+    }
+
     @Transactional
     public List<WorldRoomSystemChange> applySystemChanges(
             Long sessionId,
