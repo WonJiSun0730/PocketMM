@@ -85,12 +85,12 @@ export default function PocketScene({ className = "" }) {
           "#include <dithering_fragment>",
           `
             #include <dithering_fragment>
-            float pocketLevels = 4.0;
+            float pocketLevels = 8.0;
             gl_FragColor.rgb = floor(gl_FragColor.rgb * pocketLevels + 0.5) / pocketLevels;
           `,
         )
       }
-      material.customProgramCacheKey = () => "pocket-quantized-v1"
+      material.customProgramCacheKey = () => "pocket-quantized-v2"
       material.needsUpdate = true
 
       for (const key of ["map", "emissiveMap", "normalMap", "roughnessMap", "metalnessMap"]) {
