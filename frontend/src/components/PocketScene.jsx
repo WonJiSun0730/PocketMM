@@ -88,7 +88,17 @@ export default function PocketScene({ className = "" }) {
             return
           }
 
+          const box = new THREE.Box3().setFromObject(vrm.scene)
+          const height = box.max.y - box.min.y
+          const targetHeight = url.includes("marbas") ? 2.23 : 1.6
+          if (height > 0) {
+            const scale = targetHeight / height
+            vrm.scene.scale.setScalar(scale)
+          }
+
+          const scaledBox = new THREE.Box3().setFromObject(vrm.scene)
           vrm.scene.position.copy(position)
+          vrm.scene.position.y -= scaledBox.min.y
           vrm.scene.rotation.y = facingY
           vrm.scene.traverse(object => {
             object.frustumCulled = false
@@ -113,7 +123,7 @@ export default function PocketScene({ className = "" }) {
       renderer.domElement.style.height = `${height}px`
 
       const aspect = width / height
-      const viewHeight = 2.7
+      const viewHeight = 3.25
       camera.left = -(viewHeight * aspect) / 2
       camera.right = (viewHeight * aspect) / 2
       camera.top = viewHeight / 2
