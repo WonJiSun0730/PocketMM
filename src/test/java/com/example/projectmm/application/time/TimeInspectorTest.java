@@ -79,6 +79,32 @@ class TimeInspectorTest {
     }
 
     @Test
+    void completedThreeWeekDurationAdvancesAuthoritativeTime() {
+        var result = interpreter.interpret(
+                "그 뒤로 주기적으로 상담을 3주 정도 했습니다. 오늘은 상담이 없는 날이고, 저녁 시간이라 장을 보러 나왔어요.",
+                now
+        );
+
+        assertThat(result.interpreter()).isEqualTo(Interpreter.RULE);
+        assertThat(result.precision()).isEqualTo(TimePrecision.EXACT);
+        assertThat(result.timeChange().newTime()).isEqualTo(now.plusWeeks(3));
+        assertThat(result.timeChange().appliedElapsedMinutes()).isEqualTo(3L * 7 * 24 * 60);
+        verifyNoInteractions(parser);
+    }
+
+    @Test
+    void futureThreeWeekPlanDoesNotAdvanceCurrentTime() {
+        when(parser.parse(any(), any())).thenReturn(new AiTimeParseResult(
+                false, TimeType.UNKNOWN, null, null, null,
+                TimePrecision.AMBIGUOUS, 0.95, "3주 뒤", DurationScale.UNSPECIFIED));
+
+        var result = interpreter.interpret("3주 뒤에 여행 갈 생각이에요.", now);
+
+        assertThat(result.interpreter()).isEqualTo(Interpreter.NONE);
+        assertThat(result.timeChange()).isNull();
+    }
+
+    @Test
     void ordinaryActionHasNoTimeInterpretation() {
         var result = interpreter.interpret("*고개를 끄덕였다.*", now);
         assertThat(result.interpreter()).isEqualTo(Interpreter.NONE);
