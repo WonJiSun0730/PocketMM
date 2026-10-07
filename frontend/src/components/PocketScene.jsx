@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import * as THREE from "three"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { VRMLoaderPlugin } from "@pixiv/three-vrm"
@@ -7,6 +7,7 @@ const INTERNAL_HEIGHT = 120
 
 export default function PocketScene({ className = "" }) {
   const hostRef = useRef(null)
+  const [zoom, setZoom] = useState(1.35)
 
   useEffect(() => {
     const host = hostRef.current
@@ -123,7 +124,7 @@ export default function PocketScene({ className = "" }) {
       renderer.domElement.style.height = `${height}px`
 
       const aspect = width / height
-      const viewHeight = 3.25
+      const viewHeight = 3.25 / zoom
       camera.left = -(viewHeight * aspect) / 2
       camera.right = (viewHeight * aspect) / 2
       camera.top = viewHeight / 2
@@ -149,7 +150,14 @@ export default function PocketScene({ className = "" }) {
         }
       })
     }
-  }, [])
+  }, [zoom])
 
-  return <div ref={hostRef} className={`pocket-scene ${className}`} aria-label="Pocket 3D scene preview" />
+  return <div className={`pocket-scene ${className}`}>
+    <div ref={hostRef} className="pocket-scene__viewport" aria-label="Pocket 3D scene preview" />
+    <div className="pocket-scene__zoom" aria-label="장면 확대 배율">
+      <button type="button" onClick={() => setZoom(value => Math.max(0.8, +(value - 0.1).toFixed(1)))} aria-label="장면 축소">−</button>
+      <span>{Math.round(zoom * 100)}%</span>
+      <button type="button" onClick={() => setZoom(value => Math.min(2.2, +(value + 0.1).toFixed(1)))} aria-label="장면 확대">+</button>
+    </div>
+  </div>
 }
