@@ -8,6 +8,7 @@ const INTERNAL_HEIGHT = 120
 export default function PocketScene({ className = "" }) {
   const hostRef = useRef(null)
   const [zoom, setZoom] = useState(1.35)
+  const [sceneHeight, setSceneHeight] = useState(260)
 
   useEffect(() => {
     const host = hostRef.current
@@ -152,12 +153,21 @@ export default function PocketScene({ className = "" }) {
     }
   }, [zoom])
 
-  return <div className={`pocket-scene ${className}`}>
+  return <div className={`pocket-scene ${className}`} style={{ height: `${sceneHeight}px` }}>
     <div ref={hostRef} className="pocket-scene__viewport" aria-label="Pocket 3D scene preview" />
-    <div className="pocket-scene__zoom" aria-label="장면 확대 배율">
-      <button type="button" onClick={() => setZoom(value => Math.max(0.8, +(value - 0.1).toFixed(1)))} aria-label="장면 축소">−</button>
-      <span>{Math.round(zoom * 100)}%</span>
-      <button type="button" onClick={() => setZoom(value => Math.min(2.2, +(value + 0.1).toFixed(1)))} aria-label="장면 확대">+</button>
+    <div className="pocket-scene__controls">
+      <div className="pocket-scene__control" aria-label="장면 확대 배율">
+        <span className="pocket-scene__control-label">배율</span>
+        <button type="button" onClick={() => setZoom(value => Math.max(0.8, +(value - 0.1).toFixed(1)))} aria-label="장면 축소">−</button>
+        <span>{Math.round(zoom * 100)}%</span>
+        <button type="button" onClick={() => setZoom(value => Math.min(2.2, +(value + 0.1).toFixed(1)))} aria-label="장면 확대">+</button>
+      </div>
+      <div className="pocket-scene__control" aria-label="장면 높이">
+        <span className="pocket-scene__control-label">높이</span>
+        <button type="button" onClick={() => setSceneHeight(value => Math.max(180, value - 20))} aria-label="장면 높이 줄이기">−</button>
+        <span>{sceneHeight}px</span>
+        <button type="button" onClick={() => setSceneHeight(value => Math.min(520, value + 20))} aria-label="장면 높이 늘리기">+</button>
+      </div>
     </div>
   </div>
 }
