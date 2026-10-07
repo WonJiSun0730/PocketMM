@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react"
 import * as THREE from "three"
 
-const INTERNAL_HEIGHT = 96
+const INTERNAL_HEIGHT = 120
 
 export default function PocketScene({ className = "" }) {
   const hostRef = useRef(null)
@@ -81,6 +81,8 @@ export default function PocketScene({ className = "" }) {
       const height = Math.max(1, host.clientHeight)
       const internalWidth = Math.max(1, Math.round(INTERNAL_HEIGHT * width / height))
       renderer.setSize(internalWidth, INTERNAL_HEIGHT, false)
+      renderer.domElement.style.width = `${width}px`
+      renderer.domElement.style.height = `${height}px`
 
       const aspect = width / height
       const viewHeight = 4.5
