@@ -380,8 +380,20 @@ export default function PocketPage({ pocket, onBack }) {
     </main>
   }
 
-  return <main className="flex h-svh bg-background text-foreground">
-    <section className="mx-auto flex h-full w-full max-w-4xl flex-col border-x bg-card">
+  return <main className="pocket-page flex h-svh bg-background text-foreground">
+    <aside className="pocket-desktop-tools">
+      <PocketPlayerStatePanel
+        sessionId={session.id}
+        onError={setError}
+        refreshKey={playerStateRefreshKey}
+        onStateChange={state => setSceneRuntimeState({
+          simulatedAt: state.simulatedAt,
+          location: state.location,
+        })}
+      />
+      <PocketSettingsPanel sessionId={session.id} onError={setError} />
+    </aside>
+    <section className="pocket-main mx-auto flex h-full w-full max-w-4xl flex-col border-x bg-card">
       <header className="flex min-h-16 shrink-0 flex-wrap items-center gap-3 border-b px-4 py-2 sm:px-6">
         <Button type="button" variant="ghost" size="icon" onClick={onBack} disabled={sending} aria-label="월드로 돌아가기">
           <ArrowLeft className="size-4" />
@@ -426,16 +438,18 @@ export default function PocketPage({ pocket, onBack }) {
 
       {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}
 
-      <PocketPlayerStatePanel
-        sessionId={session.id}
-        onError={setError}
-        refreshKey={playerStateRefreshKey}
-        onStateChange={state => setSceneRuntimeState({
-          simulatedAt: state.simulatedAt,
-          location: state.location,
-        })}
-      />
-      <PocketSettingsPanel sessionId={session.id} onError={setError} />
+      <div className="pocket-inline-tools">
+        <PocketPlayerStatePanel
+          sessionId={session.id}
+          onError={setError}
+          refreshKey={playerStateRefreshKey}
+          onStateChange={state => setSceneRuntimeState({
+            simulatedAt: state.simulatedAt,
+            location: state.location,
+          })}
+        />
+        <PocketSettingsPanel sessionId={session.id} onError={setError} />
+      </div>
 
       {isDeveloper && <section className="shrink-0 border-b bg-muted/20">
         <button type="button" onClick={() => setDevOpen(open => !open)}
