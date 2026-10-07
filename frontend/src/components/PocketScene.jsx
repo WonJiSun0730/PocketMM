@@ -3,7 +3,7 @@ import * as THREE from "three"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { VRMLoaderPlugin } from "@pixiv/three-vrm"
 
-export default function PocketScene({ className = "", simulatedAt = "", location = "", characterModels = [] }) {
+export default function PocketScene({ className = "", simulatedAt = "", location = "", playerModel = null, characterModels = [] }) {
   const hostRef = useRef(null)
   const [zoom, setZoom] = useState(1.35)
   const [sceneHeight, setSceneHeight] = useState(260)
@@ -389,11 +389,15 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       )
     }
 
+    const visibleModels = [
+      ...(playerModel ? [{ ...playerModel, role: "player" }] : []),
+      ...characterModels.map(model => ({ ...model, role: "character" })),
+    ]
     const spacing = 1.65
-    const startX = -((characterModels.length - 1) * spacing) / 2
-    characterModels.forEach((model, index) => {
+    const startX = -((visibleModels.length - 1) * spacing) / 2
+    visibleModels.forEach((model, index) => {
       const x = startX + index * spacing
-      const z = 0.55 - Math.abs(index - (characterModels.length - 1) / 2) * 0.08
+      const z = 0.55 - Math.abs(index - (visibleModels.length - 1) / 2) * 0.08
       const facing = x <= 0 ? Math.PI * 0.1 : -Math.PI * 0.2
       loadVrm(model, new THREE.Vector3(x, 0, z), facing)
     })
@@ -442,7 +446,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
         }
       })
     }
-  }, [zoom, sceneHeight, pixelHeight, simulatedAt, location, characterModels])
+  }, [zoom, sceneHeight, pixelHeight, simulatedAt, location, playerModel, characterModels])
 
   return <div className={`pocket-scene-shell ${className}`}>
     <div className="pocket-scene" style={{ height: `${sceneHeight}px` }}>
