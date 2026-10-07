@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import PlayerProfilePicker from "@/components/PlayerProfilePicker"
 import PocketPlayerStatePanel from "@/components/PocketPlayerStatePanel"
 import PocketSettingsPanel from "@/components/PocketSettingsPanel"
+import PocketScene from "@/components/PocketScene"
 
 function RpText({ text }) {
   const parts = (text ?? "").split(/(\*[^*]+\*)/g)
@@ -396,6 +397,10 @@ export default function PocketPage({ pocket, onBack }) {
           {systems.map(system => <span key={system.id}>{system.name} <strong className="text-foreground">{system.currentValue}</strong></span>)}
         </div>
       </div>
+
+      <section className="shrink-0 border-b bg-muted/10 px-4 py-3 sm:px-6">
+        <PocketScene />
+      </section>
 
       {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}
 
