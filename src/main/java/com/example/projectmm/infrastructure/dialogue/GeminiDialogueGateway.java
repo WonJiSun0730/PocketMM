@@ -149,8 +149,18 @@ public class GeminiDialogueGateway implements DialogueGateway {
                                   "reply": "roleplay prose",
                                   "enterCharacterIds": [],
                                   "leaveCharacterIds": [],
-                                  "systemChanges": []
+                                  "systemChanges": [],
+                                  "elapsedSeconds": 0
                                 }
+
+                                Narrative-time rules:
+                                - elapsedSeconds is the amount of in-story time that actually passes during YOUR generated reply.
+                                - Estimate it from the narrated events, not from token count or response length.
+                                - Brief dialogue/reaction may take only seconds. Sustained conversation, travel, meals, preparation, waiting, montage, sleep, and scene transitions may take minutes or hours when the prose actually advances through them.
+                                - Do not add time merely because you wrote a long descriptive paragraph about a single instant.
+                                - Do not encode an explicit user-requested time skip here. The server handles explicit user time expressions separately before generation.
+                                - Use 0 when the response is meta/OOC, time is effectively frozen, or no meaningful in-story duration can be justified.
+                                - Return a non-negative whole number of seconds. Never return an absolute date/time.
 
                                 World-system change rules:
                                 - Current session world-system values are authoritative.
@@ -238,11 +248,22 @@ public class GeminiDialogueGateway implements DialogueGateway {
                             readLongArray(turn.path("enterCharacterIds")),
                             readLongArray(turn.path("leaveCharacterIds"))
                     ),
-                    readWorldRoomSystemChanges(turn.path("systemChanges"), context)
+                    readWorldRoomSystemChanges(turn.path("systemChanges"), context),
+                    readElapsedSeconds(turn.path("elapsedSeconds"))
             );
         } catch (Exception e) {
             throw new IllegalStateException("Failed to parse world room dialogue response", e);
         }
+    }
+
+    private long readElapsedSeconds(JsonNode node) {
+        if (!node.isIntegralNumber() || !node.canConvertToLong()) {
+            return 0;
+        }
+        long seconds = node.asLong();
+        // One generated turn may narratively cover a long scene, but absurd or
+        // malformed values must not move the authoritative Pocket clock.
+        return seconds < 0 || seconds > 604_800L ? 0 : seconds;
     }
 
     private List<WorldRoomSystemChange> readWorldRoomSystemChanges(
