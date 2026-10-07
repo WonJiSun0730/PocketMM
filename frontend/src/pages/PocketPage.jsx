@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import PlayerProfilePicker from "@/components/PlayerProfilePicker"
 import PocketPlayerStatePanel from "@/components/PocketPlayerStatePanel"
+import PocketSettingsPanel from "@/components/PocketSettingsPanel"
 
 function RpText({ text }) {
   const parts = (text ?? "").split(/(\*[^*]+\*)/g)
@@ -374,6 +375,7 @@ export default function PocketPage({ pocket, onBack }) {
       {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}
 
       <PocketPlayerStatePanel sessionId={session.id} onError={setError} />
+      <PocketSettingsPanel sessionId={session.id} onError={setError} />
 
       {isDeveloper && <section className="shrink-0 border-b bg-muted/20">
         <button type="button" onClick={() => setDevOpen(open => !open)}
