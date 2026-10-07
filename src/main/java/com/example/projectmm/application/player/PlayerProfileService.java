@@ -30,9 +30,11 @@ public class PlayerProfileService {
             int slot = IntStream.rangeClosed(1, 10).filter(n -> !used.contains(n)).findFirst()
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "프로필은 최대 10개까지 만들 수 있습니다."));
             profile = new PlayerProfile(slot, request.name().strip(), request.description().strip(), request.avatar());
+            profile.updateModel(request.modelUrl(), request.modelHeight());
         } else {
             profile = profiles.findById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
             profile.update(request.name().strip(), request.description().strip(), request.avatar());
+            profile.updateModel(request.modelUrl(), request.modelHeight());
         }
         try {
             return PlayerProfileResponse.from(profiles.saveAndFlush(profile));
@@ -47,6 +49,10 @@ public class PlayerProfileService {
                 || request.description() == null || request.description().isBlank()
                 || request.name().length() + request.description().length() > 500) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "이름은 40자 이내, 이름과 설정은 합쳐 500자 이내로 입력해 주세요.");
+        }
+        if (request.modelUrl() != null && !request.modelUrl().isBlank()
+                && (request.modelHeight() == null || request.modelHeight() <= 0 || request.modelHeight() > 3.0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "3D 모델 키는 0보다 크고 3m 이하여야 합니다.");
         }
         String avatar = request.avatar();
         if (avatar == null || avatar.isBlank()) return;
