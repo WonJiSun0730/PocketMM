@@ -72,7 +72,11 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                 - If uncertain or unchanged, omit the change.
                 Cast-change rules:
                 - Use only registered room-cast character IDs.
-                - Report only actual enter/leave changes.
+                - Active cast is authoritative for who is physically present at the start of this turn.
+                - The prose and cast metadata MUST describe the same scene state.
+                - If an absent registered room-cast character physically appears or speaks in your reply, include that character's ID in enterCharacterIds in the same response.
+                - If an active registered character physically leaves the scene in your reply, include that character's ID in leaveCharacterIds in the same response.
+                - Report only actual enter/leave changes; do not report unchanged presence.
                 """;
 
         List<Map<String, Object>> input = new ArrayList<>();
