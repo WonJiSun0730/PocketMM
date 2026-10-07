@@ -27,6 +27,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
   const [systemMode, setSystemMode] = useState(false)
   const [playGuide, setPlayGuide] = useState("")
   const [systems, setSystems] = useState([])
+  const [savingSystems, setSavingSystems] = useState(false)
   const [worldCharacters, setWorldCharacters] = useState([])
   const [worldRooms, setWorldRooms] = useState([])
   const [roomIntros, setRoomIntros] = useState({})
@@ -249,16 +250,27 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
   }
 
   async function saveSystems() {
-    if (!selectedWorld) return
-    const response = await fetch(`/api/worlds/${selectedWorld.id}/systems`, {
-      method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include",
-      body: JSON.stringify({ playGuide, systems }),
-    })
-    if (!response.ok) return setMessage("시스템을 저장하지 못했어요.")
-    const data = await response.json()
-    setPlayGuide(data.playGuide ?? "")
-    setSystems(data.systems ?? [])
-    setMessage("시스템을 저장했어요.")
+    if (!selectedWorld || savingSystems) return
+    setSavingSystems(true)
+    setMessage("")
+    try {
+      const response = await fetch(`/api/worlds/${selectedWorld.id}/systems`, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include",
+        body: JSON.stringify({ playGuide, systems }),
+      })
+      if (!response.ok) {
+        const detail = await response.text()
+        throw new Error(detail || `시스템 저장 실패 (${response.status})`)
+      }
+      const data = await response.json()
+      setPlayGuide(data.playGuide ?? "")
+      setSystems(data.systems ?? [])
+      setMessage("시스템을 저장했어요.")
+    } catch (error) {
+      setMessage(error.message || "시스템을 저장하지 못했어요.")
+    } finally {
+      setSavingSystems(false)
+    }
   }
 
   function addSystem() {
@@ -445,8 +457,8 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
           <h1>작은 세계를 정리해요</h1>
           <p>필요한 설정만 짧은 슬롯으로 나눠 두면, 관련 장면에서 꺼내 쓸 수 있어요.</p>
         </div>
-        <button className="world-save" disabled={!selectedWorld || (!systemMode && totalCharacters > selectedCategory.maxCharacters)} onClick={() => systemMode ? saveSystems() : saveLore(false)} type="button">
-          <Save size={16} /> 저장
+        <button className="world-save" disabled={!selectedWorld || savingSystems || (!systemMode && totalCharacters > selectedCategory.maxCharacters)} onClick={() => systemMode ? saveSystems() : saveLore(false)} type="button">
+          <Save size={16} /> {systemMode && savingSystems ? "저장 중..." : "저장"}
         </button>
       </header>
 
