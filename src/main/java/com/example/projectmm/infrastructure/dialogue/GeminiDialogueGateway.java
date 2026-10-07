@@ -372,6 +372,16 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 - Title: %s
                 - Starting context: %s
 
+                Pocket-specific settings:
+                - User note: %s
+                - Additional play guide: %s
+                - Never control the player character: %s
+
+                Pocket-setting rules:
+                - User note and additional play guide apply only to this Pocket and refine the creator play guide without replacing established world facts.
+                - When "Never control the player character" is true, NEVER invent the player's dialogue, actions, thoughts, feelings, decisions, reactions, or movement. Narrate only the world, NPCs, and consequences that do not decide the player's response.
+                - When it is false, routine low-consequence player continuity may be supplied only where the normal room rules allow it.
+
                 World lore:
                 %s
 
@@ -455,6 +465,9 @@ public class GeminiDialogueGateway implements DialogueGateway {
                         blankAsNone(world.playGuide()),
                         blankAsNone(context.introTitle()),
                         blankAsNone(context.introContent()),
+                        blankAsNone(context.userNote()),
+                        blankAsNone(context.pocketPlayGuide()),
+                        context.noControlPlayer() ? "true" : "false",
                         lore.isBlank() ? "(none)" : lore,
                         systems.isBlank() ? "(none)" : systems,
                         currentSystems.isBlank() ? "(none)" : currentSystems,
