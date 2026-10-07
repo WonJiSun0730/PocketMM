@@ -89,23 +89,21 @@
 
 @media (min-width: 1280px) {
   .pocket-layout {
-    display: grid;
-    grid-template-columns: 18rem minmax(0, 56rem) 18rem;
-    column-gap: 1.25rem;
-    justify-content: center;
-    align-items: stretch;
+    position: relative;
+    width: min(100%, 56rem);
+    margin-inline: auto;
   }
 
   .pocket-main {
-    grid-column: 2;
     margin-inline: 0;
   }
 
   .pocket-desktop-tools {
     display: block;
-    grid-column: 1;
-    grid-row: 1;
-    align-self: start;
+    position: absolute;
+    top: 0;
+    right: calc(100% + 1.25rem);
+    width: 18rem;
     margin-top: 4.5rem;
     max-height: calc(100vh - 6rem);
     overflow-y: auto;
