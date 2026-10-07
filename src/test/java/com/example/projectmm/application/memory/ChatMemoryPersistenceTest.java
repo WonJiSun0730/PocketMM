@@ -157,7 +157,7 @@ class ChatMemoryPersistenceTest {
         assertThat(context.energy()).isEqualTo(70);
         assertThat(context.mood()).isEqualTo(70);
         assertThat(context.characterProfile().rawDescription()).isEqualTo("캐릭터 설정");
-        assertThat(context.recentMessages()).hasSize(1);
+        assertThat(context.recentMessages()).isEmpty();
         assertThat(em.find(CharacterState.class, state.getId()).getEnergy()).isEqualTo(12);
 
         // 분리된 방에서도 새 발언 저장·회상은 계속 동작해야 한다.
