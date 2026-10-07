@@ -76,6 +76,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
   }
 
   async function loadWorldRooms(worldId) {
+    setRoomIntros({})
     const response = await fetch(`/api/worlds/${worldId}/rooms`, { credentials: "include" })
     if (response.ok) {
       const rooms = await response.json()
@@ -99,7 +100,38 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
   async function saveRoomIntro(event) {
     event.preventDefault()
     if (!selectedWorld || !introDialog) return
-    const { room, intro } = introDialog
+    let { room, intro } = introDialog
+
+    if (!room) {
+      const roomResponse = await fetch(`/api/worlds/${selectedWorld.id}/rooms`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          title: introForm.title.trim(),
+          visibility: "PRIVATE",
+        }),
+      })
+      if (!roomResponse.ok) return setMessage("인트로를 위한 시작 공간을 만들지 못했어요.")
+      room = await roomResponse.json()
+
+      for (const character of worldCharacters) {
+        const castResponse = await fetch(
+          `/api/worlds/${selectedWorld.id}/rooms/${room.id}/cast`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ characterId: character.id }),
+          }
+        )
+        if (!castResponse.ok) {
+          await loadWorldRooms(selectedWorld.id)
+          return setMessage("시작 공간은 만들었지만 등장인물을 연결하지 못했어요.")
+        }
+      }
+    }
+
     const response = await fetch(
       `/api/worlds/${selectedWorld.id}/rooms/${room.id}/intros${intro ? `/${intro.id}` : ""}`,
       {
@@ -114,7 +146,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
       }
     )
     if (!response.ok) return setMessage("인트로을 저장하지 못했어요.")
-    await loadRoomIntros(selectedWorld.id, room.id)
+    await loadWorldRooms(selectedWorld.id)
     setIntroDialog(null)
     setMessage("인트로을 저장했어요.")
   }
@@ -442,9 +474,12 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
               <div className="world-title-row"><div><span className="world-eyebrow">EDITING</span><div className="world-name-line"><h2>{selectedWorld.name}</h2><button className="world-edit-meta" onClick={openEditWorld} type="button" aria-label="월드 정보 수정"><Pencil size={14} /></button><button className="world-delete" onClick={deleteWorld} type="button" aria-label="월드 삭제"><Trash2 size={14} /></button></div>{selectedWorld.description && <p className="world-private-description">{selectedWorld.description}</p>}</div>{message && <span className="world-message">{message}</span>}</div>
               <div className="world-cast-summary"><Users size={15}/><span>등장인물 {worldCharacters.length}명</span>{worldCharacters.length > 0 && <span className="world-cast-names">{worldCharacters.map((character) => character.name).join(" · ")}</span>}{worldCharacters.length > 0 && <div className="world-cast-actions">{worldCharacters.map((character) => <button key={character.id} type="button" onClick={() => onOpenWorldChat?.(selectedWorld, character)}><MessageCircle size={13}/>{character.name}과 대화</button>)}</div>}</div>
               <div className="world-room-summary">
-                <div className="world-room-summary-heading"><strong>인트로</strong><span>{Object.values(roomIntros).reduce((sum, items) => sum + items.length, 0)}개</span></div>
+                <div className="world-room-summary-heading"><strong>인트로</strong><span>{worldRooms.reduce((sum, room) => sum + (roomIntros[room.id]?.length ?? 0), 0)}개</span></div>
                 {worldRooms.length === 0 ? (
-                  <p className="world-room-empty">아직 이 월드에 생성된 인트로가 없어요.</p>
+                  <div className="world-room-empty">
+                    <p>아직 이 월드에 생성된 인트로가 없어요.</p>
+                    <button className="world-intro-add" type="button" onClick={() => openIntroDialog(null)}><Plus size={14}/> 인트로 추가</button>
+                  </div>
                 ) : (
                   <div className="world-room-list">
                     {worldRooms.map((room) => (
