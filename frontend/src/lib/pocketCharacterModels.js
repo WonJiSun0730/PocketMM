@@ -10,7 +10,6 @@ function toModel(source) {
 export function resolvePocketSceneModels({ playerProfile, worldCharacters = [], cast = [] }) {
   const playerModel = toModel(playerProfile)
   const allCharactersReady =
-    worldCharacters.length > 0 &&
     worldCharacters.every(character => toModel(character))
 
   const castModels = cast.map(character => toModel(character))
