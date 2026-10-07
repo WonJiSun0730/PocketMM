@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react"
 import * as THREE from "three"
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
+import { VRMLoaderPlugin } from "@pixiv/three-vrm"
 
 const INTERNAL_HEIGHT = 120
 
@@ -10,12 +12,13 @@ export default function PocketScene({ className = "" }) {
     const host = hostRef.current
     if (!host) return
 
+    let disposed = false
     const scene = new THREE.Scene()
     scene.background = new THREE.Color(0x171821)
 
     const camera = new THREE.OrthographicCamera(-4, 4, 2.25, -2.25, 0.1, 100)
     camera.position.set(5, 5, 7)
-    camera.lookAt(0, 0.8, 0)
+    camera.lookAt(0, 0.9, 0)
 
     const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false })
     renderer.setPixelRatio(1)
@@ -23,9 +26,7 @@ export default function PocketScene({ className = "" }) {
     renderer.domElement.className = "pocket-scene__canvas"
     host.appendChild(renderer.domElement)
 
-    const ambient = new THREE.HemisphereLight(0xfff4dd, 0x4c526b, 2.2)
-    scene.add(ambient)
-
+    scene.add(new THREE.HemisphereLight(0xfff4dd, 0x4c526b, 2.2))
     const key = new THREE.DirectionalLight(0xffffff, 2.4)
     key.position.set(4, 7, 5)
     scene.add(key)
@@ -69,12 +70,39 @@ export default function PocketScene({ className = "" }) {
       }
     }
 
-    const marker = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.28, 0.8, 4, 8),
-      new THREE.MeshStandardMaterial({ color: 0x8e8ab7, roughness: 0.8 }),
-    )
-    marker.position.set(-0.65, 0.72, 0.55)
-    scene.add(marker)
+    const loader = new GLTFLoader()
+    loader.register(parser => new VRMLoaderPlugin(parser))
+
+    function render() {
+      if (!disposed) renderer.render(scene, camera)
+    }
+
+    function loadVrm(url, position, facingY = 0) {
+      loader.load(
+        url,
+        gltf => {
+          if (disposed) return
+          const vrm = gltf.userData.vrm
+          if (!vrm) {
+            console.warn("[PocketScene] VRM data missing:", url)
+            return
+          }
+
+          vrm.scene.position.copy(position)
+          vrm.scene.rotation.y = facingY
+          vrm.scene.traverse(object => {
+            object.frustumCulled = false
+          })
+          scene.add(vrm.scene)
+          render()
+        },
+        undefined,
+        error => console.error("[PocketScene] VRM load failed:", url, error),
+      )
+    }
+
+    loadVrm("/models/milieponygood.vrm", new THREE.Vector3(-0.9, 0, 0.65), Math.PI * 0.1)
+    loadVrm("/models/marbas.vrm", new THREE.Vector3(1.15, 0, 0.45), -Math.PI * 0.2)
 
     function resize() {
       const width = Math.max(1, host.clientWidth)
@@ -91,7 +119,7 @@ export default function PocketScene({ className = "" }) {
       camera.top = viewHeight / 2
       camera.bottom = -viewHeight / 2
       camera.updateProjectionMatrix()
-      renderer.render(scene, camera)
+      render()
     }
 
     const observer = new ResizeObserver(resize)
@@ -99,6 +127,7 @@ export default function PocketScene({ className = "" }) {
     resize()
 
     return () => {
+      disposed = true
       observer.disconnect()
       renderer.dispose()
       renderer.domElement.remove()
