@@ -3,6 +3,8 @@ package com.example.projectmm.application.chat;
 import com.example.projectmm.application.dialogue.DialogueGateway;
 import com.example.projectmm.application.dialogue.WorldRoomContextBuilder;
 import com.example.projectmm.application.memory.MemoryRecallService;
+import com.example.projectmm.application.time.TimeInterpreter;
+import com.example.projectmm.application.time.TimeInterpretation;
 import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.member.Member;
 import com.example.projectmm.domain.member.MemberRepository;
@@ -40,6 +42,7 @@ class WorldRoomHistoryIntegrationTest {
 
     @MockitoBean DialogueGateway gateway;
     @MockitoBean MemoryRecallService memoryRecallService;
+    @MockitoBean TimeInterpreter timeInterpreter;
 
     @Test
     void aiContextUsesLatestFiftyMessagesWhileUiCanPageOlderHistory() {
