@@ -43,6 +43,7 @@ export default function PocketPage({ pocket, onBack }) {
   const [memoryDiff, setMemoryDiff] = useState(null)
   const [hasOlderMessages, setHasOlderMessages] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
+  const [playerStateRefreshKey, setPlayerStateRefreshKey] = useState(0)
   const scrollAreaRef = useRef(null)
   const historySentinelRef = useRef(null)
   const bottomRef = useRef(null)
@@ -178,6 +179,10 @@ export default function PocketPage({ pocket, onBack }) {
     }
   }
 
+  function refreshPlayerState() {
+    setPlayerStateRefreshKey(current => current + 1)
+  }
+
   async function sendMessage() {
     const message = input.trim()
     if (sending || loading) return
@@ -199,6 +204,7 @@ export default function PocketPage({ pocket, onBack }) {
       })
       if (!response.ok) throw new Error("대화를 이어가지 못했어요.")
       await refresh()
+      refreshPlayerState()
       await refreshMemoryInspector()
     } catch (e) {
       setMessages(current => current.filter(item => item.id !== pending.id))
@@ -239,6 +245,7 @@ export default function PocketPage({ pocket, onBack }) {
       if (response.status === 409) throw new Error("이 응답은 이미 이어진 과거 장면이라 리롤할 수 없어요.")
       if (!response.ok) throw new Error("리롤하지 못했어요.")
       await refresh()
+      refreshPlayerState()
       await loadVariants(item.id)
     } catch (e) { setError(e.message) }
     finally { setSending(false) }
@@ -260,6 +267,7 @@ export default function PocketPage({ pocket, onBack }) {
       if (response.status === 409) throw new Error("이 응답은 이미 이어진 과거 장면이라 다른 버전으로 바꿀 수 없어요.")
       if (!response.ok) throw new Error("다른 버전을 선택하지 못했어요.")
       await refresh()
+      refreshPlayerState()
       await loadVariants(item.id)
     } catch (e) { setError(e.message) }
     finally { setSending(false) }
@@ -273,6 +281,7 @@ export default function PocketPage({ pocket, onBack }) {
       const response = await fetch(`${base}/messages/${item.id}`, { method: "DELETE", credentials: "include" })
       if (!response.ok) throw new Error("메시지를 삭제하지 못했어요.")
       await refresh()
+      refreshPlayerState()
       await refreshMemoryInspector()
     } catch (e) { setError(e.message) }
     finally { setSending(false) }
@@ -289,6 +298,7 @@ export default function PocketPage({ pocket, onBack }) {
       })
       if (!response.ok) throw new Error("장면을 이어가지 못했어요.")
       await refresh()
+      refreshPlayerState()
       await refreshMemoryInspector()
     } catch (e) {
       setError(e.message)
@@ -374,7 +384,7 @@ export default function PocketPage({ pocket, onBack }) {
 
       {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}
 
-      <PocketPlayerStatePanel sessionId={session.id} onError={setError} />
+      <PocketPlayerStatePanel sessionId={session.id} onError={setError} refreshKey={playerStateRefreshKey} />
       <PocketSettingsPanel sessionId={session.id} onError={setError} />
 
       {isDeveloper && <section className="shrink-0 border-b bg-muted/20">
