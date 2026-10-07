@@ -13,6 +13,7 @@ export default function PocketScene({ className = "" }) {
   useEffect(() => {
     const host = hostRef.current
     if (!host) return
+    host.replaceChildren()
 
     let disposed = false
     const scene = new THREE.Scene()
@@ -117,12 +118,12 @@ export default function PocketScene({ className = "" }) {
     loadVrm("/models/marbas.vrm", new THREE.Vector3(1.15, 0, 0.45), -Math.PI * 0.2)
 
     function resize() {
-      const width = Math.max(1, host.clientWidth)
-      const height = Math.max(1, host.clientHeight)
+      const width = Math.max(1, host.getBoundingClientRect().width)
+      const height = Math.max(1, sceneHeight)
       const internalWidth = Math.max(1, Math.round(INTERNAL_HEIGHT * width / height))
       renderer.setSize(internalWidth, INTERNAL_HEIGHT, false)
-      renderer.domElement.style.width = `${width}px`
-      renderer.domElement.style.height = `${height}px`
+      renderer.domElement.style.width = "100%"
+      renderer.domElement.style.height = "100%"
 
       const aspect = width / height
       const viewHeight = 3.25 / zoom
