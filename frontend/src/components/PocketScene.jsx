@@ -29,8 +29,8 @@ export default function PocketScene({ className = "" }) {
     renderer.domElement.className = "pocket-scene__canvas"
     host.appendChild(renderer.domElement)
 
-    scene.add(new THREE.HemisphereLight(0xfff4dd, 0x4c526b, 2.2))
-    const key = new THREE.DirectionalLight(0xffffff, 2.4)
+    scene.add(new THREE.HemisphereLight(0xfff4dd, 0x4c526b, 1.45))
+    const key = new THREE.DirectionalLight(0xffffff, 2.8)
     key.position.set(4, 7, 5)
     scene.add(key)
 
@@ -76,6 +76,29 @@ export default function PocketScene({ className = "" }) {
     const loader = new GLTFLoader()
     loader.register(parser => new VRMLoaderPlugin(parser))
 
+    function pixelizeMaterial(material) {
+      if (!material) return
+      material.flatShading = true
+      material.needsUpdate = true
+
+      for (const key of ["map", "emissiveMap", "normalMap", "roughnessMap", "metalnessMap"]) {
+        const texture = material[key]
+        if (!texture) continue
+        texture.magFilter = THREE.NearestFilter
+        texture.minFilter = THREE.NearestFilter
+        texture.generateMipmaps = false
+        texture.needsUpdate = true
+      }
+    }
+
+    function pixelizeModel(root) {
+      root.traverse(object => {
+        if (!object.isMesh && !object.isSkinnedMesh) return
+        const materials = Array.isArray(object.material) ? object.material : [object.material]
+        materials.forEach(pixelizeMaterial)
+      })
+    }
+
     function render() {
       if (!disposed) renderer.render(scene, camera)
     }
@@ -106,6 +129,7 @@ export default function PocketScene({ className = "" }) {
           vrm.scene.traverse(object => {
             object.frustumCulled = false
           })
+          pixelizeModel(vrm.scene)
           scene.add(vrm.scene)
           render()
         },
