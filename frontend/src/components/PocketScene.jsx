@@ -82,9 +82,9 @@ export default function PocketScene({ className = "" }) {
     postScene.add(postQuad)
 
     // Keep a soft ambient base, then let local lights define the room.
-    scene.add(new THREE.HemisphereLight(0xfff3dc, 0x4c526b, 1.15))
+    scene.add(new THREE.HemisphereLight(0xfffbf2, 0x596071, 1.35))
 
-    const key = new THREE.DirectionalLight(0xfff4e5, 2.15)
+    const key = new THREE.DirectionalLight(0xfffdf8, 2.35)
     key.position.set(4, 7, 5)
     key.castShadow = true
     key.shadow.mapSize.set(128, 128)
@@ -98,14 +98,14 @@ export default function PocketScene({ className = "" }) {
     // The real PointLight stays intentionally subtle. The visible lamp pool is
     // built from stepped emissive patches below so it reads as pixel lighting
     // instead of a smooth high-resolution radial gradient.
-    const lampLight = new THREE.PointLight(0xffc184, 0.75, 2.4, 2)
+    const lampLight = new THREE.PointLight(0xffc184, 0.08, 1.8, 2)
     lampLight.position.set(-2.15, 1.45, -1.25)
     lampLight.castShadow = true
     lampLight.shadow.mapSize.set(64, 64)
     lampLight.shadow.bias = -0.002
     scene.add(lampLight)
 
-    const roomFill = new THREE.PointLight(0xffe2bd, 1.15, 5.5, 2)
+    const roomFill = new THREE.PointLight(0xfff8ed, 1.35, 5.5, 2)
     roomFill.position.set(1.8, 2.7, 1.5)
     scene.add(roomFill)
 
