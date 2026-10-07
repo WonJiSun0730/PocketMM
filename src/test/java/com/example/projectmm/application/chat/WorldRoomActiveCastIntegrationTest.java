@@ -3,6 +3,8 @@ package com.example.projectmm.application.chat;
 import com.example.projectmm.application.dialogue.DialogueGateway;
 import com.example.projectmm.application.dialogue.WorldRoomContextBuilder;
 import com.example.projectmm.application.memory.MemoryRecallService;
+import com.example.projectmm.application.time.TimeInterpreter;
+import com.example.projectmm.application.time.TimeInterpretation;
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.character.CharacterRepository;
 import com.example.projectmm.domain.chat.*;
@@ -46,9 +48,13 @@ class WorldRoomActiveCastIntegrationTest {
 
     @MockitoBean DialogueGateway gateway;
     @MockitoBean MemoryRecallService memoryRecallService;
+    @MockitoBean TimeInterpreter timeInterpreter;
 
     @Test
     void castCanEnterLeaveReenterAndOverlapWithinOneSession() {
+        when(timeInterpreter.interpret(any(), any(LocalDateTime.class)))
+                .thenReturn(TimeInterpretation.noMatch());
+
         PasswordEncoder encoder = mock(PasswordEncoder.class);
         when(encoder.encode("password")).thenReturn("encoded");
 
