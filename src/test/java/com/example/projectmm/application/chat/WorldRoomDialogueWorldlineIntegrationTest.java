@@ -341,6 +341,58 @@ class WorldRoomDialogueWorldlineIntegrationTest {
     }
 
     @Test
+    void pocketSettingsReachDialogueContextAndNoControlContinuationPrompt() {
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        when(encoder.encode("password")).thenReturn("encoded");
+
+        Member member = members.save(Member.createLocal(
+                "pocket-settings-user", "password", "Pocket Settings User",
+                "pocket-settings-user@example.test", encoder
+        ));
+        World world = worlds.save(new World(member, "Settings World", "Settings test."));
+        WorldConversation room = rooms.save(new WorldConversation(
+                world, member, "Settings Room",
+                WorldConversation.Visibility.PRIVATE,
+                LocalDateTime.of(2026, 10, 7, 21, 0)
+        ));
+        WorldRoomIntro intro = intros.save(new WorldRoomIntro(room, "Start", "Start scene.", 0));
+        var session = sessionService.start(room.getId(), member.getLoginId(), null, intro.getId());
+
+        sessionService.updatePocketSettings(
+                session.getId(),
+                member.getLoginId(),
+                "이 장면에서 계속 참고할 메모",
+                "잔잔한 분위기를 유지한다.",
+                true
+        );
+
+        when(gateway.generateWorldRoomTurn(
+                argThat(context -> context != null
+                        && "이 장면에서 계속 참고할 메모".equals(context.userNote())
+                        && "잔잔한 분위기를 유지한다.".equals(context.pocketPlayGuide())
+                        && context.noControlPlayer()),
+                contains("without controlling the player character")
+        )).thenReturn(new WorldRoomTurn(
+                "*주변 인물들의 대화가 이어진다.*",
+                WorldRoomCastChange.none(),
+                List.of(),
+                30
+        ));
+
+        dialogueService.continueScene(session.getId());
+
+        verify(gateway).generateWorldRoomTurn(
+                argThat(context -> context != null
+                        && "이 장면에서 계속 참고할 메모".equals(context.userNote())
+                        && "잔잔한 분위기를 유지한다.".equals(context.pocketPlayGuide())
+                        && context.noControlPlayer()),
+                argThat(prompt -> prompt != null
+                        && prompt.contains("without controlling the player character")
+                        && prompt.contains("Do not invent any player dialogue"))
+        );
+    }
+
+    @Test
     void rerollAndVariantSelectionRestoreTextCastAndSystemAsOneWorldline() {
         PasswordEncoder encoder = mock(PasswordEncoder.class);
         when(encoder.encode("password")).thenReturn("encoded");
