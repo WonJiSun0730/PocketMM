@@ -3,12 +3,11 @@ import * as THREE from "three"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { VRMLoaderPlugin } from "@pixiv/three-vrm"
 
-const INTERNAL_HEIGHT = 120
-
 export default function PocketScene({ className = "" }) {
   const hostRef = useRef(null)
   const [zoom, setZoom] = useState(1.35)
   const [sceneHeight, setSceneHeight] = useState(260)
+  const [pixelHeight, setPixelHeight] = useState(120)
 
   useEffect(() => {
     const host = hostRef.current
@@ -70,7 +69,7 @@ export default function PocketScene({ className = "" }) {
             max(length(center.rgb - up), length(center.rgb - down))
           );
           float edgeMask = smoothstep(0.20, 0.48, edge);
-          vec3 outlined = mix(center.rgb, center.rgb * 0.72, edgeMask * 0.38);
+          vec3 outlined = mix(center.rgb, center.rgb * 0.82, edgeMask * 0.18);
           gl_FragColor = vec4(outlined, center.a);
         }
       `,
@@ -201,10 +200,10 @@ export default function PocketScene({ className = "" }) {
     function resize() {
       const width = Math.max(1, host.getBoundingClientRect().width)
       const height = Math.max(1, sceneHeight)
-      const internalWidth = Math.max(1, Math.round(INTERNAL_HEIGHT * width / height))
-      renderer.setSize(internalWidth, INTERNAL_HEIGHT, false)
-      renderTarget.setSize(internalWidth, INTERNAL_HEIGHT)
-      postMaterial.uniforms.resolution.value.set(internalWidth, INTERNAL_HEIGHT)
+      const internalWidth = Math.max(1, Math.round(pixelHeight * width / height))
+      renderer.setSize(internalWidth, pixelHeight, false)
+      renderTarget.setSize(internalWidth, pixelHeight)
+      postMaterial.uniforms.resolution.value.set(internalWidth, pixelHeight)
       renderer.domElement.style.width = "100%"
       renderer.domElement.style.height = "100%"
 
@@ -238,7 +237,7 @@ export default function PocketScene({ className = "" }) {
         }
       })
     }
-  }, [zoom, sceneHeight])
+  }, [zoom, sceneHeight, pixelHeight])
 
   return <div className={`pocket-scene-shell ${className}`}>
     <div className="pocket-scene" style={{ height: `${sceneHeight}px` }}>
@@ -250,6 +249,12 @@ export default function PocketScene({ className = "" }) {
         <button type="button" onClick={() => setZoom(value => Math.max(0.8, +(value - 0.1).toFixed(1)))} aria-label="장면 축소">−</button>
         <span>{Math.round(zoom * 100)}%</span>
         <button type="button" onClick={() => setZoom(value => Math.min(2.2, +(value + 0.1).toFixed(1)))} aria-label="장면 확대">+</button>
+      </div>
+      <div className="pocket-scene__control" aria-label="내부 렌더 해상도">
+        <span className="pocket-scene__control-label">픽셀</span>
+        <button type="button" onClick={() => setPixelHeight(value => Math.max(80, value - 20))} aria-label="내부 렌더 해상도 낮추기">−</button>
+        <span>{pixelHeight}px</span>
+        <button type="button" onClick={() => setPixelHeight(value => Math.min(200, value + 20))} aria-label="내부 렌더 해상도 높이기">+</button>
       </div>
       <div className="pocket-scene__control" aria-label="장면 높이">
         <span className="pocket-scene__control-label">높이</span>
