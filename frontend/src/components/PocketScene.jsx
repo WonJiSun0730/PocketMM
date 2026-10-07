@@ -80,28 +80,13 @@ export default function PocketScene({ className = "" }) {
       if (!material) return
       material.flatShading = true
 
-      // Keep the VRM's authored palette intact. The previous experiment quantized
-      // final RGB, which crushed skin/hair/clothing color variation. Instead,
-      // quantize only the light contribution into three broad cel-shading bands.
-      material.onBeforeCompile = shader => {
-        shader.fragmentShader = shader.fragmentShader.replace(
-          "#include <lights_fragment_end>",
-          `
-            #include <lights_fragment_end>
-            float pocketLight = clamp(
-              dot(normalize(vNormal), normalize(vec3(0.45, 0.8, 0.55))) * 0.5 + 0.5,
-              0.0,
-              1.0
-            );
-            float pocketBand = pocketLight < 0.38
-              ? 0.72
-              : (pocketLight < 0.68 ? 0.88 : 1.0);
-            reflectedLight.directDiffuse *= pocketBand;
-            reflectedLight.indirectDiffuse *= mix(0.9, 1.0, pocketBand);
-          `,
-        )
-      }
-      material.customProgramCacheKey = () => "pocket-toon-light-v1"
+      // Preserve the VRM material pipeline. MToon does not expose the same
+      // lighting shader chunks as MeshStandardMaterial, so injecting into
+      // lights_fragment_end can make VRM meshes fail to compile/disappear.
+      // Keep flat geometry + nearest textures here; toon bands will be added
+      // with an MToon-compatible path next.
+      material.onBeforeCompile = null
+      material.customProgramCacheKey = () => "pocket-palette-safe-v1"
       material.needsUpdate = true
 
       for (const key of ["map", "emissiveMap", "normalMap", "roughnessMap", "metalnessMap"]) {
