@@ -92,12 +92,12 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     scene.add(new THREE.HemisphereLight(
       daypart === "day" ? 0xffffff : daypart === "evening" ? 0xfffbf2 : 0xd9e2ff,
       daypart === "night" ? 0x30364b : 0x596071,
-      daypart === "day" ? 1.55 : daypart === "evening" ? 1.35 : 0.95,
+      daypart === "day" ? 1.55 : daypart === "evening" ? 1.48 : 0.95,
     ))
 
     const key = new THREE.DirectionalLight(
       daypart === "day" ? 0xffffff : daypart === "evening" ? 0xfffdf8 : 0xc9d5ff,
-      daypart === "day" ? 2.6 : daypart === "evening" ? 2.35 : 1.55,
+      daypart === "day" ? 2.6 : daypart === "evening" ? 2.52 : 1.55,
     )
     key.position.set(4, 7, 5)
     key.castShadow = true
