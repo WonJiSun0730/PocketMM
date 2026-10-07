@@ -26,18 +26,23 @@ export default function PocketsPage({ onBack, onOpenPocket, onManageProfiles }) 
   async function openPocket(item) {
     setError("")
     try {
-      const [sessionResponse, roomResponse] = await Promise.all([
+      const [sessionResponse, roomResponse, profilesResponse] = await Promise.all([
         fetch(`/api/worlds/pockets/${item.sessionId}`, { credentials: "include" }),
         fetch(`/api/worlds/${item.worldId}/rooms/${item.roomId}`, { credentials: "include" }),
+        fetch("/api/player-profiles", { credentials: "include" }),
       ])
-      if (!sessionResponse.ok || !roomResponse.ok) throw new Error("포켓을 열지 못했어요.")
+      if (!sessionResponse.ok || !roomResponse.ok || !profilesResponse.ok) throw new Error("포켓을 열지 못했어요.")
       const session = await sessionResponse.json()
       const room = await roomResponse.json()
+      const profiles = await profilesResponse.json()
+      const playerProfile = item.playerProfileId
+        ? profiles.find(profile => profile.id === item.playerProfileId) ?? null
+        : null
       onOpenPocket({
         world: { id: item.worldId, name: item.worldName },
         room,
         session,
-        playerProfile: item.playerProfileId ? { id: item.playerProfileId, name: item.playerProfileName } : null,
+        playerProfile,
       })
     } catch (error) {
       setError(error.message)
