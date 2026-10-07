@@ -84,47 +84,101 @@ export default function PocketScene({ className = "" }) {
     key.position.set(4, 7, 5)
     scene.add(key)
 
+    // Warm temporary counseling room. Furniture GLBs can replace these
+    // primitives incrementally without touching the VRM pipeline.
     const floor = new THREE.Mesh(
-      new THREE.BoxGeometry(6.4, 0.2, 4.2),
-      new THREE.MeshStandardMaterial({ color: 0x6f6a78, roughness: 0.95 }),
+      new THREE.BoxGeometry(6.4, 0.16, 4.2),
+      new THREE.MeshStandardMaterial({ color: 0x7b6048, roughness: 0.96 }),
     )
-    floor.position.y = -0.1
+    floor.position.y = -0.08
     scene.add(floor)
 
     const backWall = new THREE.Mesh(
-      new THREE.BoxGeometry(6.4, 3.2, 0.18),
-      new THREE.MeshStandardMaterial({ color: 0xb9b1c7, roughness: 1 }),
+      new THREE.BoxGeometry(6.4, 3.2, 0.16),
+      new THREE.MeshStandardMaterial({ color: 0xd8cbb5, roughness: 1 }),
     )
     backWall.position.set(0, 1.5, -2)
     scene.add(backWall)
 
     const sideWall = new THREE.Mesh(
-      new THREE.BoxGeometry(0.18, 3.2, 4.2),
-      new THREE.MeshStandardMaterial({ color: 0x9993aa, roughness: 1 }),
+      new THREE.BoxGeometry(0.16, 3.2, 4.2),
+      new THREE.MeshStandardMaterial({ color: 0xcbbda6, roughness: 1 }),
     )
     sideWall.position.set(-3.1, 1.5, 0)
     scene.add(sideWall)
 
-    const table = new THREE.Mesh(
-      new THREE.BoxGeometry(2.2, 0.18, 1.05),
-      new THREE.MeshStandardMaterial({ color: 0x6b5148, roughness: 0.85 }),
+    const rug = new THREE.Mesh(
+      new THREE.BoxGeometry(3.4, 0.035, 2.15),
+      new THREE.MeshStandardMaterial({ color: 0x71806a, roughness: 1 }),
     )
-    table.position.set(0.55, 0.95, -0.2)
-    scene.add(table)
+    rug.position.set(0.15, 0.02, 0.15)
+    scene.add(rug)
 
-    for (const x of [-0.35, 1.45]) {
-      for (const z of [-0.55, 0.15]) {
+    const coffeeTable = new THREE.Mesh(
+      new THREE.BoxGeometry(1.45, 0.12, 0.72),
+      new THREE.MeshStandardMaterial({ color: 0x76513b, roughness: 0.9 }),
+    )
+    coffeeTable.position.set(0.25, 0.48, 0.05)
+    scene.add(coffeeTable)
+    for (const x of [-0.58, 0.58]) {
+      for (const z of [-0.25, 0.25]) {
         const leg = new THREE.Mesh(
-          new THREE.BoxGeometry(0.14, 0.95, 0.14),
-          new THREE.MeshStandardMaterial({ color: 0x514039, roughness: 0.9 }),
+          new THREE.BoxGeometry(0.09, 0.46, 0.09),
+          new THREE.MeshStandardMaterial({ color: 0x51382d, roughness: 0.95 }),
         )
-        leg.position.set(x, 0.45, z)
+        leg.position.set(0.25 + x, 0.23, 0.05 + z)
         scene.add(leg)
       }
     }
 
+    const lampStem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.045, 0.055, 1.35, 8),
+      new THREE.MeshStandardMaterial({ color: 0x5b493d, roughness: 0.9 }),
+    )
+    lampStem.position.set(-2.15, 0.68, -1.35)
+    scene.add(lampStem)
+    const lampShade = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.22, 0.36, 0.42, 8),
+      new THREE.MeshStandardMaterial({ color: 0xe4b66f, emissive: 0x6b421c, emissiveIntensity: 0.25, roughness: 1 }),
+    )
+    lampShade.position.set(-2.15, 1.48, -1.35)
+    scene.add(lampShade)
+
+    const plantPot = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.22, 0.17, 0.38, 8),
+      new THREE.MeshStandardMaterial({ color: 0xa65f43, roughness: 1 }),
+    )
+    plantPot.position.set(2.35, 0.19, -1.45)
+    scene.add(plantPot)
+    for (let i = 0; i < 6; i += 1) {
+      const leaf = new THREE.Mesh(
+        new THREE.SphereGeometry(0.25, 6, 4),
+        new THREE.MeshStandardMaterial({ color: i % 2 ? 0x526c4c : 0x667d58, roughness: 1 }),
+      )
+      const angle = (Math.PI * 2 * i) / 6
+      leaf.scale.set(0.55, 1.25, 0.35)
+      leaf.rotation.z = Math.sin(angle) * 0.55
+      leaf.position.set(2.35 + Math.cos(angle) * 0.22, 0.62 + (i % 3) * 0.15, -1.45 + Math.sin(angle) * 0.18)
+      scene.add(leaf)
+    }
+
     const loader = new GLTFLoader()
     loader.register(parser => new VRMLoaderPlugin(parser))
+
+    // CC0 Cozy Home Interiors sofa. Loaded from the pack's permanent CORS CDN.
+    loader.load(
+      "https://cdn.3dassets.dev/assets/17137/v1/model.glb",
+      gltf => {
+        if (disposed) return
+        const sofa = gltf.scene
+        sofa.position.set(0.15, 0, -1.35)
+        sofa.rotation.y = 0
+        scene.add(sofa)
+        render()
+      },
+      undefined,
+      error => console.warn("[PocketScene] Cozy sofa load failed:", error),
+    )
 
     function pixelizeMaterial(material) {
       if (!material) return
