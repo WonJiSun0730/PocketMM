@@ -21,6 +21,9 @@ public class PlayerProfile {
     private String description;
     @Lob @Column(columnDefinition = "MEDIUMTEXT")
     private String avatar;
+    @Column(length = 500)
+    private String modelUrl;
+    private Double modelHeight;
 
     public PlayerProfile(int slot, String name, String description, String avatar) {
         this.slot = slot;
@@ -31,5 +34,10 @@ public class PlayerProfile {
         this.name = name;
         this.description = description;
         this.avatar = avatar;
+    }
+
+    public void updateModel(String modelUrl, Double modelHeight) {
+        this.modelUrl = modelUrl == null || modelUrl.isBlank() ? null : modelUrl.trim();
+        this.modelHeight = this.modelUrl == null ? null : modelHeight;
     }
 }
