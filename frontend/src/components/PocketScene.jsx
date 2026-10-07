@@ -78,17 +78,11 @@ export default function PocketScene({ className = "" }) {
 
     function pixelizeMaterial(material) {
       if (!material) return
-      material.flatShading = true
 
-      // Preserve the VRM material pipeline. MToon does not expose the same
-      // lighting shader chunks as MeshStandardMaterial, so injecting into
-      // lights_fragment_end can make VRM meshes fail to compile/disappear.
-      // Keep flat geometry + nearest textures here; toon bands will be added
-      // with an MToon-compatible path next.
-      material.onBeforeCompile = null
-      material.customProgramCacheKey = () => "pocket-palette-safe-v1"
-      material.needsUpdate = true
-
+      // Do not mutate MToon shader hooks or flatShading here. VRM materials
+      // own their shader pipeline; touching those flags can invalidate the
+      // compiled program. Pixel character is produced safely by low-res
+      // rendering plus nearest texture sampling.
       for (const key of ["map", "emissiveMap", "normalMap", "roughnessMap", "metalnessMap"]) {
         const texture = material[key]
         if (!texture) continue
