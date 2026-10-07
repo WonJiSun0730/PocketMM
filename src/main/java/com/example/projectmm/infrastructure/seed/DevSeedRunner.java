@@ -10,6 +10,7 @@ import com.example.projectmm.domain.event.EventParticipantRepository;
 import com.example.projectmm.domain.event.EventRepository;
 import com.example.projectmm.domain.member.Member;
 import com.example.projectmm.domain.member.MemberRepository;
+import com.example.projectmm.domain.member.Role;
 import com.example.projectmm.domain.scene.Scene;
 import com.example.projectmm.domain.scene.SceneParticipant;
 import com.example.projectmm.domain.scene.SceneParticipantRepository;
@@ -52,6 +53,9 @@ public class DevSeedRunner implements CommandLineRunner {
                                 passwordEncoder
                         )
                 ));
+        if (devOwner.getRole() != Role.DEVELOPER) {
+            devOwner.changeRole(Role.DEVELOPER);
+        }
 
         characterRepository.findAll().stream()
                 .filter(character ->
