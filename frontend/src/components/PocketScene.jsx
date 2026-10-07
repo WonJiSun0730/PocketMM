@@ -7,7 +7,7 @@ export default function PocketScene({ className = "" }) {
   const hostRef = useRef(null)
   const [zoom, setZoom] = useState(1.35)
   const [sceneHeight, setSceneHeight] = useState(260)
-  const [pixelHeight, setPixelHeight] = useState(120)
+  const [pixelHeight, setPixelHeight] = useState(160)
 
   useEffect(() => {
     const host = hostRef.current
