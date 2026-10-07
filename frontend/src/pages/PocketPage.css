@@ -71,25 +71,25 @@
 }
 
 
-@media (min-width: 1280px) {
-  .pocket-page {
-    position: relative;
-  }
+.pocket-aux-rail {
+  width: 100%;
+}
 
+@media (min-width: 1280px) {
   .pocket-main {
     position: relative;
   }
 
-  .pocket-aux-tools {
-    position: relative;
+  .pocket-aux-rail {
+    position: absolute;
+    top: 4.5rem;
+    right: calc(100% + 1.25rem);
     width: 18rem;
-    margin-left: -19.25rem;
-    margin-right: 0;
-    z-index: 2;
+    max-height: calc(100vh - 6rem);
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
     background: var(--card);
-  }
-
-  .pocket-aux-tools + .pocket-aux-tools {
-    margin-top: 0;
+    z-index: 10;
   }
 }
