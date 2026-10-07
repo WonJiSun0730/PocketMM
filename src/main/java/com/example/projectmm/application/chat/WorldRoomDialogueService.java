@@ -58,13 +58,16 @@ public class WorldRoomDialogueService {
                 now()
         ));
 
-        applyExplicitTimeChange(session, userMessage);
+        boolean explicitTimeChanged = applyExplicitTimeChange(session, userMessage);
         var context = contextBuilder.buildSession(sessionId);
         var beforeCast = sessionService.captureCastState(sessionId);
         var beforeSystems = sessionService.captureSystemState(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
+        if (!explicitTimeChanged) {
+            applyNarrativeElapsedTime(session, generated.elapsedSeconds());
+        }
         var afterCast = sessionService.captureCastState(sessionId);
         var afterSystems = sessionService.captureSystemState(sessionId);
 
@@ -92,19 +95,31 @@ public class WorldRoomDialogueService {
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
     }
 
-    private void applyExplicitTimeChange(
+    private boolean applyExplicitTimeChange(
             com.example.projectmm.domain.chat.WorldRoomSession session,
             String userMessage
     ) {
         var interpretation = timeInterpreter.interpret(userMessage, session.getSimulatedAt());
-        if (!interpretation.matched() || interpretation.timeChange() == null) {
-            return;
+        if (interpretation == null || !interpretation.matched() || interpretation.timeChange() == null) {
+            return false;
         }
 
         var change = interpretation.timeChange();
         if (change.changed() && change.newTime() != null) {
             session.updateSimulatedAt(change.newTime());
+            return true;
         }
+        return false;
+    }
+
+    private void applyNarrativeElapsedTime(
+            com.example.projectmm.domain.chat.WorldRoomSession session,
+            long elapsedSeconds
+    ) {
+        if (elapsedSeconds <= 0) {
+            return;
+        }
+        session.updateSimulatedAt(session.getSimulatedAt().plusSeconds(elapsedSeconds));
     }
 
     @Transactional
@@ -121,6 +136,7 @@ public class WorldRoomDialogueService {
         var generated = dialogueGateway.generateWorldRoomTurn(context, continuationPrompt);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
+        applyNarrativeElapsedTime(session, generated.elapsedSeconds());
         var afterCast = sessionService.captureCastState(sessionId);
         var afterSystems = sessionService.captureSystemState(sessionId);
 
