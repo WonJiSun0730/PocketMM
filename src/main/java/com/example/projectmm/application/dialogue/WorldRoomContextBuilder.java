@@ -150,6 +150,7 @@ public class WorldRoomContextBuilder {
                 .toList();
 
         return new WorldRoomDialogueContext(
+                session.getId(),
                 room.getId(),
                 room.getTitle(),
                 room.getVisibility(),
@@ -207,7 +208,9 @@ public class WorldRoomContextBuilder {
                 recalledMemories,
                 session.getUserNote(),
                 session.getPocketPlayGuide(),
-                session.isNoControlPlayer()
+                session.isNoControlPlayer(),
+                session.getAiProvider() == null ? "GEMINI" : session.getAiProvider(),
+                session.getAiModel()
         );
     }
 
