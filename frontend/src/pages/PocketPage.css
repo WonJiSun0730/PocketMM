@@ -70,26 +70,51 @@
   color: rgb(255 255 255 / 65%);
 }
 
-
-.pocket-aux-rail {
+.pocket-layout {
   width: 100%;
+  height: 100%;
+}
+
+.pocket-main {
+  margin-inline: auto;
+}
+
+.pocket-desktop-tools {
+  display: none;
+}
+
+.pocket-mobile-tools {
+  display: block;
 }
 
 @media (min-width: 1280px) {
-  .pocket-main {
-    position: relative;
+  .pocket-layout {
+    display: grid;
+    grid-template-columns: 18rem minmax(0, 56rem) 18rem;
+    column-gap: 1.25rem;
+    justify-content: center;
+    align-items: stretch;
   }
 
-  .pocket-aux-rail {
-    position: absolute;
-    top: 4.5rem;
-    right: calc(100% + 1.25rem);
-    width: 18rem;
+  .pocket-main {
+    grid-column: 2;
+    margin-inline: 0;
+  }
+
+  .pocket-desktop-tools {
+    display: block;
+    grid-column: 1;
+    grid-row: 1;
+    align-self: start;
+    margin-top: 4.5rem;
     max-height: calc(100vh - 6rem);
     overflow-y: auto;
     border: 1px solid var(--border);
     border-radius: 0.75rem;
     background: var(--card);
-    z-index: 10;
+  }
+
+  .pocket-mobile-tools {
+    display: none;
   }
 }
