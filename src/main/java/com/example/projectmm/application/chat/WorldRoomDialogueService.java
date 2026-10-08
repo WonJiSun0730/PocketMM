@@ -12,6 +12,8 @@ import com.example.projectmm.domain.chat.WorldRoomMessageRepository;
 import com.example.projectmm.domain.chat.WorldRoomMessageVariant;
 import com.example.projectmm.domain.chat.WorldRoomMessageVariantRepository;
 import com.example.projectmm.domain.chat.WorldRoomSessionRepository;
+import com.example.projectmm.domain.chat.WorldRoomPlayerState;
+import com.example.projectmm.domain.chat.WorldRoomPlayerStateRepository;
 import com.example.projectmm.domain.chat.WorldRoomVariantCastSnapshotRepository;
 import com.example.projectmm.domain.chat.WorldRoomVariantSystemSnapshotRepository;
 import com.example.projectmm.domain.dialogue.WorldRoomTurn;
@@ -35,6 +37,7 @@ public class WorldRoomDialogueService {
     private final DialogueGateway dialogueGateway;
     private final WorldRoomSessionService sessionService;
     private final WorldRoomSessionRepository sessions;
+    private final WorldRoomPlayerStateRepository playerStates;
     private final WorldRoomMessageRepository messages;
     private final WorldRoomMessageVariantRepository variants;
     private final WorldRoomVariantCastSnapshotRepository castSnapshots;
@@ -66,6 +69,7 @@ public class WorldRoomDialogueService {
         var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
+        applySceneLocation(sessionId, generated);
         if (!explicitTimeChanged) {
             applyNarrativeElapsedTime(session, generated.elapsedSeconds());
         }
@@ -95,6 +99,15 @@ public class WorldRoomDialogueService {
         ));
 
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
+    }
+
+    private void applySceneLocation(Long sessionId, WorldRoomTurn generated) {
+        String location = generated.locationChange();
+        if (location == null || location.isBlank() || location.length() > 200) return;
+        var session = sessions.findById(sessionId).orElseThrow();
+        var state = playerStates.findBySessionId(sessionId)
+                .orElseGet(() -> playerStates.save(new WorldRoomPlayerState(session)));
+        state.update(location, state.getConditions(), state.getInventory());
     }
 
     private boolean applyExplicitTimeChange(
@@ -141,6 +154,7 @@ public class WorldRoomDialogueService {
         var generated = dialogueGateway.generateWorldRoomTurn(context, continuationPrompt);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
+        applySceneLocation(sessionId, generated);
         applyNarrativeElapsedTime(session, generated.elapsedSeconds());
         var afterCast = sessionService.captureCastState(sessionId);
         var afterSystems = sessionService.captureSystemState(sessionId);
@@ -242,6 +256,7 @@ public class WorldRoomDialogueService {
         var generated = dialogueGateway.generateWorldRoomTurn(context, rerollPrompt);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
+        applySceneLocation(sessionId, generated);
         applyNarrativeElapsedTime(sessions.findById(sessionId).orElseThrow(), generated.elapsedSeconds());
         var afterCast = sessionService.captureCastState(sessionId);
         var afterSystems = sessionService.captureSystemState(sessionId);
@@ -293,6 +308,7 @@ public class WorldRoomDialogueService {
         var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage.getContent());
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
+        applySceneLocation(sessionId, generated);
         applyNarrativeElapsedTime(session, generated.elapsedSeconds());
         var afterCast = sessionService.captureCastState(sessionId);
         var afterSystems = sessionService.captureSystemState(sessionId);
