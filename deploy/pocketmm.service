@@ -1,6 +1,7 @@
 [Unit]
-Description=PocketMM private test server
-After=network.target
+Description=PocketMM Spring Boot
+After=network-online.target redis6.service
+Wants=network-online.target
 
 [Service]
 Type=simple
@@ -8,10 +9,12 @@ User=pocketmm
 Group=pocketmm
 WorkingDirectory=/opt/pocketmm
 EnvironmentFile=/etc/pocketmm/pocketmm.env
-ExecStart=/usr/bin/java -jar /opt/pocketmm/pocketmm.jar
+ExecStart=/usr/bin/java -Xms128m -Xmx384m -jar /opt/pocketmm/pocketmm.jar
 Restart=on-failure
-RestartSec=5
+RestartSec=10
 TimeoutStopSec=30
+SuccessExitStatus=143
+UMask=0077
 
 [Install]
 WantedBy=multi-user.target
