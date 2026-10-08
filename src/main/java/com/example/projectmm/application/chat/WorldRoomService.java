@@ -8,6 +8,7 @@ import com.example.projectmm.domain.chat.WorldConversationRepository;
 import com.example.projectmm.domain.chat.WorldRoomIntro;
 import com.example.projectmm.domain.chat.WorldRoomIntroRepository;
 import com.example.projectmm.domain.chat.WorldRoomMessageRepository;
+import com.example.projectmm.domain.chat.WorldRoomPlayerStateRepository;
 import com.example.projectmm.domain.chat.WorldRoomMessageVariantRepository;
 import com.example.projectmm.domain.chat.WorldRoomSessionCastRepository;
 import com.example.projectmm.domain.chat.WorldRoomSessionRepository;
