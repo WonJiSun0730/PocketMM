@@ -433,6 +433,12 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 Relevant recalled memories of currently active characters:
                 %s
 
+                Scene-state authority rules:
+                - Explicit values stored in the selected intro and the current authoritative runtime state outrank inferred details from prose or world lore.
+                - Explicit user/OOC corrections to the current scene outrank older narrative implications.
+                - World lore supplies background truth only where no more specific current-scene fact conflicts with it.
+                - When a scene-state field is unspecified, infer conservatively from the intro/current narrative; if still uncertain, leave structured state unchanged rather than inventing a conflicting fact.
+
                 Player runtime-state rules:
                 - The runtime state above is the player's current authoritative state for this Pocket.
                 - Respect the current location, conditions, and inventory when continuing the scene.
