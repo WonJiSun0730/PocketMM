@@ -26,8 +26,9 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     scene.userData.runtime = { simulatedAt, location, daypart }
 
     const camera = new THREE.OrthographicCamera(-4, 4, 2.25, -2.25, 0.1, 100)
-    camera.position.set(4.2, 3.8, 6)
-    camera.lookAt(0, 1.05, 0)
+    // Fixed side-on stage view: keep the room depth for distant scenery.
+    camera.position.set(0, 1.55, 10)
+    camera.lookAt(0, 1.25, 0)
 
     const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false })
     renderer.setPixelRatio(1)
@@ -398,7 +399,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     visibleModels.forEach((model, index) => {
       const x = startX + index * spacing
       const z = 0.55 - Math.abs(index - (visibleModels.length - 1) / 2) * 0.08
-      const facing = x <= 0 ? Math.PI * 0.1 : -Math.PI * 0.2
+      const facing = x <= 0 ? Math.PI * 0.12 : -Math.PI * 0.12
       loadVrm(model, new THREE.Vector3(x, 0, z), facing)
     })
 
