@@ -3,8 +3,9 @@ import * as THREE from "three"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { VRMLoaderPlugin } from "@pixiv/three-vrm"
 import { resolvePocketScene } from "@/lib/pocketSceneRegistry"
+import { getPocketBackground } from "@/lib/pocketSceneBackgrounds"
 
-export default function PocketScene({ className = "", simulatedAt = "", location = "", playerModel = null, characterModels = [] }) {
+export default function PocketScene({ className = "", simulatedAt = "", location = "", sessionId = null, playerModel = null, characterModels = [] }) {
   const hostRef = useRef(null)
   const [zoom, setZoom] = useState(1.35)
   const [sceneHeight, setSceneHeight] = useState(260)
@@ -26,6 +27,35 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     const hour = simulatedAt ? Number(simulatedAt.slice(11, 13)) : 12
     const daypart = hour >= 6 && hour < 17 ? "day" : hour < 21 ? "evening" : "night"
     scene.userData.runtime = { simulatedAt, location, daypart, sceneId: preset.id }
+
+    // A generated backdrop is an optional far-wall layer, not a replacement
+    // for the depth scene, furniture, or VRM actors.
+    const backdropUrl = getPocketBackground(sessionId, location)
+    let generatedBackdropTexture = null
+    if (backdropUrl) {
+      new THREE.TextureLoader().load(
+        backdropUrl,
+        texture => {
+          if (disposed) {
+            texture.dispose()
+            return
+          }
+          texture.colorSpace = THREE.SRGBColorSpace
+          texture.magFilter = THREE.NearestFilter
+          texture.minFilter = THREE.NearestFilter
+          generatedBackdropTexture = texture
+          const backdrop = new THREE.Mesh(
+            new THREE.PlaneGeometry(6.25, 3.1),
+            new THREE.MeshBasicMaterial({ map: texture, depthWrite: false }),
+          )
+          backdrop.position.set(0, 1.55, -1.905)
+          scene.add(backdrop)
+          render()
+        },
+        undefined,
+        error => console.warn("[PocketScene] Background image unavailable:", error),
+      )
+    }
 
     const camera = new THREE.OrthographicCamera(-4, 4, 2.25, -2.25, 0.1, 100)
     // Fixed side-on stage view: keep the room depth for distant scenery.
@@ -467,6 +497,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     return () => {
       disposed = true
       observer.disconnect()
+      generatedBackdropTexture?.dispose()
       floorTexture.dispose()
       wallTexture.dispose()
       rugTexture.dispose()
@@ -484,7 +515,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
         }
       })
     }
-  }, [zoom, sceneHeight, pixelHeight, simulatedAt, location, playerModel, characterModels])
+  }, [zoom, sceneHeight, pixelHeight, simulatedAt, location, sessionId, playerModel, characterModels])
 
   return <div className={`pocket-scene-shell ${className}`}>
     <div className="pocket-scene" style={{ height: `${sceneHeight}px` }}>
