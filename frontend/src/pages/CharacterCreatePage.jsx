@@ -151,19 +151,24 @@ export default function CharacterCreatePage({
 
       let savedCharacter = await response.json()
 
-      if (worldId || editing) {
+      const previousWorldId = character?.worldId == null ? "" : String(character.worldId)
+      const worldChanged = editing ? worldId !== previousWorldId : Boolean(worldId)
+      if (worldChanged) {
         const targetWorldIds = worlds.map((world) => world.id)
         for (const targetWorldId of targetWorldIds) {
           const assignedResponse = await fetch(`/api/worlds/${targetWorldId}/characters`, { credentials: "include" })
-          if (!assignedResponse.ok) continue
+          if (!assignedResponse.ok) throw new Error("월드 연결 정보를 불러오지 못했어요.")
           const assigned = await assignedResponse.json()
           const ids = assigned.map((item) => item.id).filter((id) => id !== savedCharacter.id)
           if (String(targetWorldId) === worldId) ids.push(savedCharacter.id)
           if (assigned.some((item) => item.id === savedCharacter.id) || String(targetWorldId) === worldId) {
-            await fetch(`/api/worlds/${targetWorldId}/characters`, { method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ characterIds: ids }) })
+            const worldResponse = await fetch(`/api/worlds/${targetWorldId}/characters`, { method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ characterIds: ids }) })
+            if (!worldResponse.ok) throw new Error("월드 연결을 저장하지 못했어요.")
           }
         }
       }
+
+      savedCharacter = { ...savedCharacter, worldId: worldId ? Number(worldId) : null }
 
       if (editing) {
         onUpdated(savedCharacter)

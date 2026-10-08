@@ -1,6 +1,7 @@
 package com.example.projectmm.application.character;
 
 import com.example.projectmm.api.character.CharacterCreateRequest;
+import com.example.projectmm.api.character.CharacterUpdateRequest;
 import com.example.projectmm.domain.character.CharacterRepository;
 import com.example.projectmm.domain.member.Member;
 import com.example.projectmm.domain.member.MemberRepository;
@@ -29,6 +30,7 @@ class CharacterOwnershipServiceTest {
     @Autowired CharacterRepository characterRepository;
     @Autowired MemberRepository memberRepository;
     @Autowired PasswordEncoder passwordEncoder;
+    @Autowired com.example.projectmm.domain.world.WorldRepository worlds;
     @MockitoBean DialogueGateway dialogueGateway;
 
     @Test
@@ -63,6 +65,37 @@ class CharacterOwnershipServiceTest {
         return memberRepository.save(
                 Member.createLocal(loginId, "password123", loginId, email, passwordEncoder)
         );
+    }
+
+    @Test
+    void libraryDetailAndProfileUpdateRetainExistingWorldSelection() {
+        Member owner = saveMember("world-owner", "world-owner@pocketmm.test");
+        var world = worlds.save(new com.example.projectmm.domain.world.World(owner, "TestWorld", ""));
+        var created = characterService.create(request("Marbas"), owner.getLoginId());
+        var character = characterRepository.findById(created.id()).orElseThrow();
+        character.assignWorld(world);
+        characterRepository.flush();
+
+        assertThat(characterService.getAll(owner.getLoginId()).getFirst().worldId()).isEqualTo(world.getId());
+        assertThat(characterService.getById(created.id(), owner.getLoginId()).worldId()).isEqualTo(world.getId());
+        var updated = characterService.updateProfile(created.id(), new CharacterUpdateRequest(
+                "Counsellor", null, null, null, null, "British English", null, null, null, null), owner.getLoginId());
+        assertThat(updated.worldId()).isEqualTo(world.getId());
+        assertThat(character.getWorld().getId()).isEqualTo(world.getId());
+        assertThat(new tools.jackson.databind.ObjectMapper().writeValueAsString(updated))
+                .contains("\"worldId\":" + world.getId());
+    }
+
+    @Test
+    void missingProfileStillReturnsWorldSelectionAndUnassignedCharacterReturnsNull() {
+        Member owner = saveMember("legacy-world-owner", "legacy-world-owner@pocketmm.test");
+        var world = worlds.save(new com.example.projectmm.domain.world.World(owner, "Legacy World", ""));
+        var legacy = characterRepository.save(new com.example.projectmm.domain.character.Character("Legacy", owner));
+        legacy.assignWorld(world);
+        assertThat(characterService.getById(legacy.getId(), owner.getLoginId()).worldId()).isEqualTo(world.getId());
+        var created = characterService.create(request("Unassigned"), owner.getLoginId());
+        assertThat(created.worldId()).isNull();
+        assertThat(characterService.getById(created.id(), owner.getLoginId()).worldId()).isNull();
     }
 
     private CharacterCreateRequest request(String name) {

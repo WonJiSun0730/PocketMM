@@ -163,7 +163,8 @@ public class CharacterService {
                     null, // background
                     null, // appearance
                     character.getModelUrl(),
-                    character.getModelHeight()
+                    character.getModelHeight(),
+                    character.getWorld() == null ? null : character.getWorld().getId()
             );
         }
 
@@ -186,7 +187,8 @@ public class CharacterService {
                 profile.getBackground(),
                 profile.getAppearance(),
                 character.getModelUrl(),
-                character.getModelHeight()
+                character.getModelHeight(),
+                character.getWorld() == null ? null : character.getWorld().getId()
         );
     }
 

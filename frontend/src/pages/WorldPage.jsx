@@ -495,7 +495,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
           ) : (
             <>
               <div className="world-title-row"><div><span className="world-eyebrow">EDITING</span><div className="world-name-line"><h2>{selectedWorld.name}</h2><button className="world-edit-meta" onClick={openEditWorld} type="button" aria-label="월드 정보 수정"><Pencil size={14} /></button><button className="world-delete" onClick={deleteWorld} type="button" aria-label="월드 삭제"><Trash2 size={14} /></button></div>{selectedWorld.description && <p className="world-private-description">{selectedWorld.description}</p>}</div>{message && <span className="world-message">{message}</span>}</div>
-              <div className="world-cast-summary"><Users size={15}/><span>등장인물 {worldCharacters.length}명</span>{worldCharacters.length > 0 && <span className="world-cast-names">{worldCharacters.map((character) => character.name).join(" · ")}</span>}{worldCharacters.length > 0 && <div className="world-cast-actions">{worldCharacters.map((character) => <button key={character.id} type="button" onClick={() => onOpenWorldChat?.(selectedWorld, character)}><MessageCircle size={13}/>{character.name}과 대화</button>)}</div>}</div>
+              <div className="world-cast-summary"><Users size={15}/><span>월드 연결 캐릭터 {worldCharacters.length}명</span>{worldCharacters.length > 0 && <span className="world-cast-names">{worldCharacters.map((character) => character.name).join(" · ")}</span>}{worldCharacters.length > 0 && <div className="world-cast-actions">{worldCharacters.map((character) => <button key={character.id} type="button" onClick={() => onOpenWorldChat?.(selectedWorld, character)}><MessageCircle size={13}/>{character.name}과 대화</button>)}</div>}</div>
               <div className="world-room-summary">
                 <div className="world-room-summary-heading"><strong>인트로</strong><span>{worldRooms.reduce((sum, room) => sum + (roomIntros[room.id]?.length ?? 0), 0)}개</span></div>
                 {worldRooms.length === 0 ? (
@@ -509,6 +509,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
                       <div className="world-room-item" key={room.id}>
                         <div className="world-room-main">
                           <span><strong>{room.title}</strong><small>{room.visibility === "PUBLIC" ? "공개" : "비공개"} · 등장인물 {room.cast?.length ?? 0}명 · 인트로 {roomIntros[room.id]?.length ?? 0}개</small></span>
+                          <p className="world-room-cast-names">포켓 등장인물 · {room.cast?.length ? room.cast.map((item) => item.characterName).join(" · ") : "없음"}</p>
                           <div className="world-intro-list">
                             {(roomIntros[room.id] ?? []).map((intro) => (
                               <div className="world-intro-item" key={intro.id}>
@@ -573,6 +574,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
       {pocketSetup && <div className="world-dialog-backdrop" onMouseDown={() => !pocketBusy && setPocketSetup(null)}><div className="world-pocket-dialog" onMouseDown={(event) => event.stopPropagation()}>
         {!pocketSetup.choosingProfile ? <>
           <div className="world-dialog-heading"><div><span className="world-eyebrow">NEW POCKET</span><h2>어디서 시작할까요?</h2><p>{pocketSetup.room.title}</p></div><button type="button" onClick={() => setPocketSetup(null)} aria-label="닫기"><X size={18}/></button></div>
+          <p className="world-room-cast-names">포켓 등장인물 · {pocketSetup.room.cast?.length ? pocketSetup.room.cast.map((item) => item.characterName).join(" · ") : "없음"}</p>
           <div className="world-pocket-intros">
             {(roomIntros[pocketSetup.room.id] ?? []).map((intro) => <button className={pocketSetup.intro?.id === intro.id ? "selected" : ""} key={intro.id} type="button" onClick={() => setPocketSetup((current) => ({ ...current, intro }))}><strong>{intro.title}</strong><span>{intro.content}</span></button>)}
           </div>

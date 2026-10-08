@@ -14,6 +14,7 @@ public record CharacterResponse(
         String background,
         String appearance,
         String modelUrl,
-        Double modelHeight
+        Double modelHeight,
+        Long worldId
 ) {
 }
