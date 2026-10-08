@@ -1,0 +1,17 @@
+[Unit]
+Description=PocketMM private test server
+After=network.target
+
+[Service]
+Type=simple
+User=pocketmm
+Group=pocketmm
+WorkingDirectory=/opt/pocketmm
+EnvironmentFile=/etc/pocketmm/pocketmm.env
+ExecStart=/usr/bin/java -jar /opt/pocketmm/pocketmm.jar
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
