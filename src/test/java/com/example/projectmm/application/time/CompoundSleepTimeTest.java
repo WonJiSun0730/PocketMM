@@ -60,4 +60,31 @@ class CompoundSleepTimeTest {
         var result = interpreter.interpret("3일 후, 오후 13시에 잠들어 6시간 잤다", now);
         assertThat(result.matched()).isFalse();
     }
+
+    @Test
+    void pastedNarrationMarkupAndAdditionalSleepKeepTheDate() {
+        var before = LocalDateTime.of(2026, 10, 8, 15, 30);
+        var sleep = interpreter.interpret("*3일 후, 오후 3시에 잠들어 6시간 잤다.*", before);
+        assertThat(sleep.timeChange().newTime()).isEqualTo(LocalDateTime.of(2026, 10, 11, 21, 0));
+        var extra = interpreter.interpret("*이후 6시간 더 잤다.*", sleep.timeChange().newTime());
+        assertThat(extra.timeChange().newTime()).isEqualTo(LocalDateTime.of(2026, 10, 12, 3, 0));
+        verifyNoInteractions(parser);
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = {"**이후 6시간 더 잤다.**", "_이후 6시간 더 잤다._", "이후 6시간 더 잤다."})
+    void formattingDoesNotChangeCompletedSleep(String input) {
+        var result = interpreter.interpret(input, now);
+        assertThat(result.timeChange().newTime()).isEqualTo(now.plusHours(6));
+        verifyNoInteractions(parser);
+    }
+
+    @Test
+    void addedApproximateSleepIsBoundedAndPlansAreNotCompleted() {
+        String input = "*이후 6시간정도 더 잤다.*";
+        var result = interpreter.interpret(input, now);
+        assertThat(result.timeChange().newTime()).isBetween(now.plusHours(6).minusMinutes(10), now.plusHours(6).plusMinutes(10));
+        assertThat(interpreter.interpret(input, now)).isEqualTo(result);
+        assertThat(interpreter.interpret("*이후 6시간 더 잘 계획이다.*", now).matched()).isFalse();
+    }
 }

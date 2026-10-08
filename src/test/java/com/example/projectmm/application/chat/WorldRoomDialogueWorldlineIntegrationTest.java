@@ -211,7 +211,7 @@ class WorldRoomDialogueWorldlineIntegrationTest {
         var session = sessionService.start(room.getId(), member.getLoginId(), null, intro.getId());
         var before = session.getSimulatedAt();
 
-        when(gateway.generateWorldRoomTurn(any(), contains("Continue the current scene naturally")))
+        when(gateway.generateWorldRoomTurn(any(), contains("developed story beat")))
                 .thenReturn(new WorldRoomTurn(
                         "*식사를 마친 뒤 일행은 역까지 걸어간다.*",
                         WorldRoomCastChange.none(),
@@ -428,6 +428,22 @@ class WorldRoomDialogueWorldlineIntegrationTest {
                         && prompt.contains("without controlling the player character")
                         && prompt.contains("Do not invent any player dialogue"))
         );
+
+        var reply = messages.findTop50BySessionIdOrderByIdDesc(session.getId()).stream()
+                .filter(message -> message.getRole() == ChatRole.CHARACTER).findFirst().orElseThrow();
+        dialogueService.reroll(session.getId(), reply.getId());
+        verify(gateway, times(2)).generateWorldRoomTurn(
+                argThat(context -> context != null && context.noControlPlayer()),
+                contains("without controlling the player character"));
+
+        sessionService.updatePocketSettings(session.getId(), member.getLoginId(), "", "", false);
+        when(gateway.generateWorldRoomTurn(argThat(context -> context != null && !context.noControlPlayer()), anyString()))
+                .thenReturn(new WorldRoomTurn("*플레이어도 대화에 참여한다.*", WorldRoomCastChange.none(), List.of(), 30));
+        dialogueService.reroll(session.getId(), reply.getId());
+        verify(gateway).generateWorldRoomTurn(
+                argThat(context -> context != null && !context.noControlPlayer()),
+                argThat(prompt -> prompt.contains("natural spoken contributions")
+                        && !prompt.contains("without controlling the player character")));
     }
 
     @Test

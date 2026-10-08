@@ -12,6 +12,12 @@ import java.util.regex.Pattern;
 @Component
 public class RuleBasedTimeInterpreter implements TimeInterpreter {
 
+    private static final Pattern NARRATION_WRAPPER = Pattern.compile("^(\\*{1,3}|_{1,3})([\\s\\S]+)\\1$");
+    private static final Pattern COMPLETED_SLEEP_PATTERN = Pattern.compile(
+            "^(?:(?:이후|그\\s*뒤|그리고|다시)\\s*[,，]?\\s*)?"
+                    + "([0-9]+|한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\\s*(시간|분)"
+                    + "\\s*(정도|쯤|가량)?\\s*(?:더\\s*)?(?:잤다|자고\\s*깼다|잔\\s*것\\s*같다)\\s*[.!]?$");
+
     // A complete sequence must be interpreted before any partial date/day-part rule.
     private static final Pattern DATED_SLEEP_PATTERN = Pattern.compile(
             "^\\s*([0-9]+|한|두|세|네)\\s*일\\s*(?:후|뒤)(?:의)?[\\s,]*"
@@ -63,6 +69,14 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
             return TimeInterpretation.noMatch();
         }
 
+        // Asterisks are the product's narration syntax, not part of the temporal statement.
+        userInput = userInput.trim();
+        Matcher wrapper = NARRATION_WRAPPER.matcher(userInput);
+        while (wrapper.matches()) {
+            userInput = wrapper.group(2).trim();
+            wrapper = NARRATION_WRAPPER.matcher(userInput);
+        }
+
         Matcher sleep = DATED_SLEEP_PATTERN.matcher(userInput);
         if (sleep.matches()) {
             return interpretDatedSleep(sleep, currentTime);
@@ -76,6 +90,25 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
         if (userInput.contains("잠들")
                 || userInput.matches("(?s).*(?:약속|예정|만나기로|기억|회상|일 전|일\\s*후에).*")) {
             return TimeInterpretation.noMatch();
+        }
+
+        Matcher completedSleep = COMPLETED_SLEEP_PATTERN.matcher(userInput);
+        if (completedSleep.matches()) {
+            long amount;
+            try { amount = parseAmount(completedSleep.group(1)); }
+            catch (NumberFormatException invalidAmount) { return TimeInterpretation.noMatch(); }
+            if (amount < 1 || amount > 10000) return TimeInterpretation.noMatch();
+            long minutes = "시간".equals(completedSleep.group(2)) ? amount * 60 : amount;
+            boolean approximate = completedSleep.group(3) != null || userInput.matches("(?s).*것\\s*같다.*");
+            long actualMinutes = minutes;
+            if (approximate) {
+                int margin = (int) Math.min(10, Math.max(1, minutes / 20));
+                int adjustment = Math.floorMod((currentTime + "|" + userInput).hashCode(), margin * 2 + 1) - margin;
+                actualMinutes = Math.max(1, minutes + adjustment);
+            }
+            return TimeInterpretation.matched(TimeInterpretation.Interpreter.RULE,
+                    approximate ? TimePrecision.APPROXIMATE : TimePrecision.EXACT,
+                    TimeChange.changed(currentTime, currentTime.plusMinutes(actualMinutes), userInput, minutes));
         }
 
         Matcher elapsedDurationMatcher =

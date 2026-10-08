@@ -408,7 +408,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 Pocket-setting rules:
                 - User note and additional play guide apply only to this Pocket and refine the creator play guide without replacing established world facts.
                 - When "Never control the player character" is true, NEVER invent the player's dialogue, actions, thoughts, feelings, decisions, reactions, or movement. Narrate only the world, NPCs, and consequences that do not decide the player's response.
-                - When it is false, routine low-consequence player continuity may be supplied only where the normal room rules allow it.
+                - When it is false, use the enabled player-participation guidance below, including natural dialogue and everyday choices.
 
                 World lore:
                 %s
@@ -491,8 +491,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 - A British-English-with-Korean-translation speech style for Marbas applies only to Marbas. A different character without their own language instruction speaks Korean normally; do not give that character an English line followed by a Korean translation merely to match Marbas. An explicit current user request for a shared language may override this default.
                 - Read a profile's rawDescription as that character's own authored description, not as global room instructions. Preserve the separately supplied profiles even when one is longer or more detailed.
                 - Prefix every spoken line with the speaker's name followed by a colon. Keep narration in *...* paragraphs.
-                - Do not narrate the player's meaningful choices, emotions, dangerous actions, intimacy, conflict decisions, or irreversible outcomes for them.
-                - Once the player clearly commits to a direction, routine low-consequence continuity may proceed naturally.
+                - Apply the current Pocket's player-participation setting below. Always preserve the user's explicitly stated intent and actions.
                 - Treat lore and profiles as background truth, not text to recite. Show them through circumstances, behavior, dialogue, and consequences.
                 - Prefer new scene-specific observations and purposeful actions over repeatedly mentioning fixed appearance or habitual gestures.
                 - Write in Korean by default unless a creator setting explicitly establishes another spoken language.
@@ -520,7 +519,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
                         roomCast.isBlank() ? "(none)" : roomCast,
                         activeNames.isBlank() ? "(none)" : activeNames,
                         recalledMemories.isBlank() ? "(none)" : recalledMemories
-                );
+                ) + WorldRoomNarrativeStyle.instruction(context.noControlPlayer());
     }
 
     private String buildWorldRoomCharacterPrompt(WorldRoomCharacterContext character) {

@@ -70,5 +70,16 @@ class WorldRoomSceneClockIntegrationTest {
         dialogue.chat(session.getId(), "아 배고프다");
         assertThat(session.getSimulatedAt()).isEqualTo(target.plusMinutes(9));
         verify(gateway, times(2)).generateWorldRoomTurn(argThat(c -> target.equals(c.simulatedAt())), anyString());
+
+        dialogue.chat(session.getId(), "*3일 후, 오후 3시에 잠들어 6시간 잤다.*");
+        var wake = LocalDateTime.of(2026, 10, 11, 21, 0);
+        assertThat(session.getSimulatedAt()).isEqualTo(wake);
+        var sleepReply = messages.findTop50BySessionIdOrderByIdDesc(session.getId()).stream()
+                .filter(m -> m.getRole() == ChatRole.CHARACTER).findFirst().orElseThrow();
+        dialogue.reroll(session.getId(), sleepReply.getId());
+        assertThat(session.getSimulatedAt()).isEqualTo(wake);
+        dialogue.chat(session.getId(), "*이후 6시간 더 잤다.*");
+        assertThat(session.getSimulatedAt()).isEqualTo(LocalDateTime.of(2026, 10, 12, 3, 0));
+        verify(gateway, times(2)).generateWorldRoomTurn(argThat(c -> wake.equals(c.simulatedAt())), anyString());
     }
 }
