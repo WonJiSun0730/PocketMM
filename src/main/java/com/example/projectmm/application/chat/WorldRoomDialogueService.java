@@ -244,9 +244,31 @@ public class WorldRoomDialogueService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "World room message not found. messageId=" + messageId
                 ));
+        // Earlier edits have downstream worldlines; only the latest reply can be
+        // re-evaluated without invalidating subsequent snapshots.
+        boolean latestCharacter = message.getRole() == ChatRole.CHARACTER
+                && !messages.existsBySessionIdAndIdGreaterThan(sessionId, messageId);
+        var variant = message.getRole() == ChatRole.CHARACTER ? selectedVariant(message) : null;
+        if (latestCharacter && variant.getBeforePlayerStateJson() != null) {
+            var currentState = capturePlayerState(sessionId);
+            try {
+                restorePlayerState(sessionId, variant.getBeforePlayerStateJson());
+                var context = contextBuilder.buildSessionBeforeMessage(sessionId, messageId);
+                var analyzed = dialogueGateway.analyzeEditedWorldRoomState(context, content);
+                if (analyzed != null) {
+                    applySceneLocation(sessionId, analyzed);
+                    savePlayerStateSnapshot(variant, variant.getBeforePlayerStateJson(), sessionId);
+                } else {
+                    restorePlayerState(sessionId, currentState);
+                }
+            } catch (Exception extractionFailure) {
+                // A model or extraction error must never prevent saving the edited prose.
+                restorePlayerState(sessionId, currentState);
+            }
+        }
         message.edit(content, now());
-        if (message.getRole() == ChatRole.CHARACTER) {
-            selectedVariant(message).editContent(content);
+        if (variant != null) {
+            variant.editContent(content);
         }
         return message;
     }
