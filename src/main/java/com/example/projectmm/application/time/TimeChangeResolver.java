@@ -39,6 +39,8 @@ public class TimeChangeResolver {
                     case SAME_DAY_PART ->
                             resolveSameDayPart(result, currentTime);
 
+                    case SCENE_TIME -> resolveSceneTime(result, currentTime);
+
                     case UNKNOWN ->
                             currentTime;
                 };
@@ -66,6 +68,8 @@ public class TimeChangeResolver {
             case NEXT_DAY -> Duration.between(currentTime, resolveNextDay(result, currentTime)).toMinutes();
             case SAME_DAY_PART -> result.dayPart() == null ? null
                     : Duration.between(currentTime, applyDayPart(currentTime, result.dayPart())).toMinutes();
+            case SCENE_TIME -> result.targetTime() == null ? null
+                    : Duration.between(currentTime, resolveSceneTime(result, currentTime)).toMinutes();
             case UNKNOWN -> null;
         };
     }
@@ -79,6 +83,16 @@ public class TimeChangeResolver {
             case HOUR -> result.amount() * 60;
             case DAY -> result.amount() * 24 * 60;
         };
+    }
+
+    private LocalDateTime resolveSceneTime(AiTimeParseResult result, LocalDateTime currentTime) {
+        var target = result.targetTime();
+        if (target == null || result.precision() == AiTimeParseResult.TimePrecision.AMBIGUOUS
+                || result.sourceExpression() == null || result.sourceExpression().isBlank()
+                || target.isBefore(currentTime.minusDays(36500))
+                || target.isAfter(currentTime.plusDays(36500))) return currentTime;
+        // Compound events are already resolved into their final clock. Never vary it again.
+        return target.withSecond(0).withNano(0);
     }
 
     private LocalDateTime resolveRelative(
@@ -135,6 +149,11 @@ public class TimeChangeResolver {
             String sourceExpression,
             LocalDateTime currentTime
     ) {
+        if (sourceExpression != null && sourceExpression.matches("(?s).*(?:잤|잔|자고|수면|slept).*")) {
+            int margin = (int) Math.min(10, Math.max(1, baseMinutes / 20));
+            int adjustment = Math.floorMod((currentTime + "|" + sourceExpression).hashCode(), margin * 2 + 1) - margin;
+            return Math.max(1, baseMinutes + adjustment);
+        }
         String seed =
                 currentTime
                         + "|"

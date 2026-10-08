@@ -9,8 +9,15 @@ public record AiTimeParseResult(
         TimePrecision precision,
         Double confidence,
         String sourceExpression,
-        DurationScale durationScale
+        DurationScale durationScale,
+        java.time.LocalDateTime targetTime
 ) {
+
+    public AiTimeParseResult(boolean matched, TimeType type, Long amount, TimeUnit unit, DayPart dayPart,
+                             TimePrecision precision, Double confidence, String sourceExpression,
+                             DurationScale durationScale) {
+        this(matched, type, amount, unit, dayPart, precision, confidence, sourceExpression, durationScale, null);
+    }
 
     public enum DurationScale {
         SHORT, MEDIUM, LONG, UNSPECIFIED
@@ -26,6 +33,7 @@ public record AiTimeParseResult(
         RELATIVE,
         NEXT_DAY,
         SAME_DAY_PART,
+        SCENE_TIME,
         UNKNOWN
     }
 

@@ -46,6 +46,13 @@ public class WorldRoomMessageVariant {
     @Column(columnDefinition = "TEXT")
     private String afterPlayerStateJson;
 
+    @Column(columnDefinition = "TEXT")
+    private String userSceneSetupJson;
+
+    public void captureUserSceneSetup(String json) {
+        this.userSceneSetupJson = json;
+    }
+
     public void capturePlayerStateWorldline(String before, String after) {
         this.beforePlayerStateJson = before;
         this.afterPlayerStateJson = after;

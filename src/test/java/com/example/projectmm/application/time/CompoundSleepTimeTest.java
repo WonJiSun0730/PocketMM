@@ -45,6 +45,17 @@ class CompoundSleepTimeTest {
     }
 
     @Test
+    void subjectAndReportedSleepDoNotLoseTheThreeDayJump() {
+        String input = "3일 후, 수험생 B는 오후 3시에 잠들어 6시간정도 잔 것 같다.";
+        var result = interpreter.interpret(input, now);
+        assertThat(result.precision()).isEqualTo(TimePrecision.APPROXIMATE);
+        assertThat(result.timeChange().newTime()).isBetween(
+                LocalDateTime.of(2026, 1, 11, 20, 50), LocalDateTime.of(2026, 1, 11, 21, 10));
+        assertThat(interpreter.interpret(input, now)).isEqualTo(result);
+        verifyNoInteractions(parser);
+    }
+
+    @Test
     void invalidClockIsNotAppliedAsPartialDateJump() {
         var result = interpreter.interpret("3일 후, 오후 13시에 잠들어 6시간 잤다", now);
         assertThat(result.matched()).isFalse();

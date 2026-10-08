@@ -12,13 +12,13 @@ import java.util.regex.Pattern;
 @Component
 public class RuleBasedTimeInterpreter implements TimeInterpreter {
 
-    // Deliberately narrow complete sequence: date jump, sleep clock, elapsed sleep.
-    // Other sentence shapes retain the existing interpretation path.
+    // A complete sequence must be interpreted before any partial date/day-part rule.
     private static final Pattern DATED_SLEEP_PATTERN = Pattern.compile(
             "^\\s*([0-9]+|한|두|세|네)\\s*일\\s*(?:후|뒤)(?:의)?[\\s,]*"
+                    + "(?:[가-힣A-Za-z0-9 ]{1,40}(?:은|는)\\s*)?"
                     + "(오전|오후)\\s*([0-9]{1,2})시(?:\\s*([0-9]{1,2})분)?\\s*에?\\s*"
                     + "잠들(?:었다가|어|고)\\s*([0-9]+|한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)"
-                    + "\\s*(시간|분)\\s*(정도|쯤|가량)?\\s*(?:자고\\s*깼다|잤다)\\s*[.!]?\\s*$");
+                    + "\\s*(시간|분)\\s*(정도|쯤|가량)?\\s*(?:자고\\s*깼다|잤다|잔\\s*것\\s*같다)\\s*[.!]?\\s*$");
 
     private static final Pattern RELATIVE_TIME_PATTERN =
             Pattern.compile(
@@ -66,6 +66,16 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
         Matcher sleep = DATED_SLEEP_PATTERN.matcher(userInput);
         if (sleep.matches()) {
             return interpretDatedSleep(sleep, currentTime);
+        }
+
+        var clock = SceneClockInterpreter.interpret(userInput, currentTime);
+        if (clock.matched()) return clock;
+
+        // Leave incomplete compound events to the semantic parser instead of accepting
+        // only "3일 후" and silently discarding the bedtime and sleep interval.
+        if (userInput.contains("잠들")
+                || userInput.matches("(?s).*(?:약속|예정|만나기로|기억|회상|일 전|일\\s*후에).*")) {
+            return TimeInterpretation.noMatch();
         }
 
         Matcher elapsedDurationMatcher =
@@ -210,7 +220,7 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
                 .withHour(hour).withMinute(minute).withSecond(0).withNano(0);
         long durationMinutes = "시간".equals(sleep.group(6)) ? amount * 60 : amount;
         LocalDateTime baseline = bedtime.plusMinutes(durationMinutes);
-        boolean approximate = sleep.group(7) != null;
+        boolean approximate = sleep.group(7) != null || sleep.group().matches("(?s).*것\\s*같다.*");
         // Approximation affects only the sleep interval, never the day jump or clock.
         // Bound uncertainty to at most ten minutes and reproduce it on reroll.
         if (approximate) {

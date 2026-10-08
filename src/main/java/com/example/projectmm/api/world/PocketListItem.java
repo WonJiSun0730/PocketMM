@@ -26,7 +26,7 @@ public record PocketListItem(
                 session.getRoom().getWorld().getId(),
                 session.getRoom().getWorld().getName(),
                 session.getIntro().getId(),
-                session.getIntro().getTitle(),
+                session.getInitialSimulatedAt() == null ? session.getIntro().getTitle() : session.getIntroTitleSnapshot(),
                 player == null ? null : player.getId(),
                 player == null ? null : player.getName(),
                 session.getCreatedAt(),

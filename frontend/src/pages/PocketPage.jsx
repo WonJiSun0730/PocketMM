@@ -83,6 +83,7 @@ export default function PocketPage({ pocket, onBack }) {
     inventory: [],
     conditions: [],
   })
+  const [initialScene, setInitialScene] = useState(session.initialScene ?? null)
   const sceneModels = useMemo(() => resolvePocketSceneModels({
     playerProfile: selectedPlayerProfile,
     worldCharacters,
@@ -143,11 +144,12 @@ export default function PocketPage({ pocket, onBack }) {
 
   async function refresh() {
     try {
-      const [loadedMessages, castResponse, systemResponse, worldCharactersResponse] = await Promise.all([
+      const [loadedMessages, castResponse, systemResponse, worldCharactersResponse, sessionResponse] = await Promise.all([
         loadMessagePage(),
         fetch(`${base}/cast`, { credentials: "include" }),
         fetch(`${base}/systems`, { credentials: "include" }),
         fetch(`${base}/characters`, { credentials: "include" }),
+        fetch(`/api/worlds/pockets/${session.id}`, { credentials: "include" }),
       ])
       setMessages(loadedMessages)
       await loadPageVariants(loadedMessages)
@@ -155,6 +157,7 @@ export default function PocketPage({ pocket, onBack }) {
       if (castResponse.ok) setCast(await castResponse.json())
       if (systemResponse.ok) setSystems(await systemResponse.json())
       if (worldCharactersResponse.ok) setWorldCharacters(await worldCharactersResponse.json())
+      if (sessionResponse.ok) setInitialScene((await sessionResponse.json()).initialScene ?? null)
     } catch (e) {
       setError(e.message)
     } finally {
@@ -620,7 +623,8 @@ export default function PocketPage({ pocket, onBack }) {
           {!loading && !hasOlderMessages && <article className="border-b border-border/70 py-7 sm:py-9">
             <p className="mb-4 text-xs font-semibold tracking-[.12em] text-muted-foreground">INTRO · {session.introTitle}</p>
             <RpText text={session.introContent} />
-            <SceneStateMessage state={sceneRuntimeState} />
+            {initialScene?.reference && <p className="mt-4 text-xs text-muted-foreground">초기 상태 참고값 · 현재 인트로 설정 기준</p>}
+            <SceneStateMessage state={initialScene ?? { simulatedAt: "", location: "", inventory: [], conditions: [] }} />
           </article>}
 
           {!loading && messages.map((item, index) => {

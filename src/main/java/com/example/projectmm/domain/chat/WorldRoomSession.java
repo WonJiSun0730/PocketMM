@@ -41,6 +41,32 @@ public class WorldRoomSession {
     @Column(nullable = false)
     private LocalDateTime simulatedAt;
 
+    private LocalDateTime initialSimulatedAt;
+
+    private Boolean initialTimeConfigured;
+    private Boolean initialSceneResolved;
+
+    @Column(length = 100)
+    private String introTitleSnapshot;
+
+    @Column(columnDefinition = "TEXT")
+    private String introContentSnapshot;
+
+    @Column(length = 200)
+    private String initialLocation;
+
+    @ElementCollection
+    @CollectionTable(name = "world_room_session_initial_conditions", joinColumns = @JoinColumn(name = "session_id"))
+    @OrderColumn(name = "sort_order")
+    @Column(name = "condition_text", length = 300)
+    private java.util.List<String> initialConditions = new java.util.ArrayList<>();
+
+    @ElementCollection
+    @CollectionTable(name = "world_room_session_initial_inventory", joinColumns = @JoinColumn(name = "session_id"))
+    @OrderColumn(name = "sort_order")
+    @Column(name = "item_text", length = 300)
+    private java.util.List<String> initialInventory = new java.util.ArrayList<>();
+
     private LocalDateTime lastPresenceAt;
 
     // Null on pre-snapshot pockets; their original room roster remains the fallback.
@@ -81,11 +107,41 @@ public class WorldRoomSession {
         this.intro = intro;
         this.createdAt = at;
         this.simulatedAt = at;
+        this.initialSimulatedAt = at;
+        this.initialTimeConfigured = intro.getInitialSimulatedAt() != null;
+        this.initialSceneResolved = intro.getInitialSimulatedAt() != null && intro.getInitialLocation() != null
+                && !intro.getInitialConditions().isEmpty() && !intro.getInitialInventory().isEmpty();
+        this.introTitleSnapshot = intro.getTitle();
+        this.introContentSnapshot = intro.getContent();
+        this.initialLocation = intro.getInitialLocation();
+        this.initialConditions.addAll(intro.getInitialConditions());
+        this.initialInventory.addAll(intro.getInitialInventory());
         this.lastPresenceAt = at;
     }
 
     public void selectPlayerProfile(PlayerProfile playerProfile) {
         this.playerProfile = playerProfile;
+    }
+
+    public void completeInitialScene(com.example.projectmm.domain.dialogue.WorldRoomInitialScene proposed) {
+        if (!Boolean.FALSE.equals(initialSceneResolved)) return;
+        if (proposed != null) {
+            if (!Boolean.TRUE.equals(initialTimeConfigured) && proposed.simulatedAt() != null) {
+                initialSimulatedAt = proposed.simulatedAt().withSecond(0).withNano(0);
+                simulatedAt = initialSimulatedAt;
+            }
+            if (initialLocation == null && proposed.location() != null && !proposed.location().isBlank()
+                    && proposed.location().trim().length() <= 200) initialLocation = proposed.location().trim();
+            if (initialConditions.isEmpty()) initialConditions.addAll(validInitialItems(proposed.conditions()));
+            if (initialInventory.isEmpty()) initialInventory.addAll(validInitialItems(proposed.inventory()));
+        }
+        initialSceneResolved = true;
+    }
+
+    private java.util.List<String> validInitialItems(java.util.List<String> items) {
+        return items == null ? java.util.List.of() : items.stream()
+                .filter(item -> item != null && !item.isBlank() && item.trim().length() <= 300)
+                .map(String::trim).distinct().limit(50).toList();
     }
 
     public void updateSimulatedAt(LocalDateTime at) {

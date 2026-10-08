@@ -57,6 +57,7 @@ public class WorldRoomDialogueService {
                         "World room session not found. sessionId=" + sessionId
                 ));
 
+        initializeSceneIfNeeded(session, userMessage);
         var userSourceMessage = messages.save(new WorldRoomMessage(
                 session,
                 ChatRole.USER,
@@ -65,16 +66,17 @@ public class WorldRoomDialogueService {
         ));
 
         var beforeTime = session.getSimulatedAt();
-        boolean explicitTimeChanged = applyExplicitTimeChange(session, userMessage);
+        var beforePlayerState = capturePlayerState(sessionId);
+        String sceneSetup = applySceneInstruction(session, userMessage, null);
+        boolean explicitTimeChanged = sceneSetupHasTime(sceneSetup) || applyExplicitTimeChange(session, userMessage);
         var context = contextBuilder.buildSession(sessionId);
         var beforeCast = sessionService.captureCastState(sessionId);
         var beforeSystems = sessionService.captureSystemState(sessionId);
-        var beforePlayerState = capturePlayerState(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
         applySceneLocation(sessionId, generated);
-        if (!explicitTimeChanged) {
+        if (!explicitTimeChanged && sceneSetup == null) {
             applyNarrativeElapsedTime(session, generated.elapsedSeconds());
         }
         var afterCast = sessionService.captureCastState(sessionId);
@@ -96,6 +98,7 @@ public class WorldRoomDialogueService {
         sessionService.saveSystemSnapshot(variant, beforeSystems, afterSystems);
         sessionService.saveTimeSnapshot(variant, beforeTime, session.getSimulatedAt());
         savePlayerStateSnapshot(variant, beforePlayerState, sessionId);
+        variant.captureUserSceneSetup(sceneSetup);
         events.publishEvent(new PocketUserSpeechCommitted(
                 sessionId,
                 userSourceMessage.getId(),
@@ -107,6 +110,69 @@ public class WorldRoomDialogueService {
     }
 
     private record PlayerStateSnapshot(String location, List<String> conditions, List<String> inventory) {}
+
+    private record SceneSetupSnapshot(String source, com.example.projectmm.domain.dialogue.WorldRoomInitialScene scene) {}
+
+    private static final java.util.regex.Pattern STATE_INSTRUCTION = java.util.regex.Pattern.compile(
+            "(?i)\\booc\\b|(?:롤플|롤플레이).*(?:중단|다시|새)|(?:새\\s*(?:상황|장면)).*(?:시작|설정)|(?:장소|소지품|상태|시간|날짜).*(?:만\\s*(?:바꿔|변경)|설정해|수정해)");
+
+    private String applySceneInstruction(com.example.projectmm.domain.chat.WorldRoomSession session, String input, String cached) {
+        if (input == null || !STATE_INSTRUCTION.matcher(input).find()) return null;
+        com.example.projectmm.domain.dialogue.WorldRoomInitialScene proposed = null;
+        if (cached != null) {
+            try {
+                var previous = objectMapper.readValue(cached, SceneSetupSnapshot.class);
+                if (input.equals(previous.source())) proposed = previous.scene();
+            } catch (Exception invalidCache) { /* Request a fresh analysis when a cache is invalid. */ }
+        }
+        if (proposed == null) {
+            String reply = dialogueGateway.setupWorldRoomScene(contextBuilder.buildSession(session.getId()), input);
+            if (reply == null || reply.isBlank()) return null;
+            try {
+                proposed = objectMapper.readValue(reply, com.example.projectmm.domain.dialogue.WorldRoomInitialScene.class);
+            } catch (Exception invalidSetup) { return null; }
+        }
+        if (proposed == null || !("PATCH".equals(proposed.mode()) || "RESET".equals(proposed.mode()))) return null;
+        var state = playerStates.findBySessionId(session.getId())
+                .orElseGet(() -> playerStates.save(new WorldRoomPlayerState(session)));
+        boolean reset = "RESET".equals(proposed.mode());
+        String location = proposed.location();
+        if (location == null || location.isBlank() || location.trim().length() > 200) location = state.getLocation();
+        var inventory = proposed.inventory() == null && !reset ? List.copyOf(state.getInventory()) : validSceneItems(proposed.inventory());
+        var conditions = proposed.conditions() == null && !reset ? List.copyOf(state.getConditions()) : validSceneItems(proposed.conditions());
+        state.update(location, conditions, inventory);
+        if (proposed.simulatedAt() != null) session.updateSimulatedAt(proposed.simulatedAt().withSecond(0).withNano(0));
+        return objectMapper.writeValueAsString(new SceneSetupSnapshot(input, proposed));
+    }
+
+    private List<String> validSceneItems(List<String> values) {
+        return values == null ? List.of() : values.stream()
+                .filter(value -> value != null && !value.isBlank() && value.trim().length() <= 300)
+                .map(String::trim).distinct().limit(50).toList();
+    }
+
+    private boolean sceneSetupHasTime(String setup) {
+        if (setup == null) return false;
+        return objectMapper.readValue(setup, SceneSetupSnapshot.class).scene().simulatedAt() != null;
+    }
+
+    private void initializeSceneIfNeeded(com.example.projectmm.domain.chat.WorldRoomSession session, String openingMessage) {
+        if (!Boolean.FALSE.equals(session.getInitialSceneResolved())) return;
+        String reply = dialogueGateway.initializeWorldRoomScene(contextBuilder.buildSession(session.getId()),
+                !Boolean.TRUE.equals(session.getInitialTimeConfigured()), openingMessage);
+        com.example.projectmm.domain.dialogue.WorldRoomInitialScene proposed = null;
+        if (reply != null && !reply.isBlank()) {
+            try {
+                proposed = objectMapper.readValue(reply, com.example.projectmm.domain.dialogue.WorldRoomInitialScene.class);
+            } catch (Exception invalidSetup) {
+                // Keep the supplied initial values and provisional time when AI setup is malformed.
+            }
+        }
+        session.completeInitialScene(proposed);
+        var state = playerStates.findBySessionId(session.getId())
+                .orElseGet(() -> playerStates.save(new WorldRoomPlayerState(session)));
+        state.update(session.getInitialLocation(), session.getInitialConditions(), session.getInitialInventory());
+    }
 
     private String capturePlayerState(Long sessionId) {
         var state = playerStates.findBySessionId(sessionId).orElse(null);
@@ -177,7 +243,10 @@ public class WorldRoomDialogueService {
             session.updateSimulatedAt(change.newTime());
             return true;
         }
-        return false;
+        // An exact current-time confirmation can legitimately leave the clock unchanged.
+        // It still establishes the endpoint of this turn, so never append AI elapsed time.
+        return interpretation.precision() == com.example.projectmm.domain.time.AiTimeParseResult.TimePrecision.EXACT
+                && change.expectedElapsedMinutes() != null && change.expectedElapsedMinutes() == 0L;
     }
 
     private void applyNarrativeElapsedTime(
@@ -197,6 +266,7 @@ public class WorldRoomDialogueService {
                         "World room session not found. sessionId=" + sessionId
                 ));
 
+        initializeSceneIfNeeded(session, null);
         var context = contextBuilder.buildSession(sessionId);
         var beforeCast = sessionService.captureCastState(sessionId);
         var beforeSystems = sessionService.captureSystemState(sessionId);
@@ -333,14 +403,16 @@ public class WorldRoomDialogueService {
         var beforeTime = sessionService.captureSimulatedAt(sessionId);
         var beforePlayerState = capturePlayerState(sessionId);
         var rerollSession = sessions.findById(sessionId).orElseThrow();
-        boolean explicitTimeChanged = precedingMessage != null && precedingMessage.getRole() == ChatRole.USER
-                && applyExplicitTimeChange(rerollSession, rerollBase);
+        String sceneSetup = applySceneInstruction(rerollSession, rerollBase, selected.getUserSceneSetupJson());
+        boolean explicitTimeChanged = sceneSetupHasTime(sceneSetup)
+                || (precedingMessage != null && precedingMessage.getRole() == ChatRole.USER
+                && applyExplicitTimeChange(rerollSession, rerollBase));
         var context = contextBuilder.buildSessionBeforeMessage(sessionId, target.getId());
         var generated = dialogueGateway.generateWorldRoomTurn(context, rerollPrompt);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
         applySceneLocation(sessionId, generated);
-        if (!explicitTimeChanged) {
+        if (!explicitTimeChanged && sceneSetup == null) {
             applyNarrativeElapsedTime(rerollSession, generated.elapsedSeconds());
         }
         var afterCast = sessionService.captureCastState(sessionId);
@@ -357,6 +429,7 @@ public class WorldRoomDialogueService {
         sessionService.saveSystemSnapshot(variant, beforeSystems, afterSystems);
         sessionService.saveTimeSnapshot(variant, beforeTime, sessionService.captureSimulatedAt(sessionId));
         savePlayerStateSnapshot(variant, beforePlayerState, sessionId);
+        variant.captureUserSceneSetup(sceneSetup);
         target.selectVariant(variantNo, generated.reply());
 
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
@@ -392,13 +465,14 @@ public class WorldRoomDialogueService {
         var beforeSystems = sessionService.captureSystemState(sessionId);
         var beforeTime = sessionService.captureSimulatedAt(sessionId);
         var beforePlayerState = capturePlayerState(sessionId);
-        boolean explicitTimeChanged = applyExplicitTimeChange(session, userMessage.getContent());
+        String sceneSetup = applySceneInstruction(session, userMessage.getContent(), selected.getUserSceneSetupJson());
+        boolean explicitTimeChanged = sceneSetupHasTime(sceneSetup) || applyExplicitTimeChange(session, userMessage.getContent());
         var context = contextBuilder.buildSession(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage.getContent());
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
         applySceneLocation(sessionId, generated);
-        if (!explicitTimeChanged) {
+        if (!explicitTimeChanged && sceneSetup == null) {
             applyNarrativeElapsedTime(session, generated.elapsedSeconds());
         }
         var afterCast = sessionService.captureCastState(sessionId);
@@ -420,6 +494,7 @@ public class WorldRoomDialogueService {
         sessionService.saveSystemSnapshot(variant, beforeSystems, afterSystems);
         sessionService.saveTimeSnapshot(variant, beforeTime, session.getSimulatedAt());
         savePlayerStateSnapshot(variant, beforePlayerState, sessionId);
+        variant.captureUserSceneSetup(sceneSetup);
 
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
     }

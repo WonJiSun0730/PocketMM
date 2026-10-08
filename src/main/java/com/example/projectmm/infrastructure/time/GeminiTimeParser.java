@@ -146,6 +146,7 @@ public class GeminiTimeParser implements AiTimeParser {
                   "precision": "APPROXIMATE",
                   "durationScale": "UNSPECIFIED",
                   "dayPart": null,
+                  "targetTime": null,
                   "confidence": 0.95,
                   "sourceExpression": "두 시간 뒤"
                 }
@@ -159,6 +160,7 @@ public class GeminiTimeParser implements AiTimeParser {
                 - RELATIVE
                 - NEXT_DAY
                 - SAME_DAY_PART
+                - SCENE_TIME
                 - UNKNOWN
 
                 Allowed unit values:
@@ -179,7 +181,19 @@ public class GeminiTimeParser implements AiTimeParser {
                 - Do not treat hypothetical future events as progression.
                 - Do not treat schedules or plans as progression.
                 - Do not treat quoted speech about time as progression.
-                - Do not return an absolute date or absolute time.
+                - Use SCENE_TIME when the current scene's final clock is explicitly stated,
+                  or a compound transition combines a day jump, clock, and elapsed activity.
+                  Return targetTime as an ISO local date-time, e.g. "2026-10-08T15:25:00".
+                  Resolve every event in narrative order; never ignore the day jump.
+                  Set amount/unit/dayPart to null for SCENE_TIME. For all other types targetTime=null.
+                - "다시 상담소에 돌아오니 3시 25분이다" establishes the current clock;
+                  retain the current date and infer omitted AM/PM from the current scene.
+                - "상담은 3시 반이다" is an appointment, not the current clock: matched=false.
+                - "3일 후, 수험생 B는 오후 3시에 잠들어 6시간정도 잔 것 같다" means
+                  move forward three days, set bedtime to 15:00, then add roughly six hours.
+                  Return that day's 21:00 as the approximate baseline, never just a day part.
+                - Explicit final clock readings override estimates of how long earlier activities took.
+                - A reported current clock equal to the server clock is still matched=true, EXACT.
                 - RELATIVE means a duration passes from the current scene.
                 - NEXT_DAY means the scene moves to the following day.
                 - SAME_DAY_PART means the scene moves forward to a later
@@ -316,7 +330,8 @@ public class GeminiTimeParser implements AiTimeParser {
                             AiTimeParseResult.DurationScale.class,
                             nullableText(result, "durationScale"),
                             AiTimeParseResult.DurationScale.UNSPECIFIED
-                    )
+                    ),
+                    parseTargetTime(nullableText(result, "targetTime"))
             );
 
         } catch (Exception e) {
@@ -340,6 +355,15 @@ public class GeminiTimeParser implements AiTimeParser {
             );
         } catch (IllegalArgumentException e) {
             return fallback;
+        }
+    }
+
+    private LocalDateTime parseTargetTime(String value) {
+        if (value == null) return null;
+        try {
+            return LocalDateTime.parse(value);
+        } catch (java.time.format.DateTimeParseException invalidTime) {
+            return null;
         }
     }
 

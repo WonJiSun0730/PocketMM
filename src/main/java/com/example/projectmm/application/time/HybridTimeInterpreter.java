@@ -15,7 +15,7 @@ public class HybridTimeInterpreter implements TimeInterpreter {
             Pattern.compile(
                     "(시간|날|하루|아침|오전|점심|낮|오후|저녁|밤|"
                             + "뒤|후|지나|흐르|다음|이튿|잠시|잠깐|"
-                            + "곧|나중|한참|며칠|몇\\s*시간)"
+                            + "곧|나중|한참|며칠|몇\\s*시간|[0-9]{1,2}\\s*시|[0-9]{1,2}:[0-9]{2}|기다렸|기다렸다)"
             );
 
     private final RuleBasedTimeInterpreter ruleBasedTimeInterpreter;

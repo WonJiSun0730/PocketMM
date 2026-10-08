@@ -179,8 +179,8 @@ public class WorldRoomContextBuilder {
                                 session.getPlayerProfile().getName(),
                                 session.getPlayerProfile().getDescription()
                         ),
-                session.getIntro().getTitle(),
-                session.getIntro().getContent(),
+                session.getInitialSimulatedAt() == null ? session.getIntro().getTitle() : session.getIntroTitleSnapshot(),
+                session.getInitialSimulatedAt() == null ? session.getIntro().getContent() : session.getIntroContentSnapshot(),
                 recentMessages.stream()
                         .map(message -> new DialogueMessageContext(
                                 message.getRole(),

@@ -34,6 +34,37 @@ class WorldRoomSessionIntegrationTest {
     @Autowired WorldRoomIntroRepository intros;
     @Autowired WorldSystemRepository systems;
     @Autowired WorldRoomSessionCastRepository sessionCasts;
+    @Autowired jakarta.persistence.EntityManager entityManager;
+    @Autowired com.example.projectmm.domain.chat.WorldRoomSessionRepository sessionRepository;
+
+    @Test
+    void initialIntroAndSceneAreStoredIndependentlyOfProgressAndLaterIntroEdits() {
+        var encoder = mock(PasswordEncoder.class);
+        when(encoder.encode("password")).thenReturn("encoded");
+        var member = members.save(Member.createLocal("initial", "password", "Initial", "initial@example.test", encoder));
+        var world = worlds.save(new World(member, "TestWorld", "A world"));
+        var at = LocalDateTime.of(2026, 10, 8, 15, 5);
+        var room = rooms.save(new WorldConversation(world, member, "Room", WorldConversation.Visibility.PRIVATE, at));
+        var intro = intros.save(new WorldRoomIntro(room, "Free start", "Start freely", 0, at, "대기실",
+                java.util.List.of("피곤함"), java.util.List.of("노트")));
+        var session = sessions.start(room.getId(), member.getLoginId(), null, intro.getId());
+        session.updateSimulatedAt(at.plusMinutes(32));
+        intro.update("New intro", "Changed", 0, at.plusDays(10), "학교", java.util.List.of(), java.util.List.of("가방"));
+        entityManager.flush();
+        entityManager.clear();
+        var loaded = sessionRepository.findById(session.getId()).orElseThrow();
+        var response = com.example.projectmm.api.world.WorldRoomSessionResponse.from(loaded);
+        assertThat(response.introTitle()).isEqualTo("Free start");
+        assertThat(response.introContent()).isEqualTo("Start freely");
+        assertThat(response.simulatedAt()).isEqualTo(at.plusMinutes(32));
+        assertThat(response.initialScene().simulatedAt()).isEqualTo(at);
+        assertThat(response.initialScene().location()).isEqualTo("대기실");
+        assertThat(response.initialScene().conditions()).containsExactly("피곤함");
+        assertThat(response.initialScene().inventory()).containsExactly("노트");
+        sessions.deletePocket(loaded.getId(), member.getLoginId());
+        entityManager.flush();
+        assertThat(sessionRepository.findById(loaded.getId())).isEmpty();
+    }
 
     @Test
     void victorianSessionStartsWithSelectedIntroNoActiveCastAndInitialSystemValue() {

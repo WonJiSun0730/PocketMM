@@ -16,6 +16,20 @@ class GeminiTimeParserTest {
     private final GeminiTimeParser parser = new GeminiTimeParser("test-key", "test-model", mapper);
 
     @Test
+    void readsExplicitSceneClockAndRejectsMalformedTarget() {
+        for (String target : List.of("2026-10-08T15:25:00", "invalid")) {
+            String json = "{\"matched\":true,\"type\":\"SCENE_TIME\",\"precision\":\"EXACT\","
+                    + "\"confidence\":0.95,\"sourceExpression\":\"3시 25분이다\",\"targetTime\":\"" + target + "\"}";
+            String response = mapper.writeValueAsString(Map.of("candidates", List.of(
+                    Map.of("content", Map.of("parts", List.of(Map.of("text", json)))))));
+            AiTimeParseResult result = ReflectionTestUtils.invokeMethod(parser, "parseResponse", response);
+            assertThat(result.type()).isEqualTo(AiTimeParseResult.TimeType.SCENE_TIME);
+            if (target.equals("invalid")) assertThat(result.targetTime()).isNull();
+            else assertThat(result.targetTime()).isEqualTo(java.time.LocalDateTime.of(2026, 10, 8, 15, 25));
+        }
+    }
+
+    @Test
     void readsScaleWithoutNumericDuration() {
         var result = parse("\"durationScale\":\"LONG\",");
         assertThat(result.matched()).isTrue();
