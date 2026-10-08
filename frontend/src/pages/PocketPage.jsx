@@ -440,6 +440,7 @@ export default function PocketPage({ pocket, onBack }) {
       <section className="shrink-0 border-b bg-muted/10 px-4 py-3 sm:px-6">
         {sceneModels.ready
           ? <PocketScene
+              sessionId={session.id}
               simulatedAt={sceneRuntimeState.simulatedAt}
               location={sceneRuntimeState.location}
               playerModel={sceneModels.playerModel}
