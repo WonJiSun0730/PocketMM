@@ -70,6 +70,11 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                 - locationChange is the final physical location at the end of YOUR reply, only if it explicitly changes.
                 - Use an empty string when location is unchanged or uncertain.
                 - Do not infer travel from plans, wishes, hypotheticals, or quoted dialogue.
+                Player-state delta rules:
+                - addedConditions/removedConditions describe explicit changes to the player character's conditions only.
+                - addedInventory/removedInventory describe explicit acquisition, loss or consumption of player possessions only.
+                - Never infer ownership from seeing, touching, mentioning, or planning to acquire an object.
+                - Do not modify NPC state or inventory. Return empty arrays for unchanged or uncertain items.
                 World-system change rules:
                 - Current session world-system values are authoritative.
                 - Return deltas only and use only supplied systemId values.
@@ -121,9 +126,13 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                                 )
                         ),
                         "elapsedSeconds", Map.of("type", "integer", "minimum", 0, "maximum", 604800),
-                        "locationChange", Map.of("type", "string")
+                        "locationChange", Map.of("type", "string"),
+                        "addedConditions", Map.of("type", "array", "items", Map.of("type", "string")),
+                        "removedConditions", Map.of("type", "array", "items", Map.of("type", "string")),
+                        "addedInventory", Map.of("type", "array", "items", Map.of("type", "string")),
+                        "removedInventory", Map.of("type", "array", "items", Map.of("type", "string"))
                 ),
-                "required", List.of("reply", "enterCharacterIds", "leaveCharacterIds", "systemChanges", "elapsedSeconds", "locationChange")
+                "required", List.of("reply", "enterCharacterIds", "leaveCharacterIds", "systemChanges", "elapsedSeconds", "locationChange", "addedConditions", "removedConditions", "addedInventory", "removedInventory")
         );
 
         Map<String, Object> request = Map.of(
@@ -191,11 +200,26 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                     ),
                     readSystemChanges(turn.path("systemChanges"), context),
                     readElapsedSeconds(turn.path("elapsedSeconds")),
-                    turn.path("locationChange").asText("")
+                    turn.path("locationChange").asText(""),
+                    readStringArray(turn.path("addedConditions")),
+                    readStringArray(turn.path("removedConditions")),
+                    readStringArray(turn.path("addedInventory")),
+                    readStringArray(turn.path("removedInventory"))
             );
         } catch (Exception e) {
             throw new IllegalStateException("Failed to parse OpenAI Pocket response", e);
         }
+    }
+
+    private List<String> readStringArray(JsonNode node) {
+        if (!node.isArray()) return List.of();
+        List<String> values = new ArrayList<>();
+        for (JsonNode item : node) {
+            if (item.isTextual() && !item.asText().isBlank() && item.asText().length() <= 300 && values.size() < 20) {
+                values.add(item.asText().trim());
+            }
+        }
+        return values;
     }
 
     private long readElapsedSeconds(JsonNode node) {
