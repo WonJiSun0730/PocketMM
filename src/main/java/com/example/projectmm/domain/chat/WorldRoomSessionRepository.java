@@ -18,5 +18,6 @@ public interface WorldRoomSessionRepository extends JpaRepository<WorldRoomSessi
             Long memberId
     );
     List<WorldRoomSession> findByMemberIdOrderBySimulatedAtDescIdDesc(Long memberId);
+    List<WorldRoomSession> findByRoomIdOrderByCreatedAtDescIdDesc(Long roomId);
     void deleteByRoomId(Long roomId);
 }
