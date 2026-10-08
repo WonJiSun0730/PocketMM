@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import * as THREE from "three"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { VRMLoaderPlugin } from "@pixiv/three-vrm"
+import { resolvePocketScene } from "@/lib/pocketSceneRegistry"
 
 export default function PocketScene({ className = "", simulatedAt = "", location = "", playerModel = null, characterModels = [] }) {
   const hostRef = useRef(null)
@@ -16,14 +17,15 @@ export default function PocketScene({ className = "", simulatedAt = "", location
 
     let disposed = false
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color(0x171821)
+    const preset = resolvePocketScene(location)
+    scene.background = new THREE.Color(preset.backdrop)
 
     // Runtime hooks are intentionally simple for the first linkage pass.
     // Scene selection comes next; for now location is exposed to the renderer
     // and authoritative Pocket time drives the room's daypart.
     const hour = simulatedAt ? Number(simulatedAt.slice(11, 13)) : 12
     const daypart = hour >= 6 && hour < 17 ? "day" : hour < 21 ? "evening" : "night"
-    scene.userData.runtime = { simulatedAt, location, daypart }
+    scene.userData.runtime = { simulatedAt, location, daypart, sceneId: preset.id }
 
     const camera = new THREE.OrthographicCamera(-4, 4, 2.25, -2.25, 0.1, 100)
     // Fixed side-on stage view: keep the room depth for distant scenery.
@@ -142,7 +144,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     }
 
     const floorTexture = makePixelTexture(32, 32, (ctx, w, h) => {
-      ctx.fillStyle = "#76533c"
+      ctx.fillStyle = `#${preset.floor.toString(16).padStart(6, "0")}`
       ctx.fillRect(0, 0, w, h)
       for (let y = 0; y < h; y += 8) {
         ctx.fillStyle = y % 16 === 0 ? "#8a6347" : "#684733"
@@ -154,7 +156,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     }, 4, 3)
 
     const wallTexture = makePixelTexture(24, 24, (ctx, w, h) => {
-      ctx.fillStyle = "#d8c9ae"
+      ctx.fillStyle = `#${preset.wall.toString(16).padStart(6, "0")}`
       ctx.fillRect(0, 0, w, h)
       ctx.fillStyle = "#c8b99e"
       for (const [x, y] of [[3,4],[16,2],[8,13],[20,17],[2,21],[13,8]]) {
