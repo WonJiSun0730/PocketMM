@@ -197,7 +197,11 @@ public class WorldController {
                 authentication.getName(),
                 request.title(),
                 request.content(),
-                request.sortOrder()
+                request.sortOrder(),
+                request.initialSimulatedAt(),
+                request.initialLocation(),
+                request.initialConditions(),
+                request.initialInventory()
         ));
     }
 
@@ -217,7 +221,11 @@ public class WorldController {
                 authentication.getName(),
                 request.title(),
                 request.content(),
-                request.sortOrder()
+                request.sortOrder(),
+                request.initialSimulatedAt(),
+                request.initialLocation(),
+                request.initialConditions(),
+                request.initialInventory()
         ));
     }
 
