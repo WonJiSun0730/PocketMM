@@ -148,9 +148,13 @@ public class GeminiDialogueGateway implements DialogueGateway {
                                   "enterCharacterIds": [],
                                   "leaveCharacterIds": [],
                                   "systemChanges": [],
-                                  "elapsedSeconds": 0
+                                  "elapsedSeconds": 0,
+                                  "locationChange": ""
                                 }
 
+                                Scene-location change rules:
+                                - locationChange is the final physical location only when the generated reply clearly changes it.
+                                - Use an empty string if unchanged or uncertain; plans and hypothetical travel do not count.
                                 Narrative-time rules:
                                 - elapsedSeconds is the amount of in-story time that actually passes during YOUR generated reply.
                                 - Estimate it from the narrated events, not from token count or response length.
@@ -247,7 +251,8 @@ public class GeminiDialogueGateway implements DialogueGateway {
                             readLongArray(turn.path("leaveCharacterIds"))
                     ),
                     readWorldRoomSystemChanges(turn.path("systemChanges"), context),
-                    readElapsedSeconds(turn.path("elapsedSeconds"))
+                    readElapsedSeconds(turn.path("elapsedSeconds")),
+                    turn.path("locationChange").asText("")
             );
         } catch (Exception e) {
             throw new IllegalStateException("Failed to parse world room dialogue response", e);
