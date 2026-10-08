@@ -38,6 +38,9 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
                             + "한참|얼마간|꽤\\s*오래)"
             );
 
+    private static final Pattern DAY_PART_PATTERN =
+            Pattern.compile("(늦은\\s*저녁|이른\\s*저녁|저녁|밤|아침|오전|점심|낮|오후)");
+
     private static final Pattern NEXT_DAY_PATTERN =
             Pattern.compile(
                     "(?:다음\\s*날|다음날|이튿날)(?:\\s*(아침|오전|점심|낮|오후|저녁|밤))?"
@@ -140,6 +143,27 @@ public class RuleBasedTimeInterpreter implements TimeInterpreter {
 
         LocalDateTime newTime =
                 addDuration(currentTime, amount, unit);
+
+        // A date jump and a named time of day form one explicit scene transition.
+        // Only apply a day part for day-sized jumps; "3분 후, 저녁에..." must
+        // not turn a short elapsed duration into an unrelated clock jump.
+        if ("일".equals(unit)) {
+            Matcher dayPartMatcher = DAY_PART_PATTERN.matcher(userInput.substring(matcher.end()));
+            if (dayPartMatcher.find()) {
+                String dayPart = dayPartMatcher.group(1);
+                int hour = switch (dayPart) {
+                    case "아침", "오전" -> 8;
+                    case "점심" -> 12;
+                    case "낮", "오후" -> 15;
+                    case "이른 저녁" -> 18;
+                    case "저녁" -> 19;
+                    case "늦은 저녁" -> 21;
+                    case "밤" -> 22;
+                    default -> newTime.getHour();
+                };
+                newTime = newTime.withHour(hour).withMinute(0).withSecond(0).withNano(0);
+            }
+        }
 
         return TimeInterpretation.matched(
                 TimeInterpretation.Interpreter.RULE,
