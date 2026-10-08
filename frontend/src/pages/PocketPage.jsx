@@ -579,6 +579,7 @@ export default function PocketPage({ pocket, onBack }) {
       <ScrollArea ref={scrollAreaRef} className="min-h-0 flex-1">
         <div className="mx-auto flex w-full max-w-3xl flex-col p-4 pb-32 sm:p-6 sm:pb-36">
           {loading && <p className="py-10 text-center text-sm text-muted-foreground">포켓을 불러오는 중...</p>}
+          {!loading && <SceneStateMessage state={sceneRuntimeState} />}
 
           {!loading && hasOlderMessages && <div ref={historySentinelRef} className="flex min-h-12 items-center justify-center border-b border-border/70 py-3 text-xs text-muted-foreground">
             {loadingOlder
