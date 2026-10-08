@@ -146,6 +146,20 @@ export default function PocketPage({ pocket, onBack }) {
       .catch(() => { if (active) setIsDeveloper(false) })
     return () => { active = false }
   }, [])
+  // Scene rendering must keep receiving runtime state even when the legacy editor is hidden.
+  useEffect(() => {
+    let active = true
+    fetch(`/api/worlds/pockets/${session.id}/player-state`, { credentials: "include" })
+      .then(response => response.ok ? response.json() : null)
+      .then(state => {
+        if (active && state) setSceneRuntimeState({
+          simulatedAt: state.simulatedAt ?? "",
+          location: state.location ?? "",
+        })
+      })
+      .catch(() => {})
+    return () => { active = false }
+  }, [session.id, playerStateRefreshKey])
   useEffect(() => {
     if (!isDeveloper) {
       setMemoryInspector([])
@@ -430,15 +444,14 @@ export default function PocketPage({ pocket, onBack }) {
         </div>
 
       <div>
-        <PocketPlayerStatePanel
+        {isDeveloper && <PocketPlayerStatePanel
           sessionId={session.id}
           onError={setError}
           refreshKey={playerStateRefreshKey}
           onStateChange={state => setSceneRuntimeState({
             simulatedAt: state.simulatedAt,
             location: state.location,
-          })}
-        />
+          })} />}
         <PocketSettingsPanel sessionId={session.id} onError={setError} />
       </div>
 
@@ -610,15 +623,14 @@ export default function PocketPage({ pocket, onBack }) {
         </div>
 
       <div>
-        <PocketPlayerStatePanel
+        {isDeveloper && <PocketPlayerStatePanel
           sessionId={session.id}
           onError={setError}
           refreshKey={playerStateRefreshKey}
           onStateChange={state => setSceneRuntimeState({
             simulatedAt: state.simulatedAt,
             location: state.location,
-          })}
-        />
+          })} />}
         <PocketSettingsPanel sessionId={session.id} onError={setError} />
       </div>
 
