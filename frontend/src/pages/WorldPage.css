@@ -4,6 +4,7 @@
 .world-cast-actions{display:flex;flex-wrap:wrap;gap:6px;margin-left:auto}.world-cast-actions button{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--border);border-radius:8px;background:var(--card);padding:5px 8px;color:var(--foreground);font-size:11px;cursor:pointer}.world-cast-actions button:hover{background:var(--secondary)}
 
 .system-section-label{display:block;margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}
+.system-bounds{grid-template-columns:repeat(3,minmax(0,1fr))}
 
 
 .world-room-summary {

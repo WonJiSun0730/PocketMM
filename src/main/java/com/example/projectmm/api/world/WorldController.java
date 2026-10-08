@@ -103,7 +103,7 @@ public class WorldController {
     }
 
     @PutMapping("/{worldId}/systems")
-    public WorldSystemsResponse replaceSystems(@PathVariable Long worldId, @RequestBody WorldSystemsRequest request, Authentication authentication) {
+    public WorldSystemsResponse replaceSystems(@PathVariable Long worldId, @jakarta.validation.Valid @RequestBody WorldSystemsRequest request, Authentication authentication) {
         return worldSystemService.replace(worldId, request, authentication.getName());
     }
     @GetMapping("/{worldId}/characters")
@@ -674,5 +674,4 @@ public class WorldController {
         return chatService.getRecentWorldMessages(worldId, characterId);
     }
 }
-
 

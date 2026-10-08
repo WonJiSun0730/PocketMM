@@ -35,6 +35,11 @@ public class WorldSystem {
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
+    @Column(nullable = false, columnDefinition = "boolean default false")
+    private boolean archived;
+
+    public void archive() { archived = true; }
+
     public WorldSystem(
             World world,
             String name,

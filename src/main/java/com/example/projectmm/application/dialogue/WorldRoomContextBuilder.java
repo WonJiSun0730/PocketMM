@@ -102,8 +102,9 @@ public class WorldRoomContextBuilder {
                 ))
                 .toList();
 
-        var worldSystems = systems.findByWorldIdOrderBySortOrderAsc(world.getId())
+        var worldSystems = sessionSystemStates.findBySessionIdOrderBySystemSortOrderAscIdAsc(sessionId)
                 .stream()
+                .map(com.example.projectmm.domain.chat.WorldRoomSessionSystemState::getSystem)
                 .map(system -> new DialogueWorldSystem(
                         system.getName(),
                         system.getChangeCondition(),

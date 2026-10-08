@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { ArrowLeft, BookOpen, ChevronRight, MessageCircle, Pencil, Plus, Save, Sparkles, Trash2, Users, X } from "lucide-react"
 
 import PlayerProfilePicker from "@/components/PlayerProfilePicker"
+import { newWorldSystem, prepareWorldSystems } from "@/lib/worldSystemForm"
 import "./WorldPage.css"
 
 const categories = [
@@ -249,13 +250,14 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
     setSavingSystems(true)
     setMessage("")
     try {
+      const preparedSystems = prepareWorldSystems(systems);
       const response = await fetch(`/api/worlds/${selectedWorld.id}/systems`, {
         method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include",
-        body: JSON.stringify({ playGuide, systems }),
+        body: JSON.stringify({ playGuide, systems: preparedSystems }),
       })
       if (!response.ok) {
-        const detail = await response.text()
-        throw new Error(detail || `시스템 저장 실패 (${response.status})`)
+        const detail = await response.json().catch(() => null)
+        throw new Error(detail?.message || `시스템 저장 실패 (${response.status})`)
       }
       const data = await response.json()
       setPlayGuide(data.playGuide ?? "")
@@ -270,7 +272,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
 
   function addSystem() {
     if (systems.length >= 5) return
-    setSystems((current) => [...current, { name: "", changeCondition: "", minValue: 0, maxValue: 100, states: [] }])
+    setSystems((current) => [...current, newWorldSystem()])
   }
 
   function updateSystem(index, field, value) {
@@ -527,7 +529,8 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
                     {systems.map((system, index) => <article className="system-card" key={index}>
                       <div className="system-card-head"><input value={system.name} onChange={(e) => updateSystem(index, "name", e.target.value)} placeholder="시스템 이름 (예: 피에타)" /><button onClick={() => setSystems((current) => current.filter((_, i) => i !== index))} type="button"><X size={16}/></button></div>
                       <label>변동 조건<textarea value={system.changeCondition} onChange={(e) => updateSystem(index, "changeCondition", e.target.value)} placeholder="AI가 이 수치를 언제, 왜, 얼마나 변화시켜야 하는지 적어 주세요." /></label>
-                      <div className="system-bounds"><label>하한<input type="number" value={system.minValue} onChange={(e) => updateSystem(index, "minValue", Number(e.target.value))}/></label><label>상한<input type="number" value={system.maxValue} onChange={(e) => updateSystem(index, "maxValue", Number(e.target.value))}/></label></div>
+                      <div className="system-bounds"><label>하한<input type="number" step="1" value={system.minValue} onChange={(e) => updateSystem(index, "minValue", e.target.value)}/></label><label>상한<input type="number" step="1" value={system.maxValue} onChange={(e) => updateSystem(index, "maxValue", e.target.value)}/></label><label>초기값<input type="number" step="1" value={system.initialValue ?? ""} onChange={(e) => updateSystem(index, "initialValue", e.target.value)}/></label></div>
+                      <p className="text-xs text-muted-foreground">초기값은 새 포켓에 적용됩니다. 기존 포켓의 시스템과 수치는 유지돼요.</p>
                       <div className="system-states"><strong>수치에 따른 상태</strong>{(system.states ?? []).map((state, stateIndex) => <div className="system-state-row" key={stateIndex}><input type="number" value={state.minValue} onChange={(e) => updateSystemState(index,stateIndex,"minValue",Number(e.target.value))}/><span>~</span><input type="number" value={state.maxValue} onChange={(e) => updateSystemState(index,stateIndex,"maxValue",Number(e.target.value))}/><input value={state.label} onChange={(e) => updateSystemState(index,stateIndex,"label",e.target.value)} placeholder="상태 / 설명"/><button type="button" onClick={() => setSystems((current) => current.map((item,i) => i === index ? {...item,states:item.states.filter((_,j)=>j!==stateIndex)} : item))}><X size={14}/></button></div>)}<button className="add-system-state" type="button" onClick={() => addSystemState(index)}><Plus size={14}/> 상태 추가</button></div>
                     </article>)}
                     <button className="add-lore-entry" disabled={systems.length >= 5} onClick={addSystem} type="button"><Plus size={17}/> 시스템 추가 ({systems.length}/5)</button>

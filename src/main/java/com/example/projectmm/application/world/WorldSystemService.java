@@ -33,16 +33,27 @@ public class WorldSystemService {
         World world = owned(worldId, loginId);
         String playGuide = blankToNull(request.playGuide());
         if (playGuide != null && playGuide.length() > 1000) throw new IllegalArgumentException("Play guide must not exceed 1000 characters.");
-        world.updatePlayGuide(playGuide);
-        for (WorldSystem system : systems.findByWorldIdOrderBySortOrderAsc(worldId)) {
-            states.deleteBySystemId(system.getId());
-        }
-        systems.deleteByWorldId(worldId);
-
         List<WorldSystemItem> normalized = new ArrayList<>();
         List<WorldSystemItem> requested = request.systems() == null ? List.of() : request.systems();
         long definedSystemCount = requested.stream().filter(item -> item.name() != null && !item.name().isBlank()).count();
         if (definedSystemCount > 5) throw new IllegalArgumentException("World systems must not exceed 5.");
+        // Validate the entire request before replacing definitions or changing the play guide.
+        for (WorldSystemItem item : requested) {
+            if (item.name() == null || item.name().isBlank()) continue;
+            if (item.name().trim().length() > 100) throw new IllegalArgumentException("System name must not exceed 100 characters.");
+            if (item.minValue() >= item.maxValue()) throw new IllegalArgumentException("System minimum must be lower than maximum.");
+            if (item.initialValue() == null) throw new IllegalArgumentException("시스템 초기값을 입력해주세요.");
+            if (item.initialValue() < item.minValue() || item.initialValue() > item.maxValue())
+                throw new IllegalArgumentException("System initial value is outside system bounds.");
+            for (WorldSystemStateItem state : item.states() == null ? List.<WorldSystemStateItem>of() : item.states()) {
+                if (state.label() == null || state.label().isBlank()) continue;
+                if (state.minValue() > state.maxValue() || state.minValue() < item.minValue() || state.maxValue() > item.maxValue())
+                    throw new IllegalArgumentException("System state range is outside system bounds.");
+            }
+        }
+        world.updatePlayGuide(playGuide);
+        // Existing pockets reference these immutable definitions; preserve their ranges and state labels.
+        for (WorldSystem system : systems.findByWorldIdOrderBySortOrderAsc(worldId)) system.archive();
         for (int i = 0; i < requested.size(); i++) {
             WorldSystemItem item = requested.get(i);
             if (item.name() == null || item.name().isBlank()) continue;

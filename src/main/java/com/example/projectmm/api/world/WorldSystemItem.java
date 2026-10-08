@@ -7,7 +7,7 @@ public record WorldSystemItem(
         String changeCondition,
         int minValue,
         int maxValue,
-        int initialValue,
+        @jakarta.validation.constraints.NotNull(message = "시스템 초기값을 입력해주세요.") Integer initialValue,
         List<WorldSystemStateItem> states
 ) {
 }
