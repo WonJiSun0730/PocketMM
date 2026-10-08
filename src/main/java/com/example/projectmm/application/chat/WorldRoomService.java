@@ -131,13 +131,17 @@ public class WorldRoomService {
             String ownerLoginId,
             String title,
             String content,
-            Integer sortOrder
+            Integer sortOrder,
+            LocalDateTime initialSimulatedAt,
+            String initialLocation,
+            List<String> initialConditions,
+            List<String> initialInventory
     ) {
         var room = ownedRoom(roomId, ownerLoginId);
         int resolvedSortOrder = sortOrder == null
                 ? intros.findByRoomIdOrderBySortOrderAscIdAsc(roomId).size()
                 : sortOrder;
-        return intros.save(new WorldRoomIntro(room, title, content, resolvedSortOrder));
+        return intros.save(new WorldRoomIntro(room, title, content, resolvedSortOrder, initialSimulatedAt, initialLocation, initialConditions, initialInventory));
     }
 
     @Transactional
@@ -147,12 +151,16 @@ public class WorldRoomService {
             String ownerLoginId,
             String title,
             String content,
-            Integer sortOrder
+            Integer sortOrder,
+            LocalDateTime initialSimulatedAt,
+            String initialLocation,
+            List<String> initialConditions,
+            List<String> initialInventory
     ) {
         ownedRoom(roomId, ownerLoginId);
         var intro = intros.findByIdAndRoomId(introId, roomId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room intro not found"));
-        intro.update(title, content, sortOrder == null ? intro.getSortOrder() : sortOrder);
+        intro.update(title, content, sortOrder == null ? intro.getSortOrder() : sortOrder, initialSimulatedAt, initialLocation, initialConditions, initialInventory);
         return intro;
     }
 
