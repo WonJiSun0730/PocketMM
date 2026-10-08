@@ -23,6 +23,21 @@ function RpText({ text }) {
   </div>
 }
 
+function snapshotSceneState(variant) {
+  if (!variant?.scenePlayerStateJson) return null
+  try {
+    const snapshot = JSON.parse(variant.scenePlayerStateJson)
+    return {
+      simulatedAt: variant.sceneSimulatedAt ?? "",
+      location: snapshot.location ?? "",
+      inventory: snapshot.inventory ?? [],
+      conditions: snapshot.conditions ?? [],
+    }
+  } catch {
+    return null
+  }
+}
+
 function SceneStateMessage({ state }) {
   const date = state.simulatedAt ? new Date(state.simulatedAt) : null
   const validDate = date && !Number.isNaN(date.getTime())
@@ -113,6 +128,19 @@ export default function PocketPage({ pocket, onBack }) {
     return response.json()
   }
 
+  async function loadPageVariants(page) {
+    const characterMessages = page.filter(item => item.role === "CHARACTER")
+    const entries = await Promise.all(characterMessages.map(async item => {
+      try {
+        const response = await fetch(`${base}/messages/${item.id}/variants`, { credentials: "include" })
+        return [item.id, response.ok ? await response.json() : []]
+      } catch {
+        return [item.id, []]
+      }
+    }))
+    setVariantsByMessage(current => ({ ...current, ...Object.fromEntries(entries) }))
+  }
+
   async function refresh() {
     try {
       const [loadedMessages, castResponse, systemResponse, worldCharactersResponse] = await Promise.all([
@@ -122,6 +150,7 @@ export default function PocketPage({ pocket, onBack }) {
         fetch(`/api/worlds/${world.id}/characters`, { credentials: "include" }),
       ])
       setMessages(loadedMessages)
+      await loadPageVariants(loadedMessages)
       setHasOlderMessages(loadedMessages.length === 15)
       if (castResponse.ok) setCast(await castResponse.json())
       if (systemResponse.ok) setSystems(await systemResponse.json())
@@ -140,6 +169,7 @@ export default function PocketPage({ pocket, onBack }) {
       historyAnchorIdRef.current = messages[0].id
       const page = await loadMessagePage(messages[0].id)
       setMessages(current => [...page, ...current])
+      await loadPageVariants(page)
       setHasOlderMessages(page.length === 15)
     } catch (e) {
       setError(e.message)
@@ -580,7 +610,6 @@ export default function PocketPage({ pocket, onBack }) {
       <ScrollArea ref={scrollAreaRef} className="min-h-0 flex-1">
         <div className="mx-auto flex w-full max-w-3xl flex-col p-4 pb-32 sm:p-6 sm:pb-36">
           {loading && <p className="py-10 text-center text-sm text-muted-foreground">포켓을 불러오는 중...</p>}
-          {!loading && <SceneStateMessage state={sceneRuntimeState} />}
 
           {!loading && hasOlderMessages && <div ref={historySentinelRef} className="flex min-h-12 items-center justify-center border-b border-border/70 py-3 text-xs text-muted-foreground">
             {loadingOlder
@@ -598,11 +627,13 @@ export default function PocketPage({ pocket, onBack }) {
             const isLatest = index === messages.length - 1
             const variants = variantsByMessage[item.id] ?? []
             const selectedIndex = variants.findIndex(variant => variant.selected)
+            const messageSceneState = isCharacter ? snapshotSceneState(variants.find(variant => variant.selected)) : null
             return <article key={item.id} data-pocket-message-id={item.id} className="group border-b border-border/70 py-7 last:border-b-0 sm:py-9">
               {editing === item.id ? <div className="space-y-2">
                 <Textarea autoFocus value={editText} onChange={e => setEditText(e.target.value)} className="min-h-32 resize-y text-base leading-7" />
                 <div className="flex justify-end gap-2"><Button size="sm" variant="ghost" onClick={() => setEditing(null)}><X className="mr-1 size-3.5"/>취소</Button><Button size="sm" onClick={() => editMessage(item)}>저장</Button></div>
               </div> : <RpText text={item.content ?? item.message} />}
+              {messageSceneState && <SceneStateMessage state={messageSceneState} />}
               {editing !== item.id && <div className="mt-4 flex min-h-7 flex-wrap items-center gap-1 text-xs text-muted-foreground opacity-40 transition-opacity group-hover:opacity-100">
                 <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { setEditing(item.id); setEditText(item.content ?? item.message ?? "") }} disabled={sending}><Pencil className="mr-1 size-3"/>수정</Button>
                 {isCharacter && isLatest && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => reroll(item)} disabled={sending}><RefreshCw className="mr-1 size-3"/>리롤</Button>}
