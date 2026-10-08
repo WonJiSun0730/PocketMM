@@ -9,7 +9,9 @@ public record WorldRoomMessageVariantItem(
         int variantNo,
         String content,
         LocalDateTime createdAt,
-        boolean selected
+        boolean selected,
+        LocalDateTime sceneSimulatedAt,
+        String scenePlayerStateJson
 ) {
     public static WorldRoomMessageVariantItem from(
             WorldRoomMessageVariant variant,
@@ -20,7 +22,9 @@ public record WorldRoomMessageVariantItem(
                 variant.getVariantNo(),
                 variant.getContent(),
                 variant.getCreatedAt(),
-                selectedVariantNo != null && selectedVariantNo == variant.getVariantNo()
+                selectedVariantNo != null && selectedVariantNo == variant.getVariantNo(),
+                variant.getAfterSimulatedAt(),
+                variant.getAfterPlayerStateJson()
         );
     }
 }
