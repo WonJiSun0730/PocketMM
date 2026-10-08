@@ -620,6 +620,7 @@ export default function PocketPage({ pocket, onBack }) {
           {!loading && !hasOlderMessages && <article className="border-b border-border/70 py-7 sm:py-9">
             <p className="mb-4 text-xs font-semibold tracking-[.12em] text-muted-foreground">INTRO · {session.introTitle}</p>
             <RpText text={session.introContent} />
+            <SceneStateMessage state={sceneRuntimeState} />
           </article>}
 
           {!loading && messages.map((item, index) => {
