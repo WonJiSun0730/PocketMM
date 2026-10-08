@@ -70,6 +70,44 @@ class WorldRoomDialogueWorldlineIntegrationTest {
     }
 
     @Test
+    void compoundSleepTimeSurvivesRerollAndEditedRegenerationWithoutDoubleElapsedTime() {
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        when(encoder.encode("password")).thenReturn("encoded");
+        Member member = members.save(Member.createLocal("compound-time-user", "password",
+                "Compound Time", "compound-time@example.test", encoder));
+        World world = worlds.save(new World(member, "Compound Time", "Time test."));
+        WorldConversation room = rooms.save(new WorldConversation(world, member, "Room",
+                WorldConversation.Visibility.PRIVATE, LocalDateTime.of(2026, 1, 8, 12, 0)));
+        WorldRoomIntro intro = intros.save(new WorldRoomIntro(room, "Start", "Start scene.", 0));
+        var session = sessionService.start(room.getId(), member.getLoginId(), null, intro.getId());
+        var before = session.getSimulatedAt();
+        var target = before.plusDays(3).withHour(21).withMinute(0).withSecond(0).withNano(0);
+        var rule = new com.example.projectmm.application.time.RuleBasedTimeInterpreter();
+        when(timeInterpreter.interpret(anyString(), any(LocalDateTime.class)))
+                .thenAnswer(call -> rule.interpret(call.getArgument(0), call.getArgument(1)));
+        when(gateway.generateWorldRoomTurn(any(), anyString())).thenReturn(
+                new WorldRoomTurn("Woke up.", WorldRoomCastChange.none(), List.of(), 3600));
+
+        dialogueService.chat(session.getId(), "3일 후, 오후 3시에 잠들어 6시간 잤다");
+        assertThat(session.getSimulatedAt()).isEqualTo(target);
+        var character = messages.findTop50BySessionIdOrderByIdDesc(session.getId()).stream()
+                .filter(message -> message.getRole() == ChatRole.CHARACTER).findFirst().orElseThrow();
+        var user = messages.findTopBySessionIdAndIdLessThanOrderByIdDesc(session.getId(), character.getId())
+                .orElseThrow();
+        dialogueService.reroll(session.getId(), character.getId());
+        assertThat(session.getSimulatedAt()).isEqualTo(target);
+
+        dialogueService.editMessage(session.getId(), user.getId(),
+                "3일 후, 오후 3시에 잠들어 7시간 잤다");
+        dialogueService.regenerate(session.getId(), character.getId());
+        assertThat(session.getSimulatedAt()).isEqualTo(target.plusHours(1));
+        verify(gateway, times(2)).generateWorldRoomTurn(
+                argThat(context -> target.equals(context.simulatedAt())), anyString());
+        verify(gateway).generateWorldRoomTurn(
+                argThat(context -> target.plusHours(1).equals(context.simulatedAt())), anyString());
+    }
+
+    @Test
     void explicitUserTimeChangeUpdatesPocketClockBeforeDialogueGeneration() {
         PasswordEncoder encoder = mock(PasswordEncoder.class);
         when(encoder.encode("password")).thenReturn("encoded");

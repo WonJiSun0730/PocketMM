@@ -398,7 +398,9 @@ public class WorldRoomDialogueService {
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
         applySceneLocation(sessionId, generated);
-        applyNarrativeElapsedTime(session, generated.elapsedSeconds());
+        if (!explicitTimeChanged) {
+            applyNarrativeElapsedTime(session, generated.elapsedSeconds());
+        }
         var afterCast = sessionService.captureCastState(sessionId);
         var afterSystems = sessionService.captureSystemState(sessionId);
 
