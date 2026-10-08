@@ -107,7 +107,7 @@ public class WorldRoomDialogueService {
         var session = sessions.findById(sessionId).orElseThrow();
         var state = playerStates.findBySessionId(sessionId)
                 .orElseGet(() -> playerStates.save(new WorldRoomPlayerState(session)));
-        state.update(location, state.getConditions(), state.getInventory());
+        state.update(location, List.copyOf(state.getConditions()), List.copyOf(state.getInventory()));
     }
 
     private boolean applyExplicitTimeChange(
