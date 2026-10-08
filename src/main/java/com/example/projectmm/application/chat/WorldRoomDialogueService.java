@@ -41,6 +41,19 @@ public class WorldRoomDialogueService {
     private final WorldRoomSessionRepository sessions;
     private final WorldRoomPlayerStateRepository playerStates;
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    @org.springframework.beans.factory.annotation.Value("${gemini.model:gemini-3.5-flash-lite}")
+    private String evaluationGeminiModel = "gemini-3.5-flash-lite";
+    @org.springframework.beans.factory.annotation.Value("${openai.model:gpt-5.6-luna}")
+    private String evaluationOpenAiModel = "gpt-5.6-luna";
+
+    private String captureEvaluationContext(String operation, String input, String modelInput, String reply,
+            com.example.projectmm.domain.dialogue.WorldRoomDialogueContext context) {
+        String model = context.aiModel();
+        if (model == null || model.isBlank()) model = "OPENAI".equalsIgnoreCase(context.aiProvider())
+                ? evaluationOpenAiModel : evaluationGeminiModel;
+        return com.example.projectmm.application.dialogue.DialogueEvaluationEvidence
+                .capture(operation, input, modelInput, reply, model, context);
+    }
     private final WorldRoomMessageRepository messages;
     private final WorldRoomMessageVariantRepository variants;
     private final WorldRoomVariantCastSnapshotRepository castSnapshots;
@@ -99,6 +112,8 @@ public class WorldRoomDialogueService {
         sessionService.saveTimeSnapshot(variant, beforeTime, session.getSimulatedAt());
         savePlayerStateSnapshot(variant, beforePlayerState, sessionId);
         variant.captureUserSceneSetup(sceneSetup);
+
+        variant.captureEvaluationContext(captureEvaluationContext("CHAT", userMessage, userMessage, generated.reply(), context));
         events.publishEvent(new PocketUserSpeechCommitted(
                 sessionId,
                 userSourceMessage.getId(),
@@ -298,6 +313,8 @@ public class WorldRoomDialogueService {
         sessionService.saveTimeSnapshot(variant, beforeTime, session.getSimulatedAt());
         savePlayerStateSnapshot(variant, beforePlayerState, sessionId);
 
+        variant.captureEvaluationContext(captureEvaluationContext("CONTINUE", "[자동 전개]", continuationPrompt, generated.reply(), context));
+
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
     }
 
@@ -429,6 +446,8 @@ public class WorldRoomDialogueService {
         variant.captureUserSceneSetup(sceneSetup);
         target.selectVariant(variantNo, generated.reply());
 
+        variant.captureEvaluationContext(captureEvaluationContext("REROLL", rerollBase, rerollPrompt, generated.reply(), context));
+
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
     }
 
@@ -492,6 +511,8 @@ public class WorldRoomDialogueService {
         sessionService.saveTimeSnapshot(variant, beforeTime, session.getSimulatedAt());
         savePlayerStateSnapshot(variant, beforePlayerState, sessionId);
         variant.captureUserSceneSetup(sceneSetup);
+
+        variant.captureEvaluationContext(captureEvaluationContext("REGENERATE", userMessage.getContent(), userMessage.getContent(), generated.reply(), context));
 
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
     }

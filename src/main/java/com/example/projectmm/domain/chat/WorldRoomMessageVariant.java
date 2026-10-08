@@ -49,6 +49,11 @@ public class WorldRoomMessageVariant {
     @Column(columnDefinition = "TEXT")
     private String userSceneSetupJson;
 
+    @Column(columnDefinition = "LONGTEXT")
+    private String evaluationContextJson;
+
+    public void captureEvaluationContext(String json) { this.evaluationContextJson = json; }
+
     public void captureUserSceneSetup(String json) {
         this.userSceneSetupJson = json;
     }

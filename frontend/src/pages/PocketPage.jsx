@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import PlayerProfilePicker from "@/components/PlayerProfilePicker"
 import PocketPlayerStatePanel from "@/components/PocketPlayerStatePanel"
 import PocketSettingsPanel from "@/components/PocketSettingsPanel"
+import DialogueIssuePanel from "@/components/DialogueIssuePanel"
 import PocketScene from "@/components/PocketScene"
 import { resolvePocketSceneModels } from "@/lib/pocketCharacterModels"
 import "./PocketPage.css"
@@ -68,6 +69,9 @@ export default function PocketPage({ pocket, onBack }) {
   const [editing, setEditing] = useState(null)
   const [editText, setEditText] = useState("")
   const [variantsByMessage, setVariantsByMessage] = useState({})
+  const [issueTarget, setIssueTarget] = useState(null)
+  const [issueManagerOpen, setIssueManagerOpen] = useState(false)
+  const [issueNotice, setIssueNotice] = useState("")
   const [isDeveloper, setIsDeveloper] = useState(false)
   const [devOpen, setDevOpen] = useState(false)
   const [devSystemValues, setDevSystemValues] = useState({})
@@ -456,6 +460,9 @@ export default function PocketPage({ pocket, onBack }) {
           <h1 className="truncate font-medium leading-none">{room.title}</h1>
           <p className="mt-1 text-xs text-muted-foreground">{world.name} · POCKET</p>
         </div>
+        <Button type="button" variant="ghost" size="sm" disabled={sending}
+          onClick={() => { setIssueNotice(""); setIssueManagerOpen(true) }}>문제 기록 관리</Button>
+        {issueNotice && <p role="status" className="text-xs text-muted-foreground">{issueNotice}</p>}
         <Button
           type="button"
           variant="ghost"
@@ -643,6 +650,8 @@ export default function PocketPage({ pocket, onBack }) {
                 <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { setEditing(item.id); setEditText(item.content ?? item.message ?? "") }} disabled={sending}><Pencil className="mr-1 size-3"/>수정</Button>
                 {isCharacter && isLatest && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => reroll(item)} disabled={sending}><RefreshCw className="mr-1 size-3"/>리롤</Button>}
                 {isCharacter && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => loadVariants(item.id)} disabled={sending}>버전 {item.selectedVariantNo ?? 1}</Button>}
+                {isCharacter && <Button size="sm" variant="ghost" className="h-7 px-2" disabled={sending}
+                  onClick={() => { setIssueNotice(""); setIssueTarget({ ...item }) }}>문제 기록</Button>}
                 {variants.length > 1 && <div className="flex items-center gap-1">
                   <Button size="icon" variant="ghost" className="size-7" disabled={sending || selectedIndex <= 0 || !isLatest} onClick={() => selectVariant(item, variants[selectedIndex - 1].variantNo)}><ChevronLeft className="size-3"/></Button>
                   <span>{selectedIndex + 1} / {variants.length}</span>
@@ -795,5 +804,7 @@ export default function PocketPage({ pocket, onBack }) {
       </div>
       </aside>
     </div>
+    <DialogueIssuePanel sessionId={session.id} target={issueTarget} managerOpen={issueManagerOpen}
+      onClose={result => { setIssueTarget(null); setIssueManagerOpen(false); if (result === "saved") setIssueNotice("문제 기록을 저장했어요.") }} />
   </main>
 }
