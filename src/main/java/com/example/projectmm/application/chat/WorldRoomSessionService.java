@@ -39,6 +39,7 @@ public class WorldRoomSessionService {
     private final WorldRoomMessageVariantRepository variants;
     private final MemoryRepository memories;
     private final ProtectedMemoryDetailRepository protectedMemoryDetails;
+    private final WorldRoomPlayerStateRepository playerStates;
 
     @Transactional
     public WorldRoomSession start(Long roomId, String loginId, Long playerProfileId, Long introId) {
@@ -56,7 +57,14 @@ public class WorldRoomSessionService {
         }
         var intro = intros.findByIdAndRoomId(introId, roomId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room intro not found"));
-        var session = sessions.save(new WorldRoomSession(room, member, player, intro, now()));
+        var startedAt = intro.getInitialSimulatedAt() == null ? now() : intro.getInitialSimulatedAt();
+        var session = sessions.save(new WorldRoomSession(room, member, player, intro, startedAt));
+        var playerState = playerStates.save(new WorldRoomPlayerState(session));
+        playerState.update(
+                intro.getInitialLocation(),
+                intro.getInitialConditions(),
+                intro.getInitialInventory()
+        );
         worldSystems.findByWorldIdOrderBySortOrderAsc(room.getWorld().getId())
                 .forEach(system -> systemStates.save(new WorldRoomSessionSystemState(
                         session,
