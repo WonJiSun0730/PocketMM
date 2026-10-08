@@ -16,6 +16,15 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AuthController {
 
+    @org.springframework.beans.factory.annotation.Value("${app.private-test.enabled:false}")
+    private boolean privateTest;
+
+    @GetMapping("/options")
+    public Map<String, Object> options() {
+        return Map.of("registrationEnabled", !privateTest, "emailVerificationRequired", privateTest,
+                "maskedEmail", privateTest ? "wl***@gmail.com" : "");
+    }
+
     private final MemberSignupService memberSignupService;
 
     @PostMapping("/signup")

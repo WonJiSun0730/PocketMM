@@ -18,8 +18,35 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(
-            HttpSecurity http
+            HttpSecurity http,
+            @org.springframework.beans.factory.annotation.Value("${app.private-test.enabled:false}") boolean privateTest
     ) throws Exception {
+
+        if (privateTest) {
+            http.csrf(csrf -> csrf.disable())
+                    .formLogin(form -> form.disable())
+                    .requestCache(cache -> cache.disable())
+                    .exceptionHandling(errors -> errors
+                            .authenticationEntryPoint((request, response, exception) -> response.sendError(401))
+                            .accessDeniedHandler((request, response, exception) -> response.sendError(403)))
+                    .authorizeHttpRequests(auth -> auth
+                            .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/verify-login").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api/auth/options", "/actuator/health").permitAll()
+                            .requestMatchers("/api/auth/signup", "/api/auth/check-login-id", "/api/auth/check-email").denyAll()
+                            .requestMatchers("/api/**").access((authentication, context) -> {
+                                var session = context.getRequest().getSession(false);
+                                var principal = authentication.get();
+                                return new org.springframework.security.authorization.AuthorizationDecision(
+                                        principal != null && principal.isAuthenticated()
+                                        && "devseed".equals(principal.getName()) && session != null
+                                        && Boolean.TRUE.equals(session.getAttribute(
+                                                com.example.projectmm.application.member.PrivateTestLoginService.VERIFIED)));
+                            })
+                            .anyRequest().permitAll())
+                    .logout(logout -> logout.logoutUrl("/api/auth/logout")
+                            .logoutSuccessHandler((request, response, authentication) -> response.setStatus(204)));
+            return http.build();
+        }
 
         http
                 .csrf(csrf -> csrf.disable())
