@@ -23,6 +23,19 @@ function RpText({ text }) {
   </div>
 }
 
+function SceneStateMessage({ state }) {
+  const date = state.simulatedAt ? new Date(state.simulatedAt) : null
+  const validDate = date && !Number.isNaN(date.getTime())
+  const dateText = validDate ? new Intl.DateTimeFormat("ko-KR", { month: "2-digit", day: "2-digit", weekday: "long" }).format(date) : "미설정"
+  const timeText = validDate ? new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: true }).format(date) : "미설정"
+  return <section aria-label="현재 장면 상태" className="mx-auto w-full max-w-3xl border-b border-border/70 px-4 py-3 text-xs leading-6 text-muted-foreground sm:px-6">
+    <div className="mb-1 font-medium text-foreground">💌 현재 장면</div>
+    <div className="whitespace-pre-wrap font-mono">
+      {`📅: ${dateText}\n⏰: ${timeText}\n🧭: ${state.location || "미설정"}\n👜: ${state.inventory?.length ? state.inventory.join("·") : "없음"}\n🧷: ${state.conditions?.length ? state.conditions.join("·") : "없음"}`}
+    </div>
+  </section>
+}
+
 export default function PocketPage({ pocket, onBack }) {
   const { world, room, session, playerProfile } = pocket
   const base = `/api/worlds/${world.id}/rooms/${room.id}/sessions/${session.id}`
@@ -52,6 +65,8 @@ export default function PocketPage({ pocket, onBack }) {
   const [sceneRuntimeState, setSceneRuntimeState] = useState({
     simulatedAt: session.simulatedAt ?? "",
     location: "",
+    inventory: [],
+    conditions: [],
   })
   const sceneModels = useMemo(() => resolvePocketSceneModels({
     playerProfile: selectedPlayerProfile,
@@ -155,6 +170,8 @@ export default function PocketPage({ pocket, onBack }) {
         if (active && state) setSceneRuntimeState({
           simulatedAt: state.simulatedAt ?? "",
           location: state.location ?? "",
+          inventory: state.inventory ?? [],
+          conditions: state.conditions ?? [],
         })
       })
       .catch(() => {})
@@ -451,6 +468,8 @@ export default function PocketPage({ pocket, onBack }) {
           onStateChange={state => setSceneRuntimeState({
             simulatedAt: state.simulatedAt,
             location: state.location,
+            inventory: state.inventory ?? [],
+            conditions: state.conditions ?? [],
           })} />}
         <PocketSettingsPanel sessionId={session.id} onError={setError} />
       </div>
@@ -630,6 +649,8 @@ export default function PocketPage({ pocket, onBack }) {
           onStateChange={state => setSceneRuntimeState({
             simulatedAt: state.simulatedAt,
             location: state.location,
+            inventory: state.inventory ?? [],
+            conditions: state.conditions ?? [],
           })} />}
         <PocketSettingsPanel sessionId={session.id} onError={setError} />
       </div>
