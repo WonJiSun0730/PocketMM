@@ -66,6 +66,10 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                 - Estimate it from narrated events, not token count or response length.
                 - Do not encode an explicit user-requested time skip here; the server handles it separately.
                 - Use 0 for meta/OOC or effectively frozen time.
+                Scene-location change rules:
+                - locationChange is the final physical location at the end of YOUR reply, only if it explicitly changes.
+                - Use an empty string when location is unchanged or uncertain.
+                - Do not infer travel from plans, wishes, hypotheticals, or quoted dialogue.
                 World-system change rules:
                 - Current session world-system values are authoritative.
                 - Return deltas only and use only supplied systemId values.
@@ -116,9 +120,10 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                                         "required", List.of("systemId", "delta")
                                 )
                         ),
-                        "elapsedSeconds", Map.of("type", "integer", "minimum", 0, "maximum", 604800)
+                        "elapsedSeconds", Map.of("type", "integer", "minimum", 0, "maximum", 604800),
+                        "locationChange", Map.of("type", "string")
                 ),
-                "required", List.of("reply", "enterCharacterIds", "leaveCharacterIds", "systemChanges", "elapsedSeconds")
+                "required", List.of("reply", "enterCharacterIds", "leaveCharacterIds", "systemChanges", "elapsedSeconds", "locationChange")
         );
 
         Map<String, Object> request = Map.of(
@@ -185,7 +190,8 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                             readLongArray(turn.path("leaveCharacterIds"))
                     ),
                     readSystemChanges(turn.path("systemChanges"), context),
-                    readElapsedSeconds(turn.path("elapsedSeconds"))
+                    readElapsedSeconds(turn.path("elapsedSeconds")),
+                    turn.path("locationChange").asText("")
             );
         } catch (Exception e) {
             throw new IllegalStateException("Failed to parse OpenAI Pocket response", e);
