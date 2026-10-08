@@ -90,3 +90,9 @@
 .world-intro-dialog .world-intro-editor{min-height:300px;line-height:1.7;font-family:inherit}
 .world-intro-format{display:grid;gap:5px;padding:11px 12px;border-radius:10px;background:var(--secondary);color:var(--muted-foreground);font-size:11px;line-height:1.45}
 .world-intro-format strong{color:var(--foreground);font-size:12px}
+
+.world-intro-scene-fields{display:grid;gap:10px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--background)}
+.world-intro-scene-fields>strong{font-size:12px}.world-intro-scene-fields>strong small{margin-left:6px;color:var(--muted-foreground);font-weight:400}
+.world-intro-scene-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.world-intro-scene-fields textarea{min-height:72px}
+.world-intro-system-defaults{display:flex;flex-wrap:wrap;gap:6px 12px;padding-top:4px;color:var(--muted-foreground);font-size:11px}.world-intro-system-defaults strong{width:100%;color:var(--foreground);font-size:12px}
+@media(max-width:600px){.world-intro-scene-grid{grid-template-columns:1fr}}
