@@ -40,6 +40,17 @@ public class WorldRoomMessageVariant {
 
     private LocalDateTime afterSimulatedAt;
 
+    @Column(columnDefinition = "TEXT")
+    private String beforePlayerStateJson;
+
+    @Column(columnDefinition = "TEXT")
+    private String afterPlayerStateJson;
+
+    public void capturePlayerStateWorldline(String before, String after) {
+        this.beforePlayerStateJson = before;
+        this.afterPlayerStateJson = after;
+    }
+
     public void editContent(String content) {
         if (content == null || content.isBlank()) {
             throw new IllegalArgumentException("content must not be blank");
