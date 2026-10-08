@@ -149,12 +149,21 @@ public class GeminiDialogueGateway implements DialogueGateway {
                                   "leaveCharacterIds": [],
                                   "systemChanges": [],
                                   "elapsedSeconds": 0,
-                                  "locationChange": ""
+                                  "locationChange": "",
+                                  "addedConditions": [],
+                                  "removedConditions": [],
+                                  "addedInventory": [],
+                                  "removedInventory": []
                                 }
 
                                 Scene-location change rules:
                                 - locationChange is the final physical location only when the generated reply clearly changes it.
                                 - Use an empty string if unchanged or uncertain; plans and hypothetical travel do not count.
+                                Player-state delta rules:
+                                - addedConditions/removedConditions represent only explicit changes to the player's conditions.
+                                - addedInventory/removedInventory represent only explicitly acquired, lost or consumed player possessions.
+                                - Do not infer ownership from mentions, plans or NPC actions.
+                                - Return empty arrays if unchanged or uncertain.
                                 Narrative-time rules:
                                 - elapsedSeconds is the amount of in-story time that actually passes during YOUR generated reply.
                                 - Estimate it from the narrated events, not from token count or response length.
@@ -252,11 +261,26 @@ public class GeminiDialogueGateway implements DialogueGateway {
                     ),
                     readWorldRoomSystemChanges(turn.path("systemChanges"), context),
                     readElapsedSeconds(turn.path("elapsedSeconds")),
-                    turn.path("locationChange").asText("")
+                    turn.path("locationChange").asText(""),
+                    readSceneStateStrings(turn.path("addedConditions")),
+                    readSceneStateStrings(turn.path("removedConditions")),
+                    readSceneStateStrings(turn.path("addedInventory")),
+                    readSceneStateStrings(turn.path("removedInventory"))
             );
         } catch (Exception e) {
             throw new IllegalStateException("Failed to parse world room dialogue response", e);
         }
+    }
+
+    private List<String> readSceneStateStrings(JsonNode node) {
+        if (!node.isArray()) return List.of();
+        List<String> values = new ArrayList<>();
+        for (JsonNode item : node) {
+            if (item.isTextual() && !item.asText().isBlank() && item.asText().length() <= 300 && values.size() < 20) {
+                values.add(item.asText().trim());
+            }
+        }
+        return values;
     }
 
     private long readElapsedSeconds(JsonNode node) {
