@@ -44,6 +44,7 @@ public class WorldRoomService {
     private final WorldRoomVariantSystemSnapshotRepository systemSnapshots;
     private final WorldRoomSessionCastRepository sessionCasts;
     private final WorldRoomSessionSystemStateRepository sessionSystemStates;
+    private final WorldRoomPlayerStateRepository playerStates;
 
     @Transactional
     public WorldConversation create(
@@ -102,6 +103,9 @@ public class WorldRoomService {
         messages.deleteBySessionRoomId(roomId);
         sessionCasts.deleteBySessionRoomId(roomId);
         sessionSystemStates.deleteBySessionRoomId(roomId);
+        sessions.findByRoomIdOrderByCreatedAtDescIdDesc(roomId)
+                .forEach(session -> playerStates.deleteBySessionId(session.getId()));
+        playerStates.flush();
         sessions.deleteByRoomId(roomId);
         intros.deleteByRoomId(roomId);
         casts.deleteByConversationId(roomId);
