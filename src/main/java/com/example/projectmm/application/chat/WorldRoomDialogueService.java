@@ -40,7 +40,7 @@ public class WorldRoomDialogueService {
     private final WorldRoomSessionService sessionService;
     private final WorldRoomSessionRepository sessions;
     private final WorldRoomPlayerStateRepository playerStates;
-    private final ObjectMapper objectMapper;
+    private static final ObjectMapper objectMapper = new ObjectMapper();
     private final WorldRoomMessageRepository messages;
     private final WorldRoomMessageVariantRepository variants;
     private final WorldRoomVariantCastSnapshotRepository castSnapshots;
