@@ -32,7 +32,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
   const [worldRooms, setWorldRooms] = useState([])
   const [roomIntros, setRoomIntros] = useState({})
   const [introDialog, setIntroDialog] = useState(null)
-  const [introForm, setIntroForm] = useState({ title: "", content: "" })
+  const [introForm, setIntroForm] = useState({ title: "", content: "", initialSimulatedAt: "", initialLocation: "", initialConditions: "", initialInventory: "" })
   const [pocketSetup, setPocketSetup] = useState(null)
   const [pocketBusy, setPocketBusy] = useState(false)
   const autosaveTimer = useRef(null)
@@ -95,7 +95,14 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
 
   function openIntroDialog(room, intro = null) {
     setIntroDialog({ room, intro })
-    setIntroForm({ title: intro?.title ?? "", content: intro?.content ?? "" })
+    setIntroForm({
+      title: intro?.title ?? "",
+      content: intro?.content ?? "",
+      initialSimulatedAt: intro?.initialSimulatedAt?.slice(0, 16) ?? "",
+      initialLocation: intro?.initialLocation ?? "",
+      initialConditions: (intro?.initialConditions ?? []).join("\n"),
+      initialInventory: (intro?.initialInventory ?? []).join("\n"),
+    })
   }
 
   async function saveRoomIntro(event) {
@@ -143,6 +150,10 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
           title: introForm.title.trim(),
           content: introForm.content.trim(),
           sortOrder: intro?.sortOrder ?? null,
+          initialSimulatedAt: introForm.initialSimulatedAt || null,
+          initialLocation: introForm.initialLocation.trim() || null,
+          initialConditions: introForm.initialConditions.split("\n").map(item => item.trim()).filter(Boolean),
+          initialInventory: introForm.initialInventory.split("\n").map(item => item.trim()).filter(Boolean),
         }),
       }
     )
@@ -569,7 +580,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
         </> : <PlayerProfilePicker busy={pocketBusy} onSelect={startPocket} onCancel={() => setPocketSetup((current) => ({ ...current, choosingProfile: false }))} />}
       </div></div>}
 
-      {introDialog && <div className="world-dialog-backdrop" onMouseDown={() => setIntroDialog(null)}><form className="world-dialog world-intro-dialog" onSubmit={saveRoomIntro} onMouseDown={(event) => event.stopPropagation()}><div className="world-dialog-heading"><div><span className="world-eyebrow">INTRO</span><h2>{introDialog.intro ? "인트로 수정" : "새 인트로"}</h2><p>포켓에서 가장 먼저 보이는 실제 RP 장면이에요.</p></div><button type="button" onClick={() => setIntroDialog(null)} aria-label="닫기"><X size={18}/></button></div><label>인트로 제목<input autoFocus required maxLength={100} value={introForm.title} onChange={(event) => setIntroForm((current) => ({ ...current, title: event.target.value }))} placeholder="예: [안개 속의 의뢰인]" /></label><label>인트로 본문 <small>설정 설명이 아니라 소설/RP의 첫 장면처럼 작성해 주세요.</small><textarea className="world-intro-editor" required value={introForm.content} onChange={(event) => setIntroForm((current) => ({ ...current, content: event.target.value }))} placeholder={"*늦은 저녁, 베이커 스트리트의 창밖으로 짙은 안개가 내려앉아 있었다.*\n\nSherlock Holmes: \"들어오시죠. 문 앞에서 망설일 이유는 없을 텐데요.\"\n\n*그는 시선을 들지 않은 채 테이블 위 봉투를 가볍게 두드렸다.*"} /></label><div className="world-intro-format"><strong>작성 형식</strong><span>*행동·상황·서술* + 캐릭터의 대사를 자연스럽게 섞어 작성</span><span>필요하면 날짜·시간·장소·상태 등의 메타 정보도 본문에 포함 가능</span><span>{`{user}`}의 행동이나 감정은 미리 확정하지 않기</span></div><div className="world-dialog-actions"><button type="button" onClick={() => setIntroDialog(null)}>취소</button><button className="primary" disabled={!introForm.title.trim() || !introForm.content.trim()} type="submit">저장</button></div></form></div>}
+      {introDialog && <div className="world-dialog-backdrop" onMouseDown={() => setIntroDialog(null)}><form className="world-dialog world-intro-dialog" onSubmit={saveRoomIntro} onMouseDown={(event) => event.stopPropagation()}><div className="world-dialog-heading"><div><span className="world-eyebrow">INTRO</span><h2>{introDialog.intro ? "인트로 수정" : "새 인트로"}</h2><p>포켓에서 가장 먼저 보이는 실제 RP 장면이에요.</p></div><button type="button" onClick={() => setIntroDialog(null)} aria-label="닫기"><X size={18}/></button></div><label>인트로 제목<input autoFocus required maxLength={100} value={introForm.title} onChange={(event) => setIntroForm((current) => ({ ...current, title: event.target.value }))} placeholder="예: [안개 속의 의뢰인]" /></label><label>인트로 본문 <small>설정 설명이 아니라 소설/RP의 첫 장면처럼 작성해 주세요.</small><textarea className="world-intro-editor" required value={introForm.content} onChange={(event) => setIntroForm((current) => ({ ...current, content: event.target.value }))} placeholder={"*늦은 저녁, 베이커 스트리트의 창밖으로 짙은 안개가 내려앉아 있었다.*\n\nSherlock Holmes: \"들어오시죠. 문 앞에서 망설일 이유는 없을 텐데요.\"\n\n*그는 시선을 들지 않은 채 테이블 위 봉투를 가볍게 두드렸다.*"} /></label><div className="world-intro-scene-fields"><strong>초기 Scene State <small>비워두면 AI가 장면 맥락에 맞춰 이어갈 수 있어요.</small></strong><div className="world-intro-scene-grid"><label>날짜·시간<input type="datetime-local" value={introForm.initialSimulatedAt} onChange={(event) => setIntroForm((current) => ({ ...current, initialSimulatedAt: event.target.value }))} /></label><label>장소<input maxLength={200} value={introForm.initialLocation} onChange={(event) => setIntroForm((current) => ({ ...current, initialLocation: event.target.value }))} placeholder="예: QWL 내부 / 식당" /></label></div><label>초기 상태 <small>한 줄에 하나</small><textarea value={introForm.initialConditions} onChange={(event) => setIntroForm((current) => ({ ...current, initialConditions: event.target.value }))} placeholder={"예: 피로\n오른팔 부상"} /></label><label>초기 소지품 <small>한 줄에 하나</small><textarea value={introForm.initialInventory} onChange={(event) => setIntroForm((current) => ({ ...current, initialInventory: event.target.value }))} placeholder={"예: 도그태그\n휴대폰"} /></label>{systems.length > 0 && <div className="world-intro-system-defaults"><strong>월드 시스템 초기값</strong>{systems.map((system) => <span key={system.name}>{system.name} · {system.initialValue} <small>({system.minValue}~{system.maxValue})</small></span>)}</div>}</div><div className="world-intro-format"><strong>작성 형식</strong><span>*행동·상황·서술* + 캐릭터의 대사를 자연스럽게 섞어 작성</span><span>필요하면 날짜·시간·장소·상태 등의 메타 정보도 본문에 포함 가능</span><span>{`{user}`}의 행동이나 감정은 미리 확정하지 않기</span></div><div className="world-dialog-actions"><button type="button" onClick={() => setIntroDialog(null)}>취소</button><button className="primary" disabled={!introForm.title.trim() || !introForm.content.trim()} type="submit">저장</button></div></form></div>}
 
       {worldDialog && <div className="world-dialog-backdrop" onMouseDown={() => setWorldDialog(null)}><form className="world-dialog" onSubmit={submitWorld} onMouseDown={(event) => event.stopPropagation()}><div className="world-dialog-heading"><div><span className="world-eyebrow">{worldDialog === "edit" ? "EDIT WORLD" : "NEW WORLD"}</span><h2>{worldDialog === "edit" ? "세계관 정보 수정" : "새 세계관 만들기"}</h2></div><button type="button" onClick={() => setWorldDialog(null)} aria-label="닫기"><X size={18} /></button></div><label>세계관 이름<input autoFocus maxLength={100} value={worldForm.name} onChange={(event) => setWorldForm((current) => ({ ...current, name: event.target.value }))} placeholder="세계관 이름" /></label><label>설명 <small>AI에게 전달되지 않는 메모예요.</small><textarea value={worldForm.description} onChange={(event) => setWorldForm((current) => ({ ...current, description: event.target.value }))} placeholder="이 세계관을 구분하기 위한 설명이나 개인 메모를 적어 주세요." /></label><div className="world-dialog-actions"><button type="button" onClick={() => setWorldDialog(null)}>취소</button><button className="primary" disabled={!worldForm.name.trim() || worldSubmitting} type="submit">{worldSubmitting ? "처리 중..." : worldDialog === "edit" ? "수정" : "생성"}</button></div></form></div>}
     </main>
