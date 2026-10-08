@@ -39,6 +39,7 @@ class WorldRoomActiveCastIntegrationTest {
 
     @Autowired WorldRoomSessionService sessionService;
     @Autowired WorldRoomDialogueService dialogueService;
+    @Autowired WorldRoomContextBuilder contextBuilder;
     @Autowired MemberRepository members;
     @Autowired WorldRepository worlds;
     @Autowired WorldConversationRepository rooms;
@@ -89,6 +90,11 @@ class WorldRoomActiveCastIntegrationTest {
         );
 
         assertThat(sessionService.activeCast(session.getId())).isEmpty();
+        assertThat(contextBuilder.buildSession(session.getId()).roomCast())
+                .allSatisfy(character -> {
+                    assertThat(character.active()).isFalse();
+                    assertThat(character.departed()).isFalse();
+                });
 
         when(gateway.generateWorldRoomTurn(any(), eq("I knock.")))
                 .thenReturn(new WorldRoomTurn(
@@ -122,6 +128,13 @@ class WorldRoomActiveCastIntegrationTest {
                 ));
         dialogueService.chat(session.getId(), "Sherlock leaves to inspect the alley.");
 
+        assertThat(contextBuilder.buildSession(session.getId()).roomCast())
+                .filteredOn(character -> character.characterId().equals(sherlock.getId()))
+                .singleElement().satisfies(character -> {
+                    assertThat(character.active()).isFalse();
+                    assertThat(character.departed()).isTrue();
+                });
+
         assertThat(sessionService.activeCast(session.getId()))
                 .extracting(state -> state.getCharacter().getName())
                 .containsExactly("Victor Hale");
@@ -133,6 +146,13 @@ class WorldRoomActiveCastIntegrationTest {
                         List.of()
                 ));
         dialogueService.chat(session.getId(), "Footsteps return on the stairs.");
+
+        assertThat(contextBuilder.buildSession(session.getId()).roomCast())
+                .filteredOn(character -> character.characterId().equals(sherlock.getId()))
+                .singleElement().satisfies(character -> {
+                    assertThat(character.active()).isTrue();
+                    assertThat(character.departed()).isFalse();
+                });
 
         assertThat(sessionService.activeCast(session.getId()))
                 .extracting(state -> state.getCharacter().getName())

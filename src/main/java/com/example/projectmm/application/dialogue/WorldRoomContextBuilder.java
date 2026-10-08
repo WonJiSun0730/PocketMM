@@ -68,6 +68,12 @@ public class WorldRoomContextBuilder {
                 .map(state -> state.getCharacter().getId())
                 .collect(java.util.stream.Collectors.toSet());
 
+        var departedIds = sessionCasts.findBySessionIdOrderByIdAsc(sessionId)
+                .stream()
+                .filter(state -> !state.isActive() && state.getLeftAt() != null)
+                .map(state -> state.getCharacter().getId())
+                .collect(java.util.stream.Collectors.toSet());
+
         var roomCast = buildCast(room.getId()).stream()
                 .map(character -> new WorldRoomCharacterContext(
                         character.characterId(),
@@ -75,7 +81,8 @@ public class WorldRoomContextBuilder {
                         character.profile(),
                         character.energy(),
                         character.mood(),
-                        activeIds.contains(character.characterId())
+                        activeIds.contains(character.characterId()),
+                        departedIds.contains(character.characterId())
                 ))
                 .toList();
         var activeCast = roomCast.stream()
