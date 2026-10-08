@@ -149,6 +149,8 @@ public class WorldRoomSessionService {
         messages.deleteBySessionId(sessionId);
         sessionCasts.deleteBySessionId(sessionId);
         systemStates.deleteBySessionId(sessionId);
+        playerStates.deleteBySessionId(sessionId);
+        playerStates.flush();
         sessions.delete(session);
     }
 
