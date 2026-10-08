@@ -43,7 +43,7 @@ function SceneStateMessage({ state }) {
   const validDate = date && !Number.isNaN(date.getTime())
   const dateText = validDate ? new Intl.DateTimeFormat("ko-KR", { month: "2-digit", day: "2-digit", weekday: "long" }).format(date) : "미설정"
   const timeText = validDate ? new Intl.DateTimeFormat("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: true }).format(date) : "미설정"
-  return <section aria-label="현재 장면 상태" className="mx-auto w-full max-w-3xl border-b border-border/70 px-4 py-3 text-xs leading-6 text-muted-foreground sm:px-6">
+  return <section aria-label="현재 장면 상태" className="mx-auto mt-5 w-full max-w-3xl border-t border-border/70 px-4 py-3 text-xs leading-6 text-muted-foreground sm:px-6">
     <div className="mb-1 font-medium text-foreground">💌 현재 장면</div>
     <div className="whitespace-pre-wrap font-mono">
       {`📅: ${dateText}\n⏰: ${timeText}\n🧭: ${state.location || "미설정"}\n👜: ${state.inventory?.length ? state.inventory.join("·") : "없음"}\n🧷: ${state.conditions?.length ? state.conditions.join("·") : "없음"}`}
