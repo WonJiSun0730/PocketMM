@@ -283,7 +283,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       new THREE.MeshStandardMaterial({ map: woodTexture, roughness: 0.9 }),
     )
     coffeeTable.position.set(0.25, 0.48, 0.05)
-    scene.add(coffeeTable)
+    if (preset.id === "counseling" || preset.id === "default") scene.add(coffeeTable)
     for (const x of [-0.58, 0.58]) {
       for (const z of [-0.25, 0.25]) {
         const leg = new THREE.Mesh(
@@ -291,7 +291,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
           new THREE.MeshStandardMaterial({ color: 0x51382d, roughness: 0.95 }),
         )
         leg.position.set(0.25 + x, 0.23, 0.05 + z)
-        scene.add(leg)
+        if (preset.id === "counseling" || preset.id === "default") scene.add(leg)
       }
     }
 
@@ -336,7 +336,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     loader.register(parser => new VRMLoaderPlugin(parser))
 
     // CC0 Cozy Home Interiors sofa. Loaded from the pack's permanent CORS CDN.
-    loader.load(
+    if (preset.id === "counseling" || preset.id === "default" || preset.id === "lounge") loader.load(
       "https://cdn.3dassets.dev/assets/17137/v1/model.glb",
       gltf => {
         if (disposed) return
