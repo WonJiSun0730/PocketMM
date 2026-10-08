@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -103,11 +104,32 @@ public class WorldRoomDialogueService {
 
     private void applySceneLocation(Long sessionId, WorldRoomTurn generated) {
         String location = generated.locationChange();
-        if (location == null || location.isBlank() || location.length() > 200) return;
+        boolean hasLocation = location != null && !location.isBlank() && location.length() <= 200;
+        boolean hasChanges = !generated.addedConditions().isEmpty()
+                || !generated.removedConditions().isEmpty()
+                || !generated.addedInventory().isEmpty()
+                || !generated.removedInventory().isEmpty();
+        if (!hasLocation && !hasChanges) return;
         var session = sessions.findById(sessionId).orElseThrow();
         var state = playerStates.findBySessionId(sessionId)
                 .orElseGet(() -> playerStates.save(new WorldRoomPlayerState(session)));
-        state.update(location, List.copyOf(state.getConditions()), List.copyOf(state.getInventory()));
+        var conditions = new ArrayList<>(state.getConditions());
+        var inventory = new ArrayList<>(state.getInventory());
+        applyStateDelta(conditions, generated.removedConditions(), generated.addedConditions());
+        applyStateDelta(inventory, generated.removedInventory(), generated.addedInventory());
+        state.update(hasLocation ? location : state.getLocation(), conditions, inventory);
+    }
+
+    private void applyStateDelta(List<String> current, List<String> removed, List<String> added) {
+        for (String item : removed) {
+            if (item != null && !item.isBlank()) current.removeIf(existing -> existing.equalsIgnoreCase(item.trim()));
+        }
+        for (String item : added) {
+            if (item != null && !item.isBlank() && item.length() <= 300
+                    && current.size() < 50 && current.stream().noneMatch(existing -> existing.equalsIgnoreCase(item.trim()))) {
+                current.add(item.trim());
+            }
+        }
     }
 
     private boolean applyExplicitTimeChange(
