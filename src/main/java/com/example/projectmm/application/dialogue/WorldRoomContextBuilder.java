@@ -1,5 +1,7 @@
 package com.example.projectmm.application.dialogue;
 
+import com.example.projectmm.domain.character.Character;
+import com.example.projectmm.application.chat.WorldRoomSessionService;
 import com.example.projectmm.domain.character.CharacterExample;
 import com.example.projectmm.domain.character.CharacterExampleRepository;
 import com.example.projectmm.domain.character.CharacterProfileRepository;
@@ -30,6 +32,7 @@ import java.util.List;
 public class WorldRoomContextBuilder {
 
     private final WorldConversationRepository rooms;
+    private final WorldRoomSessionService sessionService;
     private final WorldConversationCastRepository casts;
     private final WorldRoomSessionRepository sessions;
     private final WorldRoomSessionCastRepository sessionCasts;
@@ -74,7 +77,8 @@ public class WorldRoomContextBuilder {
                 .map(state -> state.getCharacter().getId())
                 .collect(java.util.stream.Collectors.toSet());
 
-        var roomCast = buildCast(room.getId()).stream()
+        var roomCast = sessionService.registeredCharacters(sessionId).stream()
+                .map(this::buildCharacter)
                 .map(character -> new WorldRoomCharacterContext(
                         character.characterId(),
                         character.characterName(),
@@ -228,28 +232,29 @@ public class WorldRoomContextBuilder {
 
         return casts.findByConversationIdOrderByJoinedAtAscIdAsc(roomId)
                 .stream()
-                .map(cast -> {
-                    var character = cast.getCharacter();
-                    var profile = profiles.findByCharacterId(character.getId()).orElse(null);
-                    var state = states.findByCharacterId(character.getId()).orElse(null);
-                    return new WorldRoomCharacterContext(
-                            character.getId(),
-                            character.getName(),
-                            profile == null ? null : new DialogueCharacterProfile(
-                                    profile.getDescription(),
-                                    profile.getRawDescription(),
-                                    buildExamples(character.getId(), profile.getExampleDialogue()),
-                                    profile.getPersonality(),
-                                    profile.getSpeechStyle(),
-                                    profile.getBackground(),
-                                    profile.getAppearance()
-                            ),
-                            state == null ? 70 : state.getEnergy(),
-                            state == null ? 70 : state.getMood(),
-                            false
-                    );
-                })
+                .map(cast -> buildCharacter(cast.getCharacter()))
                 .toList();
+    }
+
+    private WorldRoomCharacterContext buildCharacter(Character character) {
+        var profile = profiles.findByCharacterId(character.getId()).orElse(null);
+        var state = states.findByCharacterId(character.getId()).orElse(null);
+        return new WorldRoomCharacterContext(
+                character.getId(),
+                character.getName(),
+                profile == null ? null : new DialogueCharacterProfile(
+                        profile.getDescription(),
+                        profile.getRawDescription(),
+                        buildExamples(character.getId(), profile.getExampleDialogue()),
+                        profile.getPersonality(),
+                        profile.getSpeechStyle(),
+                        profile.getBackground(),
+                        profile.getAppearance()
+                ),
+                state == null ? 70 : state.getEnergy(),
+                state == null ? 70 : state.getMood(),
+                false
+        );
     }
 
     private List<String> buildExamples(Long characterId, String legacyExampleDialogue) {

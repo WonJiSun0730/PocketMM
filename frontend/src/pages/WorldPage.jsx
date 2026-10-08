@@ -122,22 +122,6 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
       })
       if (!roomResponse.ok) return setMessage("인트로를 위한 시작 공간을 만들지 못했어요.")
       room = await roomResponse.json()
-
-      for (const character of worldCharacters) {
-        const castResponse = await fetch(
-          `/api/worlds/${selectedWorld.id}/rooms/${room.id}/cast`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({ characterId: character.id }),
-          }
-        )
-        if (!castResponse.ok) {
-          await loadWorldRooms(selectedWorld.id)
-          return setMessage("시작 공간은 만들었지만 등장인물을 연결하지 못했어요.")
-        }
-      }
     }
 
     const response = await fetch(
@@ -508,8 +492,8 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
                     {worldRooms.map((room) => (
                       <div className="world-room-item" key={room.id}>
                         <div className="world-room-main">
-                          <span><strong>{room.title}</strong><small>{room.visibility === "PUBLIC" ? "공개" : "비공개"} · 등장인물 {room.cast?.length ?? 0}명 · 인트로 {roomIntros[room.id]?.length ?? 0}개</small></span>
-                          <p className="world-room-cast-names">포켓 등장인물 · {room.cast?.length ? room.cast.map((item) => item.characterName).join(" · ") : "없음"}</p>
+                          <span><strong>{room.title}</strong><small>{room.visibility === "PUBLIC" ? "공개" : "비공개"} · 새 포켓 등장인물 {worldCharacters.length}명 · 인트로 {roomIntros[room.id]?.length ?? 0}개</small></span>
+                          <p className="world-room-cast-names">새 포켓 등장인물 · {worldCharacters.length ? worldCharacters.map((item) => item.name).join(" · ") : "없음"}</p>
                           <div className="world-intro-list">
                             {(roomIntros[room.id] ?? []).map((intro) => (
                               <div className="world-intro-item" key={intro.id}>
@@ -574,7 +558,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
       {pocketSetup && <div className="world-dialog-backdrop" onMouseDown={() => !pocketBusy && setPocketSetup(null)}><div className="world-pocket-dialog" onMouseDown={(event) => event.stopPropagation()}>
         {!pocketSetup.choosingProfile ? <>
           <div className="world-dialog-heading"><div><span className="world-eyebrow">NEW POCKET</span><h2>어디서 시작할까요?</h2><p>{pocketSetup.room.title}</p></div><button type="button" onClick={() => setPocketSetup(null)} aria-label="닫기"><X size={18}/></button></div>
-          <p className="world-room-cast-names">포켓 등장인물 · {pocketSetup.room.cast?.length ? pocketSetup.room.cast.map((item) => item.characterName).join(" · ") : "없음"}</p>
+          <p className="world-room-cast-names">새 포켓 등장인물 · {worldCharacters.length ? worldCharacters.map((item) => item.name).join(" · ") : "없음"}</p>
           <div className="world-pocket-intros">
             {(roomIntros[pocketSetup.room.id] ?? []).map((intro) => <button className={pocketSetup.intro?.id === intro.id ? "selected" : ""} key={intro.id} type="button" onClick={() => setPocketSetup((current) => ({ ...current, intro }))}><strong>{intro.title}</strong><span>{intro.content}</span></button>)}
           </div>

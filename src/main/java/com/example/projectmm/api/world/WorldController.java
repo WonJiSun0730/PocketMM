@@ -525,6 +525,19 @@ public class WorldController {
         return worldRoomDialogueService.regenerate(sessionId, messageId);
     }
 
+    @GetMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/characters")
+    public List<WorldCharacterItem> getRoomSessionCharacters(
+            @PathVariable Long worldId, @PathVariable Long roomId, @PathVariable Long sessionId,
+            Authentication authentication
+    ) {
+        var session = worldRoomSessionService.ownedSession(roomId, sessionId, authentication.getName());
+        ensureRoomWorld(worldId, session.getRoom().getWorld().getId());
+        return worldRoomSessionService.registeredCharacters(sessionId).stream()
+                .map(character -> new WorldCharacterItem(character.getId(), character.getName(),
+                        null, character.getModelUrl(), character.getModelHeight()))
+                .toList();
+    }
+
     @GetMapping("/{worldId}/rooms/{roomId}/sessions/{sessionId}/cast")
     public List<WorldRoomSessionCastItem> getRoomSessionActiveCast(
             @PathVariable Long worldId,
@@ -661,6 +674,5 @@ public class WorldController {
         return chatService.getRecentWorldMessages(worldId, characterId);
     }
 }
-
 
 

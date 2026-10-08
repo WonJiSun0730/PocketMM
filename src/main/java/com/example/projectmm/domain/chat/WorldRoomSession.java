@@ -43,6 +43,13 @@ public class WorldRoomSession {
 
     private LocalDateTime lastPresenceAt;
 
+    // Null on pre-snapshot pockets; their original room roster remains the fallback.
+    private Boolean castRosterCaptured;
+
+    public void markCastRosterCaptured() {
+        this.castRosterCaptured = true;
+    }
+
     @Column(columnDefinition = "TEXT")
     private String userNote;
 

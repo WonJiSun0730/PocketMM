@@ -147,7 +147,7 @@ export default function PocketPage({ pocket, onBack }) {
         loadMessagePage(),
         fetch(`${base}/cast`, { credentials: "include" }),
         fetch(`${base}/systems`, { credentials: "include" }),
-        fetch(`/api/worlds/${world.id}/characters`, { credentials: "include" }),
+        fetch(`${base}/characters`, { credentials: "include" }),
       ])
       setMessages(loadedMessages)
       await loadPageVariants(loadedMessages)

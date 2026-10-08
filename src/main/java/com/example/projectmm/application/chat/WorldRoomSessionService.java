@@ -1,6 +1,8 @@
 package com.example.projectmm.application.chat;
 
 import com.example.projectmm.domain.chat.*;
+import com.example.projectmm.domain.character.Character;
+import com.example.projectmm.domain.character.CharacterRepository;
 import com.example.projectmm.domain.dialogue.WorldRoomCastChange;
 import com.example.projectmm.domain.dialogue.WorldRoomSystemChange;
 import com.example.projectmm.domain.member.MemberRepository;
@@ -25,6 +27,7 @@ import java.util.List;
 public class WorldRoomSessionService {
 
     private final WorldConversationRepository rooms;
+    private final CharacterRepository characters;
     private final WorldConversationCastRepository roomCasts;
     private final WorldRoomSessionRepository sessions;
     private final WorldRoomSessionCastRepository sessionCasts;
@@ -59,6 +62,9 @@ public class WorldRoomSessionService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room intro not found"));
         var startedAt = intro.getInitialSimulatedAt() == null ? now() : intro.getInitialSimulatedAt();
         var session = sessions.save(new WorldRoomSession(room, member, player, intro, startedAt));
+        characters.findAllByWorldIdOrderByIdAsc(room.getWorld().getId())
+                .forEach(character -> sessionCasts.save(new WorldRoomSessionCast(session, character)));
+        session.markCastRosterCaptured();
         var playerState = playerStates.save(new WorldRoomPlayerState(session));
         playerState.update(
                 intro.getInitialLocation(),
@@ -177,9 +183,9 @@ public class WorldRoomSessionService {
             return WorldRoomCastChange.none();
         }
 
-        var allowed = roomCasts.findByConversationIdOrderByJoinedAtAscIdAsc(session.getRoom().getId())
+        var allowed = registeredCharacters(sessionId)
                 .stream()
-                .map(cast -> cast.getCharacter().getId())
+                .map(Character::getId)
                 .collect(java.util.stream.Collectors.toSet());
 
         var entered = new ArrayList<Long>();
@@ -193,9 +199,7 @@ public class WorldRoomSessionService {
             var state = sessionCasts.findBySessionIdAndCharacterId(sessionId, characterId)
                     .orElseGet(() -> sessionCasts.save(new WorldRoomSessionCast(
                             session,
-                            roomCasts.findByConversationIdAndCharacterId(session.getRoom().getId(), characterId)
-                                    .orElseThrow()
-                                    .getCharacter()
+                            registeredCharacter(sessionId, characterId)
                     )));
             if (!state.isActive()) {
                 state.enter(now());
@@ -222,15 +226,15 @@ public class WorldRoomSessionService {
     @Transactional(readOnly = true)
     public List<CastState> captureCastState(Long sessionId) {
         var session = session(sessionId);
-        return roomCasts.findByConversationIdOrderByJoinedAtAscIdAsc(session.getRoom().getId())
+        return registeredCharacters(sessionId)
                 .stream()
-                .map(cast -> {
+                .map(character -> {
                     var state = sessionCasts.findBySessionIdAndCharacterId(
                             sessionId,
-                            cast.getCharacter().getId()
+                            character.getId()
                     ).orElse(null);
                     return new CastState(
-                            cast.getCharacter().getId(),
+                            character.getId(),
                             state != null && state.isActive(),
                             state == null ? null : state.getEnteredAt(),
                             state == null ? null : state.getLeftAt()
@@ -272,20 +276,18 @@ public class WorldRoomSessionService {
         var session = session(sessionId);
         var snapshots = castSnapshots.findByVariantIdOrderByCharacterIdAsc(variant.getId());
         if (snapshots.isEmpty()) {
-            var roomCast = roomCasts.findByConversationIdOrderByJoinedAtAscIdAsc(session.getRoom().getId());
+            var roomCast = registeredCharacters(sessionId);
             if (roomCast.isEmpty()) {
                 return;
             }
             throw new IllegalStateException("Cast snapshot not found. variantId=" + variant.getId());
         }
         for (var snapshot : snapshots) {
-            var roomCast = roomCasts.findByConversationIdAndCharacterId(
-                    session.getRoom().getId(), snapshot.getCharacterId()
-            ).orElseThrow();
+            var character = registeredCharacter(sessionId, snapshot.getCharacterId());
             var state = sessionCasts.findBySessionIdAndCharacterId(
                     sessionId, snapshot.getCharacterId()
             ).orElseGet(() -> sessionCasts.save(
-                    new WorldRoomSessionCast(session, roomCast.getCharacter())
+                    new WorldRoomSessionCast(session, character)
             ));
             state.restore(
                     snapshot.isBeforeActive(),
@@ -300,7 +302,7 @@ public class WorldRoomSessionService {
         var session = session(sessionId);
         var snapshots = castSnapshots.findByVariantIdOrderByCharacterIdAsc(variant.getId());
         if (snapshots.isEmpty()) {
-            var roomCast = roomCasts.findByConversationIdOrderByJoinedAtAscIdAsc(session.getRoom().getId());
+            var roomCast = registeredCharacters(sessionId);
             if (roomCast.isEmpty()) {
                 return;
             }
@@ -310,20 +312,14 @@ public class WorldRoomSessionService {
         }
 
         for (var snapshot : snapshots) {
-            var roomCast = roomCasts.findByConversationIdAndCharacterId(
-                            session.getRoom().getId(),
-                            snapshot.getCharacterId()
-                    )
-                    .orElseThrow(() -> new IllegalStateException(
-                            "Room cast not found. characterId=" + snapshot.getCharacterId()
-                    ));
+            var character = registeredCharacter(sessionId, snapshot.getCharacterId());
             var state = sessionCasts.findBySessionIdAndCharacterId(
                             sessionId,
                             snapshot.getCharacterId()
                     )
                     .orElseGet(() -> sessionCasts.save(new WorldRoomSessionCast(
                             session,
-                            roomCast.getCharacter()
+                            character
                     )));
             state.restore(
                     snapshot.isAfterActive(),
@@ -498,6 +494,24 @@ public class WorldRoomSessionService {
     public List<WorldRoomSessionCast> activeCast(Long sessionId) {
         session(sessionId);
         return sessionCasts.findBySessionIdAndActiveTrueOrderByEnteredAtAscIdAsc(sessionId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Character> registeredCharacters(Long sessionId) {
+        var session = session(sessionId);
+        if (Boolean.TRUE.equals(session.getCastRosterCaptured())) {
+            return sessionCasts.findBySessionIdOrderByIdAsc(sessionId).stream()
+                    .map(WorldRoomSessionCast::getCharacter).toList();
+        }
+        // Preserve existing pockets using their historical room membership, not today's world.
+        return roomCasts.findByConversationIdOrderByJoinedAtAscIdAsc(session.getRoom().getId())
+                .stream().map(WorldConversationCast::getCharacter).toList();
+    }
+
+    private Character registeredCharacter(Long sessionId, Long characterId) {
+        return registeredCharacters(sessionId).stream()
+                .filter(character -> character.getId().equals(characterId)).findFirst()
+                .orElseThrow(() -> new IllegalStateException("Pocket cast not found. characterId=" + characterId));
     }
 
     private WorldRoomSession session(Long sessionId) {
