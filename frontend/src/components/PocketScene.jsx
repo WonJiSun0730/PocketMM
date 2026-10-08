@@ -192,6 +192,41 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       for (const [x, y] of [[3,6],[14,2],[18,12]]) ctx.fillRect(x, y, 5, 1)
     }, 3, 2)
 
+    // Authored scene furniture uses simple pixel-friendly geometry until the
+    // dedicated 2D furniture/sprite pass. All meshes share the VRM depth stage.
+    const furnitureMaterial = color => new THREE.MeshStandardMaterial({ color, roughness: 0.92 })
+    function furnitureBox(width, height, depth, x, y, z, color) {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), furnitureMaterial(color))
+      mesh.position.set(x, y, z)
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+      scene.add(mesh)
+      return mesh
+    }
+
+    if (preset.id === "office") {
+      // Desk, monitor, and filing cabinet.
+      furnitureBox(2.0, 0.12, 0.85, 0.1, 0.76, -1.3, 0x66584f)
+      furnitureBox(0.13, 0.72, 0.65, -0.7, 0.37, -1.3, 0x514b49)
+      furnitureBox(0.13, 0.72, 0.65, 0.9, 0.37, -1.3, 0x514b49)
+      furnitureBox(0.78, 0.52, 0.07, 0.2, 1.12, -1.42, 0x242f3c)
+      furnitureBox(0.18, 0.22, 0.12, 0.2, 0.85, -1.42, 0x343b42)
+      furnitureBox(0.66, 1.12, 0.65, 2.4, 0.56, -1.48, 0x69767b)
+    } else if (preset.id === "bedroom") {
+      // Low bed with pillows and a bedside cabinet.
+      furnitureBox(2.45, 0.28, 1.35, 0.35, 0.29, -1.25, 0x795c58)
+      furnitureBox(2.2, 0.12, 1.18, 0.35, 0.5, -1.25, 0xabb0c7)
+      furnitureBox(0.66, 0.13, 0.44, -0.35, 0.62, -1.52, 0xe0d7cc)
+      furnitureBox(0.65, 0.52, 0.56, -1.85, 0.26, -1.48, 0x6c5658)
+    } else if (preset.id === "lounge") {
+      // Counter, vending machine, and small side table.
+      furnitureBox(2.0, 0.95, 0.56, 1.05, 0.48, -1.72, 0x7c6654)
+      furnitureBox(0.72, 1.65, 0.55, -2.2, 0.83, -1.62, 0x566a73)
+      furnitureBox(0.46, 0.78, 0.035, -2.2, 1.06, -1.32, 0x9db6b4)
+      furnitureBox(0.8, 0.1, 0.7, -0.65, 0.54, -0.5, 0x8b6c52)
+      furnitureBox(0.1, 0.5, 0.1, -0.65, 0.25, -0.5, 0x665242)
+    }
+
     // Warm temporary counseling room. Furniture GLBs can replace these
     // primitives incrementally without touching the VRM pipeline.
     const floor = new THREE.Mesh(
