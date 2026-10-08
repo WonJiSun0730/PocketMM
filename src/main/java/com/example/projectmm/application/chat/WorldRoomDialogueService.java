@@ -209,7 +209,9 @@ public class WorldRoomDialogueService {
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
         applySceneLocation(sessionId, generated);
-        applyNarrativeElapsedTime(session, generated.elapsedSeconds());
+        if (!explicitTimeChanged) {
+            applyNarrativeElapsedTime(session, generated.elapsedSeconds());
+        }
         var afterCast = sessionService.captureCastState(sessionId);
         var afterSystems = sessionService.captureSystemState(sessionId);
 
@@ -321,7 +323,6 @@ public class WorldRoomDialogueService {
         sessionService.restoreSystemsBeforeVariant(sessionId, selected);
         sessionService.restoreTimeBeforeVariant(sessionId, selected);
         restorePlayerState(sessionId, selected.getBeforePlayerStateJson());
-        var context = contextBuilder.buildSessionBeforeMessage(sessionId, target.getId());
         var rerollBase = precedingMessage != null && precedingMessage.getRole() == ChatRole.USER
                 ? precedingMessage.getContent()
                 : "[Continue the current scene naturally for one turn. The player character may actively participate: give them plausible small actions, immediate reactions, observations, movement, or brief dialogue consistent with their PlayerProfile, established relationships, and the current situation. This mode is used when the user wants the story to move forward without deciding the next beat themselves. Keep major decisions, irreversible actions, major relationship changes, high-risk commitments, and other consequential choices open for the user.]";
@@ -333,11 +334,17 @@ public class WorldRoomDialogueService {
         var beforeSystems = sessionService.captureSystemState(sessionId);
         var beforeTime = sessionService.captureSimulatedAt(sessionId);
         var beforePlayerState = capturePlayerState(sessionId);
+        var rerollSession = sessions.findById(sessionId).orElseThrow();
+        boolean explicitTimeChanged = precedingMessage != null && precedingMessage.getRole() == ChatRole.USER
+                && applyExplicitTimeChange(rerollSession, rerollBase);
+        var context = contextBuilder.buildSessionBeforeMessage(sessionId, target.getId());
         var generated = dialogueGateway.generateWorldRoomTurn(context, rerollPrompt);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
         applySceneLocation(sessionId, generated);
-        applyNarrativeElapsedTime(sessions.findById(sessionId).orElseThrow(), generated.elapsedSeconds());
+        if (!explicitTimeChanged) {
+            applyNarrativeElapsedTime(rerollSession, generated.elapsedSeconds());
+        }
         var afterCast = sessionService.captureCastState(sessionId);
         var afterSystems = sessionService.captureSystemState(sessionId);
 
@@ -383,11 +390,12 @@ public class WorldRoomDialogueService {
         deleteTimelineFrom(sessionId, target.getId());
         messages.flush();
 
-        var context = contextBuilder.buildSession(sessionId);
         var beforeCast = sessionService.captureCastState(sessionId);
         var beforeSystems = sessionService.captureSystemState(sessionId);
         var beforeTime = sessionService.captureSimulatedAt(sessionId);
         var beforePlayerState = capturePlayerState(sessionId);
+        boolean explicitTimeChanged = applyExplicitTimeChange(session, userMessage.getContent());
+        var context = contextBuilder.buildSession(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage.getContent());
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
