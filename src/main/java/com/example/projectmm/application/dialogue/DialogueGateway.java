@@ -24,6 +24,24 @@ public interface DialogueGateway {
         return generateWorldRoomTurn(context, userMessage).reply();
     }
 
+    default WorldRoomTurn analyzeEditedWorldRoomState(
+            WorldRoomDialogueContext context,
+            String editedReply
+    ) {
+        return generateWorldRoomTurn(context, """
+                [STATE EXTRACTION ONLY — DO NOT CONTINUE THE STORY]
+                Analyze the following edited assistant reply as an already-completed scene.
+                Return the required structured JSON envelope. Set reply to an empty placeholder
+                or short acknowledgement; it will be discarded and never shown to the player.
+                Extract only explicit final location, player condition and inventory changes
+                that actually occur in the edited passage. No speculative changes.
+                Set elapsedSeconds to 0, enterCharacterIds/leaveCharacterIds and
+                systemChanges to empty arrays. Do not narrate a new event.
+
+                [EDITED ASSISTANT REPLY]
+                """ + editedReply);
+    }
+
     default WorldRoomTurn generateWorldRoomTurn(
             WorldRoomDialogueContext context,
             String userMessage
