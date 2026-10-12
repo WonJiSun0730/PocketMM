@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react"
 import * as THREE from "three"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
-import { VRMLoaderPlugin } from "@pixiv/three-vrm"
+import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm"
 import { resolvePocketScene, resolvePocketDaypart } from "@/lib/pocketSceneRegistry"
 import { getPocketBackground } from "@/lib/pocketSceneBackgrounds"
+import { createStandingIdle } from "@/lib/pocketStandingIdle"
 
 export default function PocketScene({ className = "", simulatedAt = "", location = "", sessionId = null, playerModel = null, characterModels = [] }) {
   const hostRef = useRef(null)
@@ -23,6 +24,11 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     host.replaceChildren()
 
     let disposed = false
+    const idleActors = []
+    let animationFrame = null
+    let lastFrameTime = null
+    let idleTime = 0
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
     const scene = new THREE.Scene()
     // Only actors are rendered in WebGL; the 2D backdrop lives behind its transparent canvas.
     scene.userData.runtime = { simulatedAt, location, daypart, sceneId: preset.id }
@@ -153,17 +159,21 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       renderer.render(postScene, postCamera)
     }
 
-    function loadVrm(model, position, facingY = 0) {
+    function loadVrm(model, position, facingY = 0, phase = 0) {
       const { url, height: targetHeight } = model
       loader.load(
         url,
         gltf => {
-          if (disposed) return
+          if (disposed) { VRMUtils.deepDispose(gltf.scene); return }
           const vrm = gltf.userData.vrm
           if (!vrm) {
             console.warn("[PocketScene] VRM data missing:", url)
+            VRMUtils.deepDispose(gltf.scene)
             return
           }
+
+          const updateIdle = createStandingIdle(vrm, phase)
+          vrm.scene.updateMatrixWorld(true)
 
           const box = new THREE.Box3().setFromObject(vrm.scene)
           const height = box.max.y - box.min.y
@@ -185,6 +195,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
           })
           pixelizeModel(vrm.scene)
           scene.add(vrm.scene)
+          idleActors.push(updateIdle)
           render()
         },
         undefined,
@@ -202,8 +213,28 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       const x = startX + index * spacing
       const z = 0.55 - Math.abs(index - (visibleModels.length - 1) / 2) * 0.08
       const facing = x <= 0 ? Math.PI * 0.12 : -Math.PI * 0.12
-      loadVrm(model, new THREE.Vector3(x, 0, z), facing)
+      loadVrm(model, new THREE.Vector3(x, 0, z), facing, index * 1.7)
     })
+
+    function animate(timestamp) {
+      if (disposed) return
+      animationFrame = requestAnimationFrame(animate)
+      if (document.hidden || reducedMotion.matches) { lastFrameTime = null; return }
+      if (lastFrameTime !== null && timestamp - lastFrameTime < 1000 / 30) return
+      const delta = lastFrameTime === null ? 0 : Math.min(0.05, (timestamp - lastFrameTime) / 1000)
+      lastFrameTime = timestamp
+      idleTime += delta
+      if (!idleActors.length) return
+      idleActors.forEach(update => update(idleTime, delta))
+      render()
+    }
+    function motionChanged() {
+      lastFrameTime = null
+      if (reducedMotion.matches) idleActors.forEach(update => update(0, 0, false))
+      render()
+    }
+    reducedMotion.addEventListener("change", motionChanged)
+    animationFrame = requestAnimationFrame(animate)
 
     function resize() {
       const width = Math.max(1, host.getBoundingClientRect().width)
@@ -231,19 +262,15 @@ export default function PocketScene({ className = "", simulatedAt = "", location
 
     return () => {
       disposed = true
+      cancelAnimationFrame(animationFrame)
+      reducedMotion.removeEventListener("change", motionChanged)
       observer.disconnect()
       renderTarget.dispose()
       postMaterial.dispose()
       postQuad.geometry.dispose()
       renderer.dispose()
       renderer.domElement.remove()
-      scene.traverse(object => {
-        if (object.geometry) object.geometry.dispose()
-        if (object.material) {
-          const materials = Array.isArray(object.material) ? object.material : [object.material]
-          materials.forEach(material => material.dispose())
-        }
-      })
+      VRMUtils.deepDispose(scene)
     }
   }, [zoom, sceneHeight, pixelHeight, simulatedAt, location, sessionId, playerModel, characterModels])
 
