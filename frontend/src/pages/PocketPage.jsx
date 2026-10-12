@@ -574,6 +574,7 @@ export default function PocketPage({ pocket, onBack }) {
                   <span>캐시 <strong className="text-foreground">{aiUsage.cachedInputTokens?.toLocaleString()}</strong></span>
                   <span>출력 <strong className="text-foreground">{aiUsage.outputTokens?.toLocaleString()}</strong></span>
                   <span>총 <strong className="text-foreground">{aiUsage.totalTokens?.toLocaleString()}</strong></span>
+                  <span title="표준 텍스트 토큰 기준 예상액 · 캐시 쓰기·추가 도구·세금 제외">예상 비용 <strong className="text-foreground">{aiUsage.estimatedCostUsd == null ? "단가 미설정" : `$${Number(aiUsage.estimatedCostUsd).toFixed(6)}`}</strong></span>
                 </div>
               : <p className="text-xs text-muted-foreground">아직 기록된 OpenAI 토큰 사용량이 없습니다.</p>}
           </div>
@@ -767,6 +768,7 @@ export default function PocketPage({ pocket, onBack }) {
                   <span>캐시 <strong className="text-foreground">{aiUsage.cachedInputTokens?.toLocaleString()}</strong></span>
                   <span>출력 <strong className="text-foreground">{aiUsage.outputTokens?.toLocaleString()}</strong></span>
                   <span>총 <strong className="text-foreground">{aiUsage.totalTokens?.toLocaleString()}</strong></span>
+                  <span title="표준 텍스트 토큰 기준 예상액 · 캐시 쓰기·추가 도구·세금 제외">예상 비용 <strong className="text-foreground">{aiUsage.estimatedCostUsd == null ? "단가 미설정" : `$${Number(aiUsage.estimatedCostUsd).toFixed(6)}`}</strong></span>
                 </div>
               : <p className="text-xs text-muted-foreground">아직 기록된 OpenAI 토큰 사용량이 없습니다.</p>}
           </div>
