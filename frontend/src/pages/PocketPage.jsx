@@ -10,21 +10,11 @@ import PocketSettingsPanel from "@/components/PocketSettingsPanel"
 import DialogueIssuePanel from "@/components/DialogueIssuePanel"
 import usePocketProgress from "@/hooks/usePocketProgress"
 import PocketProgressPanel from "@/components/PocketProgressPanel"
+import RpText from "@/components/RpText"
+import TypedPocketReply from "@/components/TypedPocketReply"
 import PocketActivityScene from "@/components/PocketActivityScene"
 import { resolvePocketSceneModels } from "@/lib/pocketCharacterModels"
 import "./PocketPage.css"
-
-function RpText({ text }) {
-  const parts = (text ?? "").split(/(\*[^*]+\*)/g)
-  return <div className="whitespace-pre-wrap text-[15px] leading-7 text-foreground sm:text-base sm:leading-8">
-    {parts.map((part, index) => {
-      const action = part.startsWith("*") && part.endsWith("*") && part.length > 2
-      return action
-        ? <span key={index} className="italic text-muted-foreground">{part.slice(1, -1)}</span>
-        : <span key={index}>{part}</span>
-    })}
-  </div>
-}
 
 function snapshotSceneState(variant) {
   if (!variant?.scenePlayerStateJson) return null
@@ -61,6 +51,7 @@ export default function PocketPage({ pocket, onBack }) {
   const [pickerMode, setPickerMode] = useState(false)
   const [changingPlayerProfile, setChangingPlayerProfile] = useState(false)
   const [messages, setMessages] = useState([])
+  const [typingTarget,setTypingTarget] = useState(null)
   const [cast, setCast] = useState([])
   const [worldCharacters, setWorldCharacters] = useState([])
   const [systems, setSystems] = useState([])
@@ -154,7 +145,7 @@ export default function PocketPage({ pocket, onBack }) {
     setVariantsByMessage(current => ({ ...current, ...Object.fromEntries(entries) }))
   }
 
-  async function refresh() {
+  async function refresh({animateReply=false}={}) {
     try {
       const [loadedMessages, castResponse, systemResponse, worldCharactersResponse, sessionResponse] = await Promise.all([
         loadMessagePage(),
@@ -163,6 +154,8 @@ export default function PocketPage({ pocket, onBack }) {
         fetch(`${base}/characters`, { credentials: "include" }),
         fetch(`/api/worlds/pockets/${session.id}`, { credentials: "include" }),
       ])
+      const reply=animateReply ? loadedMessages.findLast(item=>item.role==="CHARACTER" && item.absenceReportId==null) : null
+      setTypingTarget(reply ? `${reply.id}:${reply.selectedVariantNo ?? 1}` : null)
       setMessages(loadedMessages)
       await loadPageVariants(loadedMessages)
       setHasOlderMessages(loadedMessages.length === 15)
@@ -261,6 +254,12 @@ export default function PocketPage({ pocket, onBack }) {
     return () => observer.disconnect()
   }, [hasOlderMessages, loadingOlder, loading, messages[0]?.id])
 
+  function followTyping() {
+    const viewport=scrollAreaRef.current?.querySelector('[data-slot="scroll-area-viewport"]')
+    if(viewport && viewport.scrollHeight-viewport.scrollTop-viewport.clientHeight<120)
+      bottomRef.current?.scrollIntoView({block:"end",behavior:"auto"})
+  }
+
   async function selectPlayerProfile(profile) {
     if (changingPlayerProfile || sending) return
     setChangingPlayerProfile(true)
@@ -307,7 +306,7 @@ export default function PocketPage({ pocket, onBack }) {
         body: JSON.stringify({ message }),
       })
       if (!response.ok) throw new Error("대화를 이어가지 못했어요.")
-      await refresh()
+      await refresh({animateReply:true})
       refreshPlayerState()
       await refreshMemoryInspector()
       await refreshAiUsage()
@@ -351,7 +350,7 @@ export default function PocketPage({ pocket, onBack }) {
       const response = await fetch(`${base}/messages/${item.id}/reroll`, { method: "POST", credentials: "include" })
       if (response.status === 409) throw new Error("이 응답은 이미 이어진 과거 장면이라 리롤할 수 없어요.")
       if (!response.ok) throw new Error("리롤하지 못했어요.")
-      await refresh()
+      await refresh({animateReply:true})
       refreshPlayerState()
       await loadVariants(item.id)
     } catch (e) { setError(e.message) }
@@ -409,7 +408,7 @@ export default function PocketPage({ pocket, onBack }) {
         credentials: "include",
       })
       if (!response.ok) throw new Error("장면을 이어가지 못했어요.")
-      await refresh()
+      await refresh({animateReply:true})
       refreshPlayerState()
       await refreshMemoryInspector()
       await refreshAiUsage()
@@ -662,8 +661,12 @@ export default function PocketPage({ pocket, onBack }) {
               {editing === item.id ? <div className="space-y-2">
                 <Textarea autoFocus value={editText} onChange={e => setEditText(e.target.value)} className="min-h-32 resize-y text-base leading-7" />
                 <div className="flex justify-end gap-2"><Button size="sm" variant="ghost" onClick={() => setEditing(null)}><X className="mr-1 size-3.5"/>취소</Button><Button size="sm" onClick={() => editMessage(item)}>저장</Button></div>
-              </div> : <RpText text={item.content ?? item.message} />}
-              {messageSceneState && <SceneStateMessage state={messageSceneState} />}
+              </div> : <TypedPocketReply key={`${item.id}:${item.selectedVariantNo ?? 1}:${item.content ?? item.message}`}
+                text={item.content ?? item.message}
+                animate={isCharacter && !isAbsence && typingTarget===`${item.id}:${item.selectedVariantNo ?? 1}`}
+                onProgress={followTyping}>
+                {messageSceneState && <SceneStateMessage state={messageSceneState} />}
+              </TypedPocketReply>}
               {editing !== item.id && <div className="mt-4 flex min-h-7 flex-wrap items-center gap-1 text-xs text-muted-foreground opacity-40 transition-opacity group-hover:opacity-100">
                 {!isAbsence && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { setEditing(item.id); setEditText(item.content ?? item.message ?? "") }} disabled={sending}><Pencil className="mr-1 size-3"/>수정</Button>}
                 {isCharacter && !isAbsence && isLatest && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => reroll(item)} disabled={sending}><RefreshCw className="mr-1 size-3"/>리롤</Button>}

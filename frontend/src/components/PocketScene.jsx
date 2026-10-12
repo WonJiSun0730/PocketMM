@@ -24,6 +24,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     return ()=>clearInterval(timer)
   }, [activity?.start, activity?.kind, actorKey])
   const projectBubbles = useRef(() => {})
+  const refreshPose = useRef(() => {})
   const [zoom, setZoom] = useState(1.35)
   const [sceneHeight, setSceneHeight] = useState(260)
   const [pixelHeight, setPixelHeight] = useState(160)
@@ -249,6 +250,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
             vrm.scene.rotation.copy(restRotation); vrm.scene.rotation.x+=pose.rx; vrm.scene.rotation.z+=pose.rz
             updateIdle(time,delta,motion)
           })
+          idleActors.at(-1)(0,0,false)
           const head = vrm.humanoid?.getRawBoneNode("head") ?? vrm.scene
           if (actorId != null) bubbleActors.push({ id: actorId, head, vrm })
           render()
@@ -283,6 +285,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       idleActors.forEach(update => update(idleTime, delta))
       render()
     }
+    refreshPose.current = () => { idleActors.forEach(update=>update(idleTime,0,!reducedMotion.matches)); render() }
     function motionChanged() {
       lastFrameTime = null
       if (reducedMotion.matches) idleActors.forEach(update => update(0, 0, false))
@@ -330,7 +333,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     }
   }, [zoom, sceneHeight, pixelHeight, daypart, sessionId, playerModel, characterModels, compact])
 
-  useEffect(() => { projectBubbles.current() }, [activity])
+  useEffect(() => { refreshPose.current(); projectBubbles.current() }, [activity])
   const symbol = activitySymbol(activity?.kind)
   const speakers = speakingActors(activity)
   const speaker = speakers.length ? speakers[speakingIndex % speakers.length] : null
