@@ -163,7 +163,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
         if (!bubble) continue
         actor.vrm.scene.updateMatrixWorld(true)
         actor.head.getWorldPosition(headPosition)
-        headPosition.y += 0.2
+        headPosition.y += 0.55
         headPosition.project(camera)
         bubble.hidden = headPosition.z < -1 || headPosition.z > 1 || Math.abs(headPosition.x) > 1.1
         bubble.style.left = `${Math.max(6, Math.min(94, (headPosition.x + 1) * 50))}%`
