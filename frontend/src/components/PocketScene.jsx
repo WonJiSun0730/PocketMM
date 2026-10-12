@@ -264,7 +264,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       ...(playerModel ? [{ ...playerModel, role: "player" }] : []),
       ...characterModels.map(model => ({ ...model, role: "character" })),
     ]
-    const spacing = 1.65
+    const spacing = compact ? 1.45 : 1.65
     const startX = -((visibleModels.length - 1) * spacing) / 2
     visibleModels.forEach((model, index) => {
       const x = startX + index * spacing
@@ -305,7 +305,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       renderer.domElement.style.height = "100%"
 
       const aspect = width / height
-      const viewHeight = 3.25 / zoom
+      const viewHeight = compact ? Math.max(3.25 / zoom, visibleModels.length * 1.2 + 0.7) : 3.25 / zoom
       camera.left = -(viewHeight * aspect) / 2
       camera.right = (viewHeight * aspect) / 2
       camera.top = viewHeight / 2
