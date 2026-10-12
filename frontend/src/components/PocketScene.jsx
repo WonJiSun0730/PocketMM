@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import * as THREE from "three"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { VRMLoaderPlugin } from "@pixiv/three-vrm"
-import { resolvePocketScene } from "@/lib/pocketSceneRegistry"
+import { resolvePocketScene, resolvePocketDaypart } from "@/lib/pocketSceneRegistry"
 import { getPocketBackground } from "@/lib/pocketSceneBackgrounds"
 
 export default function PocketScene({ className = "", simulatedAt = "", location = "", sessionId = null, playerModel = null, characterModels = [] }) {
@@ -10,6 +10,12 @@ export default function PocketScene({ className = "", simulatedAt = "", location
   const [zoom, setZoom] = useState(1.35)
   const [sceneHeight, setSceneHeight] = useState(260)
   const [pixelHeight, setPixelHeight] = useState(160)
+  const [failedBackground, setFailedBackground] = useState(null)
+  const preset = resolvePocketScene(location)
+  const daypart = resolvePocketDaypart(simulatedAt)
+  const registeredBackground = getPocketBackground(sessionId, location)
+  const requestedBackground = registeredBackground || preset.backgroundUrl
+  const backgroundUrl = failedBackground === requestedBackground ? preset.backgroundUrl : requestedBackground
 
   useEffect(() => {
     const host = hostRef.current
@@ -18,54 +24,19 @@ export default function PocketScene({ className = "", simulatedAt = "", location
 
     let disposed = false
     const scene = new THREE.Scene()
-    const preset = resolvePocketScene(location)
-    scene.background = new THREE.Color(preset.backdrop)
-
-    // Runtime hooks are intentionally simple for the first linkage pass.
-    // Scene selection comes next; for now location is exposed to the renderer
-    // and authoritative Pocket time drives the room's daypart.
-    const hour = simulatedAt ? Number(simulatedAt.slice(11, 13)) : 12
-    const daypart = hour >= 6 && hour < 17 ? "day" : hour < 21 ? "evening" : "night"
+    // Only actors are rendered in WebGL; the 2D backdrop lives behind its transparent canvas.
     scene.userData.runtime = { simulatedAt, location, daypart, sceneId: preset.id }
-
-    // A generated backdrop is an optional far-wall layer, not a replacement
-    // for the depth scene, furniture, or VRM actors.
-    const backdropUrl = getPocketBackground(sessionId, location)
-    let generatedBackdropTexture = null
-    if (backdropUrl) {
-      new THREE.TextureLoader().load(
-        backdropUrl,
-        texture => {
-          if (disposed) {
-            texture.dispose()
-            return
-          }
-          texture.colorSpace = THREE.SRGBColorSpace
-          texture.magFilter = THREE.NearestFilter
-          texture.minFilter = THREE.NearestFilter
-          generatedBackdropTexture = texture
-          const backdrop = new THREE.Mesh(
-            new THREE.PlaneGeometry(6.25, 3.1),
-            new THREE.MeshBasicMaterial({ map: texture, depthWrite: false }),
-          )
-          backdrop.position.set(0, 1.55, -1.905)
-          scene.add(backdrop)
-          render()
-        },
-        undefined,
-        error => console.warn("[PocketScene] Background image unavailable:", error),
-      )
-    }
 
     const camera = new THREE.OrthographicCamera(-4, 4, 2.25, -2.25, 0.1, 100)
     // Fixed side-on stage view: keep the room depth for distant scenery.
     camera.position.set(0, 1.55, 10)
     camera.lookAt(0, 1.25, 0)
 
-    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: false })
+    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, premultipliedAlpha: false })
     renderer.setPixelRatio(1)
     renderer.outputColorSpace = THREE.SRGBColorSpace
-    renderer.shadowMap.enabled = true
+    renderer.setClearColor(0x000000, 0)
+    renderer.shadowMap.enabled = false
     renderer.shadowMap.type = THREE.BasicShadowMap
     renderer.domElement.className = "pocket-scene__canvas"
     host.appendChild(renderer.domElement)
@@ -142,248 +113,12 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     key.shadow.bias = -0.001
     scene.add(key)
 
-    // The real PointLight stays intentionally subtle. The visible lamp pool is
-    // built from stepped emissive patches below so it reads as pixel lighting
-    // instead of a smooth high-resolution radial gradient.
-    const lampLight = new THREE.PointLight(0xffc184, 0.08, 1.8, 2)
-    lampLight.position.set(-2.15, 1.45, -1.25)
-    lampLight.castShadow = true
-    lampLight.shadow.mapSize.set(64, 64)
-    lampLight.shadow.bias = -0.002
-    scene.add(lampLight)
-
     const roomFill = new THREE.PointLight(0xfff8ed, 1.35, 5.5, 2)
     roomFill.position.set(1.8, 2.7, 1.5)
     scene.add(roomFill)
 
-    function makePixelTexture(width, height, paint, repeatX = 1, repeatY = 1) {
-      const canvas = document.createElement("canvas")
-      canvas.width = width
-      canvas.height = height
-      const context = canvas.getContext("2d")
-      paint(context, width, height)
-      const texture = new THREE.CanvasTexture(canvas)
-      texture.colorSpace = THREE.SRGBColorSpace
-      texture.magFilter = THREE.NearestFilter
-      texture.minFilter = THREE.NearestFilter
-      texture.generateMipmaps = false
-      texture.wrapS = THREE.RepeatWrapping
-      texture.wrapT = THREE.RepeatWrapping
-      texture.repeat.set(repeatX, repeatY)
-      return texture
-    }
-
-    const floorTexture = makePixelTexture(32, 32, (ctx, w, h) => {
-      ctx.fillStyle = `#${preset.floor.toString(16).padStart(6, "0")}`
-      ctx.fillRect(0, 0, w, h)
-      for (let y = 0; y < h; y += 8) {
-        ctx.fillStyle = y % 16 === 0 ? "#8a6347" : "#684733"
-        ctx.fillRect(0, y, w, 1)
-        for (let x = (y / 8) % 2 ? 8 : 0; x < w; x += 16) ctx.fillRect(x, y, 1, 8)
-      }
-      ctx.fillStyle = "#967052"
-      for (const [x, y] of [[3,4],[12,11],[25,6],[19,22],[6,27],[29,17]]) ctx.fillRect(x, y, 4, 1)
-    }, 4, 3)
-
-    const wallTexture = makePixelTexture(24, 24, (ctx, w, h) => {
-      ctx.fillStyle = `#${preset.wall.toString(16).padStart(6, "0")}`
-      ctx.fillRect(0, 0, w, h)
-      ctx.fillStyle = "#c8b99e"
-      for (const [x, y] of [[3,4],[16,2],[8,13],[20,17],[2,21],[13,8]]) {
-        ctx.fillRect(x, y, 2, 3)
-        ctx.fillRect(x + 2, y + 1, 1, 1)
-      }
-      ctx.fillStyle = "#e2d4bc"
-      for (const [x, y] of [[10,3],[5,17],[18,11]]) ctx.fillRect(x, y, 3, 2)
-    }, 5, 3)
-
-    const rugTexture = makePixelTexture(32, 24, (ctx, w, h) => {
-      ctx.fillStyle = "#5f7259"
-      ctx.fillRect(0, 0, w, h)
-      ctx.fillStyle = "#9b916b"
-      ctx.fillRect(1, 1, w - 2, 1)
-      ctx.fillRect(1, h - 2, w - 2, 1)
-      ctx.fillRect(1, 1, 1, h - 2)
-      ctx.fillRect(w - 2, 1, 1, h - 2)
-      ctx.fillStyle = "#748267"
-      for (let y = 4; y < h - 3; y += 4) {
-        for (let x = 4; x < w - 3; x += 4) {
-          if ((x + y) % 8 === 0) ctx.fillRect(x, y, 2, 2)
-        }
-      }
-    }, 2, 2)
-
-    const woodTexture = makePixelTexture(24, 16, (ctx, w, h) => {
-      ctx.fillStyle = "#76513b"
-      ctx.fillRect(0, 0, w, h)
-      ctx.fillStyle = "#8b6247"
-      for (let y = 3; y < h; y += 5) ctx.fillRect(0, y, w, 1)
-      ctx.fillStyle = "#5e402f"
-      for (const [x, y] of [[3,6],[14,2],[18,12]]) ctx.fillRect(x, y, 5, 1)
-    }, 3, 2)
-
-    // Authored scene furniture uses simple pixel-friendly geometry until the
-    // dedicated 2D furniture/sprite pass. All meshes share the VRM depth stage.
-    const furnitureMaterial = color => new THREE.MeshStandardMaterial({ color, roughness: 0.92 })
-    function furnitureBox(width, height, depth, x, y, z, color) {
-      const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), furnitureMaterial(color))
-      mesh.position.set(x, y, z)
-      mesh.castShadow = true
-      mesh.receiveShadow = true
-      scene.add(mesh)
-      return mesh
-    }
-
-    if (preset.id === "office") {
-      // Desk, monitor, and filing cabinet.
-      furnitureBox(2.0, 0.12, 0.85, 0.1, 0.76, -1.3, 0x66584f)
-      furnitureBox(0.13, 0.72, 0.65, -0.7, 0.37, -1.3, 0x514b49)
-      furnitureBox(0.13, 0.72, 0.65, 0.9, 0.37, -1.3, 0x514b49)
-      furnitureBox(0.78, 0.52, 0.07, 0.2, 1.12, -1.42, 0x242f3c)
-      furnitureBox(0.18, 0.22, 0.12, 0.2, 0.85, -1.42, 0x343b42)
-      furnitureBox(0.66, 1.12, 0.65, 2.4, 0.56, -1.48, 0x69767b)
-    } else if (preset.id === "bedroom") {
-      // Low bed with pillows and a bedside cabinet.
-      furnitureBox(2.45, 0.28, 1.35, 0.35, 0.29, -1.25, 0x795c58)
-      furnitureBox(2.2, 0.12, 1.18, 0.35, 0.5, -1.25, 0xabb0c7)
-      furnitureBox(0.66, 0.13, 0.44, -0.35, 0.62, -1.52, 0xe0d7cc)
-      furnitureBox(0.65, 0.52, 0.56, -1.85, 0.26, -1.48, 0x6c5658)
-    } else if (preset.id === "lounge") {
-      // Counter, vending machine, and small side table.
-      furnitureBox(2.0, 0.95, 0.56, 1.05, 0.48, -1.72, 0x7c6654)
-      furnitureBox(0.72, 1.65, 0.55, -2.2, 0.83, -1.62, 0x566a73)
-      furnitureBox(0.46, 0.78, 0.035, -2.2, 1.06, -1.32, 0x9db6b4)
-      furnitureBox(0.8, 0.1, 0.7, -0.65, 0.54, -0.5, 0x8b6c52)
-      furnitureBox(0.1, 0.5, 0.1, -0.65, 0.25, -0.5, 0x665242)
-    }
-
-    // Warm temporary counseling room. Furniture GLBs can replace these
-    // primitives incrementally without touching the VRM pipeline.
-    const floor = new THREE.Mesh(
-      new THREE.BoxGeometry(6.4, 0.16, 4.2),
-      new THREE.MeshStandardMaterial({ map: floorTexture, roughness: 0.96 }),
-    )
-    floor.position.y = -0.08
-    scene.add(floor)
-
-    const backWall = new THREE.Mesh(
-      new THREE.BoxGeometry(6.4, 3.2, 0.16),
-      new THREE.MeshStandardMaterial({ map: wallTexture, roughness: 1 }),
-    )
-    backWall.position.set(0, 1.5, -2)
-    scene.add(backWall)
-
-    // Blocky lamp glow: three nested low-poly patches with hard boundaries.
-    // Slightly offset from the wall to avoid z-fighting.
-    const glowBands = [
-      { radius: 0.92, color: 0x8a4d25, opacity: 0.22 },
-      { radius: 0.62, color: 0xc87932, opacity: 0.28 },
-      { radius: 0.34, color: 0xf2b45f, opacity: 0.34 },
-    ]
-    for (const band of glowBands) {
-      const glow = new THREE.Mesh(
-        new THREE.CircleGeometry(band.radius, 12),
-        new THREE.MeshBasicMaterial({
-          color: band.color,
-          transparent: true,
-          opacity: band.opacity,
-          depthWrite: false,
-        }),
-      )
-      glow.position.set(-2.15, 1.48, -1.905)
-      scene.add(glow)
-    }
-
-    const sideWall = new THREE.Mesh(
-      new THREE.BoxGeometry(0.16, 3.2, 4.2),
-      new THREE.MeshStandardMaterial({ map: wallTexture, color: 0xeee5d4, roughness: 1 }),
-    )
-    sideWall.position.set(-3.1, 1.5, 0)
-    scene.add(sideWall)
-
-    const rug = new THREE.Mesh(
-      new THREE.BoxGeometry(3.4, 0.035, 2.15),
-      new THREE.MeshStandardMaterial({ map: rugTexture, roughness: 1 }),
-    )
-    rug.position.set(0.15, 0.02, 0.15)
-    scene.add(rug)
-
-    const coffeeTable = new THREE.Mesh(
-      new THREE.BoxGeometry(1.45, 0.12, 0.72),
-      new THREE.MeshStandardMaterial({ map: woodTexture, roughness: 0.9 }),
-    )
-    coffeeTable.position.set(0.25, 0.48, 0.05)
-    if (preset.id === "counseling" || preset.id === "default") scene.add(coffeeTable)
-    for (const x of [-0.58, 0.58]) {
-      for (const z of [-0.25, 0.25]) {
-        const leg = new THREE.Mesh(
-          new THREE.BoxGeometry(0.09, 0.46, 0.09),
-          new THREE.MeshStandardMaterial({ color: 0x51382d, roughness: 0.95 }),
-        )
-        leg.position.set(0.25 + x, 0.23, 0.05 + z)
-        if (preset.id === "counseling" || preset.id === "default") scene.add(leg)
-      }
-    }
-
-    const lampStem = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.045, 0.055, 1.35, 8),
-      new THREE.MeshStandardMaterial({ color: 0x5b493d, roughness: 0.9 }),
-    )
-    lampStem.position.set(-2.15, 0.68, -1.35)
-    scene.add(lampStem)
-    const lampShade = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.22, 0.36, 0.42, 8),
-      new THREE.MeshStandardMaterial({ color: 0xe4b66f, emissive: 0x6b421c, emissiveIntensity: 0.25, roughness: 1 }),
-    )
-    lampShade.position.set(-2.15, 1.48, -1.35)
-    scene.add(lampShade)
-
-    const plantPot = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.22, 0.17, 0.38, 8),
-      new THREE.MeshStandardMaterial({ color: 0xa65f43, roughness: 1 }),
-    )
-    plantPot.position.set(2.35, 0.19, -1.45)
-    scene.add(plantPot)
-    for (let i = 0; i < 6; i += 1) {
-      const leaf = new THREE.Mesh(
-        new THREE.SphereGeometry(0.25, 6, 4),
-        new THREE.MeshStandardMaterial({ color: i % 2 ? 0x526c4c : 0x667d58, roughness: 1 }),
-      )
-      const angle = (Math.PI * 2 * i) / 6
-      leaf.scale.set(0.55, 1.25, 0.35)
-      leaf.rotation.z = Math.sin(angle) * 0.55
-      leaf.position.set(2.35 + Math.cos(angle) * 0.22, 0.62 + (i % 3) * 0.15, -1.45 + Math.sin(angle) * 0.18)
-      scene.add(leaf)
-    }
-
-    scene.traverse(object => {
-      if (!object.isMesh) return
-      object.castShadow = true
-      object.receiveShadow = true
-    })
-
     const loader = new GLTFLoader()
     loader.register(parser => new VRMLoaderPlugin(parser))
-
-    // CC0 Cozy Home Interiors sofa. Loaded from the pack's permanent CORS CDN.
-    if (preset.id === "counseling" || preset.id === "default" || preset.id === "lounge") loader.load(
-      "https://cdn.3dassets.dev/assets/17137/v1/model.glb",
-      gltf => {
-        if (disposed) return
-        const sofa = gltf.scene
-        sofa.position.set(0.15, 0, -1.35)
-        sofa.rotation.y = 0
-        sofa.traverse(object => {
-          if (!object.isMesh) return
-          object.castShadow = true
-          object.receiveShadow = true
-        })
-        scene.add(sofa)
-        render()
-      },
-      undefined,
-      error => console.warn("[PocketScene] Cozy sofa load failed:", error),
-    )
 
     function pixelizeMaterial(material) {
       if (!material) return
@@ -497,11 +232,6 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     return () => {
       disposed = true
       observer.disconnect()
-      generatedBackdropTexture?.dispose()
-      floorTexture.dispose()
-      wallTexture.dispose()
-      rugTexture.dispose()
-      woodTexture.dispose()
       renderTarget.dispose()
       postMaterial.dispose()
       postQuad.geometry.dispose()
@@ -519,7 +249,11 @@ export default function PocketScene({ className = "", simulatedAt = "", location
 
   return <div className={`pocket-scene-shell ${className}`}>
     <div className="pocket-scene" style={{ height: `${sceneHeight}px` }}>
-      <div ref={hostRef} className="pocket-scene__viewport" aria-label="Pocket 3D scene preview" />
+      <div className="pocket-scene__backdrop" data-daypart={daypart} aria-hidden="true">
+        <img src={backgroundUrl} alt="" style={{ transform: `scale(${zoom / 1.35})` }}
+          onError={() => setFailedBackground(requestedBackground)} />
+      </div>
+      <div ref={hostRef} className="pocket-scene__viewport" aria-label="2D 배경과 3D 캐릭터 장면" />
     </div>
     <div className="pocket-scene__controls">
       <div className="pocket-scene__control" aria-label="장면 확대 배율">

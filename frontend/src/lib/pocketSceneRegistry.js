@@ -2,11 +2,11 @@
 // Unknown locations intentionally keep the neutral fallback until generated
 // backgrounds are supported; never guess an unrelated authored scene.
 export const POCKET_SCENE_PRESETS = Object.freeze({
-  counseling: Object.freeze({ id: "counseling", label: "상담실", backdrop: 0x171821, wall: 0xd8c9ae, floor: 0x76533c }),
-  lounge: Object.freeze({ id: "lounge", label: "휴게실", backdrop: 0x20202a, wall: 0xc9b8a5, floor: 0x72533e }),
-  office: Object.freeze({ id: "office", label: "사무실", backdrop: 0x1c2531, wall: 0xb9c5ca, floor: 0x555e65 }),
-  bedroom: Object.freeze({ id: "bedroom", label: "침실", backdrop: 0x252032, wall: 0xc6b5ca, floor: 0x6e5560 }),
-  default: Object.freeze({ id: "default", label: "기본 실내", backdrop: 0x171821, wall: 0xd8c9ae, floor: 0x76533c }),
+  counseling: Object.freeze({ id: "counseling", label: "상담실", backgroundUrl: "/backgrounds/counseling.svg" }),
+  lounge: Object.freeze({ id: "lounge", label: "휴게실", backgroundUrl: "/backgrounds/lounge.svg" }),
+  office: Object.freeze({ id: "office", label: "사무실", backgroundUrl: "/backgrounds/office.svg" }),
+  bedroom: Object.freeze({ id: "bedroom", label: "침실", backgroundUrl: "/backgrounds/bedroom.svg" }),
+  default: Object.freeze({ id: "default", label: "기본 실내", backgroundUrl: "/backgrounds/default.svg" }),
 })
 
 const LOCATION_RULES = [
@@ -21,4 +21,13 @@ export function resolvePocketScene(location) {
   if (!value) return POCKET_SCENE_PRESETS.default
   const match = LOCATION_RULES.find(({ pattern }) => pattern.test(value))
   return POCKET_SCENE_PRESETS[match?.preset ?? "default"]
+}
+
+// Use the Pocket's displayed local story hour, not the device timezone.
+export function resolvePocketDaypart(simulatedAt) {
+  const match = typeof simulatedAt === "string" ? simulatedAt.match(/T(\d{2}):/) : null
+  const hour = match ? Number(match[1]) : 12
+  if (hour < 0 || hour > 23) return "day"
+  if (hour < 6 || hour >= 21) return "night"
+  return hour < 17 ? "day" : "evening"
 }
