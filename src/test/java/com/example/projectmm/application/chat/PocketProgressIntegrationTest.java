@@ -135,7 +135,8 @@ class PocketProgressIntegrationTest {
     @Test void failureRetainsAnchorAndStoryTimeForRetry() {
         enabledAfter(Duration.ofMinutes(5));
         when(gateway.generateWorldRoomTurn(any(),anyString())).thenThrow(new IllegalStateException("unavailable"));
-        assertThatThrownBy(() -> progress.resume(id,login)).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> progress.resume(id,login)).isInstanceOfSatisfying(ResponseStatusException.class,
+                error -> assertThat(error.getReason()).contains("시간은 변경되지 않았어요").doesNotContain("secret SQL"));
         assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
         assertThat(db(() -> sessions.findById(id).orElseThrow().getLastPresenceAt())).isEqualTo(now);
         assertThat(progress.current(id,login).processing()).isFalse();
@@ -268,7 +269,8 @@ class PocketProgressIntegrationTest {
         var raw = plan(story,story.plusMinutes(5)).replace("\"pauseReason\":null",
                 "\"pauseReason\":null,\"playerState\":{\"inventory\":[]}");
         when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
-        assertThatThrownBy(() -> progress.resume(id,login)).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> progress.resume(id,login)).isInstanceOfSatisfying(ResponseStatusException.class,
+                error -> assertThat(error.getReason()).contains("시간은 변경되지 않았어요").doesNotContain("secret SQL"));
         assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
         assertThat(db(() -> List.copyOf(states.findBySessionId(id).orElseThrow().getInventory()))).containsExactly("phone");
     }
@@ -285,7 +287,8 @@ class PocketProgressIntegrationTest {
         var raw = plan(story,story.plusMinutes(5)).replace("\"summary\":", "\"playerInvolved\":true,\"summary\":")
                 .replace("\"pauseReason\":null", "\"pauseReason\":null,\"playerState\":{\"location\":\"Elsewhere\"}");
         when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
-        assertThatThrownBy(() -> progress.resume(id,login)).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> progress.resume(id,login)).isInstanceOfSatisfying(ResponseStatusException.class,
+                error -> assertThat(error.getReason()).contains("시간은 변경되지 않았어요").doesNotContain("secret SQL"));
         assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
         assertThat(db(() -> states.findBySessionId(id).orElseThrow().getLocation())).isEqualTo("Home");
     }

@@ -36,6 +36,7 @@ public class PocketProgressService {
     private final PlatformTransactionManager transactionManager;
     private final EntityManager em;
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(PocketProgressService.class);
 
     public record Report(Long id, LocalDateTime from, LocalDateTime to, LocalDateTime processedAt,
             boolean capped, String pauseReason, List<PocketActivityPlan.Activity> activities) {}
@@ -119,13 +120,18 @@ public class PocketProgressService {
         }
         if (prepared.claim() == null) return prepared.status();
         var claim = prepared.claim();
+        String stage = "GENERATE";
         try {
             var prompt = PocketActivityPrompt.build(claim.from(), claim.to());
             var raw = claim.context().roomCast().isEmpty() ? "{\"activities\":[],\"leaveCharacterIds\":[],\"pauseReason\":null}"
                     : gateway.generateWorldRoomTurn(claim.context(), prompt).reply();
+            stage = "VALIDATE";
             var plan = PocketActivityPlan.parse(raw, claim.context(), claim.from(), claim.to());
+            stage = "APPLY";
             return tx(() -> complete(claim, plan, prompt, raw));
         } catch (RuntimeException failure) {
+            // The resolver logs only our public 502 message. Keep the actual cause server-side.
+            LOG.warn("Pocket absence failed: sessionId={}, stage={}", id, stage, failure);
             tx(() -> {
                 var session = sessions.lockById(id).orElse(null);
                 if (session != null) {
@@ -136,7 +142,13 @@ public class PocketProgressService {
                 return null;
             });
             if (failure instanceof ResponseStatusException response) throw response;
-            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "부재 활동을 정리하지 못했어요. 시간은 변경되지 않았어요. 다시 시도해 주세요.", failure);
+            String reason = switch (stage) {
+                case "VALIDATE" -> "AI가 반환한 부재 활동의 형식이나 시각·상태가 맞지 않아 적용하지 못했어요.";
+                case "APPLY" -> "부재 활동을 저장하지 못했어요.";
+                default -> "AI의 부재 활동 응답을 받지 못했어요.";
+            };
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                    reason + " 시간은 변경되지 않았어요. 다시 시도해 주세요.", failure);
         }
     }
     private Status complete(Claim claim, PocketActivityPlan plan, String prompt, String raw) {
