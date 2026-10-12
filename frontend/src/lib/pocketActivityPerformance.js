@@ -27,14 +27,15 @@ export function speakingActors(activity) {
 }
 export function walkDirection(activity) {
   const hash = [...(activity?.start ?? "")].reduce((n,c)=>(n*31+c.charCodeAt(0))>>>0,0)
-  return [[300,0],[-300,0],[0,300],[0,-300]][hash % 4]
+  return [[300,0],[-300,0]][hash % 2]
 }
 export function puppetPose(activity, actorId, seconds, motion = true) {
-  const pose = { x:0, y:0, rx:0, rz:0 }
+  const pose = { x:0, y:0, rx:0, ry:0, rz:0 }
   if (!performanceActors(activity).includes(String(actorId))) return pose
   if (activity.kind === "SLEEP") return { ...pose, y:-0.18, rz:-0.22 }
   const mood = actorCue(activity, actorId).emotion
   if (mood === "SAD") { pose.y=-0.05; pose.rx=0.10; pose.rz=-0.035 }
+  if (activity.kind === "WALK" || activity.kind === "TRAVEL") pose.ry=-Math.sign(walkDirection(activity)[0])*Math.PI/2
   if (!motion) return pose
   const t = Number.isFinite(seconds) ? seconds : 0
   if (activity.kind === "WALK" || activity.kind === "TRAVEL") pose.rz=Math.sin(t*7)*0.035
@@ -42,4 +43,11 @@ export function puppetPose(activity, actorId, seconds, motion = true) {
   if (mood === "HAPPY") pose.y=Math.abs(Math.sin(t*3.5))*0.075
   if (activity.kind === "WALK" || activity.kind === "TRAVEL") { pose.x=0; pose.y=0 }
   return pose
+}
+
+// Identical cover scaling for still images and scrolling SVG/image tiles.
+export function scrollingBackdrop(width,height,aspect,direction) {
+  const ratio=Number.isFinite(aspect) && aspect>0 ? aspect : 1
+  const tileWidth=Math.max(width,height*ratio),tileHeight=tileWidth/ratio
+  return {width:tileWidth,height:tileHeight,offset:Math.sign(direction)*tileWidth}
 }

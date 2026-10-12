@@ -5,7 +5,7 @@ import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm"
 import { resolvePocketScene, resolvePocketDaypart } from "@/lib/pocketSceneRegistry"
 import { getPocketBackground } from "@/lib/pocketSceneBackgrounds"
 import { activitySymbol } from "@/lib/pocketActivityPlayback"
-import { actorCue, performanceActors, speakingActors, puppetPose, walkDirection } from "@/lib/pocketActivityPerformance"
+import { actorCue, performanceActors, speakingActors, puppetPose, walkDirection, scrollingBackdrop } from "@/lib/pocketActivityPerformance"
 import "./PocketActivityPerformance.css"
 import { createStandingIdle, settleStandingPhysics } from "@/lib/pocketStandingIdle"
 
@@ -29,6 +29,8 @@ export default function PocketScene({ className = "", simulatedAt = "", location
   const [sceneHeight, setSceneHeight] = useState(260)
   const [pixelHeight, setPixelHeight] = useState(160)
   const [failedBackground, setFailedBackground] = useState(null)
+  const [imageAspect,setImageAspect] = useState(1)
+  const [backdropSize,setBackdropSize] = useState({width:300,height:300})
   const preset = resolvePocketScene(location)
   const daypart = resolvePocketDaypart(simulatedAt)
   const registeredBackground = getPocketBackground(sessionId, location)
@@ -181,7 +183,10 @@ export default function PocketScene({ className = "", simulatedAt = "", location
           headPosition.y += 0.10
           headPosition.project(camera)
           expression.hidden = headPosition.z < -1 || headPosition.z > 1 || Math.abs(headPosition.x) > 1.1
-          expression.style.left = `${Math.max(10,Math.min(90,(headPosition.x+1)*50))}%`
+          const headX=(headPosition.x+1)*host.clientWidth/2
+          const radius=Math.abs(actor.radius*camera.projectionMatrix.elements[0]*host.clientWidth/2)
+          expression.style.left = `${Math.max(3,Math.min(host.clientWidth-34,headX+radius+3))}px`
+          expression.style.setProperty("--head-radius",`${radius}px`)
           expression.style.top = `${Math.max(25,Math.min(host.clientHeight-25,(1-headPosition.y)*host.clientHeight/2))}px`
         }
         if (!bubble) continue
@@ -248,11 +253,13 @@ export default function PocketScene({ className = "", simulatedAt = "", location
             const pose=puppetPose(activityRef.current,actorId,time,motion)
             vrm.scene.position.copy(origin); vrm.scene.position.x+=pose.x; vrm.scene.position.y+=pose.y
             vrm.scene.rotation.copy(restRotation); vrm.scene.rotation.x+=pose.rx; vrm.scene.rotation.z+=pose.rz
+            if (activityRef.current && ["WALK","TRAVEL"].includes(activityRef.current.kind)
+                && performanceActors(activityRef.current).includes(String(actorId))) vrm.scene.rotation.y=pose.ry
             updateIdle(time,delta,motion)
           })
           idleActors.at(-1)(0,0,false)
           const head = vrm.humanoid?.getRawBoneNode("head") ?? vrm.scene
-          if (actorId != null) bubbleActors.push({ id: actorId, head, vrm })
+          if (actorId != null) bubbleActors.push({ id: actorId, head, vrm, radius:targetHeight*0.19 })
           render()
         },
         undefined,
@@ -297,6 +304,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     function resize() {
       const width = Math.max(1, host.getBoundingClientRect().width)
       const height = Math.max(1, compact ? host.getBoundingClientRect().height : sceneHeight)
+      setBackdropSize(current=>current.width===width && current.height===height ? current : {width,height})
       const internalWidth = Math.max(1, Math.round(pixelHeight * width / height))
       renderer.setSize(internalWidth, pixelHeight, false)
       renderTarget.setSize(internalWidth, pixelHeight)
@@ -337,8 +345,9 @@ export default function PocketScene({ className = "", simulatedAt = "", location
   const symbol = activitySymbol(activity?.kind)
   const speakers = speakingActors(activity)
   const speaker = speakers.length ? speakers[speakingIndex % speakers.length] : null
-  const [walkX,walkY] = walkDirection(activity)
+  const [walkX] = walkDirection(activity)
   const walking = activity?.kind === "WALK" || activity?.kind === "TRAVEL"
+  const tile=scrollingBackdrop(backdropSize.width,backdropSize.height,imageAspect,walkX)
   const bubbleCharacters = activity ? characterModels.filter(model =>
     activity.characterIds.includes(model.source?.characterId ?? model.source?.id)) : []
   if (activity?.playerInvolved && playerModel) bubbleCharacters.push({ ...playerModel, bubbleId: "player" })
@@ -346,8 +355,11 @@ export default function PocketScene({ className = "", simulatedAt = "", location
   return <div className={`pocket-scene-shell ${compact ? "pocket-scene-shell--compact" : ""} ${className}`}>
     <div className="pocket-scene" data-player-present={Boolean(playerModel)} style={{ height: compact ? "100%" : `${sceneHeight}px` }}>
       <div className={`pocket-scene__backdrop ${walking ? "pocket-scene__backdrop--walking" : ""}`} data-daypart={daypart} aria-hidden="true"
-        style={walking ? {backgroundImage:`url(${backgroundUrl})`,"--walk-x":`${walkX}px`,"--walk-y":`${walkY}px`} : undefined}>
-        <img src={backgroundUrl} alt="" style={{ transform: `scale(${zoom / 1.35})` }}
+        style={walking ? {backgroundImage:`url(${backgroundUrl})`,backgroundSize:`${tile.width}px ${tile.height}px`,
+          "--walk-x":`${tile.offset}px`} : undefined}>
+        <img src={backgroundUrl} alt="" onLoad={event=>{
+          const image=event.currentTarget;if(image.naturalHeight>0)setImageAspect(image.naturalWidth/image.naturalHeight)
+        }} style={{ transform: `scale(${zoom / 1.35})` }}
           onError={() => setFailedBackground(requestedBackground)} />
       </div>
       <div ref={hostRef} className="pocket-scene__viewport" aria-label="2D 배경과 3D 캐릭터 장면" />
