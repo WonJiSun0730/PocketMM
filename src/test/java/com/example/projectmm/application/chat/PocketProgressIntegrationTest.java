@@ -399,6 +399,18 @@ class PocketProgressIntegrationTest {
         assertThat(progress.current(id,login).lastReport().id()).isEqualTo(report.id());
         assertThat(db(() -> messages.findTopBySessionIdOrderByIdDesc(id).orElseThrow().getContent())).isEqualTo("newer user turn");
     }
+    @Test void actorVisualCuesSurviveStorageAndReplayWithoutChangingPlayerState() {
+        enabledAfter(Duration.ofMinutes(5));
+        var cue = "\"playerInvolved\":true,\"actorCues\":[{\"actorId\":\"player\",\"emojis\":[\"🤔\",\"💤\"],\"emotion\":\"CALM\",\"turn\":0},{\"actorId\":\""+a+"\",\"emojis\":[\"🛏️\",\"✔️\"],\"emotion\":\"HAPPY\",\"turn\":1}],";
+        var raw = plan(story,story.plusMinutes(5)).replace("\"summary\":",cue+"\"summary\":");
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
+        progress.resume(id,login);
+        var cues = progress.current(id,login).lastReport().activities().getFirst().actorCues();
+        assertThat(cues).hasSize(2);
+        assertThat(cues.getFirst().emojis()).containsExactly("🤔","💤");
+        assertThat(cues.getLast().emotion()).isEqualTo("HAPPY");
+        assertThat(db(() -> List.copyOf(states.findBySessionId(id).orElseThrow().getConditions()))).containsExactly("tired");
+    }
     @Test void otherUserCannotReadOrChangeProgress() {
         assertThatThrownBy(() -> progress.resume(id,"unknown")).isInstanceOf(ResponseStatusException.class);
         assertThatThrownBy(() -> progress.configure(id,"unknown",true)).isInstanceOf(ResponseStatusException.class);

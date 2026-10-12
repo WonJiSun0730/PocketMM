@@ -14,11 +14,13 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
         public String emoji() { return emoji; }
     }
     public record PlayerStatePatch(String location, List<String> conditions, List<String> inventory) {}
+    public record ActorCue(String actorId, List<String> emojis, String emotion, Integer turn) {}
     public record Activity(LocalDateTime start, LocalDateTime end, Kind kind,
-            List<Long> characterIds, String location, String summary, Boolean playerInvolved) {
+            List<Long> characterIds, String location, String summary, Boolean playerInvolved, List<ActorCue> actorCues) {
         public Activity {
             // Pre-autonomy reports have no participation flag; explicit null is also legacy data.
             playerInvolved = Boolean.TRUE.equals(playerInvolved);
+            actorCues = actorCues == null ? List.of() : List.copyOf(actorCues);
         }
     }
     public static PocketActivityPlan parse(String json, WorldRoomDialogueContext context,
@@ -51,7 +53,7 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
             if (summary.isBlank() || summary.length() > 400 || location.length() > 200)
                 throw new IllegalArgumentException("Invalid activity text");
             result.add(new Activity(start, end, Kind.valueOf(item.path("kind").asText()),
-                    List.copyOf(ids), location, summary, playerInvolved));
+                    List.copyOf(ids), location, summary, playerInvolved, actorCues(item,ids,playerInvolved)));
             involved.addAll(ids); previous = end;
         }
         if (!timingValid) {
@@ -63,7 +65,7 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
                 var activity = result.get(i);
                 corrected.add(new Activity(from.plusNanos(intervalNanos * i / result.size()),
                         from.plusNanos(intervalNanos * (i + 1) / result.size()), activity.kind(),
-                        activity.characterIds(), activity.location(), activity.summary(), activity.playerInvolved()));
+                        activity.characterIds(), activity.location(), activity.summary(), activity.playerInvolved(), activity.actorCues()));
             }
             result = corrected;
         }
@@ -93,6 +95,27 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
                     patch == null ? null : patch.inventory());
         }
         return new PocketActivityPlan(List.copyOf(result), List.copyOf(leaves), null, patch);
+    }
+    private static List<ActorCue> actorCues(tools.jackson.databind.JsonNode item, List<Long> ids, boolean player) {
+        var allowed = new HashSet<String>(); ids.forEach(id -> allowed.add(id.toString()));
+        if (player) allowed.add("player");
+        var cues = new ArrayList<ActorCue>(); var seen = new HashSet<String>();
+        var visuals = item.path("actorCues");
+        if (!visuals.isArray()) return List.of(); // Optional presentation must not block story progress.
+        for (var cue : visuals) {
+            String actor = cue.path("actorId").asText("");
+            if (!allowed.contains(actor) || !seen.add(actor) || cues.size() >= 9) continue;
+            var emojis = new ArrayList<String>();
+            if (cue.path("emojis").isArray()) for (var emoji : cue.path("emojis")) {
+                if (emoji.isString() && !emoji.asText().isBlank() && emoji.asText().length() <= 24 && emojis.size() < 2)
+                    emojis.add(emoji.asText());
+            }
+            String emotion = cue.path("emotion").asText("CALM").toUpperCase(Locale.ROOT);
+            if (!Set.of("CALM","ANGRY","HAPPY","SAD").contains(emotion)) emotion = "CALM";
+            int turn = cue.path("turn").asInt(cues.size());
+            cues.add(new ActorCue(actor,List.copyOf(emojis),emotion,Math.max(0,Math.min(8,turn))));
+        }
+        return List.copyOf(cues);
     }
     private static List<String> stateList(tools.jackson.databind.JsonNode state, String name) {
         if (!state.has(name)) return null;

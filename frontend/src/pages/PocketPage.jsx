@@ -492,7 +492,7 @@ export default function PocketPage({ pocket, onBack }) {
         </Button>
       </header>
 
-      <section className="shrink-0 border-b bg-muted/10 px-4 py-3 sm:px-6">
+      <section className={progress.status?.lastReport?.activities?.length ? "shrink-0 border-b bg-muted/10 px-4 py-3 sm:px-6" : "contents"}>
         <PocketActivityScene
           sessionId={session.id}
           report={progress.status?.lastReport}

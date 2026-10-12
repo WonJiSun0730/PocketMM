@@ -60,7 +60,9 @@ public final class PocketActivityPrompt {
                 STRING in reply, with no Markdown fences:
                 {"activities":[{"start":"ISO_LOCAL_DATETIME","end":"ISO_LOCAL_DATETIME",
                 "kind":"WALK|TALK|REST|WAIT|SLEEP|READ|WORK|MEAL|COFFEE|COOK|CARE|TRAVEL","characterIds":[1,2],
-                "playerInvolved":true,"location":"place","summary":"short activity"}],
+                "playerInvolved":true,"location":"place","summary":"short activity",
+                "actorCues":[{"actorId":"player","emojis":["🤔","💤"],"emotion":"CALM","turn":0},
+                {"actorId":"1","emojis":["🛏️","✔️"],"emotion":"CALM","turn":1}]}],
                 "leaveCharacterIds":[],"pauseReason":null,"playerState":null}
                 leaveCharacterIds may include only currently active participants who actually finish
                 outside the player's final scene. An active NPC who stays behind when the player leaves
@@ -76,6 +78,13 @@ public final class PocketActivityPrompt {
                 so retain existing injuries and possessions unless the activities explicitly change them.
                 The final location must match the last player-participating activity. NPC-only activities
                 must not alter playerState. Keep outer envelope metadata empty/zero; apply state only here.
+                For each participating actor, provide actorCues with actorId "player" or the NPC ID as
+                a string. Choose ONE topic-specific emoji where possible, at most TWO. A discussion of
+                sleep can use thoughtful/sleep icons for the client and bed/check icons for the counsellor;
+                do not use the same generic speaking icon for everyone. Emojis contain icons only, no text.
+                emotion is CALM, ANGRY, HAPPY or SAD, grounded in that actor's mood in this activity.
+                turn is the relative speaking order (0 first); alternating speakers will be animated.
+                SLEEP actors use 💤. Keep these cues scoped to this activity, not a permanent trait.
                 Always set pauseReason null and cover the full interval with connected activity.
                 Empty activities are valid when no meaningful activity is supported.
                 Interval: %s through %s.

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import PocketAbsenceDialog from "@/components/PocketAbsenceDialog"
+import { actorCue } from "@/lib/pocketActivityPerformance"
 import PocketScene from "@/components/PocketScene"
 import { ACTIVITY_FRAME_MS, activitySymbol, activityParticipants, activityModels, nextActivityIndex, replayIncludesPlayer } from "@/lib/pocketActivityPlayback"
 
@@ -68,19 +69,14 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
     : <div className="pocket-activity-fallback pocket-activity-fallback--device">
         {(activity.playerInvolved || replayPlayer) && <div className="pocket-activity-person">
           <span>{sceneModels.playerModel?.source?.name || "플레이어"}</span>
-          {activity.playerInvolved && <span className="pocket-activity-icon">{symbol.emoji}</span>}
+          {activity.playerInvolved && <span className="pocket-activity-icon">{actorCue(activity,"player").emojis.join("")}</span>}
         </div>}
         {participants.map(character => <div key={character.id ?? character.characterId} className="pocket-activity-person">
-          <span className="pocket-activity-icon" aria-label={symbol.label}>{symbol.emoji}</span>
+          <span className="pocket-activity-icon" aria-label={symbol.label}>{actorCue(activity,character.id ?? character.characterId).emojis.join("")}</span>
           <span>{character.name ?? character.characterName}</span>
         </div>)}
       </div>)
   return <div>
-    {sceneModels.ready ? <PocketScene sessionId={sessionId} simulatedAt={simulatedAt} location={location}
-      playerModel={sceneModels.playerModel} characterModels={sceneModels.castModels} />
-      : <div className="flex min-h-24 items-center justify-center rounded-md border border-dashed px-4 text-center text-xs text-muted-foreground">
-          3D 장면은 선택한 플레이어 프로필과 이 Pocket의 모든 캐릭터에 모델이 등록된 경우에만 사용할 수 있어요.
-        </div>}
     {frames.length > 0 && <section aria-label="부재 활동 재생" className="mt-2 flex items-center justify-between gap-2 text-xs">
       <span className="text-muted-foreground">지난 부재 활동 · {frames.length}개</span>
       <Button size="sm" variant="outline" disabled={disabled} onClick={() => select(0, true)}>다시보기</Button>
