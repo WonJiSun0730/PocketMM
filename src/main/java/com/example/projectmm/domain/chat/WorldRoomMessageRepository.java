@@ -6,6 +6,8 @@ import java.util.List;
 
 public interface WorldRoomMessageRepository extends JpaRepository<WorldRoomMessage, Long> {
 
+    java.util.Optional<WorldRoomMessage> findTopBySessionIdOrderByIdDesc(Long sessionId);
+
     List<WorldRoomMessage> findTop50BySessionIdOrderByCreatedAtDescIdDesc(Long sessionId);
 
     List<WorldRoomMessage> findTop50BySessionIdOrderByIdDesc(Long sessionId);

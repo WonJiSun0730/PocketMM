@@ -35,6 +35,16 @@ public class WorldRoomMessage {
 
     private Integer selectedVariantNo;
 
+    // Null for user input and its reply. Stored on the message, not each reroll variant.
+    private Integer automaticContinuationNo;
+
+    public void markAutomaticContinuation(int consecutiveNo) {
+        if (role != ChatRole.CHARACTER || consecutiveNo < 1) {
+            throw new IllegalArgumentException("Automatic continuation requires a character reply and positive number");
+        }
+        automaticContinuationNo = consecutiveNo;
+    }
+
     public WorldRoomMessage(
             WorldRoomSession session,
             ChatRole role,

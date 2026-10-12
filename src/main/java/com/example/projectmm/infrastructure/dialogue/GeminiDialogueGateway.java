@@ -408,7 +408,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 Pocket-setting rules:
                 - User note and additional play guide apply only to this Pocket and refine the creator play guide without replacing established world facts.
                 - When "Never control the player character" is true, NEVER invent the player's dialogue, actions, thoughts, feelings, decisions, reactions, or movement. Narrate only the world, NPCs, and consequences that do not decide the player's response.
-                - When it is false, elaborate the concrete execution of user-established player actions under the authorship boundaries below. It does not authorize new player dialogue, intentions, or choices.
+                - When it is false, elaborate user-established player actions under the authorship boundaries below. Broader ordinary player dialogue/actions require the CURRENT server-supplied automatic progression scope or explicit user delegation. Fresh user input resets that scope; do not inherit permission from earlier AI replies.
 
                 World lore:
                 %s

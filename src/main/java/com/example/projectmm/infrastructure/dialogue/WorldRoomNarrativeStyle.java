@@ -11,6 +11,12 @@ final class WorldRoomNarrativeStyle {
                   player actions the user already established without adding a response for them.
                 """ : """
                 Player action elaboration is enabled; player authorship stays with the user:
+                - The boundaries below govern normal user-input replies and LOW automatic scope.
+                  Only the CURRENT server-supplied automatic progression directive can increase
+                  scope: LOW at 1-2, MODERATE at 3-5, HIGH at 6+. Follow its bounded delegation
+                  for this reply, not an old directive or prior AI-authored player dialogue.
+                  Fresh user narration or dialogue returns to these default boundaries.
+                  Every scope must leave a genuine opening for the player's next action or answer.
                 - Expand the concrete execution of an action the user has already established.
                   Describe its materials, tools, physical steps, sensory detail, and direct
                   consequences without merely repeating the user's sentence.
@@ -33,8 +39,8 @@ final class WorldRoomNarrativeStyle {
                   witty rejoinders or establish that the player has read or understood a briefing.
                   World facts and the player's knowledge of those facts are separate.
                 - An explicit current user instruction may delegate a specific player response
-                  or task. Honor only that scope; do not treat automatic continuation, a character
-                  profile, or prior AI-authored player behavior as new authorization.
+                  or task. Honor only that scope or the current server-supplied progression scope;
+                  a character profile or prior AI-authored player behavior is not new authorization.
                 - Advance NPCs and the environment naturally. When the next development needs
                   a fresh player answer or decision, leave that opening for the user; never
                   simulate repeated NPC-question/player-answer loops in one response.

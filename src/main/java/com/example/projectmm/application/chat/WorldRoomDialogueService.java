@@ -286,7 +286,11 @@ public class WorldRoomDialogueService {
         var beforeCast = sessionService.captureCastState(sessionId);
         var beforeSystems = sessionService.captureSystemState(sessionId);
         var beforeTime = session.getSimulatedAt();
-        var continuationPrompt = com.example.projectmm.application.dialogue.WorldRoomContinuationPrompt.build(session.isNoControlPlayer());
+        int continuationNo = messages.findTopBySessionIdOrderByIdDesc(sessionId)
+                .map(WorldRoomMessage::getAutomaticContinuationNo)
+                .map(previous -> Math.addExact(previous, 1)).orElse(1);
+        var continuationPrompt = com.example.projectmm.application.dialogue.WorldRoomContinuationPrompt
+                .build(session.isNoControlPlayer(), continuationNo);
         var beforePlayerState = capturePlayerState(sessionId);
         var generated = dialogueGateway.generateWorldRoomTurn(context, continuationPrompt);
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
@@ -302,6 +306,7 @@ public class WorldRoomDialogueService {
                 generated.reply(),
                 now()
         ));
+        characterMessage.markAutomaticContinuation(continuationNo);
         var variant = variants.save(new WorldRoomMessageVariant(
                 characterMessage,
                 1,
@@ -406,9 +411,12 @@ public class WorldRoomDialogueService {
         sessionService.restoreSystemsBeforeVariant(sessionId, selected);
         sessionService.restoreTimeBeforeVariant(sessionId, selected);
         restorePlayerState(sessionId, selected.getBeforePlayerStateJson());
-        var rerollBase = precedingMessage != null && precedingMessage.getRole() == ChatRole.USER
+        var rerollBase = target.getAutomaticContinuationNo() == null
+                && precedingMessage != null && precedingMessage.getRole() == ChatRole.USER
                 ? precedingMessage.getContent()
-                : com.example.projectmm.application.dialogue.WorldRoomContinuationPrompt.build(rerollSession.isNoControlPlayer());
+                : com.example.projectmm.application.dialogue.WorldRoomContinuationPrompt.build(
+                        rerollSession.isNoControlPlayer(),
+                        target.getAutomaticContinuationNo() == null ? 1 : target.getAutomaticContinuationNo());
         var rerollPrompt = rerollBase
                 + "\n\n[Previous response variant]\n"
                 + previousVariant

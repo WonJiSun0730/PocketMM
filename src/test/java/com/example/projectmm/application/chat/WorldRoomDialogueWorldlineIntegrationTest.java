@@ -62,6 +62,69 @@ class WorldRoomDialogueWorldlineIntegrationTest {
     @MockitoBean DialogueGateway gateway;
     @MockitoBean TimeInterpreter timeInterpreter;
     @MockitoBean MemoryRecallService memoryRecallService;
+    @Autowired jakarta.persistence.EntityManager entityManager;
+
+    private WorldRoomSession automaticProgressionSession(String login) {
+        PasswordEncoder encoder = mock(PasswordEncoder.class);
+        when(encoder.encode("password")).thenReturn("encoded");
+        var member = members.save(Member.createLocal(login, "password", "Millie", login + "@example.test", encoder));
+        var world = worlds.save(new World(member, "Kitchen", "Preparing food."));
+        var room = rooms.save(new WorldConversation(world, member, "Kitchen",
+                WorldConversation.Visibility.PRIVATE, LocalDateTime.of(2026, 11, 4, 21, 0)));
+        var intro = intros.save(new WorldRoomIntro(room, "Start", "Prepare ingredients.", 0));
+        when(gateway.generateWorldRoomTurn(any(), anyString())).thenReturn(
+                new WorldRoomTurn("*준비가 이어진다.*", WorldRoomCastChange.none(), List.of(), 0));
+        return sessionService.start(room.getId(), login, null, intro.getId());
+    }
+
+    @Test
+    void automaticProgressionPersistsThresholdsRerollsDeletionAndUserInputReset() {
+        var session = automaticProgressionSession("automatic-scope");
+        Long sessionId = session.getId();
+        for (int number = 1; number <= 8; number++) {
+            dialogueService.continueScene(sessionId);
+            entityManager.flush();
+            entityManager.clear();
+            assertThat(messages.findTopBySessionIdOrderByIdDesc(sessionId).orElseThrow()
+                    .getAutomaticContinuationNo()).isEqualTo(number);
+            verify(gateway).generateWorldRoomTurn(any(), eq(
+                    com.example.projectmm.application.dialogue.WorldRoomContinuationPrompt.build(false, number)));
+        }
+        var last = messages.findTopBySessionIdOrderByIdDesc(sessionId).orElseThrow();
+        dialogueService.reroll(sessionId, last.getId());
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(messages.findById(last.getId()).orElseThrow().getAutomaticContinuationNo()).isEqualTo(8);
+        assertThat(variants.findByMessageIdAndVariantNo(last.getId(), 2).orElseThrow()
+                .getEvaluationContextJson()).contains("consecutiveNo=8", "playerScope=HIGH");
+        var seventh = messages.findTop50BySessionIdOrderByIdDesc(sessionId).stream()
+                .filter(m -> Integer.valueOf(7).equals(m.getAutomaticContinuationNo())).findFirst().orElseThrow();
+        dialogueService.deleteMessageAndFollowing(sessionId, seventh.getId());
+        dialogueService.continueScene(sessionId);
+        assertThat(messages.findTopBySessionIdOrderByIdDesc(sessionId).orElseThrow().getAutomaticContinuationNo())
+                .isEqualTo(7);
+        dialogueService.chat(sessionId, "*밀리는 재료 손질을 마쳤다.*");
+        assertThat(messages.findTopBySessionIdOrderByIdDesc(sessionId).orElseThrow().getAutomaticContinuationNo())
+                .isNull();
+        dialogueService.continueScene(sessionId);
+        assertThat(messages.findTopBySessionIdOrderByIdDesc(sessionId).orElseThrow().getAutomaticContinuationNo())
+                .isEqualTo(1);
+        verify(gateway, times(2)).generateWorldRoomTurn(any(), eq(
+                com.example.projectmm.application.dialogue.WorldRoomContinuationPrompt.build(false, 1)));
+    }
+
+    @Test
+    void noControlOverridesHighAutomaticScopeAndFailedGenerationDoesNotAdvanceNumber() {
+        var session = automaticProgressionSession("automatic-strict");
+        sessionService.updatePocketSettings(session.getId(), session.getMember().getLoginId(), "", "", true);
+        for (int number = 1; number <= 6; number++) dialogueService.continueScene(session.getId());
+        verify(gateway).generateWorldRoomTurn(argThat(context -> context.noControlPlayer()), eq(
+                com.example.projectmm.application.dialogue.WorldRoomContinuationPrompt.build(true, 6)));
+        when(gateway.generateWorldRoomTurn(any(), anyString())).thenThrow(new IllegalStateException("Provider unavailable"));
+        assertThatThrownBy(() -> dialogueService.continueScene(session.getId())).isInstanceOf(IllegalStateException.class);
+        assertThat(messages.findTopBySessionIdOrderByIdDesc(session.getId()).orElseThrow().getAutomaticContinuationNo())
+                .isEqualTo(6);
+    }
 
     @BeforeEach
     void defaultTimeInterpretation() {

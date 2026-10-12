@@ -38,4 +38,28 @@ class WorldRoomPlayerAuthorshipPromptTest {
                 "Do not invent any player dialogue, action, thought, feeling, reaction, decision, or movement")
                 .doesNotContain("Fill routine procedural details");
     }
+
+    @Test
+    void thresholdsIncreaseDelegationOnlyForTheCurrentAutomaticReply() {
+        for (int number : new int[]{1, 2}) {
+            assertThat(WorldRoomContinuationPrompt.build(false, number)).contains(
+                    "consecutiveNo=" + number, "playerScope=LOW", "Never invent new player dialogue");
+        }
+        for (int number : new int[]{3, 5}) {
+            assertThat(WorldRoomContinuationPrompt.build(false, number)).contains(
+                    "consecutiveNo=" + number, "playerScope=MODERATE", "one brief",
+                    "Leave proposals needing a real choice unresolved", "Every reply must leave a genuine opening");
+        }
+        for (int number : new int[]{6, 20}) {
+            assertThat(WorldRoomContinuationPrompt.build(false, number)).contains(
+                    "consecutiveNo=" + number, "playerScope=HIGH", "ordinary player dialogue and reversible actions",
+                    "irreversible outcomes", "Every reply must leave a genuine opening",
+                    "Do not decide the player's next response in the closing sentence");
+            assertThat(WorldRoomContinuationPrompt.build(true, number)).contains(
+                    "playerScope=STRICT", "Do not invent any player dialogue").doesNotContain("Player scope HIGH");
+        }
+        assertThat(WorldRoomNarrativeStyle.instruction(false)).contains(
+                "Only the CURRENT server-supplied", "Fresh user narration or dialogue returns",
+                "Every scope must leave a genuine opening");
+    }
 }
