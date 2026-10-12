@@ -12,14 +12,16 @@ public final class WorldRoomContinuationPrompt {
                 """;
         return """
                 [Automatically continue the current scene for one developed story beat.
-                Write the player as an active participant, including natural spoken contributions and
-                replies in a conversational scene, actions, everyday choices, and context-supported
-                thoughts and feelings consistent with their PlayerProfile and established portrayal.
-                The user delegates ordinary scene progression; do not wait for a choice at every step
-                or reduce the player to a brief reply while only NPCs talk. Use connected narrative
-                paragraphs and a meaningful exchange, with sensory detail and character-specific behavior.
-                Preserve the user's stated intent and keep high-stakes commitments, major relationship
-                changes, intimacy, dangerous acts, and irreversible outcomes open for the user.
+                Elaborate only the concrete steps of player actions already established by the user,
+                within their stated stage and scope. Fill routine procedural details without asking
+                the user to specify every small step. Advance NPCs, environment, and direct consequences
+                with vivid, connected prose; do not freeze the scene or merely repeat the prior input.
+                Automatic continuation is not permission to choose the player's next response.
+                Never invent new player dialogue, intent, opinion, knowledge, emotion, agreement,
+                refusal, or independent next objective. Even a nod or a short answer may decide a choice.
+                Honor an explicit user delegation only within its stated scope, not from the profile
+                or previous AI-authored player behavior. Stop before a fresh player answer or decision
+                is needed; do not complete repeated NPC-question/player-answer loops.
                 Keep absent characters absent and do not force speech in a solitary or sleeping scene.]
                 """;
     }

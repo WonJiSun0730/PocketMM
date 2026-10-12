@@ -32,7 +32,7 @@ class WorldRoomCharacterContinuityPromptTest {
         assertThat(studentProfile).contains("presence: ACTIVE", "Korean by default").doesNotContain("British English");
         assertThat(prompt).contains("Later departures and the latest user direction take precedence.",
                 "Do not invent a school visit", "모든 등장인물이 나올 것");
-        assertThat(prompt).contains("Player participation is enabled:", "their natural dialogue",
+        assertThat(prompt).contains("Player action elaboration is enabled", "Never invent new player dialogue",
                 "not a terse status report", "Preserve authoritative scene time and state");
         assertThat(prompt).doesNotContain("Do not narrate the player's meaningful choices, emotions");
         var strict = new WorldRoomDialogueContext(context.roomId(), context.roomTitle(), context.visibility(),
@@ -42,6 +42,6 @@ class WorldRoomCharacterContinuityPromptTest {
         String strictPrompt = new GeminiDialogueGateway("test", "test", new ObjectMapper())
                 .buildWorldRoomSystemPrompt(strict);
         assertThat(strictPrompt).contains("Player authorship is reserved to the user:",
-                "Never supply new player dialogue").doesNotContain("Player participation is enabled:");
+                "Never supply new player dialogue").doesNotContain("Player action elaboration is enabled");
     }
 }

@@ -438,11 +438,14 @@ class WorldRoomDialogueWorldlineIntegrationTest {
 
         sessionService.updatePocketSettings(session.getId(), member.getLoginId(), "", "", false);
         when(gateway.generateWorldRoomTurn(argThat(context -> context != null && !context.noControlPlayer()), anyString()))
-                .thenReturn(new WorldRoomTurn("*플레이어도 대화에 참여한다.*", WorldRoomCastChange.none(), List.of(), 30));
+                .thenReturn(new WorldRoomTurn("*사용자가 정한 준비 과정과 주변 풍경이 이어진다.*", WorldRoomCastChange.none(), List.of(), 30));
         dialogueService.reroll(session.getId(), reply.getId());
-        verify(gateway).generateWorldRoomTurn(
+        dialogueService.continueScene(session.getId());
+        verify(gateway, times(2)).generateWorldRoomTurn(
                 argThat(context -> context != null && !context.noControlPlayer()),
-                argThat(prompt -> prompt.contains("natural spoken contributions")
+                argThat(prompt -> prompt.contains("Elaborate only the concrete steps")
+                        && prompt.contains("Never invent new player dialogue")
+                        && prompt.contains("Stop before a fresh player answer or decision")
                         && !prompt.contains("without controlling the player character")));
     }
 
