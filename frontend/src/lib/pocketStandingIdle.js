@@ -28,8 +28,28 @@ export function createStandingIdle(vrm, phase = 0) {
     pose("chest", breath * 0.009, 0, sway * 0.004)
     pose("head", breath * 0.004, sway * 0.015, -sway * 0.004)
     const delta = Number.isFinite(deltaSeconds) ? Math.min(0.05, Math.max(0, deltaSeconds)) : 0
-    vrm.update?.(delta)
+    if (delta === 0) vrm.update?.(0)
+    else {
+      const steps = Math.ceil(delta / (1 / 60))
+      for (let step = 0; step < steps; step++) vrm.update?.(delta / steps)
+    }
   }
   update(0, 0, false)
   return update
+}
+
+// Rebase spring tails AFTER the standing pose, scale, placement and rotation.
+// Loaded spring tails otherwise retain their pre-placement world coordinates.
+export function settleStandingPhysics(vrm) {
+  const springs = vrm.springBoneManager
+  if (!springs) return
+  for (const joint of springs.joints ?? []) {
+    if (joint.settings) joint.settings.dragForce = Math.max(joint.settings.dragForce ?? 0.4, 0.6)
+  }
+  vrm.scene.updateMatrixWorld(true)
+  springs.setInitState()
+  springs.reset()
+  // Settle gravity off-screen instead of showing the first large relaxation swing.
+  for (let step = 0; step < 60; step++) springs.update(1 / 60)
+  vrm.scene.updateMatrixWorld(true)
 }

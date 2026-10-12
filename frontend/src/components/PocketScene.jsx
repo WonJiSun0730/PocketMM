@@ -5,7 +5,7 @@ import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm"
 import { resolvePocketScene, resolvePocketDaypart } from "@/lib/pocketSceneRegistry"
 import { getPocketBackground } from "@/lib/pocketSceneBackgrounds"
 import { activitySymbol } from "@/lib/pocketActivityPlayback"
-import { createStandingIdle } from "@/lib/pocketStandingIdle"
+import { createStandingIdle, settleStandingPhysics } from "@/lib/pocketStandingIdle"
 
 export default function PocketScene({ className = "", simulatedAt = "", location = "", sessionId = null, playerModel = null, characterModels = [], activity = null }) {
   const hostRef = useRef(null)
@@ -217,6 +217,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
           })
           pixelizeModel(vrm.scene)
           scene.add(vrm.scene)
+          settleStandingPhysics(vrm)
           idleActors.push(updateIdle)
           const actorId = model.source?.characterId ?? model.source?.id
           const head = vrm.humanoid?.getRawBoneNode("head") ?? vrm.scene
@@ -306,7 +307,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     activity.characterIds.includes(model.source?.characterId ?? model.source?.id)) : []
 
   return <div className={`pocket-scene-shell ${className}`}>
-    <div className="pocket-scene" style={{ height: `${sceneHeight}px` }}>
+    <div className="pocket-scene" data-player-present={Boolean(playerModel)} style={{ height: `${sceneHeight}px` }}>
       <div className="pocket-scene__backdrop" data-daypart={daypart} aria-hidden="true">
         <img src={backgroundUrl} alt="" style={{ transform: `scale(${zoom / 1.35})` }}
           onError={() => setFailedBackground(requestedBackground)} />

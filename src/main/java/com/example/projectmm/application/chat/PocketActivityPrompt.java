@@ -14,6 +14,13 @@ public final class PocketActivityPrompt {
                 They may initiate a walk, talk to each other, return home, work, read, rest, eat or drink coffee.
                 Keep the sequence connected: a shared walk and conversation followed by coffee at home
                 should remain two ordered activities, not unrelated summaries or a full novel.
+                Continue AFTER the latest recorded scene, never restart its introduction or replay an
+                encounter, greeting, arrival, or invitation that already happened. If the NPC has already
+                welcomed the player and offered a seat, do not narrate preparing for that meeting and
+                welcoming them again. Preserve established facts and the player's physical presence.
+                The HUMAN being away does not mean the PLAYER has left the fictional room.
+                NPCs may do quiet daily tasks while waiting; do not invent new exchanges with the player.
+                If further interaction needs the player's answer or action, pause rather than invent it.
                 No player dialogue, actions, decisions, possessions, conditions, or location changes.
                 No major relationship commitments, dangerous or irreversible choices, invented diagnoses,
                 private memories, or forced encounters with the player. Pause before such a choice and

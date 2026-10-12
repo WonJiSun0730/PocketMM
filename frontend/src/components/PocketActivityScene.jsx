@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import PocketScene from "@/components/PocketScene"
-import { ACTIVITY_FRAME_MS, activitySymbol, activityParticipants, activityModels, nextActivityIndex } from "@/lib/pocketActivityPlayback"
+import { ACTIVITY_FRAME_MS, activitySymbol, activityParticipants, activityModels, nextActivityIndex, replayIncludesPlayer } from "@/lib/pocketActivityPlayback"
 
 export default function PocketActivityScene({ sessionId, report, freshReportId, characters, sceneModels,
   simulatedAt, location, disabled }) {
@@ -17,8 +17,18 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
     characterIds: participantKey.split(",").filter(Boolean).map(Number),
   }, characters), [participantKey, characters])
   // Place/time changes keep identical actor models mounted.
-  const replayModels = useMemo(() => activityModels(participants), [participants])
-  const replayReady = participants.length > 0 && replayModels.length === participants.length
+  const generatedReplayModels = useMemo(() => activityModels(participants), [participants])
+  const sameCast = participants.length === sceneModels.castModels.length && participants.every(character =>
+    sceneModels.castModels.some(model => (model.source.id ?? model.source.characterId) === (character.id ?? character.characterId)))
+  const replayAtCurrentPlace = Boolean(activity && replayIncludesPlayer(location, activity.location))
+  const replayModels = useMemo(() => {
+    if (!replayAtCurrentPlace) return sameCast ? sceneModels.castModels : generatedReplayModels
+    const presentIds = new Set(sceneModels.castModels.map(model => model.source.id ?? model.source.characterId))
+    const additional = generatedReplayModels.filter(model => !presentIds.has(model.source.id ?? model.source.characterId))
+    return additional.length ? [...sceneModels.castModels, ...additional] : sceneModels.castModels
+  }, [replayAtCurrentPlace, sameCast, sceneModels.castModels, generatedReplayModels])
+  const replayPlayer = replayAtCurrentPlace ? sceneModels.playerModel : null
+  const replayReady = participants.length > 0 && generatedReplayModels.length === participants.length
   const symbol = activitySymbol(activity?.kind)
   function select(next, shouldPlay = false) {
     setSelection(next == null ? null : { sessionId, reportId: report.id, index: next })
@@ -53,8 +63,9 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
   return <div>
     {activity ? <>
       {replayReady ? <PocketScene sessionId={sessionId} simulatedAt={activity.start}
-        location={activity.location} playerModel={null} characterModels={replayModels} activity={activity} />
+        location={activity.location} playerModel={replayPlayer} characterModels={replayModels} activity={activity} />
         : <div className="pocket-activity-fallback" aria-label="모델 미등록 캐릭터의 활동 미리보기">
+            {replayPlayer && <div className="pocket-activity-person"><span>{replayPlayer.source.name}</span><span className="text-muted-foreground">현재 장면의 플레이어</span></div>}
             {participants.map(character => <div key={character.id ?? character.characterId} className="pocket-activity-person">
               <span className="pocket-activity-icon" aria-label={symbol.label}>{symbol.emoji}</span>
               <span>{character.name ?? character.characterName}</span>

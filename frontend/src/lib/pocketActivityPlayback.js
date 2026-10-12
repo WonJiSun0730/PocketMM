@@ -24,3 +24,12 @@ export function activityModels(participants) {
 export function nextActivityIndex(index, count) {
   return Number.isInteger(index) && index >= 0 && index + 1 < count ? index + 1 : null
 }
+
+// Keep a passive player in the established place, including a named room within it.
+// A shared preset (e.g. two offices) alone is not evidence of the same place.
+export function replayIncludesPlayer(playerLocation, activityLocation) {
+  const normalize = value => typeof value === "string" ? value.trim().replace(/\s+/g, " ").toLowerCase() : ""
+  const player = normalize(playerLocation), activity = normalize(activityLocation)
+  if (!player || !activity || ["미설정", "없음", "unknown"].includes(player) || ["미설정", "없음", "unknown"].includes(activity)) return false
+  return player === activity || activity.startsWith(`${player} `) || player.startsWith(`${activity} `)
+}

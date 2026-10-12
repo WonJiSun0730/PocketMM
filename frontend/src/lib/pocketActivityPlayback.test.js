@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { activitySymbol, activityParticipants, activityModels, nextActivityIndex } from "./pocketActivityPlayback.js"
+import { activitySymbol, activityParticipants, activityModels, nextActivityIndex, replayIncludesPlayer } from "./pocketActivityPlayback.js"
 
 test("all server activity kinds yield fixed emoji bubbles, never summary or dialogue", () => {
   for (const kind of ["WALK", "TALK", "REST", "READ", "WORK", "MEAL", "COFFEE"]) {
@@ -30,4 +30,14 @@ test("ordered playback finishes instead of looping or skipping the final frame",
   assert.equal(nextActivityIndex(0, 1), null)
   assert.equal(nextActivityIndex(null, 2), null)
   assert.equal(nextActivityIndex(-1, 2), null)
+})
+
+test("same-place replay preserves a passive player without placing them in off-screen activity", () => {
+  assert.equal(replayIncludesPlayer("심리상담센터", "심리상담센터 상담실"), true)
+  assert.equal(replayIncludesPlayer("집", "집"), true)
+  assert.equal(replayIncludesPlayer("집", "집 거실"), true)
+  assert.equal(replayIncludesPlayer("집", "집무실"), false)
+  assert.equal(replayIncludesPlayer("집", "공원"), false)
+  assert.equal(replayIncludesPlayer("미설정", "미설정"), false)
+  assert.equal(replayIncludesPlayer(null, "상담실"), false)
 })
