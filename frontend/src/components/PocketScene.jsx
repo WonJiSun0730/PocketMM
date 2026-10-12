@@ -364,10 +364,13 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       </div>
       <div ref={hostRef} className="pocket-scene__viewport" aria-label="2D 배경과 3D 캐릭터 장면" />
       {activity?.kind === "SLEEP" && <div className="pocket-scene__bed" aria-label="잠자는 캐릭터 앞의 침대">
-        <svg viewBox="0 0 300 120" role="img" aria-label="침대"><path fill="#8D7864" d="M10 15h280v105H10z"/>
-          <rect x="17" y="6" width="266" height="100" rx="12" fill="#E7E0D2"/>
-          <rect x="30" y="10" width="95" height="30" rx="9" fill="#FAF7F1"/>
-          <path fill="#BCB5A7" d="M17 45h266v62H17z"/><path fill="none" stroke="#9B9282" strokeWidth="3" d="M17 52h266M30 52v50M270 52v50"/></svg>
+        <svg viewBox="0 0 300 165" role="img" aria-label="도톰한 이불이 덮인 침대">
+          <path fill="#8D7864" d="M8 55h284v110H8z"/>
+          <rect x="13" y="48" width="274" height="104" rx="13" fill="#E7E0D2"/>
+          <rect x="23" y="52" width="74" height="33" rx="12" fill="#FAF7F1"/>
+          <path fill="#D9D1C1" d="M91 85Q100 17 170 20Q240 17 280 81L287 91v61H13V91h78z"/>
+          <path fill="none" stroke="#B9B09F" strokeWidth="3" d="M91 85Q100 17 170 20Q240 17 280 81M13 104h274M25 110v36M275 110v36"/>
+        </svg>
       </div>}
       <div className="pocket-scene__expressions" aria-hidden="true">{bubbleCharacters.map(model => {
         const id=model.bubbleId ?? model.source.characterId ?? model.source.id

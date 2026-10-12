@@ -35,12 +35,12 @@ export function puppetPose(activity, actorId, seconds, motion = true) {
   if (activity.kind === "SLEEP") return { ...pose, y:-0.18, rz:-0.22 }
   const mood = actorCue(activity, actorId).emotion
   if (mood === "SAD") { pose.y=-0.05; pose.rx=0.10; pose.rz=-0.035 }
-  if (activity.kind === "WALK" || activity.kind === "TRAVEL") pose.ry=-Math.sign(walkDirection(activity)[0])*Math.PI/2
+  if (activity.kind === "WALK" || activity.kind === "TRAVEL") pose.ry=-Math.sign(walkDirection(activity)[0])*Math.PI/6
   if (!motion) return pose
   const t = Number.isFinite(seconds) ? seconds : 0
   if (activity.kind === "WALK" || activity.kind === "TRAVEL") pose.rz=Math.sin(t*7)*0.035
   if (mood === "ANGRY") { pose.x=Math.sin(t*35)*0.009; pose.rz+=Math.sin(t*27)*0.014 }
-  if (mood === "HAPPY") pose.y=Math.abs(Math.sin(t*3.5))*0.075
+  if (mood === "HAPPY") pose.y=Math.abs(Math.sin(t*4.2))*0.075
   if (activity.kind === "WALK" || activity.kind === "TRAVEL") { pose.x=0; pose.y=0 }
   return pose
 }

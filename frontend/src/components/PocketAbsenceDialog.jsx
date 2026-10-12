@@ -27,7 +27,6 @@ export default function PocketAbsenceDialog({ open, onClose, display, activity, 
     <div className="pocket-absence-device" aria-label="부재 활동 디스플레이">{display}</div>
     <div className="pocket-absence-dialog__caption" aria-live="polite">
       <p>{symbol.label}<span>{activity.location || "장소 미설정"}</span></p>
-      <p className="pocket-absence-dialog__summary">{activity.summary}</p>
     </div>
     <div className="pocket-absence-dialog__playback">
       <Button variant="ghost" size="sm" disabled={disabled || index === 0} aria-label="이전 활동" onClick={() => onSelect(index - 1)}>‹</Button>
