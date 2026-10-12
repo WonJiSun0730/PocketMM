@@ -51,6 +51,16 @@ class PrivateTestLoginServiceTest {
         assertThat(service.verify(code, session).getUsername()).isEqualTo("devseed");
         assertThatThrownBy(() -> service.verify(code, session)).isInstanceOf(ResponseStatusException.class);
     }
+    @Test void successfulVerificationAllowsImmediateLoginOnAnotherDevice() {
+        service.send("devseed", "devseed-password", session);
+        String code = sentCode();
+        assertThatThrownBy(() -> service.verify("invalid", session)).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> service.send("devseed", "devseed-password", new MockHttpSession()))
+                .isInstanceOfSatisfying(ResponseStatusException.class, e -> assertThat(e.getStatusCode().value()).isEqualTo(429));
+        service.verify(code, session);
+        service.send("devseed", "devseed-password", new MockHttpSession());
+        verify(mail, times(2)).send(any(SimpleMailMessage.class));
+    }
     @Test void fiveFailuresInvalidateCode() {
         service.send("devseed", "devseed-password", session); String code = sentCode();
         for (int i = 0; i < 5; i++) assertThatThrownBy(() -> service.verify("invalid", session)).isInstanceOf(ResponseStatusException.class);

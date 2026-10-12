@@ -89,6 +89,7 @@ public class PrivateTestLoginService {
         UserDetails user = users.loadUserByUsername(ACCOUNT);
         if (!user.isEnabled() || !user.isAccountNonLocked() || !user.isAccountNonExpired()
                 || !user.isCredentialsNonExpired()) throw invalidCredentials();
+        nextSendAt = 0;
         return user;
     }
 
