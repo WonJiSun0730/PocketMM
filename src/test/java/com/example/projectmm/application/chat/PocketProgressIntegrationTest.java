@@ -289,6 +289,20 @@ class PocketProgressIntegrationTest {
         assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
         assertThat(db(() -> states.findBySessionId(id).orElseThrow().getLocation())).isEqualTo("Home");
     }
+    @Test void legacyReportsWithMissingOrNullPlayerParticipationDoNotBlockTimeCheck() {
+        for (var flag : List.of("", "\"playerInvolved\":null,", "\"playerInvolved\":true,")) {
+            var raw = "[{\"start\":\"" + story + "\",\"end\":\"" + story.plusMinutes(1)
+                    + "\",\"kind\":\"TALK\",\"characterIds\":[" + a
+                    + "]," + flag + "\"location\":\"Home\",\"summary\":\"상담을 진행했다.\"}]";
+            db(() -> { reports.save(new PocketActivityReport(sessions.findById(id).orElseThrow(),story,
+                    story.plusMinutes(1),now,false,null,raw)); return null; });
+            var status = progress.current(id,login);
+            assertThat(status.lastReport().activities().getFirst().playerInvolved()).isEqualTo(flag.contains("true"));
+            assertThat(progress.configure(id,login,true).enabled()).isTrue();
+            assertThat(progress.resume(id,login).lastReport().id()).isEqualTo(status.lastReport().id());
+            progress.configure(id,login,false);
+        }
+    }
     @Test void otherUserCannotReadOrChangeProgress() {
         assertThatThrownBy(() -> progress.resume(id,"unknown")).isInstanceOf(ResponseStatusException.class);
         assertThatThrownBy(() -> progress.configure(id,"unknown",true)).isInstanceOf(ResponseStatusException.class);

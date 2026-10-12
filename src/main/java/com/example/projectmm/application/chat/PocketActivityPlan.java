@@ -15,7 +15,12 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
     }
     public record PlayerStatePatch(String location, List<String> conditions, List<String> inventory) {}
     public record Activity(LocalDateTime start, LocalDateTime end, Kind kind,
-            List<Long> characterIds, String location, String summary, boolean playerInvolved) {}
+            List<Long> characterIds, String location, String summary, Boolean playerInvolved) {
+        public Activity {
+            // Pre-autonomy reports have no participation flag; explicit null is also legacy data.
+            playerInvolved = Boolean.TRUE.equals(playerInvolved);
+        }
+    }
     public static PocketActivityPlan parse(String json, WorldRoomDialogueContext context,
             LocalDateTime from, LocalDateTime to) {
         var node = new ObjectMapper().readTree(json);
