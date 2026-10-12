@@ -13,10 +13,23 @@ public final class WorldRoomContinuationPrompt {
                 : consecutiveNo <= 5 ? "MODERATE" : "HIGH";
         String header = "[Current automatic progression directive: consecutiveNo=" + consecutiveNo
                 + "; playerScope=" + scope + "]\n";
+        header += """
+                Progression, not a waiting loop:
+                - Compare the recent replies. Do not repeat waiting, reassurance to take one's time,
+                  or the same unanswered question in different words as the whole next beat.
+                - Clicking automatic progression requests a meaningful next beat, not more silence.
+                  The absence of new user text is not an in-character refusal or instruction to wait.
+                - Leaving a choice open means advancing up to a NEW opening, not preserving the same
+                  unresolved question forever. Use the current playerScope and retain its limits.
+                - Never escape a stall by inventing a dream, symptom, traumatic memory, diagnosis,
+                  consent, or sudden revelation. Advance from established facts instead.
+                """;
         if (noControlPlayer) return header + """
                 [Continue the current scene naturally for one developed story beat without controlling the player character.
                 Advance only NPC actions, dialogue, environment, and context-supported events.
                 Do not invent any player dialogue, action, thought, feeling, reaction, decision, or movement.
+                An NPC may set aside an unanswered question, act on known information, or make a
+                practical offer without deciding that the player accepts. Do not add player reactions.
                 Write vivid, connected prose and leave room for the user's response.]
                 """;
         if (consecutiveNo <= 2) return header + """
@@ -36,8 +49,13 @@ public final class WorldRoomContinuationPrompt {
         String delegated = consecutiveNo <= 5 ? """
                 Player scope MODERATE (consecutive automatic continuations 3-5):
                 - Slightly increase participation within the current user-established task.
-                  You may supply one brief, context-supported player utterance or a minor reaction,
-                  but neither is mandatory. Do not fabricate a new opinion, goal, or knowledge.
+                  You may supply one brief, context-supported player utterance or a minor reaction.
+                  Do not fabricate a new opinion, goal, or knowledge.
+                - If prior replies stalled while the player was already trying to think or recall,
+                  move that authored process forward. A brief acknowledgement of still sorting it
+                  out, or words restating facts the user supplied, can let the NPC respond and advance.
+                  Do not always omit player participation merely because recall content is unknown;
+                  preserve that uncertainty rather than inventing the missing memory or symptom.
                 - Do not make the player initiate an unrelated exchange or supply repeated answers
                   to NPC questions. Leave proposals needing a real choice unresolved.
                 """ : """

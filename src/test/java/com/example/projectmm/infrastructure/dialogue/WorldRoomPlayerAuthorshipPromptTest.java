@@ -62,4 +62,27 @@ class WorldRoomPlayerAuthorshipPromptTest {
                 "Only the CURRENT server-supplied", "Fresh user narration or dialogue returns",
                 "Every scope must leave a genuine opening");
     }
+
+    @Test
+    void recallStallsAdvanceWithoutFabricatingAnAnswerOrViolatingStrictControl() {
+        for (boolean strict : new boolean[]{false, true}) {
+            assertThat(WorldRoomNarrativeStyle.instruction(strict)).contains(
+                    "An opening for the user is not a frozen scene", "rephrasing the same unanswered question",
+                    "User-authored thinking or recalling is an ongoing action",
+                    "Never invent specific memories, symptoms, diagnoses",
+                    "without presuming", "not player refusal");
+            for (int count : new int[]{1, 3, 6}) {
+                assertThat(WorldRoomContinuationPrompt.build(strict, count)).contains(
+                        "Progression, not a waiting loop", "not an in-character refusal",
+                        "advancing up to a NEW opening", "Never escape a stall by inventing a dream");
+            }
+        }
+        assertThat(WorldRoomContinuationPrompt.build(false, 3)).contains(
+                "move that authored process forward", "still sorting it",
+                "restating facts the user supplied", "preserve that uncertainty")
+                .doesNotContain("neither is mandatory");
+        assertThat(WorldRoomContinuationPrompt.build(true, 6)).contains(
+                "Do not invent any player dialogue", "without deciding that the player accepts")
+                .doesNotContain("A brief acknowledgement of still sorting");
+    }
 }

@@ -61,6 +61,18 @@ final class WorldRoomNarrativeStyle {
                   prompts such as "What will you do now?" or "Are you ready to continue?".
                   A natural NPC question or unresolved moment may end the beat without supplying
                   the player's answer; developed prose does not require completing an exchange.
+                - An opening for the user is not a frozen scene. Check recent replies for repeated
+                  waiting, 'take your time' reassurance, or rephrasing the same unanswered question.
+                  Do not reproduce that loop with different gestures, clock sounds, or filler.
+                  Move to a meaningful next beat within the current playerScope.
+                - User-authored thinking or recalling is an ongoing action, not a command for every
+                  subsequent reply to remain silent. Elaborate the process within authorship limits.
+                  At MODERATE/HIGH scope a brief acknowledgement of the ongoing effort or restatement
+                  of established facts may connect the player's process to a new NPC response.
+                  Never invent specific memories, symptoms, diagnoses, or revelations to force progress.
+                - At STRICT/LOW scope advance NPC/world behavior without choosing the player's answer:
+                  an NPC can set aside the question or offer a practical next step without presuming
+                  compliance. Lack of user text during automatic progression is not player refusal.
                 - Avoid a mechanical roll call in which every NPC gets one line. Use only those
                   present and relevant; departing characters stay absent under the cast rules.
                 - Concrete detail must make physical sense: five minutes is not five ticks of
