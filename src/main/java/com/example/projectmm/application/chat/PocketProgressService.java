@@ -92,19 +92,27 @@ public class PocketProgressService {
             session.markPresent(clock.now()); return null;
         });
     }
-    public Status resume(Long id, String loginId) {
+    public Status resume(Long id, String loginId) { return resume(id, loginId, null); }
+    public Status simulateAbsence(Long id, String loginId, int hours) {
+        if (hours < 1 || hours > 3)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "테스트 시간은 1·2·3시간 중 선택해 주세요.");
+        return resume(id, loginId, Duration.ofHours(hours));
+    }
+    private Status resume(Long id, String loginId, Duration testElapsed) {
         Prepared prepared;
         try {
             prepared = tx(() -> {
                 var session = owned(id, loginId, true); idle(session);
+                if (testElapsed != null && (!session.isTimeCheckEnabled() || session.getPlayerProfile() == null))
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "플레이어를 선택하고 시간 체크를 켠 후 테스트해 주세요.");
                 session.clearProgressPause();
                 var now = clock.now(); var presence = session.getLastPresenceAt();
                 if (!session.isTimeCheckEnabled() || session.getPlayerProfile() == null
-                        || presence == null
-                        || Duration.between(presence, now).getSeconds() < 60) {
+                        || (testElapsed == null && (presence == null
+                        || Duration.between(presence, now).getSeconds() < 60))) {
                     session.markPresent(now); return new Prepared(status(session), null);
                 }
-                var elapsed = Duration.between(presence, now);
+                var elapsed = testElapsed == null ? Duration.between(presence, now) : testElapsed;
                 var interval = simulation.calculate(session.getSimulatedAt(), session.getSimulatedAt().plus(elapsed));
                 var context = contexts.buildSession(id);
                 var token = UUID.randomUUID().toString(); session.beginProgress(token, now);

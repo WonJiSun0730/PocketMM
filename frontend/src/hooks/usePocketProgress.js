@@ -26,7 +26,7 @@ export default function usePocketProgress(sessionId, onUpdated) {
     active.pending = (async () => {
       try {
         // Keep the real ON/OFF state visible even if the first catch-up fails.
-        if (suffix === "/resume" && !active.ready) {
+        if (["/resume", "/simulate"].includes(suffix) && !active.ready) {
           const previous = await request("")
           if (scope.current !== active) return false
           setStatus(previous)
@@ -34,10 +34,10 @@ export default function usePocketProgress(sessionId, onUpdated) {
         }
         const result = await request(suffix, options)
         if (scope.current !== active) return false
-        if (suffix === "/resume" && result?.lastReport?.id != null && result.lastReport.id !== active.reportId)
+        if (["/resume", "/simulate"].includes(suffix) && result?.lastReport?.id != null && result.lastReport.id !== active.reportId)
           setFreshReportId(result.lastReport.id)
         const changed = !active.ready || active.reportId !== result?.lastReport?.id || active.simulatedAt !== result?.simulatedAt
-        setStatus(result); active.failed = false; active.ready = true
+        setStatus(result); active.failed = false; active.ready = true; active.testHours = null
         active.reportId = result?.lastReport?.id; active.simulatedAt = result?.simulatedAt
         if (refresh && changed) await updated.current?.()
         return true
@@ -51,7 +51,15 @@ export default function usePocketProgress(sessionId, onUpdated) {
     })()
     return active.pending
   }, [request])
-  const resume = useCallback(() => run("/resume", { method: "POST" }, true), [run])
+  const resume = useCallback(() => scope.current.testHours != null
+    ? run("/simulate", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hours: scope.current.testHours }) }, true)
+    : run("/resume", { method: "POST" }, true), [run])
+  const simulate = useCallback(hours => {
+    if (scope.current.pending) return scope.current.pending
+    scope.current.testHours = hours
+    return resume()
+  }, [resume])
   const configure = useCallback(enabled => run("", {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }),
   }, false), [run])
@@ -83,5 +91,5 @@ export default function usePocketProgress(sessionId, onUpdated) {
       hiddenPresence()
     }
   }, [request, resume])
-  return { status, busy, error, freshReportId, resume, configure, reload: () => run("", {}, false) }
+  return { status, busy, error, freshReportId, resume, simulate, configure, reload: () => run("", {}, false) }
 }

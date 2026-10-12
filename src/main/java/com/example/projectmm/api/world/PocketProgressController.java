@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 public class PocketProgressController {
     private final PocketProgressService progress;
     public record Configuration(boolean enabled) {}
+    public record Simulation(int hours) {}
     @GetMapping public PocketProgressService.Status current(@PathVariable Long sessionId, Authentication auth) {
         return progress.current(sessionId, auth.getName());
     }
@@ -19,6 +20,10 @@ public class PocketProgressController {
     }
     @PostMapping("/resume") public PocketProgressService.Status resume(@PathVariable Long sessionId, Authentication auth) {
         return progress.resume(sessionId, auth.getName());
+    }
+    @PostMapping("/simulate") public PocketProgressService.Status simulate(@PathVariable Long sessionId,
+            @RequestBody Simulation request, Authentication auth) {
+        return progress.simulateAbsence(sessionId, auth.getName(), request.hours());
     }
     @PostMapping("/presence") public void presence(@PathVariable Long sessionId, Authentication auth) {
         progress.presence(sessionId, auth.getName());

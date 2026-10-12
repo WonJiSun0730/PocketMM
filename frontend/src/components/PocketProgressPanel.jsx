@@ -8,7 +8,7 @@ function time(value) {
   }).format(date)
 }
 export default function PocketProgressPanel({ progress, characters, disabled }) {
-  const { status, busy, error, configure, resume } = progress
+  const { status, busy, error, configure, resume, simulate } = progress
   const names = new Map(characters.map(c => [c.id ?? c.characterId, c.name ?? c.characterName]))
   const report = status?.lastReport
   return <section aria-label="시간 체크" className="border-b px-4 py-3 text-xs sm:px-6">
@@ -19,6 +19,13 @@ export default function PocketProgressPanel({ progress, characters, disabled }) 
         onClick={() => configure(!status?.enabled)}>{status?.enabled ? "ON" : "OFF"}</Button>
     </div>
     <p className="mt-2 leading-5 text-muted-foreground">복귀할 때 부재 시간을 반영하고 캐릭터 활동을 정리해요.</p>
+    <div className="mt-3 rounded-md border border-dashed p-2">
+      <p className="font-medium">부재 시간 테스트</p>
+      <div className="mt-2 flex flex-wrap gap-2">{[1, 2, 3].map(hours =>
+        <Button key={hours} size="sm" variant="outline" disabled={busy || disabled || !status?.enabled}
+          onClick={() => simulate(hours)}>{hours}시간 경과</Button>)}</div>
+      <p className="mt-2 leading-5 text-muted-foreground">기다리지 않고 부재 활동을 생성해요. 이야기 시각과 대화 기록에 반영돼요.</p>
+    </div>
     {busy && <p role="status" className="mt-2">부재 활동을 확인하는 중…</p>}
     {error && <div className="mt-2 space-y-2"><p role="alert" className="text-destructive">{error}</p>
       <Button size="sm" variant="outline" disabled={busy} onClick={resume}>다시 확인</Button></div>}

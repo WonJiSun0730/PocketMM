@@ -310,6 +310,39 @@ class PocketProgressIntegrationTest {
             progress.configure(id,login,false);
         }
     }
+    @Test void simulatedHoursUseNormalActivityStorageWithoutChangingWallClock() {
+        progress.configure(id,login,true);
+        var expected = story;
+        for (int hours : List.of(1,2,3)) {
+            var end = expected.plusHours(hours);
+            when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(plan(expected,end),WorldRoomCastChange.none(),List.of(),0));
+            var result = progress.simulateAbsence(id,login,hours);
+            assertThat(result.simulatedAt()).isEqualTo(end);
+            assertThat(result.lastReport().from()).isEqualTo(expected);
+            assertThat(result.lastReport().to()).isEqualTo(end);
+            assertThat(result.processing()).isFalse();
+            expected = end;
+        }
+        verify(gateway,times(3)).generateWorldRoomTurn(any(),anyString());
+        assertThat(db(() -> sessions.findById(id).orElseThrow().getLastPresenceAt())).isEqualTo(now);
+    }
+    @Test void simulationRequiresEnabledOwnerAndSupportedHours() {
+        assertThatThrownBy(() -> progress.simulateAbsence(id,login,1)).isInstanceOf(ResponseStatusException.class);
+        progress.configure(id,login,true);
+        for(int hours : List.of(0,4,-1))
+            assertThatThrownBy(() -> progress.simulateAbsence(id,login,hours)).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> progress.simulateAbsence(id,"unknown",1)).isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(gateway);
+        assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
+    }
+    @Test void failedSimulationKeepsStoryAndCanRetrySameHours() {
+        progress.configure(id,login,true);
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenThrow(new IllegalStateException("unavailable"));
+        assertThatThrownBy(() -> progress.simulateAbsence(id,login,2)).isInstanceOf(ResponseStatusException.class);
+        assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
+        doReturn(new WorldRoomTurn(plan(story,story.plusHours(2)),WorldRoomCastChange.none(),List.of(),0)).when(gateway).generateWorldRoomTurn(any(),anyString());
+        assertThat(progress.simulateAbsence(id,login,2).simulatedAt()).isEqualTo(story.plusHours(2));
+    }
     @Test void otherUserCannotReadOrChangeProgress() {
         assertThatThrownBy(() -> progress.resume(id,"unknown")).isInstanceOf(ResponseStatusException.class);
         assertThatThrownBy(() -> progress.configure(id,"unknown",true)).isInstanceOf(ResponseStatusException.class);
