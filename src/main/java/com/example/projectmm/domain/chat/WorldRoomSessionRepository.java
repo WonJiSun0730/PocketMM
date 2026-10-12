@@ -7,6 +7,10 @@ import java.util.Optional;
 
 public interface WorldRoomSessionRepository extends JpaRepository<WorldRoomSession, Long> {
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select s from WorldRoomSession s where s.id = :id")
+    Optional<WorldRoomSession> lockById(@org.springframework.data.repository.query.Param("id") Long id);
+
     Optional<WorldRoomSession> findTopByRoomIdAndMemberIdOrderByCreatedAtDescIdDesc(
             Long roomId,
             Long memberId

@@ -1,6 +1,7 @@
 package com.example.projectmm.application.chat;
 
 import com.example.projectmm.domain.character.CharacterRepository;
+import com.example.projectmm.domain.chat.PocketActivityReportRepository;
 import com.example.projectmm.domain.chat.WorldConversation;
 import com.example.projectmm.domain.chat.WorldConversationCast;
 import com.example.projectmm.domain.chat.WorldConversationCastRepository;
@@ -39,6 +40,7 @@ public class WorldRoomService {
     private final MemberRepository members;
     private final WorldRoomIntroRepository intros;
     private final WorldRoomSessionRepository sessions;
+    private final PocketActivityReportRepository activityReports;
     private final WorldRoomMessageRepository messages;
     private final WorldRoomMessageVariantRepository variants;
     private final WorldRoomVariantCastSnapshotRepository castSnapshots;
@@ -46,6 +48,9 @@ public class WorldRoomService {
     private final WorldRoomSessionCastRepository sessionCasts;
     private final WorldRoomSessionSystemStateRepository sessionSystemStates;
     private final WorldRoomPlayerStateRepository playerStates;
+    private final com.example.projectmm.domain.memory.MemoryRepository memories;
+    private final com.example.projectmm.domain.memory.ProtectedMemoryDetailRepository memoryDetails;
+    private final jakarta.persistence.EntityManager em;
 
     @Transactional
     public WorldConversation create(
@@ -98,6 +103,17 @@ public class WorldRoomService {
     public void deleteRoom(Long roomId, String ownerLoginId) {
         var room = ownedRoom(roomId, ownerLoginId);
 
+        for (var pocket : sessions.findByRoomIdOrderByCreatedAtDescIdDesc(roomId)) {
+            var locked = sessions.lockById(pocket.getId()).orElseThrow(); em.refresh(locked);
+            if (locked.progressInProgress(LocalDateTime.now()))
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "부재 활동을 정리 중이에요. 잠시 기다려 주세요.");
+            var memoryIds = memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(pocket.getId())
+                    .stream().map(com.example.projectmm.domain.memory.Memory::getId).toList();
+            if (!memoryIds.isEmpty()) memoryDetails.deleteByMemoryIdIn(memoryIds);
+            memories.deleteByWorldRoomSessionId(pocket.getId());
+        }
+        memories.flush();
+        activityReports.deleteBySessionRoomId(roomId);
         systemSnapshots.deleteByVariantMessageSessionRoomId(roomId);
         castSnapshots.deleteByVariantMessageSessionRoomId(roomId);
         variants.deleteByMessageSessionRoomId(roomId);

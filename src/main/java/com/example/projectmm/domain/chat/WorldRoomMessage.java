@@ -37,6 +37,9 @@ public class WorldRoomMessage {
 
     // Null for user input and its reply. Stored on the message, not each reroll variant.
     private Integer automaticContinuationNo;
+    private Long absenceReportId;
+
+    public void markAbsenceReport(Long id) { absenceReportId = id; }
 
     public void markAutomaticContinuation(int consecutiveNo) {
         if (role != ChatRole.CHARACTER || consecutiveNo < 1) {

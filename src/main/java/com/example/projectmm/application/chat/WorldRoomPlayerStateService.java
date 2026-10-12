@@ -34,7 +34,8 @@ public class WorldRoomPlayerStateService {
             List<String> conditions,
             List<String> inventory
     ) {
-        var session = sessions.pocket(sessionId, loginId);
+        sessions.pocket(sessionId, loginId);
+        var session = sessions.lockForMutation(sessionId);
         if (simulatedAt == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Simulation time is required");
         }

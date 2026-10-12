@@ -122,12 +122,16 @@
 
 .pocket-mobile-tools {
   display: block;
+  flex-shrink: 0;
+  max-height: 35vh;
+  overflow-y: auto;
 }
 
 @media (min-width: 1280px) {
   .pocket-layout {
     position: relative;
-    width: min(100%, 56rem);
+    width: min(100%, 76rem);
+    padding-left: 19.25rem;
     margin-inline: auto;
   }
 
@@ -139,7 +143,7 @@
     display: block;
     position: absolute;
     top: 0;
-    right: calc(100% + 1.25rem);
+    left: 0;
     width: 18rem;
     margin-top: 4.5rem;
     max-height: calc(100vh - 6rem);

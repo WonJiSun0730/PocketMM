@@ -43,6 +43,27 @@ public class WorldRoomSessionService {
     private final MemoryRepository memories;
     private final ProtectedMemoryDetailRepository protectedMemoryDetails;
     private final WorldRoomPlayerStateRepository playerStates;
+    private final PocketActivityReportRepository activityReports;
+    private final jakarta.persistence.EntityManager entityManager;
+
+    @Transactional
+    public WorldRoomSession lockForMutation(Long id) {
+        var session = sessions.lockById(id).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pocket not found"));
+        entityManager.refresh(session);
+        if (session.progressInProgress(now())) throw new ResponseStatusException(HttpStatus.CONFLICT, "부재 활동을 정리 중이에요. 잠시 기다려 주세요.");
+        return session;
+    }
+
+    @Transactional
+    public WorldRoomSession lockForDialogue(Long id) {
+        var session = lockForMutation(id);
+        if (session.isTimeCheckEnabled() && session.getProgressPauseReason() == null
+                && session.getLastPresenceAt() != null
+                && java.time.Duration.between(session.getLastPresenceAt(), now()).getSeconds() >= 60)
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "먼저 부재 활동을 확인해 주세요.");
+        session.markPresent(now());
+        return session;
+    }
 
     @Transactional
     public WorldRoomSession start(Long roomId, String loginId, Long playerProfileId, Long introId) {
@@ -101,7 +122,8 @@ public class WorldRoomSessionService {
 
     @Transactional
     public WorldRoomSession selectPlayerProfile(Long sessionId, String loginId, Long playerProfileId) {
-        var session = pocket(sessionId, loginId);
+        pocket(sessionId, loginId);
+        var session = lockForMutation(sessionId);
         var player = playerProfileId == null ? null : players.findById(playerProfileId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Player profile not found"));
         session.selectPlayerProfile(player);
@@ -116,7 +138,8 @@ public class WorldRoomSessionService {
             String pocketPlayGuide,
             boolean noControlPlayer
     ) {
-        var session = pocket(sessionId, loginId);
+        pocket(sessionId, loginId);
+        var session = lockForMutation(sessionId);
         session.updatePocketSettings(userNote, pocketPlayGuide, noControlPlayer);
         return session;
     }
@@ -131,14 +154,16 @@ public class WorldRoomSessionService {
             String aiProvider,
             String aiModel
     ) {
-        var session = pocket(sessionId, loginId);
+        pocket(sessionId, loginId);
+        var session = lockForMutation(sessionId);
         session.updatePocketSettings(userNote, pocketPlayGuide, noControlPlayer, aiProvider, aiModel);
         return session;
     }
 
     @Transactional
     public void deletePocket(Long sessionId, String loginId) {
-        var session = pocket(sessionId, loginId);
+        pocket(sessionId, loginId);
+        var session = lockForMutation(sessionId);
 
         var memoryIds = memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(sessionId)
                 .stream()
@@ -148,6 +173,7 @@ public class WorldRoomSessionService {
             protectedMemoryDetails.deleteByMemoryIdIn(memoryIds);
         }
         memories.deleteByWorldRoomSessionId(sessionId);
+        activityReports.deleteBySessionId(sessionId);
 
         systemSnapshots.deleteByVariantMessageSessionId(sessionId);
         castSnapshots.deleteByVariantMessageSessionId(sessionId);
@@ -477,7 +503,7 @@ public class WorldRoomSessionService {
             Long systemId,
             int value
     ) {
-        var session = session(sessionId);
+        var session = lockForMutation(sessionId);
         var state = systemStates.findBySessionIdAndSystemId(sessionId, systemId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,

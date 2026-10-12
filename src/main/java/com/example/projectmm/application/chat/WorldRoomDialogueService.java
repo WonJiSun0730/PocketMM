@@ -62,13 +62,11 @@ public class WorldRoomDialogueService {
     private final MemoryRepository memories;
     private final ProtectedMemoryDetailRepository memoryDetails;
     private final TimeInterpreter timeInterpreter;
+    private final com.example.projectmm.domain.chat.PocketActivityReportRepository activityReports;
 
     @Transactional
     public WorldRoomTurn chat(Long sessionId, String userMessage) {
-        var session = sessions.findById(sessionId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "World room session not found. sessionId=" + sessionId
-                ));
+        var session = sessionService.lockForDialogue(sessionId);
 
         initializeSceneIfNeeded(session, userMessage);
         var userSourceMessage = messages.save(new WorldRoomMessage(
@@ -276,10 +274,7 @@ public class WorldRoomDialogueService {
 
     @Transactional
     public WorldRoomTurn continueScene(Long sessionId) {
-        var session = sessions.findById(sessionId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "World room session not found. sessionId=" + sessionId
-                ));
+        var session = sessionService.lockForDialogue(sessionId);
 
         initializeSceneIfNeeded(session, null);
         var context = contextBuilder.buildSession(sessionId);
@@ -325,15 +320,13 @@ public class WorldRoomDialogueService {
 
     @Transactional
     public WorldRoomMessage editMessage(Long sessionId, Long messageId, String content) {
-        sessions.findById(sessionId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "World room session not found. sessionId=" + sessionId
-                ));
+        sessionService.lockForDialogue(sessionId);
         var message = messages.findById(messageId)
                 .filter(item -> item.getSession().getId().equals(sessionId))
                 .orElseThrow(() -> new IllegalArgumentException(
                         "World room message not found. messageId=" + messageId
                 ));
+        requireLiveReply(message);
         // Earlier edits have downstream worldlines; only the latest reply can be
         // re-evaluated without invalidating subsequent snapshots.
         boolean latestCharacter = message.getRole() == ChatRole.CHARACTER
@@ -365,10 +358,7 @@ public class WorldRoomDialogueService {
 
     @Transactional
     public void deleteMessageAndFollowing(Long sessionId, Long messageId) {
-        sessions.findById(sessionId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "World room session not found. sessionId=" + sessionId
-                ));
+        sessionService.lockForDialogue(sessionId);
         messages.findById(messageId)
                 .filter(item -> item.getSession().getId().equals(sessionId))
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -391,10 +381,7 @@ public class WorldRoomDialogueService {
 
     @Transactional
     public WorldRoomTurn reroll(Long sessionId, Long messageId) {
-        var rerollSession = sessions.findById(sessionId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "World room session not found. sessionId=" + sessionId
-                ));
+        var rerollSession = sessionService.lockForDialogue(sessionId);
         var target = messages.findById(messageId)
                 .filter(item -> item.getSession().getId().equals(sessionId))
                 .filter(item -> item.getRole() == ChatRole.CHARACTER)
@@ -461,16 +448,14 @@ public class WorldRoomDialogueService {
 
     @Transactional
     public WorldRoomTurn regenerate(Long sessionId, Long messageId) {
-        var session = sessions.findById(sessionId)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "World room session not found. sessionId=" + sessionId
-                ));
+        var session = sessionService.lockForDialogue(sessionId);
         var target = messages.findById(messageId)
                 .filter(item -> item.getSession().getId().equals(sessionId))
                 .filter(item -> item.getRole() == ChatRole.CHARACTER)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Regeneration target must be a character message. messageId=" + messageId
                 ));
+        requireLiveReply(target);
         var userMessage = messages.findTopBySessionIdAndIdLessThanOrderByIdDesc(sessionId, target.getId())
                 .filter(item -> item.getRole() == ChatRole.USER)
                 .orElseThrow(() -> new IllegalArgumentException(
@@ -533,6 +518,7 @@ public class WorldRoomDialogueService {
 
     @Transactional
     public WorldRoomMessage selectVariant(Long sessionId, Long messageId, int variantNo) {
+        sessionService.lockForDialogue(sessionId);
         var message = requireCharacterMessage(sessionId, messageId);
         requireLatestMessage(message, "select variant");
         var variant = variants.findByMessageIdAndVariantNo(messageId, variantNo)
@@ -565,6 +551,10 @@ public class WorldRoomDialogueService {
     }
 
     private void deleteTimelineFrom(Long sessionId, Long messageId) {
+        boolean removedActivity = activityReports.findTopBySessionIdOrderByIdDesc(sessionId)
+                .map(report -> report.getSourceMessageId() != null && report.getSourceMessageId() >= messageId).orElse(false);
+        activityReports.deleteBySessionIdAndSourceMessageIdGreaterThanEqual(sessionId, messageId);
+        if (removedActivity) sessions.findById(sessionId).orElseThrow().clearProgressPause();
         var derivedMemories = memories.findByWorldRoomSessionIdAndSourceWorldRoomMessageIdGreaterThanEqual(
                 sessionId,
                 messageId
@@ -591,6 +581,7 @@ public class WorldRoomDialogueService {
     }
 
     private void requireLatestMessage(WorldRoomMessage message, String action) {
+        requireLiveReply(message);
         if (messages.existsBySessionIdAndIdGreaterThan(
                 message.getSession().getId(),
                 message.getId()
@@ -627,6 +618,10 @@ public class WorldRoomDialogueService {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Character message not found. messageId=" + messageId
                 ));
+    }
+
+    private void requireLiveReply(WorldRoomMessage message) {
+        if (message.getAbsenceReportId() != null) throw new ResponseStatusException(HttpStatus.CONFLICT, "부재 활동 기록은 수정하거나 재생성할 수 없어요.");
     }
 
     private LocalDateTime now() {

@@ -289,4 +289,11 @@ public class Memory {
         memory.sourceChatMessage = source;
         return memory;
     }
+
+    public static Memory fromPocketActivity(WorldRoomSession session, WorldRoomMessage source,
+            Character character, String summary, LocalDateTime at) {
+        Memory memory = fromWorldRoom(session, character, summary, 2, at);
+        memory.sourceWorldRoomMessage = source;
+        return memory;
+    }
 }

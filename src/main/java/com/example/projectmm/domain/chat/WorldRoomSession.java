@@ -68,6 +68,33 @@ public class WorldRoomSession {
     private java.util.List<String> initialInventory = new java.util.ArrayList<>();
 
     private LocalDateTime lastPresenceAt;
+    private Boolean timeCheckEnabled;
+    private String progressOperationId;
+    private LocalDateTime progressOperationUntil;
+    @Column(length = 300)
+    private String progressPauseReason;
+
+    public boolean isTimeCheckEnabled() { return Boolean.TRUE.equals(timeCheckEnabled); }
+    public boolean progressInProgress(LocalDateTime now) {
+        return progressOperationId != null && progressOperationUntil != null && now.isBefore(progressOperationUntil);
+    }
+    public void configureTimeCheck(boolean enabled, LocalDateTime now) {
+        timeCheckEnabled = enabled;
+        progressPauseReason = null;
+        markPresent(now);
+    }
+    public void clearProgressPause() { progressPauseReason = null; }
+    public void beginProgress(String token, LocalDateTime now) {
+        progressOperationId = token;
+        progressOperationUntil = now.plusMinutes(10);
+    }
+    public void finishProgress(String token, String pauseReason, LocalDateTime presence) {
+        if (!java.util.Objects.equals(progressOperationId, token)) throw new IllegalStateException("Progress lease changed");
+        progressOperationId = null;
+        progressOperationUntil = null;
+        progressPauseReason = pauseReason;
+        if (presence != null) markPresent(presence);
+    }
 
     // Null on pre-snapshot pockets; their original room roster remains the fallback.
     private Boolean castRosterCaptured;

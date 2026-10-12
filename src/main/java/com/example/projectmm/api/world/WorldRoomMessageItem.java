@@ -11,7 +11,8 @@ public record WorldRoomMessageItem(
         String content,
         LocalDateTime createdAt,
         LocalDateTime editedAt,
-        Integer selectedVariantNo
+        Integer selectedVariantNo,
+        Long absenceReportId
 ) {
     public static WorldRoomMessageItem from(WorldRoomMessage message) {
         return new WorldRoomMessageItem(
@@ -20,7 +21,8 @@ public record WorldRoomMessageItem(
                 message.getContent(),
                 message.getCreatedAt(),
                 message.getEditedAt(),
-                message.getSelectedVariantNo()
+                message.getSelectedVariantNo(),
+                message.getAbsenceReportId()
         );
     }
 }

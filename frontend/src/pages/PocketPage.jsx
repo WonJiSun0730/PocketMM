@@ -8,6 +8,8 @@ import PlayerProfilePicker from "@/components/PlayerProfilePicker"
 import PocketPlayerStatePanel from "@/components/PocketPlayerStatePanel"
 import PocketSettingsPanel from "@/components/PocketSettingsPanel"
 import DialogueIssuePanel from "@/components/DialogueIssuePanel"
+import usePocketProgress from "@/hooks/usePocketProgress"
+import PocketProgressPanel from "@/components/PocketProgressPanel"
 import PocketScene from "@/components/PocketScene"
 import { resolvePocketSceneModels } from "@/lib/pocketCharacterModels"
 import "./PocketPage.css"
@@ -63,7 +65,7 @@ export default function PocketPage({ pocket, onBack }) {
   const [worldCharacters, setWorldCharacters] = useState([])
   const [systems, setSystems] = useState([])
   const [input, setInput] = useState("")
-  const [sending, setSending] = useState(false)
+  const [messageSending, setSending] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [editing, setEditing] = useState(null)
@@ -98,6 +100,12 @@ export default function PocketPage({ pocket, onBack }) {
   const bottomRef = useRef(null)
   const initialScrollDoneRef = useRef(false)
   const historyAnchorIdRef = useRef(null)
+
+  const progress = usePocketProgress(session.id, async () => {
+    await refresh()
+    refreshPlayerState()
+  })
+  const sending = messageSending || progress.busy
 
   async function refreshMemoryInspector() {
     if (!isDeveloper) return
@@ -254,7 +262,7 @@ export default function PocketPage({ pocket, onBack }) {
   }, [hasOlderMessages, loadingOlder, loading, messages[0]?.id])
 
   async function selectPlayerProfile(profile) {
-    if (changingPlayerProfile) return
+    if (changingPlayerProfile || sending) return
     setChangingPlayerProfile(true)
     setError("")
     try {
@@ -291,6 +299,7 @@ export default function PocketPage({ pocket, onBack }) {
     const pending = { id: `pending-${Date.now()}`, role: "USER", content: message }
     setMessages(current => [...current, pending])
     try {
+      if (!await progress.resume()) throw new Error("먼저 부재 활동을 확인해 주세요.")
       const response = await fetch(`${base}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -318,6 +327,7 @@ export default function PocketPage({ pocket, onBack }) {
     setSending(true)
     setError("")
     try {
+      if (!await progress.resume()) throw new Error("먼저 부재 활동을 확인해 주세요.")
       const response = await fetch(`${base}/messages/${item.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -337,6 +347,7 @@ export default function PocketPage({ pocket, onBack }) {
     setSending(true)
     setError("")
     try {
+      if (!await progress.resume()) throw new Error("먼저 부재 활동을 확인해 주세요.")
       const response = await fetch(`${base}/messages/${item.id}/reroll`, { method: "POST", credentials: "include" })
       if (response.status === 409) throw new Error("이 응답은 이미 이어진 과거 장면이라 리롤할 수 없어요.")
       if (!response.ok) throw new Error("리롤하지 못했어요.")
@@ -359,6 +370,7 @@ export default function PocketPage({ pocket, onBack }) {
     setSending(true)
     setError("")
     try {
+      if (!await progress.resume()) throw new Error("먼저 부재 활동을 확인해 주세요.")
       const response = await fetch(`${base}/messages/${item.id}/variants/${variantNo}`, { method: "PUT", credentials: "include" })
       if (response.status === 409) throw new Error("이 응답은 이미 이어진 과거 장면이라 다른 버전으로 바꿀 수 없어요.")
       if (!response.ok) throw new Error("다른 버전을 선택하지 못했어요.")
@@ -374,8 +386,10 @@ export default function PocketPage({ pocket, onBack }) {
     setSending(true)
     setError("")
     try {
+      if (!await progress.resume()) throw new Error("먼저 부재 활동을 확인해 주세요.")
       const response = await fetch(`${base}/messages/${item.id}`, { method: "DELETE", credentials: "include" })
       if (!response.ok) throw new Error("메시지를 삭제하지 못했어요.")
+      await progress.reload()
       await refresh()
       refreshPlayerState()
       await refreshMemoryInspector()
@@ -389,6 +403,7 @@ export default function PocketPage({ pocket, onBack }) {
     setSending(true)
     setError("")
     try {
+      if (!await progress.resume()) throw new Error("먼저 부재 활동을 확인해 주세요.")
       const response = await fetch(`${base}/continue`, {
         method: "POST",
         credentials: "include",
@@ -512,6 +527,7 @@ export default function PocketPage({ pocket, onBack }) {
             inventory: state.inventory ?? [],
             conditions: state.conditions ?? [],
           })} />}
+        <PocketProgressPanel progress={progress} characters={worldCharacters} disabled={messageSending} />
         <PocketSettingsPanel sessionId={session.id} onError={setError} />
       </div>
 
@@ -636,6 +652,7 @@ export default function PocketPage({ pocket, onBack }) {
 
           {!loading && messages.map((item, index) => {
             const isCharacter = item.role === "CHARACTER"
+            const isAbsence = item.absenceReportId != null
             const isLatest = index === messages.length - 1
             const variants = variantsByMessage[item.id] ?? []
             const selectedIndex = variants.findIndex(variant => variant.selected)
@@ -647,9 +664,9 @@ export default function PocketPage({ pocket, onBack }) {
               </div> : <RpText text={item.content ?? item.message} />}
               {messageSceneState && <SceneStateMessage state={messageSceneState} />}
               {editing !== item.id && <div className="mt-4 flex min-h-7 flex-wrap items-center gap-1 text-xs text-muted-foreground opacity-40 transition-opacity group-hover:opacity-100">
-                <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { setEditing(item.id); setEditText(item.content ?? item.message ?? "") }} disabled={sending}><Pencil className="mr-1 size-3"/>수정</Button>
-                {isCharacter && isLatest && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => reroll(item)} disabled={sending}><RefreshCw className="mr-1 size-3"/>리롤</Button>}
-                {isCharacter && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => loadVariants(item.id)} disabled={sending}>버전 {item.selectedVariantNo ?? 1}</Button>}
+                {!isAbsence && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { setEditing(item.id); setEditText(item.content ?? item.message ?? "") }} disabled={sending}><Pencil className="mr-1 size-3"/>수정</Button>}
+                {isCharacter && !isAbsence && isLatest && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => reroll(item)} disabled={sending}><RefreshCw className="mr-1 size-3"/>리롤</Button>}
+                {isCharacter && !isAbsence && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => loadVariants(item.id)} disabled={sending}>버전 {item.selectedVariantNo ?? 1}</Button>}
                 {isCharacter && <Button size="sm" variant="ghost" className="h-7 px-2" disabled={sending}
                   onClick={() => { setIssueNotice(""); setIssueTarget({ ...item }) }}>문제 기록</Button>}
                 {variants.length > 1 && <div className="flex items-center gap-1">
@@ -663,7 +680,7 @@ export default function PocketPage({ pocket, onBack }) {
           })}
 
           {sending && <div className="border-b border-border/70 py-7 sm:py-9">
-            <p className="animate-pulse text-sm italic text-muted-foreground">장면을 이어가는 중...</p>
+            <p className="animate-pulse text-sm italic text-muted-foreground">{progress.busy ? "부재 활동을 확인하는 중…" : "장면을 이어가는 중..."}</p>
           </div>}
           <div ref={bottomRef} />
         </div>
@@ -699,6 +716,7 @@ export default function PocketPage({ pocket, onBack }) {
             inventory: state.inventory ?? [],
             conditions: state.conditions ?? [],
           })} />}
+        <PocketProgressPanel progress={progress} characters={worldCharacters} disabled={messageSending} />
         <PocketSettingsPanel sessionId={session.id} onError={setError} />
       </div>
 
