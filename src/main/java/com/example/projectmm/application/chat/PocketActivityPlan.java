@@ -5,10 +5,17 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.LocalDateTime;
 import java.util.*;
 
-public record PocketActivityPlan(List<Activity> activities, List<Long> leaveCharacterIds, String pauseReason) {
-    public enum Kind { WALK, TALK, REST, READ, WORK, MEAL, COFFEE }
+public record PocketActivityPlan(List<Activity> activities, List<Long> leaveCharacterIds, String pauseReason, PlayerStatePatch playerState) {
+    public enum Kind {
+        WALK("🚶"), TALK("🗣️"), REST("🛋️"), WAIT("⏳"), SLEEP("💤"), READ("📖"),
+        WORK("📝"), MEAL("🍽️"), COFFEE("☕"), COOK("🍳"), CARE("🩺"), TRAVEL("🚗");
+        private final String emoji;
+        Kind(String emoji) { this.emoji = emoji; }
+        public String emoji() { return emoji; }
+    }
+    public record PlayerStatePatch(String location, List<String> conditions, List<String> inventory) {}
     public record Activity(LocalDateTime start, LocalDateTime end, Kind kind,
-            List<Long> characterIds, String location, String summary) {}
+            List<Long> characterIds, String location, String summary, boolean playerInvolved) {}
     public static PocketActivityPlan parse(String json, WorldRoomDialogueContext context,
             LocalDateTime from, LocalDateTime to) {
         var node = new ObjectMapper().readTree(json);
@@ -37,7 +44,7 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
             if (summary.isBlank() || summary.length() > 400 || location.length() > 200)
                 throw new IllegalArgumentException("Invalid activity text");
             result.add(new Activity(start, end, Kind.valueOf(item.path("kind").asText()),
-                    List.copyOf(ids), location, summary));
+                    List.copyOf(ids), location, summary, item.path("playerInvolved").asBoolean(false)));
             involved.addAll(ids); previous = end;
         }
         if (!node.path("leaveCharacterIds").isArray()) throw new IllegalArgumentException("Missing scene departures");
@@ -48,11 +55,40 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
                 throw new IllegalArgumentException("Invalid scene departure");
             leaves.add(id.asLong());
         }
-        String pause = node.path("pauseReason").asText("").trim();
-        if (pause.length() > 300) throw new IllegalArgumentException("Invalid pause reason");
-        return new PocketActivityPlan(List.copyOf(result), List.copyOf(leaves), pause.isEmpty() ? null : pause);
+        // Older model outputs must not leave autonomous simulation permanently waiting for a user.
+        PlayerStatePatch patch = null;
+        var lastPlayerActivity = result.stream().filter(Activity::playerInvolved).reduce((x,y) -> y).orElse(null);
+        var state = node.path("playerState");
+        if (!state.isMissingNode() && !state.isNull()) {
+            if (!state.isObject()) throw new IllegalArgumentException("Invalid player state patch");
+            if (lastPlayerActivity == null) throw new IllegalArgumentException("Player state requires player participation");
+            String location = null;
+            if (state.has("location")) {
+                if (!state.path("location").isString()) throw new IllegalArgumentException("Invalid player location");
+                location = state.path("location").asText().trim();
+                if (location.isBlank() || location.length() > 200 || !location.equals(lastPlayerActivity.location()))
+                    throw new IllegalArgumentException("Player location must match final player activity");
+            }
+            patch = new PlayerStatePatch(location, stateList(state,"conditions"), stateList(state,"inventory"));
+        }
+        // Participation already grounds the final place even if the model omitted its state patch.
+        if (lastPlayerActivity != null && !lastPlayerActivity.location().isBlank()) {
+            patch = new PlayerStatePatch(lastPlayerActivity.location(), patch == null ? null : patch.conditions(),
+                    patch == null ? null : patch.inventory());
+        }
+        return new PocketActivityPlan(List.copyOf(result), List.copyOf(leaves), null, patch);
     }
-    public LocalDateTime appliedUntil(LocalDateTime from, LocalDateTime to) {
-        return pauseReason == null ? to : activities.isEmpty() ? from : activities.getLast().end();
+    private static List<String> stateList(tools.jackson.databind.JsonNode state, String name) {
+        if (!state.has(name)) return null;
+        var items = state.path(name);
+        if (!items.isArray() || items.size() > 50) throw new IllegalArgumentException("Invalid player state list");
+        var values = new ArrayList<String>();
+        for (var item : items) {
+            if (!item.isString() || item.asText().isBlank() || item.asText().trim().length() > 300)
+                throw new IllegalArgumentException("Invalid player state item");
+            values.add(item.asText().trim());
+        }
+        return List.copyOf(values);
     }
+    public LocalDateTime appliedUntil(LocalDateTime from, LocalDateTime to) { return to; }
 }

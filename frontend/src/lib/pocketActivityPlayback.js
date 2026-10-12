@@ -3,7 +3,12 @@ export const ACTIVITY_FRAME_MS = 4000
 const activities = Object.freeze({
   WALK: { emoji: "🚶", label: "산책" },
   TALK: { emoji: "🗣️", label: "대화" },
-  REST: { emoji: "💤", label: "휴식" },
+  REST: { emoji: "🛋️", label: "휴식" },
+  WAIT: { emoji: "⏳", label: "기다림" },
+  SLEEP: { emoji: "💤", label: "수면" },
+  COOK: { emoji: "🍳", label: "요리" },
+  CARE: { emoji: "🩺", label: "돌봄·치료" },
+  TRAVEL: { emoji: "🚗", label: "이동" },
   READ: { emoji: "📖", label: "독서" },
   WORK: { emoji: "📝", label: "일" },
   MEAL: { emoji: "🍽️", label: "식사" },

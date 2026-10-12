@@ -149,7 +149,7 @@ class PocketProgressIntegrationTest {
         assertThat(progress.current(id,login).lastReport()).isNull();
         assertThat(db(() -> memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(id).size())).isZero();
     }
-    @Test void elapsedIsCappedAtThreeDaysAndPauseStopsAtLastActivity() {
+    @Test void elapsedIsCappedAndLegacyPauseCannotPermanentlyStopAutonomy() {
         progress.configure(id,login,true); when(clock.now()).thenReturn(now.plusDays(8));
         when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(plan(story,story.plusDays(3)),WorldRoomCastChange.none(),List.of(),0));
         var capped = progress.resume(id,login);
@@ -160,10 +160,14 @@ class PocketProgressIntegrationTest {
         var paused = plan(story.plusDays(3),story.plusDays(3).plusMinutes(2)).replace("\"pauseReason\":null", "\"pauseReason\":\"플레이어의 선택을 기다립니다.\"");
         when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(paused,WorldRoomCastChange.none(),List.of(),0));
         var result = progress.resume(id,login);
-        assertThat(result.simulatedAt()).isEqualTo(story.plusDays(3).plusMinutes(2));
-        assertThat(result.pauseReason()).isNotBlank();
-        when(clock.now()).thenReturn(now.plusDays(9)); progress.resume(id,login);
-        verify(gateway,times(2)).generateWorldRoomTurn(any(),anyString());
+        assertThat(result.simulatedAt()).isEqualTo(story.plusDays(3).plusMinutes(10));
+        assertThat(result.pauseReason()).isNull();
+        assertThat(result.lastReport().pauseReason()).isNull();
+        when(clock.now()).thenReturn(now.plusDays(8).plusMinutes(15));
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(
+                plan(result.simulatedAt(),result.simulatedAt().plusMinutes(5)),WorldRoomCastChange.none(),List.of(),0));
+        assertThat(progress.resume(id,login).simulatedAt()).isEqualTo(result.simulatedAt().plusMinutes(5));
+        verify(gateway,times(3)).generateWorldRoomTurn(any(),anyString());
     }
     @Test void leaseBlocksDuplicateResumeChatAndSettingsUntilModelReturns() {
         enabledAfter(Duration.ofMinutes(5));
@@ -225,6 +229,65 @@ class PocketProgressIntegrationTest {
         assertThat(progress.current(id,login).processing()).isFalse();
         assertThat(db(() -> sessions.findById(id).orElseThrow().getLastPresenceAt())).isEqualTo(now);
         verifyNoInteractions(gateway);
+    }
+    @Test void playerParticipatesAndLocationPatchPreservesOtherStateAndDeletionRestoresIt() {
+        enabledAfter(Duration.ofMinutes(5));
+        var raw = plan(story,story.plusMinutes(5)).replace("\"summary\":", "\"playerInvolved\":true,\"summary\":")
+                .replace("\"pauseReason\":null", "\"pauseReason\":null,\"playerState\":{\"location\":\"Cafe\"}")
+                .replace("\"location\":\"Home\"", "\"location\":\"Cafe\"");
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
+        var report = progress.resume(id,login).lastReport();
+        assertThat(report.activities()).allMatch(PocketActivityPlan.Activity::playerInvolved);
+        db(() -> {
+            var state = states.findBySessionId(id).orElseThrow();
+            assertThat(state.getLocation()).isEqualTo("Cafe");
+            assertThat(state.getInventory()).containsExactly("phone");
+            assertThat(state.getConditions()).containsExactly("tired");
+            var source = messages.findTopBySessionIdOrderByIdDesc(id).orElseThrow();
+            assertThat(source.getContent()).contains("🚶", "☕", "Player");
+            var variant = variants.findByMessageIdAndVariantNo(source.getId(),1).orElseThrow();
+            assertThat(variant.getEvaluationContextJson()).contains("ABSENCE AUTONOMY", "Student");
+            return null;
+        });
+        var sourceId = db(() -> messages.findTopBySessionIdOrderByIdDesc(id).orElseThrow().getId());
+        dialogue.deleteMessageAndFollowing(id,sourceId);
+        assertThat(db(() -> states.findBySessionId(id).orElseThrow().getLocation())).isEqualTo("Home");
+    }
+    @Test void legacyPausedSessionResumesWithoutTogglingTimeCheck() {
+        enabledAfter(Duration.ofMinutes(5));
+        db(() -> {
+            var session = sessions.findById(id).orElseThrow();
+            session.beginProgress("old",now); session.finishProgress("old","플레이어 응답 대기",null);
+            return null;
+        });
+        assertThat(progress.resume(id,login).simulatedAt()).isEqualTo(story.plusMinutes(5));
+        assertThat(db(() -> sessions.findById(id).orElseThrow().getProgressPauseReason())).isNull();
+    }
+    @Test void npcOnlyActivityCannotOverwritePlayerState() {
+        enabledAfter(Duration.ofMinutes(5));
+        var raw = plan(story,story.plusMinutes(5)).replace("\"pauseReason\":null",
+                "\"pauseReason\":null,\"playerState\":{\"inventory\":[]}");
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
+        assertThatThrownBy(() -> progress.resume(id,login)).isInstanceOf(ResponseStatusException.class);
+        assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
+        assertThat(db(() -> List.copyOf(states.findBySessionId(id).orElseThrow().getInventory()))).containsExactly("phone");
+    }
+    @Test void playerParticipationGroundsFinalLocationWhenPatchIsOmitted() {
+        enabledAfter(Duration.ofMinutes(5));
+        var raw = plan(story,story.plusMinutes(5)).replace("\"summary\":", "\"playerInvolved\":true,\"summary\":")
+                .replace("\"location\":\"Home\"", "\"location\":\"Cafe\"");
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
+        progress.resume(id,login);
+        assertThat(db(() -> states.findBySessionId(id).orElseThrow().getLocation())).isEqualTo("Cafe");
+    }
+    @Test void inconsistentPlayerLocationRejectsPlanWithoutConsumingAbsence() {
+        enabledAfter(Duration.ofMinutes(5));
+        var raw = plan(story,story.plusMinutes(5)).replace("\"summary\":", "\"playerInvolved\":true,\"summary\":")
+                .replace("\"pauseReason\":null", "\"pauseReason\":null,\"playerState\":{\"location\":\"Elsewhere\"}");
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
+        assertThatThrownBy(() -> progress.resume(id,login)).isInstanceOf(ResponseStatusException.class);
+        assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
+        assertThat(db(() -> states.findBySessionId(id).orElseThrow().getLocation())).isEqualTo("Home");
     }
     @Test void otherUserCannotReadOrChangeProgress() {
         assertThatThrownBy(() -> progress.resume(id,"unknown")).isInstanceOf(ResponseStatusException.class);

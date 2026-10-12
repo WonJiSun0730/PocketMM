@@ -65,7 +65,7 @@ public class PocketProgressService {
             return new Report(r.getId(), r.getFromTime(), r.getToTime(), r.getProcessedAt(), r.isCapped(),
                     r.getPauseReason(), List.of(activities));
         }).orElse(null);
-        return new Status(session.isTimeCheckEnabled(), session.getSimulatedAt(), session.getProgressPauseReason(),
+        return new Status(session.isTimeCheckEnabled(), session.getSimulatedAt(), null,
                 report, session.progressInProgress(clock.now()));
     }
     public Status current(Long id, String loginId) {
@@ -85,8 +85,7 @@ public class PocketProgressService {
         tx(() -> {
             var session = owned(id, loginId, true); idle(session);
             // A delayed heartbeat must not silently discard an unprocessed absence.
-            if (session.isTimeCheckEnabled() && session.getProgressPauseReason() == null
-                    && session.getLastPresenceAt() != null
+            if (session.isTimeCheckEnabled() && session.getLastPresenceAt() != null
                     && Duration.between(session.getLastPresenceAt(), clock.now()).getSeconds() >= 60)
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "먼저 부재 활동을 확인해 주세요.");
             session.markPresent(clock.now()); return null;
@@ -95,20 +94,21 @@ public class PocketProgressService {
     public Status resume(Long id, String loginId) {
         Prepared prepared;
         try {
-        prepared = tx(() -> {
-            var session = owned(id, loginId, true); idle(session);
-            var now = clock.now(); var presence = session.getLastPresenceAt();
-            if (!session.isTimeCheckEnabled() || session.getPlayerProfile() == null
-                    || session.getProgressPauseReason() != null || presence == null
-                    || Duration.between(presence, now).getSeconds() < 60) {
-                session.markPresent(now); return new Prepared(status(session), null);
-            }
-            var elapsed = Duration.between(presence, now);
-            var interval = simulation.calculate(session.getSimulatedAt(), session.getSimulatedAt().plus(elapsed));
-            var context = contexts.buildSession(id);
-            var token = UUID.randomUUID().toString(); session.beginProgress(token, now);
-            return new Prepared(null, new Claim(id, token, interval.from(), interval.to(), interval.capped(), context));
-        });
+            prepared = tx(() -> {
+                var session = owned(id, loginId, true); idle(session);
+                session.clearProgressPause();
+                var now = clock.now(); var presence = session.getLastPresenceAt();
+                if (!session.isTimeCheckEnabled() || session.getPlayerProfile() == null
+                        || presence == null
+                        || Duration.between(presence, now).getSeconds() < 60) {
+                    session.markPresent(now); return new Prepared(status(session), null);
+                }
+                var elapsed = Duration.between(presence, now);
+                var interval = simulation.calculate(session.getSimulatedAt(), session.getSimulatedAt().plus(elapsed));
+                var context = contexts.buildSession(id);
+                var token = UUID.randomUUID().toString(); session.beginProgress(token, now);
+                return new Prepared(null, new Claim(id, token, interval.from(), interval.to(), interval.capped(), context));
+            });
         } catch (ResponseStatusException known) {
             throw known;
         } catch (RuntimeException failure) {
@@ -161,8 +161,9 @@ public class PocketProgressService {
         claim.context().roomCast().forEach(c -> names.put(c.characterId(), c.characterName()));
         var summary = new StringBuilder("[부재 활동]\n");
         for (var activity : plan.activities()) {
-            summary.append(activity.start()).append(" ~ ").append(activity.end()).append(" · ")
+            summary.append(activity.kind().emoji()).append(" ").append(activity.start()).append(" ~ ").append(activity.end()).append(" · ")
                     .append(activity.characterIds().stream().map(names::get).collect(java.util.stream.Collectors.joining("·")))
+                    .append(activity.playerInvolved() ? " · " + claim.context().playerProfile().name() : "")
                     .append(" · ").append(activity.location()).append("\n").append(activity.summary()).append("\n");
         }
         if (plan.activities().isEmpty()) summary.append("별도로 기록할 활동 없이 시간이 지났어요.\n");
@@ -173,7 +174,18 @@ public class PocketProgressService {
         sessionService.saveCastSnapshot(variant, beforeCast, sessionService.captureCastState(session.getId()));
         sessionService.saveSystemSnapshot(variant, beforeSystems, sessionService.captureSystemState(session.getId()));
         sessionService.saveTimeSnapshot(variant, claim.from(), appliedTo);
-        variant.capturePlayerStateWorldline(playerJson, playerJson);
+        var patch = plan.playerState();
+        if (patch != null) {
+            if (state == null) state = playerStates.save(new WorldRoomPlayerState(session));
+            state.update(patch.location() == null ? state.getLocation() : patch.location(),
+                    patch.conditions() == null ? List.copyOf(state.getConditions()) : patch.conditions(),
+                    patch.inventory() == null ? List.copyOf(state.getInventory()) : patch.inventory());
+        }
+        var afterPlayer = new LinkedHashMap<String,Object>();
+        afterPlayer.put("location", state == null ? null : state.getLocation());
+        afterPlayer.put("conditions", state == null ? List.of() : List.copyOf(state.getConditions()));
+        afterPlayer.put("inventory", state == null ? List.of() : List.copyOf(state.getInventory()));
+        variant.capturePlayerStateWorldline(playerJson, JSON.writeValueAsString(afterPlayer));
         variant.captureEvaluationContext(DialogueEvaluationEvidence.capture("ABSENCE", "[부재 활동]", prompt, raw,
                 claim.context().aiModel(), claim.context()));
         for (var activity : plan.activities()) for (var participant : activity.characterIds()) {

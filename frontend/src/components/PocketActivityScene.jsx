@@ -27,7 +27,7 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
     const additional = generatedReplayModels.filter(model => !presentIds.has(model.source.id ?? model.source.characterId))
     return additional.length ? [...sceneModels.castModels, ...additional] : sceneModels.castModels
   }, [replayAtCurrentPlace, sameCast, sceneModels.castModels, generatedReplayModels])
-  const replayPlayer = replayAtCurrentPlace ? sceneModels.playerModel : null
+  const replayPlayer = (activity?.playerInvolved || replayAtCurrentPlace) ? sceneModels.playerModel : null
   const replayReady = participants.length > 0 && generatedReplayModels.length === participants.length
   const symbol = activitySymbol(activity?.kind)
   function select(next, shouldPlay = false) {

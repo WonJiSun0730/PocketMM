@@ -3,12 +3,15 @@ import assert from "node:assert/strict"
 import { activitySymbol, activityParticipants, activityModels, nextActivityIndex, replayIncludesPlayer } from "./pocketActivityPlayback.js"
 
 test("all server activity kinds yield fixed emoji bubbles, never summary or dialogue", () => {
-  for (const kind of ["WALK", "TALK", "REST", "READ", "WORK", "MEAL", "COFFEE"]) {
+  for (const kind of ["WALK", "TALK", "REST", "READ", "WORK", "MEAL", "COFFEE", "WAIT", "SLEEP", "COOK", "CARE", "TRAVEL"]) {
     const symbol = activitySymbol(kind)
     assert.ok(symbol.emoji && symbol.label)
     assert.ok(!/[A-Za-z가-힣]/.test(symbol.emoji))
   }
   assert.equal(activitySymbol("COFFEE").emoji, "☕")
+  assert.equal(activitySymbol("REST").emoji, "🛋️")
+  assert.equal(activitySymbol("WAIT").emoji, "⏳")
+  assert.equal(activitySymbol("SLEEP").emoji, "💤")
   assert.equal(activitySymbol("untrusted dialogue goes here").emoji, "✨")
 })
 test("absence replay includes only registered participants, including departed NPCs, excluding the player", () => {

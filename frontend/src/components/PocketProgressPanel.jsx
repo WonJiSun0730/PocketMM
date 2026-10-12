@@ -22,7 +22,6 @@ export default function PocketProgressPanel({ progress, characters, disabled }) 
     {busy && <p role="status" className="mt-2">부재 활동을 확인하는 중…</p>}
     {error && <div className="mt-2 space-y-2"><p role="alert" className="text-destructive">{error}</p>
       <Button size="sm" variant="outline" disabled={busy} onClick={resume}>다시 확인</Button></div>}
-    {status?.pauseReason && <p className="mt-2 leading-5 text-muted-foreground">진행 일시정지 · {status.pauseReason}<br/>상황을 정리한 후 OFF → ON으로 다시 켤 수 있어요.</p>}
     {report && <div className="mt-3 space-y-2">
       <p className="font-medium">지난 부재 활동</p>
       <p className="text-muted-foreground">{time(report.from)} → {time(report.to)}</p>

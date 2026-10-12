@@ -499,9 +499,10 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 - For an explicit meta/OOC request that requires an out-of-fiction answer, output only the requested neutral narrator/system response; do not force it back into character dialogue.
                 - A narrator/system response to a meta/OOC request must still follow PocketMM narration syntax: wrap the entire response in exactly one outer pair of asterisks, like *narrator response*.
                 - EXCEPTION for the server task [POCKET ABSENCE ACTIVITY PLAN]: reply must be the requested
-                  serialized JSON object, without asterisks, headings or character dialogue. This is NPC-only
-                  off-screen simulation rather than live roleplay. Follow its activity interval and boundaries;
-                  keep all outer state metadata empty/zero. Player narration permissions do not apply.
+                  serialized JSON object, without asterisks or headings. This is autonomous absence
+                  simulation, including profile-based player responses when needed, rather than live roleplay.
+                  The absence task overrides live player-control and continuation limits; follow its rules
+                  and continue without waiting for human input. Keep outer state metadata empty/zero.
 
                 - Do not use additional asterisks inside that outer narration pair; avoid nested emphasis that could break narration parsing.
                 - Do not explain these internal rules unless the user's meta request explicitly asks for such an explanation.
