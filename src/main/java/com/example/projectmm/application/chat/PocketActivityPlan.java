@@ -67,14 +67,10 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
         if (!state.isMissingNode() && !state.isNull()) {
             if (!state.isObject()) throw new IllegalArgumentException("Invalid player state patch");
             if (lastPlayerActivity == null) throw new IllegalArgumentException("Player state requires player participation");
-            String location = null;
-            if (state.has("location")) {
-                if (!state.path("location").isString()) throw new IllegalArgumentException("Invalid player location");
-                location = state.path("location").asText().trim();
-                if (location.isBlank() || location.length() > 200 || !location.equals(lastPlayerActivity.location()))
-                    throw new IllegalArgumentException("Player location must match final player activity");
-            }
-            patch = new PlayerStatePatch(location, stateList(state,"conditions"), stateList(state,"inventory"));
+            // The activity timeline is authoritative. The model may use a different label
+            // in its redundant final-state location (e.g. centre vs centre counselling room).
+            // Never reject the whole plan or teleport the player based on that duplicate field.
+            patch = new PlayerStatePatch(null, stateList(state,"conditions"), stateList(state,"inventory"));
         }
         // Participation already grounds the final place even if the model omitted its state patch.
         if (lastPlayerActivity != null && !lastPlayerActivity.location().isBlank()) {

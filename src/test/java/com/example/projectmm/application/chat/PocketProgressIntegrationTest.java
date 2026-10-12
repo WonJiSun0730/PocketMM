@@ -282,15 +282,19 @@ class PocketProgressIntegrationTest {
         progress.resume(id,login);
         assertThat(db(() -> states.findBySessionId(id).orElseThrow().getLocation())).isEqualTo("Cafe");
     }
-    @Test void inconsistentPlayerLocationRejectsPlanWithoutConsumingAbsence() {
+    @Test void duplicateFinalLocationCannotRejectPlanOrOverrideLastPlayerActivity() {
         enabledAfter(Duration.ofMinutes(5));
         var raw = plan(story,story.plusMinutes(5)).replace("\"summary\":", "\"playerInvolved\":true,\"summary\":")
                 .replace("\"pauseReason\":null", "\"pauseReason\":null,\"playerState\":{\"location\":\"Elsewhere\"}");
         when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
-        assertThatThrownBy(() -> progress.resume(id,login)).isInstanceOfSatisfying(ResponseStatusException.class,
-                error -> assertThat(error.getReason()).contains("시간은 변경되지 않았어요").doesNotContain("secret SQL"));
-        assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
-        assertThat(db(() -> states.findBySessionId(id).orElseThrow().getLocation())).isEqualTo("Home");
+        assertThat(progress.resume(id,login).simulatedAt()).isEqualTo(story.plusMinutes(5));
+        db(() -> {
+            var state = states.findBySessionId(id).orElseThrow();
+            assertThat(state.getLocation()).isEqualTo("Home");
+            assertThat(state.getInventory()).containsExactly("phone");
+            assertThat(state.getConditions()).containsExactly("tired");
+            return null;
+        });
     }
     @Test void legacyReportsWithMissingOrNullPlayerParticipationDoNotBlockTimeCheck() {
         for (var flag : List.of("", "\"playerInvolved\":null,", "\"playerInvolved\":true,")) {
