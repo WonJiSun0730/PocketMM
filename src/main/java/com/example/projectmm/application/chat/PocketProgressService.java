@@ -131,8 +131,7 @@ public class PocketProgressService {
         String stage = "GENERATE";
         try {
             var prompt = PocketActivityPrompt.build(claim.from(), claim.to());
-            var raw = claim.context().roomCast().isEmpty() ? "{\"activities\":[],\"leaveCharacterIds\":[],\"pauseReason\":null}"
-                    : gateway.generateWorldRoomTurn(claim.context(), prompt).reply();
+            var raw = gateway.generateWorldRoomTurn(claim.context(), prompt).reply();
             stage = "VALIDATE";
             var plan = PocketActivityPlan.parse(raw, claim.context(), claim.from(), claim.to());
             stage = "APPLY";

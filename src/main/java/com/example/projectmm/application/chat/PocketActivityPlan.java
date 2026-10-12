@@ -30,12 +30,13 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
         context.roomCast().forEach(c -> allowed.add(c.characterId()));
         var involved = new HashSet<Long>();
         var result = new ArrayList<Activity>();
+        if (!to.isAfter(from)) throw new IllegalArgumentException("Invalid absence interval");
+        boolean timingValid = true;
         var previous = from;
         for (var item : node.path("activities")) {
             var start = LocalDateTime.parse(item.path("start").asText());
             var end = LocalDateTime.parse(item.path("end").asText());
-            if (start.isBefore(previous) || !end.isAfter(start) || end.isAfter(to))
-                throw new IllegalArgumentException("Activity outside interval or overlapping");
+            if (start.isBefore(previous) || !end.isAfter(start) || end.isAfter(to)) timingValid = false;
             var ids = new ArrayList<Long>();
             if (!item.path("characterIds").isArray()) throw new IllegalArgumentException("Missing participants");
             for (var id : item.path("characterIds")) {
@@ -43,20 +44,34 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
                     throw new IllegalArgumentException("Unregistered or duplicate participant");
                 ids.add(id.asLong());
             }
-            if (ids.isEmpty()) throw new IllegalArgumentException("Activity requires NPC participants");
+            boolean playerInvolved = item.path("playerInvolved").asBoolean(false);
+            if (ids.isEmpty() && !playerInvolved) throw new IllegalArgumentException("Activity requires participants");
             var summary = item.path("summary").asText("").trim();
             var location = item.path("location").asText("").trim();
             if (summary.isBlank() || summary.length() > 400 || location.length() > 200)
                 throw new IllegalArgumentException("Invalid activity text");
             result.add(new Activity(start, end, Kind.valueOf(item.path("kind").asText()),
-                    List.copyOf(ids), location, summary, item.path("playerInvolved").asBoolean(false)));
+                    List.copyOf(ids), location, summary, playerInvolved));
             involved.addAll(ids); previous = end;
+        }
+        if (!timingValid) {
+            // Preserve the proposed story order. Repair only invalid model timestamps; never
+            // extend the simulation past the requested interval or discard an activity's actors.
+            long intervalNanos = java.time.Duration.between(from,to).toNanos();
+            var corrected = new ArrayList<Activity>();
+            for (int i = 0; i < result.size(); i++) {
+                var activity = result.get(i);
+                corrected.add(new Activity(from.plusNanos(intervalNanos * i / result.size()),
+                        from.plusNanos(intervalNanos * (i + 1) / result.size()), activity.kind(),
+                        activity.characterIds(), activity.location(), activity.summary(), activity.playerInvolved()));
+            }
+            result = corrected;
         }
         if (!node.path("leaveCharacterIds").isArray()) throw new IllegalArgumentException("Missing scene departures");
         var active = context.activeCast().stream().map(c -> c.characterId()).collect(java.util.stream.Collectors.toSet());
         var leaves = new ArrayList<Long>();
         for (var id : node.path("leaveCharacterIds")) {
-            if (!id.isIntegralNumber() || !active.contains(id.asLong()) || !involved.contains(id.asLong()) || leaves.contains(id.asLong()))
+            if (!id.isIntegralNumber() || !active.contains(id.asLong()) || leaves.contains(id.asLong()))
                 throw new IllegalArgumentException("Invalid scene departure");
             leaves.add(id.asLong());
         }

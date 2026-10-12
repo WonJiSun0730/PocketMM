@@ -22,13 +22,14 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
     sceneModels.castModels.some(model => (model.source.id ?? model.source.characterId) === (character.id ?? character.characterId)))
   const replayAtCurrentPlace = Boolean(activity && replayIncludesPlayer(location, activity.location))
   const replayModels = useMemo(() => {
-    if (!replayAtCurrentPlace) return sameCast ? sceneModels.castModels : generatedReplayModels
+    // Explicit player activity shows its actual companions, not every Pocket member.
+    if (activity?.playerInvolved || !replayAtCurrentPlace) return sameCast ? sceneModels.castModels : generatedReplayModels
     const presentIds = new Set(sceneModels.castModels.map(model => model.source.id ?? model.source.characterId))
     const additional = generatedReplayModels.filter(model => !presentIds.has(model.source.id ?? model.source.characterId))
     return additional.length ? [...sceneModels.castModels, ...additional] : sceneModels.castModels
-  }, [replayAtCurrentPlace, sameCast, sceneModels.castModels, generatedReplayModels])
+  }, [activity?.playerInvolved, replayAtCurrentPlace, sameCast, sceneModels.castModels, generatedReplayModels])
   const replayPlayer = (activity?.playerInvolved || replayAtCurrentPlace) ? sceneModels.playerModel : null
-  const replayReady = participants.length > 0 && generatedReplayModels.length === participants.length
+  const replayReady = (participants.length > 0 || (activity?.playerInvolved && replayPlayer)) && generatedReplayModels.length === participants.length
   const symbol = activitySymbol(activity?.kind)
   function select(next, shouldPlay = false) {
     setSelection(next == null ? null : { sessionId, reportId: report.id, index: next })
@@ -65,12 +66,12 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
       {replayReady ? <PocketScene sessionId={sessionId} simulatedAt={activity.start}
         location={activity.location} playerModel={replayPlayer} characterModels={replayModels} activity={activity} />
         : <div className="pocket-activity-fallback" aria-label="모델 미등록 캐릭터의 활동 미리보기">
-            {replayPlayer && <div className="pocket-activity-person"><span>{replayPlayer.source.name}</span><span className="text-muted-foreground">현재 장면의 플레이어</span></div>}
+            {replayPlayer && <div className="pocket-activity-person"><span>{replayPlayer.source.name}</span>{activity?.playerInvolved && <span className="pocket-activity-icon" aria-label={symbol.label}>{symbol.emoji}</span>}</div>}
             {participants.map(character => <div key={character.id ?? character.characterId} className="pocket-activity-person">
               <span className="pocket-activity-icon" aria-label={symbol.label}>{symbol.emoji}</span>
               <span>{character.name ?? character.characterName}</span>
             </div>)}
-            {!participants.length && <span>참여 캐릭터 정보를 불러오는 중…</span>}
+            {!participants.length && !activity?.playerInvolved && <span>참여 캐릭터 정보를 불러오는 중…</span>}
           </div>}
     </> : sceneModels.ready ? <PocketScene sessionId={sessionId} simulatedAt={simulatedAt} location={location}
       playerModel={sceneModels.playerModel} characterModels={sceneModels.castModels} />

@@ -219,7 +219,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
           scene.add(vrm.scene)
           settleStandingPhysics(vrm)
           idleActors.push(updateIdle)
-          const actorId = model.source?.characterId ?? model.source?.id
+          const actorId = model.role === "player" ? "player" : model.source?.characterId ?? model.source?.id
           const head = vrm.humanoid?.getRawBoneNode("head") ?? vrm.scene
           if (actorId != null) bubbleActors.push({ id: actorId, head, vrm })
           render()
@@ -305,6 +305,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
   const symbol = activitySymbol(activity?.kind)
   const bubbleCharacters = activity ? characterModels.filter(model =>
     activity.characterIds.includes(model.source?.characterId ?? model.source?.id)) : []
+  if (activity?.playerInvolved && playerModel) bubbleCharacters.push({ ...playerModel, bubbleId: "player" })
 
   return <div className={`pocket-scene-shell ${className}`}>
     <div className="pocket-scene" data-player-present={Boolean(playerModel)} style={{ height: `${sceneHeight}px` }}>
@@ -315,7 +316,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       <div ref={hostRef} className="pocket-scene__viewport" aria-label="2D 배경과 3D 캐릭터 장면" />
       <div className="pocket-scene__bubbles" aria-label="캐릭터 활동 말풍선">
         {bubbleCharacters.map(model => {
-          const id = model.source.characterId ?? model.source.id
+          const id = model.bubbleId ?? model.source.characterId ?? model.source.id
           const name = model.source.characterName ?? model.source.name
           return <div key={id} hidden className="pocket-scene__bubble" data-character-id={id}
             aria-label={`${name} · ${symbol.label}`}

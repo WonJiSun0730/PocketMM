@@ -24,8 +24,23 @@ public final class PocketActivityPrompt {
                 Use the player's own profile, established behavior, relationships and latest intent to
                 choose plausible dialogue, reactions and actions when a response is needed. Continue
                 the scene; never stop, ask the human for input, or spend the whole interval waiting.
-                In a counselling session, a seated client can answer the counsellor in character, and
-                the consultation can develop. Do not replace that situation with unrelated chores.
+                PRIMARY VIEWPOINT: continue the player character's own life from their current location
+                and latest actions. Room membership or an activeCast ID does not prove co-location.
+                NPC life elsewhere may be a short secondary activity, never replace the player's thread.
+                Permit solo player activities with characterIds:[] and playerInvolved:true. Only include
+                an NPC ID if that NPC actually participates; a counsellor need not follow a client home.
+                COMPLETED EVENTS STAY COMPLETED: read the latest conversation and absence outcomes.
+                Do not repeat previously answered questions, advice, greetings, or an already finished
+                consultation/meal/work task. "Finished", "left", "returned home", and "see you next time"
+                are phase boundaries. Continue the next plausible phase, not that completed interaction.
+                Let appointments, meals and shifts end after plausible durations. A multi-hour interval
+                should include subsequent personal life where appropriate, not stretching one exchange
+                or repeating the same summary to keep all registered characters together.
+                Examples (adapt to profiles, do not impose them): after a consultation ends, the client
+                leaves and continues their own evening; after a shared meal ends, people may part;
+                after a shift ends, return home; after arriving home, unpack, rest or follow personal plans.
+                Preserve an explicitly ongoing interaction long enough for new developments, then allow
+                a natural conclusion. Never force homecoming or togetherness against the latest intent.
                 Preserve injuries, belongings and established facts unless the activities justify a change.
                 Do not invent a cure, secret past or abrupt relationship commitment just to move forward.
                 If a choice conflicts with established intent, choose a compatible everyday alternative
@@ -33,11 +48,14 @@ public final class PocketActivityPrompt {
                 Summarize the actual interaction and its outcome, not just readiness for a future response.
                 Set playerInvolved true on activities the player actually participates in; false for NPC-only
                 life elsewhere. The human being away does not make the fictional player absent.
-                Use only registered roomCast IDs; do not invent participants. Respect prior departures:
+                Use only registered roomCast IDs for NPCs; the player needs no NPC ID. do not invent participants. Respect prior departures:
                 off-screen NPC life does not authorize bringing them back into the player's scene.
                 Generate at most 8 concise Korean summaries, each at most 400 characters. Do not
                 generate detailed novel prose now; that belongs to a later explicit detail-view request.
                 Times must be inside the interval, strictly ordered, and non-overlapping.
+                Copy the exact supplied boundary times including seconds/fractions. A rounded minute
+                before the supplied start is outside the interval. Cover the full interval with subsequent
+                activities, rather than declaring three hours elapsed after only thirty minutes of events.
                 Return the normal envelope with empty/zero state metadata. Serialize this object as a
                 STRING in reply, with no Markdown fences:
                 {"activities":[{"start":"ISO_LOCAL_DATETIME","end":"ISO_LOCAL_DATETIME",
@@ -45,7 +63,10 @@ public final class PocketActivityPrompt {
                 "playerInvolved":true,"location":"place","summary":"short activity"}],
                 "leaveCharacterIds":[],"pauseReason":null,"playerState":null}
                 leaveCharacterIds may include only currently active participants who actually finish
-                outside the player's final scene. Do not auto-enter absent characters.
+                outside the player's final scene. An active NPC who stays behind when the player leaves
+                belongs in leaveCharacterIds even if not otherwise included in an activity. Departures
+                track the player's scene, not whether that NPC stops living elsewhere. Do not auto-enter
+                absent characters.
                 Match kind to the action being summarized: TALK for a consultation/conversation, WAIT
                 for briefly waiting, REST for awake rest, SLEEP only for actual sleep, COOK for preparing
                 food, CARE for treatment, TRAVEL for transport. Never use sleep for sitting quietly.

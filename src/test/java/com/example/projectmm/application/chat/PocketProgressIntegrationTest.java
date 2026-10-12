@@ -343,6 +343,41 @@ class PocketProgressIntegrationTest {
         doReturn(new WorldRoomTurn(plan(story,story.plusHours(2)),WorldRoomCastChange.none(),List.of(),0)).when(gateway).generateWorldRoomTurn(any(),anyString());
         assertThat(progress.simulateAbsence(id,login,2).simulatedAt()).isEqualTo(story.plusHours(2));
     }
+    @Test void invalidModelTimesAreRepairedWithinRequestedIntervalInStoryOrder() {
+        enabledAfter(Duration.ofHours(3));
+        var mid = story.plusMinutes(90);
+        var raw = plan(story,story.plusHours(3)).replace(story.toString(),story.minusSeconds(1).toString())
+                .replace(mid.toString(),story.plusHours(4).toString());
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
+        var result = progress.resume(id,login);
+        var activities = result.lastReport().activities();
+        assertThat(result.simulatedAt()).isEqualTo(story.plusHours(3));
+        assertThat(activities.getFirst().start()).isEqualTo(story);
+        assertThat(activities.getFirst().end()).isEqualTo(activities.getLast().start());
+        assertThat(activities.getLast().end()).isEqualTo(story.plusHours(3));
+        assertThat(activities).extracting(PocketActivityPlan.Activity::kind)
+                .containsExactly(PocketActivityPlan.Kind.WALK,PocketActivityPlan.Kind.COFFEE);
+        assertThat(activities).allMatch(activity -> activity.end().isAfter(activity.start()));
+    }
+    @Test void soloPlayerCanContinueAtHomeWithoutBringingCounsellorAlong() {
+        progress.configure(id,login,true);
+        db(() -> { sessionService.applyCastChange(id,new WorldRoomCastChange(List.of(a),List.of())); return null; });
+        var raw = """
+            {"activities":[{"start":"%s","end":"%s","kind":"REST","characterIds":[],
+            "playerInvolved":true,"location":"Home","summary":"플레이어는 상담을 마치고 집에서 자신의 저녁을 보냈다."}],
+            "leaveCharacterIds":[%d],"pauseReason":null}
+            """.formatted(story,story.plusHours(1),a);
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
+        var result = progress.simulateAbsence(id,login,1);
+        assertThat(db(() -> sessionService.captureCastState(id))).noneMatch(cast -> cast.active());
+        assertThat(result.lastReport().activities().getFirst().characterIds()).isEmpty();
+        assertThat(result.lastReport().activities().getFirst().playerInvolved()).isTrue();
+        assertThat(db(() -> states.findBySessionId(id).orElseThrow().getLocation())).isEqualTo("Home");
+        assertThat(db(() -> messages.findTopBySessionIdOrderByIdDesc(id).orElseThrow().getContent())).contains("Player", "🛋️");
+        assertThat(db(() -> memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(id).size())).isZero();
+        verify(gateway).generateWorldRoomTurn(any(),argThat(prompt -> prompt.contains("COMPLETED EVENTS STAY COMPLETED")
+                && prompt.contains("PRIMARY VIEWPOINT") && prompt.contains("after a shared meal ends")));
+    }
     @Test void otherUserCannotReadOrChangeProgress() {
         assertThatThrownBy(() -> progress.resume(id,"unknown")).isInstanceOf(ResponseStatusException.class);
         assertThatThrownBy(() -> progress.configure(id,"unknown",true)).isInstanceOf(ResponseStatusException.class);
