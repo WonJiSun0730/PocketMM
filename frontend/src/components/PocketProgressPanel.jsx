@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button"
 
-const symbols = { WALK: "🚶", TALK: "💬", REST: "🛋️", READ: "📖", WORK: "📝", MEAL: "🍽️", COFFEE: "☕" }
+import { activitySymbol } from "@/lib/pocketActivityPlayback"
 function time(value) {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? "" : new Intl.DateTimeFormat("ko-KR", {
@@ -29,7 +29,7 @@ export default function PocketProgressPanel({ progress, characters, disabled }) 
       {report.capped && <p className="text-muted-foreground">최대 3일의 부재 시간을 반영했어요.</p>}
       {report.activities.length ? <ol className="space-y-2">{report.activities.map((activity, index) =>
         <li key={index} className="rounded-md border bg-muted/20 p-2 leading-5">
-          <p>{symbols[activity.kind] || "💬"} {activity.characterIds.map(id => names.get(id) || "캐릭터").join(" · ")}</p>
+          <p>{activitySymbol(activity.kind).emoji} {activity.characterIds.map(id => names.get(id) || "캐릭터").join(" · ")}</p>
           <p className="text-muted-foreground">{time(activity.start)} · {activity.location}</p>
           <p>{activity.summary}</p>
         </li>)}</ol> : <p className="text-muted-foreground">별도로 기록할 활동은 없었어요.</p>}

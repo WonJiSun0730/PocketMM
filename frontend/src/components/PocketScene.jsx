@@ -4,10 +4,13 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm"
 import { resolvePocketScene, resolvePocketDaypart } from "@/lib/pocketSceneRegistry"
 import { getPocketBackground } from "@/lib/pocketSceneBackgrounds"
+import { activitySymbol } from "@/lib/pocketActivityPlayback"
 import { createStandingIdle } from "@/lib/pocketStandingIdle"
 
-export default function PocketScene({ className = "", simulatedAt = "", location = "", sessionId = null, playerModel = null, characterModels = [] }) {
+export default function PocketScene({ className = "", simulatedAt = "", location = "", sessionId = null, playerModel = null, characterModels = [], activity = null }) {
   const hostRef = useRef(null)
+  const bubbleNodes = useRef(new Map())
+  const projectBubbles = useRef(() => {})
   const [zoom, setZoom] = useState(1.35)
   const [sceneHeight, setSceneHeight] = useState(260)
   const [pixelHeight, setPixelHeight] = useState(160)
@@ -22,16 +25,19 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     const host = hostRef.current
     if (!host) return
     host.replaceChildren()
+    bubbleNodes.current.forEach(node => { node.hidden = true })
 
     let disposed = false
     const idleActors = []
+    const bubbleActors = []
+    const headPosition = new THREE.Vector3()
     let animationFrame = null
     let lastFrameTime = null
     let idleTime = 0
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
     const scene = new THREE.Scene()
     // Only actors are rendered in WebGL; the 2D backdrop lives behind its transparent canvas.
-    scene.userData.runtime = { simulatedAt, location, daypart, sceneId: preset.id }
+
 
     const camera = new THREE.OrthographicCamera(-4, 4, 2.25, -2.25, 0.1, 100)
     // Fixed side-on stage view: keep the room depth for distant scenery.
@@ -151,12 +157,28 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       })
     }
 
+    function updateBubbles() {
+      for (const actor of bubbleActors) {
+        const bubble = bubbleNodes.current.get(actor.id)
+        if (!bubble) continue
+        actor.vrm.scene.updateMatrixWorld(true)
+        actor.head.getWorldPosition(headPosition)
+        headPosition.y += 0.2
+        headPosition.project(camera)
+        bubble.hidden = headPosition.z < -1 || headPosition.z > 1 || Math.abs(headPosition.x) > 1.1
+        bubble.style.left = `${Math.max(6, Math.min(94, (headPosition.x + 1) * 50))}%`
+        bubble.style.top = `${Math.max(58, Math.min(host.clientHeight - 12, (1 - headPosition.y) * host.clientHeight / 2))}px`
+      }
+    }
+    projectBubbles.current = updateBubbles
+
     function render() {
       if (disposed) return
       renderer.setRenderTarget(renderTarget)
       renderer.render(scene, camera)
       renderer.setRenderTarget(null)
       renderer.render(postScene, postCamera)
+      updateBubbles()
     }
 
     function loadVrm(model, position, facingY = 0, phase = 0) {
@@ -196,6 +218,9 @@ export default function PocketScene({ className = "", simulatedAt = "", location
           pixelizeModel(vrm.scene)
           scene.add(vrm.scene)
           idleActors.push(updateIdle)
+          const actorId = model.source?.characterId ?? model.source?.id
+          const head = vrm.humanoid?.getRawBoneNode("head") ?? vrm.scene
+          if (actorId != null) bubbleActors.push({ id: actorId, head, vrm })
           render()
         },
         undefined,
@@ -271,8 +296,14 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       renderer.dispose()
       renderer.domElement.remove()
       VRMUtils.deepDispose(scene)
+      projectBubbles.current = () => {}
     }
-  }, [zoom, sceneHeight, pixelHeight, simulatedAt, location, sessionId, playerModel, characterModels])
+  }, [zoom, sceneHeight, pixelHeight, daypart, sessionId, playerModel, characterModels])
+
+  useEffect(() => { projectBubbles.current() }, [activity])
+  const symbol = activitySymbol(activity?.kind)
+  const bubbleCharacters = activity ? characterModels.filter(model =>
+    activity.characterIds.includes(model.source?.characterId ?? model.source?.id)) : []
 
   return <div className={`pocket-scene-shell ${className}`}>
     <div className="pocket-scene" style={{ height: `${sceneHeight}px` }}>
@@ -281,6 +312,17 @@ export default function PocketScene({ className = "", simulatedAt = "", location
           onError={() => setFailedBackground(requestedBackground)} />
       </div>
       <div ref={hostRef} className="pocket-scene__viewport" aria-label="2D 배경과 3D 캐릭터 장면" />
+      <div className="pocket-scene__bubbles" aria-label="캐릭터 활동 말풍선">
+        {bubbleCharacters.map(model => {
+          const id = model.source.characterId ?? model.source.id
+          const name = model.source.characterName ?? model.source.name
+          return <div key={id} hidden className="pocket-scene__bubble" data-character-id={id}
+            aria-label={`${name} · ${symbol.label}`}
+            ref={node => { if (node) bubbleNodes.current.set(id, node); else bubbleNodes.current.delete(id) }}>
+            <span aria-hidden="true">{symbol.emoji}</span>
+          </div>
+        })}
+      </div>
     </div>
     <div className="pocket-scene__controls">
       <div className="pocket-scene__control" aria-label="장면 확대 배율">

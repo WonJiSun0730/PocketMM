@@ -10,7 +10,7 @@ import PocketSettingsPanel from "@/components/PocketSettingsPanel"
 import DialogueIssuePanel from "@/components/DialogueIssuePanel"
 import usePocketProgress from "@/hooks/usePocketProgress"
 import PocketProgressPanel from "@/components/PocketProgressPanel"
-import PocketScene from "@/components/PocketScene"
+import PocketActivityScene from "@/components/PocketActivityScene"
 import { resolvePocketSceneModels } from "@/lib/pocketCharacterModels"
 import "./PocketPage.css"
 
@@ -493,17 +493,16 @@ export default function PocketPage({ pocket, onBack }) {
       </header>
 
       <section className="shrink-0 border-b bg-muted/10 px-4 py-3 sm:px-6">
-        {sceneModels.ready
-          ? <PocketScene
-              sessionId={session.id}
-              simulatedAt={sceneRuntimeState.simulatedAt}
-              location={sceneRuntimeState.location}
-              playerModel={sceneModels.playerModel}
-              characterModels={sceneModels.castModels}
-            />
-          : <div className="flex min-h-24 items-center justify-center rounded-md border border-dashed px-4 text-center text-xs text-muted-foreground">
-              3D 장면은 선택한 플레이어 프로필과 이 Pocket의 모든 캐릭터에 모델이 등록된 경우에만 사용할 수 있어요.
-            </div>}
+        <PocketActivityScene
+          sessionId={session.id}
+          report={progress.status?.lastReport}
+          freshReportId={progress.freshReportId}
+          characters={worldCharacters}
+          sceneModels={sceneModels}
+          simulatedAt={sceneRuntimeState.simulatedAt}
+          location={sceneRuntimeState.location}
+          disabled={sending || loading}
+        />
       </section>
 
       {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}

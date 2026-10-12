@@ -4,6 +4,7 @@ export default function usePocketProgress(sessionId, onUpdated) {
   const [status, setStatus] = useState(null)
   const [busy, setBusy] = useState(true)
   const [error, setError] = useState("")
+  const [freshReportId, setFreshReportId] = useState(null)
   const updated = useRef(onUpdated)
   updated.current = onUpdated
   const scope = useRef(null)
@@ -29,9 +30,12 @@ export default function usePocketProgress(sessionId, onUpdated) {
           const previous = await request("")
           if (scope.current !== active) return false
           setStatus(previous)
+          active.reportId = previous?.lastReport?.id
         }
         const result = await request(suffix, options)
         if (scope.current !== active) return false
+        if (suffix === "/resume" && result?.lastReport?.id != null && result.lastReport.id !== active.reportId)
+          setFreshReportId(result.lastReport.id)
         const changed = !active.ready || active.reportId !== result?.lastReport?.id || active.simulatedAt !== result?.simulatedAt
         setStatus(result); active.failed = false; active.ready = true
         active.reportId = result?.lastReport?.id; active.simulatedAt = result?.simulatedAt
@@ -79,5 +83,5 @@ export default function usePocketProgress(sessionId, onUpdated) {
       hiddenPresence()
     }
   }, [request, resume])
-  return { status, busy, error, resume, configure, reload: () => run("", {}, false) }
+  return { status, busy, error, freshReportId, resume, configure, reload: () => run("", {}, false) }
 }

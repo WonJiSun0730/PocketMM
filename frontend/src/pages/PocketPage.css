@@ -157,3 +157,64 @@
     display: none;
   }
 }
+
+.pocket-scene__bubbles {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+.pocket-scene__bubble {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  min-width: 2.8rem;
+  padding: .35rem .6rem;
+  border: 2px solid #4e4855;
+  border-radius: .85rem;
+  background: #fffdf6;
+  box-shadow: 0 3px 0 rgb(0 0 0 / 14%);
+  font-size: 1.5rem;
+  line-height: 1.25;
+  text-align: center;
+}
+.pocket-scene__bubble::after {
+  content: "";
+  position: absolute;
+  left: calc(50% - .3rem);
+  bottom: -.4rem;
+  width: .6rem;
+  height: .6rem;
+  background: #fffdf6;
+  border-right: 2px solid #4e4855;
+  border-bottom: 2px solid #4e4855;
+  transform: rotate(45deg);
+}
+.pocket-activity-fallback {
+  min-height: 180px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  border: 1px dashed var(--border);
+  border-radius: .75rem;
+  background: var(--muted);
+}
+.pocket-activity-person {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: .6rem;
+  font-size: .8rem;
+}
+.pocket-activity-icon {
+  padding: .4rem .7rem;
+  border: 1px solid var(--border);
+  border-radius: .75rem;
+  background: var(--card);
+  font-size: 1.5rem;
+}
+
+@media (max-width: 639px) {
+  .pocket-mobile-tools { max-height: 20svh; }
+}
