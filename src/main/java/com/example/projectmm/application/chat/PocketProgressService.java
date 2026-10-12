@@ -93,7 +93,9 @@ public class PocketProgressService {
         });
     }
     public Status resume(Long id, String loginId) {
-        var prepared = tx(() -> {
+        Prepared prepared;
+        try {
+        prepared = tx(() -> {
             var session = owned(id, loginId, true); idle(session);
             var now = clock.now(); var presence = session.getLastPresenceAt();
             if (!session.isTimeCheckEnabled() || session.getPlayerProfile() == null
@@ -107,6 +109,14 @@ public class PocketProgressService {
             var token = UUID.randomUUID().toString(); session.beginProgress(token, now);
             return new Prepared(null, new Claim(id, token, interval.from(), interval.to(), interval.capped(), context));
         });
+        } catch (ResponseStatusException known) {
+            throw known;
+        } catch (RuntimeException failure) {
+            // Preparation rolls back before any claim or story time is committed.
+            // Never expose raw database statements through the time-check panel.
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "기억 정보를 정리하지 못했어요. 부재 시간은 그대로 남아 있어요. 잠시 후 다시 확인해 주세요.", failure);
+        }
         if (prepared.claim() == null) return prepared.status();
         var claim = prepared.claim();
         try {

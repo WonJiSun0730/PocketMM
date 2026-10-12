@@ -15,6 +15,9 @@ import java.util.List;
 
 @Service
 public class MemoryCompressionService {
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
+
     private static final int MIN_PATTERN_RELATED_MEMORIES = 1;
     private static final int MIN_SCHEMA_RELATED_MEMORIES = 2;
 
@@ -139,6 +142,13 @@ public class MemoryCompressionService {
         if (output.evidenceMemoryIds().size() < minimum
                 || !persistence.apply(memory.getId(), memory.getDetailLevel(), memory.getSummary(), output)) {
             return MemoryCompressionResult.skipped(memory.getSummary());
+        }
+        // Persistence committed in REQUIRES_NEW. The caller only needs a recall view.
+        // Detach before updating that view so auto-flush cannot write it a second time
+        // and hold a lock against markAccessed's independent transaction. Unlike refresh,
+        // this also works when the caller has an older REPEATABLE_READ database snapshot.
+        if (entityManager != null && entityManager.contains(memory)) {
+            entityManager.detach(memory);
         }
         memory.compress(compressedSummary);
 

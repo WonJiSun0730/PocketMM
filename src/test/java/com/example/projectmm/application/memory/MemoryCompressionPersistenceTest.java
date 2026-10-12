@@ -23,10 +23,11 @@ import static org.mockito.Mockito.*;
 
 @DataJpaTest(properties = {"spring.datasource.driver-class-name=org.h2.Driver",
         "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.show-sql=false"}, showSql = false)
-@Import({MemoryCompressionService.class, MemoryCompressionPersistenceService.class, MemoryDecayPolicy.class, MemoryProvenanceAccessPolicy.class,ProtectedMemoryDetailPolicy.class})
+@Import({MemoryCompressionService.class, MemoryCompressionPersistenceService.class, MemoryDecayPolicy.class, MemoryProvenanceAccessPolicy.class,ProtectedMemoryDetailPolicy.class, MemoryLifecycleService.class})
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class MemoryCompressionPersistenceTest {
     @Autowired MemoryCompressionService service;
+    @Autowired MemoryLifecycleService lifecycle;
     @Autowired MemoryCompressionPersistenceService persistence;
     @Autowired MemoryRepository memories;
     @Autowired MemoryAccessStateRepository access;
@@ -310,6 +311,42 @@ class MemoryCompressionPersistenceTest {
             em.persist(memory);
             return memory;
         });
+    }
+
+    @Test
+    void compressionThenAccessInsideWriteTransactionDoesNotSelfLockOrOverwriteAccess() {
+        var saved = seed(MemoryDetailLevel.DETAILED);
+        stub(List.of(),new MemoryCompressorOutput("compressed summary",List.of()));
+        var accessedAt = at.plusYears(2);
+        var caller = new TransactionTemplate(transactions);
+        caller.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        caller.executeWithoutResult(status -> {
+            var managed = memories.findById(saved.getId()).orElseThrow();
+            assertThat(service.compressIfNeeded(managed,accessedAt).compressed()).isTrue();
+            assertThat(em.contains(managed)).isFalse();
+            assertThat(managed.getDetailLevel()).isEqualTo(MemoryDetailLevel.SUMMARY);
+            assertThat(managed.getSummary()).isEqualTo("compressed summary");
+            // Context-building queries can auto-flush here before the independent access write.
+            em.flush();
+            lifecycle.markAccessed(List.of(managed.getId()),accessedAt);
+            em.flush();
+        });
+        var result = memories.findById(saved.getId()).orElseThrow();
+        assertThat(result.getSummary()).isEqualTo("compressed summary");
+        assertThat(result.getDetailLevel()).isEqualTo(MemoryDetailLevel.SUMMARY);
+        assertThat(result.getLastAccessedAt()).isEqualTo(accessedAt);
+        assertThat(result.getLastReactivatedAt()).isEqualTo(accessedAt);
+    }
+
+    @Test
+    void compressionKeepsIndependentCommitWhenCallerRollsBack() {
+        var saved = seed(MemoryDetailLevel.DETAILED);
+        stub(List.of(),new MemoryCompressorOutput("committed summary",List.of()));
+        assertThatThrownBy(() -> new TransactionTemplate(transactions).executeWithoutResult(status -> {
+            service.compressIfNeeded(memories.findById(saved.getId()).orElseThrow(),at.plusYears(2));
+            throw new IllegalStateException("caller rollback");
+        })).isInstanceOf(IllegalStateException.class);
+        assertThat(memories.findById(saved.getId()).orElseThrow().getSummary()).isEqualTo("committed summary");
     }
 
     private void stub(List<Memory> related, MemoryCompressorOutput output) {

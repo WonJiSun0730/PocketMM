@@ -210,6 +210,22 @@ class PocketProgressIntegrationTest {
             return null;
         });
     }
+    @Test void preparationDatabaseFailureIsSanitizedAndDoesNotConsumeAbsence() {
+        enabledAfter(Duration.ofMinutes(5));
+        when(recall.recallForWorldRoomSession(anyLong(),anyLong(),any(),anyInt(),anyString()))
+                .thenThrow(new org.springframework.dao.CannotAcquireLockException("update memories secret SQL"));
+        // At least one active character is needed for the real context's recall path.
+        db(() -> { sessionService.applyCastChange(id,new WorldRoomCastChange(List.of(a),List.of())); return null; });
+        assertThatThrownBy(() -> progress.resume(id,login))
+                .isInstanceOfSatisfying(ResponseStatusException.class,error -> {
+                    assertThat(error.getStatusCode().value()).isEqualTo(503);
+                    assertThat(error.getReason()).contains("부재 시간은 그대로").doesNotContain("SQL", "update memories");
+                });
+        assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
+        assertThat(progress.current(id,login).processing()).isFalse();
+        assertThat(db(() -> sessions.findById(id).orElseThrow().getLastPresenceAt())).isEqualTo(now);
+        verifyNoInteractions(gateway);
+    }
     @Test void otherUserCannotReadOrChangeProgress() {
         assertThatThrownBy(() -> progress.resume(id,"unknown")).isInstanceOf(ResponseStatusException.class);
         assertThatThrownBy(() -> progress.configure(id,"unknown",true)).isInstanceOf(ResponseStatusException.class);
