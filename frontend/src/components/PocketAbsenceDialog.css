@@ -1,0 +1,31 @@
+.pocket-absence-dialog {
+  width: 344px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100svh - 32px);
+  margin: auto;
+  padding: 20px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--card);
+  color: var(--foreground);
+  box-shadow: 0 18px 56px rgb(0 0 0 / 18%);
+}
+.pocket-absence-dialog::backdrop { background: rgb(18 18 24 / 58%); }
+.pocket-absence-dialog__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.pocket-absence-dialog__eyebrow { color: var(--muted-foreground); font-size: 10px; letter-spacing: .12em; margin-bottom: 4px; }
+.pocket-absence-dialog h2 { font-size: 16px; font-weight: 600; }
+.pocket-absence-device { width: 300px; max-width: 100%; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--border); border-radius: 18px; background: var(--muted); }
+.pocket-absence-device .pocket-scene-shell--compact { height: 100%; }
+.pocket-absence-device .pocket-scene { border: 0; border-radius: 0; }
+.pocket-activity-fallback--device { height: 100%; min-height: 0; border: 0; border-radius: 0; padding: 16px; }
+.pocket-absence-dialog__caption { margin-top: 14px; font-size: 14px; }
+.pocket-absence-dialog__caption > p:first-child { display: flex; justify-content: space-between; gap: 12px; font-weight: 500; }
+.pocket-absence-dialog__caption span { color: var(--muted-foreground); font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pocket-absence-dialog__summary { margin-top: 6px; color: var(--muted-foreground); line-height: 1.6; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.pocket-absence-dialog__playback { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 8px 0; font-size: 12px; color: var(--muted-foreground); }
+.pocket-absence-dialog__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pocket-absence-dialog__discard { grid-column: 1 / -1; color: var(--muted-foreground); }
+.pocket-absence-dialog__error { color: var(--destructive); font-size: 13px; line-height: 1.5; margin-bottom: 12px; }
+.pocket-absence-dialog button:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+@media (max-width: 400px) { .pocket-absence-dialog__caption { font-size: 15px; } }

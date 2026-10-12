@@ -37,6 +37,7 @@ export default function usePocketProgress(sessionId, onUpdated) {
         if (["/resume", "/simulate"].includes(suffix) && result?.lastReport?.id != null && result.lastReport.id !== active.reportId)
           setFreshReportId(result.lastReport.id)
         const changed = !active.ready || active.reportId !== result?.lastReport?.id || active.simulatedAt !== result?.simulatedAt
+        if (options?.method === "DELETE") setFreshReportId(null)
         setStatus(result); active.failed = false; active.ready = true; active.testHours = null
         active.reportId = result?.lastReport?.id; active.simulatedAt = result?.simulatedAt
         if (refresh && changed) await updated.current?.()
@@ -60,6 +61,7 @@ export default function usePocketProgress(sessionId, onUpdated) {
     scope.current.testHours = hours
     return resume()
   }, [resume])
+  const discard = useCallback(reportId => run(`/reports/${reportId}`, { method: "DELETE" }, true), [run])
   const configure = useCallback(enabled => run("", {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }),
   }, false), [run])
@@ -91,5 +93,5 @@ export default function usePocketProgress(sessionId, onUpdated) {
       hiddenPresence()
     }
   }, [request, resume])
-  return { status, busy, error, freshReportId, resume, simulate, configure, reload: () => run("", {}, false) }
+  return { status, busy, error, freshReportId, resume, simulate, discard, configure, reload: () => run("", {}, false) }
 }

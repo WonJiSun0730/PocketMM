@@ -7,7 +7,7 @@ import { getPocketBackground } from "@/lib/pocketSceneBackgrounds"
 import { activitySymbol } from "@/lib/pocketActivityPlayback"
 import { createStandingIdle, settleStandingPhysics } from "@/lib/pocketStandingIdle"
 
-export default function PocketScene({ className = "", simulatedAt = "", location = "", sessionId = null, playerModel = null, characterModels = [], activity = null }) {
+export default function PocketScene({ className = "", simulatedAt = "", location = "", sessionId = null, playerModel = null, characterModels = [], activity = null, compact = false }) {
   const hostRef = useRef(null)
   const bubbleNodes = useRef(new Map())
   const projectBubbles = useRef(() => {})
@@ -307,8 +307,8 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     activity.characterIds.includes(model.source?.characterId ?? model.source?.id)) : []
   if (activity?.playerInvolved && playerModel) bubbleCharacters.push({ ...playerModel, bubbleId: "player" })
 
-  return <div className={`pocket-scene-shell ${className}`}>
-    <div className="pocket-scene" data-player-present={Boolean(playerModel)} style={{ height: `${sceneHeight}px` }}>
+  return <div className={`pocket-scene-shell ${compact ? "pocket-scene-shell--compact" : ""} ${className}`}>
+    <div className="pocket-scene" data-player-present={Boolean(playerModel)} style={{ height: compact ? "100%" : `${sceneHeight}px` }}>
       <div className="pocket-scene__backdrop" data-daypart={daypart} aria-hidden="true">
         <img src={backgroundUrl} alt="" style={{ transform: `scale(${zoom / 1.35})` }}
           onError={() => setFailedBackground(requestedBackground)} />
@@ -326,7 +326,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
         })}
       </div>
     </div>
-    <div className="pocket-scene__controls">
+    {!compact && <div className="pocket-scene__controls">
       <div className="pocket-scene__control" aria-label="장면 확대 배율">
         <span className="pocket-scene__control-label">배율</span>
         <button type="button" onClick={() => setZoom(value => Math.max(0.8, +(value - 0.1).toFixed(1)))} aria-label="장면 축소">−</button>
@@ -345,6 +345,6 @@ export default function PocketScene({ className = "", simulatedAt = "", location
         <span>{sceneHeight}px</span>
         <button type="button" onClick={() => setSceneHeight(value => Math.min(520, value + 20))} aria-label="장면 높이 늘리기">+</button>
       </div>
-    </div>
+    </div>}
   </div>
 }

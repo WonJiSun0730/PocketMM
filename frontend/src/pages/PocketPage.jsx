@@ -497,6 +497,8 @@ export default function PocketPage({ pocket, onBack }) {
           sessionId={session.id}
           report={progress.status?.lastReport}
           freshReportId={progress.freshReportId}
+          onDiscard={progress.discard}
+          progressError={progress.error}
           characters={worldCharacters}
           sceneModels={sceneModels}
           simulatedAt={sceneRuntimeState.simulatedAt}

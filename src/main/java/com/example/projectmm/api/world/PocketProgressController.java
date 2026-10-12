@@ -25,6 +25,10 @@ public class PocketProgressController {
             @RequestBody Simulation request, Authentication auth) {
         return progress.simulateAbsence(sessionId, auth.getName(), request.hours());
     }
+    @DeleteMapping("/reports/{reportId}") public PocketProgressService.Status discard(@PathVariable Long sessionId,
+            @PathVariable Long reportId, Authentication auth) {
+        return progress.discardLatest(sessionId,auth.getName(),reportId);
+    }
     @PostMapping("/presence") public void presence(@PathVariable Long sessionId, Authentication auth) {
         progress.presence(sessionId, auth.getName());
     }

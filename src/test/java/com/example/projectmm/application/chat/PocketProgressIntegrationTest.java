@@ -378,6 +378,27 @@ class PocketProgressIntegrationTest {
         verify(gateway).generateWorldRoomTurn(any(),argThat(prompt -> prompt.contains("COMPLETED EVENTS STAY COMPLETED")
                 && prompt.contains("PRIMARY VIEWPOINT") && prompt.contains("after a shared meal ends")));
     }
+    @Test void rejectingLatestAbsenceRestoresTimelineAndRemovesDerivedMemoryWithoutGeneratingAgain() {
+        enabledAfter(Duration.ofMinutes(5));
+        var report = progress.resume(id,login).lastReport();
+        var result = progress.discardLatest(id,login,report.id());
+        assertThat(result.simulatedAt()).isEqualTo(story);
+        assertThat(result.lastReport()).isNull();
+        assertThat(db(() -> memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(id))).isEmpty();
+        assertThat(progress.resume(id,login).simulatedAt()).isEqualTo(story);
+        verify(gateway,times(1)).generateWorldRoomTurn(any(),anyString());
+    }
+    @Test void rejectingOldOrForeignReportCannotRemoveNewerActivityOrConversation() {
+        enabledAfter(Duration.ofMinutes(5));
+        var report = progress.resume(id,login).lastReport();
+        assertThatThrownBy(() -> progress.discardLatest(id,"unknown",report.id())).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> progress.discardLatest(id,login,report.id()+100)).isInstanceOf(ResponseStatusException.class);
+        db(() -> { messages.save(new WorldRoomMessage(sessions.findById(id).orElseThrow(),ChatRole.USER,"newer user turn",now)); return null; });
+        assertThatThrownBy(() -> progress.discardLatest(id,login,report.id())).isInstanceOfSatisfying(ResponseStatusException.class,
+                failure -> assertThat(failure.getStatusCode().value()).isEqualTo(409));
+        assertThat(progress.current(id,login).lastReport().id()).isEqualTo(report.id());
+        assertThat(db(() -> messages.findTopBySessionIdOrderByIdDesc(id).orElseThrow().getContent())).isEqualTo("newer user turn");
+    }
     @Test void otherUserCannotReadOrChangeProgress() {
         assertThatThrownBy(() -> progress.resume(id,"unknown")).isInstanceOf(ResponseStatusException.class);
         assertThatThrownBy(() -> progress.configure(id,"unknown",true)).isInstanceOf(ResponseStatusException.class);

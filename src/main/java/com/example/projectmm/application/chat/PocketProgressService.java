@@ -22,6 +22,7 @@ import java.util.*;
 @Service @RequiredArgsConstructor
 public class PocketProgressService {
     private final WorldRoomSessionService sessionService;
+    private final WorldRoomDialogueService dialogue;
     private final WorldRoomSessionRepository sessions;
     private final PocketActivityReportRepository reports;
     private final WorldRoomMessageRepository messages;
@@ -71,6 +72,23 @@ public class PocketProgressService {
     }
     public Status current(Long id, String loginId) {
         return tx(() -> status(owned(id, loginId, false)));
+    }
+    public Status discardLatest(Long id, String loginId, Long reportId) {
+        return tx(() -> {
+            var session = owned(id,loginId,true); idle(session);
+            var report = reports.findTopBySessionIdOrderByIdDesc(id)
+                    .filter(item -> Objects.equals(item.getId(),reportId))
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT,"최근 부재 활동이 바뀌었어요. 다시 확인해 주세요."));
+            var latest = messages.findTopBySessionIdOrderByIdDesc(id).orElse(null);
+            if (report.getSourceMessageId() == null || latest == null
+                    || !Objects.equals(latest.getId(),report.getSourceMessageId()))
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"이 활동 이후에 대화가 진행됐어요. 대화 기록에서 해당 시점부터 삭제해 주세요.");
+            // Discarding is an explicit present-time choice, not another absence to simulate.
+            session.markPresent(clock.now());
+            dialogue.deleteMessageAndFollowing(id,report.getSourceMessageId());
+            em.flush();
+            return status(session);
+        });
     }
     public Status configure(Long id, String loginId, boolean enabled) {
         return tx(() -> {
