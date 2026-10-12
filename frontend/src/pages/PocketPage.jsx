@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, Pencil, RefreshCw, Send, Trash2, Wrench, X } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, Menu, Pencil, RefreshCw, Send, Trash2, Wrench, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -67,6 +67,18 @@ export default function PocketPage({ pocket, onBack }) {
   const [issueNotice, setIssueNotice] = useState("")
   const [isDeveloper, setIsDeveloper] = useState(false)
   const [devOpen, setDevOpen] = useState(false)
+  const [mobileToolsOpen,setMobileToolsOpen] = useState(false)
+  const mobileToolsRef = useRef(null)
+  useEffect(() => {
+    const dialog=mobileToolsRef.current
+    if (!dialog) return
+    if (mobileToolsOpen) dialog.showModal()
+    else dialog.close()
+    const media=window.matchMedia("(min-width:1280px)")
+    const resized=()=>{if(media.matches)setMobileToolsOpen(false)}
+    media.addEventListener("change",resized)
+    return ()=>media.removeEventListener("change",resized)
+  },[mobileToolsOpen,pickerMode])
   const [devSystemValues, setDevSystemValues] = useState({})
   const [memoryInspector, setMemoryInspector] = useState([])
   const [memoryDiff, setMemoryDiff] = useState(null)
@@ -489,6 +501,9 @@ export default function PocketPage({ pocket, onBack }) {
             : <span className="grid size-7 place-items-center rounded-full bg-accent text-xs text-accent-foreground">{selectedPlayerProfile?.name?.slice(0, 1) ?? "나"}</span>}
           {selectedPlayerProfile?.name ?? "프로필 선택"}
         </Button>
+        <Button type="button" variant="ghost" size="icon" className="pocket-mobile-menu-button"
+          aria-label="포켓 메뉴 열기" aria-haspopup="dialog" aria-expanded={mobileToolsOpen}
+          onClick={()=>setMobileToolsOpen(true)}><Menu className="size-5" /></Button>
       </header>
 
       <section className={progress.status?.lastReport?.activities?.length ? "shrink-0 border-b bg-muted/10 px-4 py-3 sm:px-6" : "contents"}>
@@ -508,7 +523,13 @@ export default function PocketPage({ pocket, onBack }) {
 
       {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}
 
-      <div className="pocket-mobile-tools">
+      <dialog ref={mobileToolsRef} className="pocket-mobile-tools" aria-label="포켓 메뉴"
+        onCancel={event=>{event.preventDefault();setMobileToolsOpen(false)}}>
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <h2 className="text-sm font-medium">포켓 메뉴</h2>
+          <Button type="button" variant="ghost" size="icon" aria-label="포켓 메뉴 닫기"
+            onClick={()=>setMobileToolsOpen(false)}><X className="size-4" /></Button>
+        </div>
         <div className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span>현재 장면 · {cast.length ? cast.map(item => item.characterName ?? item.name).join(" · ") : "등장인물 없음"}</span>
@@ -631,7 +652,7 @@ export default function PocketPage({ pocket, onBack }) {
       </section>}
 
       </div>
-      </div>
+      </dialog>
 
       <ScrollArea ref={scrollAreaRef} className="min-h-0 flex-1">
         <div className="mx-auto flex w-full max-w-3xl flex-col p-4 pb-32 sm:p-6 sm:pb-36">
