@@ -65,7 +65,7 @@ export default function PocketsPage({ onBack, onOpenPocket, onManageProfiles }) 
     <section className="mx-auto w-full max-w-4xl">
       <header className="mb-8 flex items-center gap-4">
         <button type="button" onClick={onBack} className="grid size-10 place-items-center rounded-xl border bg-card" aria-label="돌아가기"><ArrowLeft size={18}/></button>
-        <div className="min-w-0 flex-1"><span className="text-[11px] font-bold tracking-[.14em] text-accent-foreground">POCKET</span><h1 className="mt-1 text-3xl font-medium">내 포켓</h1><p className="mt-1 text-sm text-muted-foreground">시작했던 이야기를 다시 이어가요.</p></div><button type="button" onClick={onManageProfiles} className="shrink-0 rounded-xl border bg-card px-4 py-2 text-sm font-medium hover:bg-accent">플레이어 프로필 관리</button>
+        <div className="min-w-0 flex-1"><span className="text-[11px] font-bold tracking-[.14em] text-accent-foreground">POCKET</span><h1 className="mt-1 text-3xl font-medium">내 포켓</h1><p className="mt-1 text-sm text-muted-foreground">최근에 진행한 이야기부터 이어가요.</p></div><button type="button" onClick={onManageProfiles} className="shrink-0 rounded-xl border bg-card px-4 py-2 text-sm font-medium hover:bg-accent">플레이어 프로필 관리</button>
       </header>
       {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
       {loading ? <p className="py-16 text-center text-sm text-muted-foreground">포켓을 불러오는 중...</p> :

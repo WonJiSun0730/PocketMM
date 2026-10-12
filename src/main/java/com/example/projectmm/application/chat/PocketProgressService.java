@@ -171,6 +171,7 @@ public class PocketProgressService {
             memories.save(Memory.fromPocketActivity(session, source, character,
                     activity.location() + " · " + activity.summary(), activity.end()));
         }
+        session.markProgressed(clock.now());
         session.finishProgress(claim.token(), plan.pauseReason(), clock.now());
         return status(session);
     }

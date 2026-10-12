@@ -20,6 +20,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.time.LocalDateTime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -39,6 +41,7 @@ class WorldRoomHistoryIntegrationTest {
     @Autowired WorldConversationRepository rooms;
     @Autowired WorldRoomIntroRepository intros;
     @Autowired WorldRoomMessageRepository messages;
+    @Autowired WorldRoomMessageVariantRepository variants;
 
     @MockitoBean DialogueGateway gateway;
     @MockitoBean MemoryRecallService memoryRecallService;
@@ -97,4 +100,76 @@ class WorldRoomHistoryIntegrationTest {
         assertThat(olderPage.get(0).getContent()).isEqualTo("message-31");
         assertThat(olderPage.get(14).getContent()).isEqualTo("message-45");
     }
+    private Member listOwner(String login) {
+        var encoder = mock(PasswordEncoder.class);
+        when(encoder.encode("password")).thenReturn("encoded");
+        when(timeInterpreter.interpret(anyString(), any(LocalDateTime.class))).thenReturn(TimeInterpretation.noMatch());
+        when(gateway.generateWorldRoomTurn(any(), anyString())).thenReturn(
+                new com.example.projectmm.domain.dialogue.WorldRoomTurn("Reply", com.example.projectmm.domain.dialogue.WorldRoomCastChange.none(), java.util.List.of(), 0));
+        return members.save(Member.createLocal(login,"password","Tester",login+"@example.test",encoder));
+    }
+    private WorldRoomSession listPocket(Member owner, int year) {
+        var at = LocalDateTime.of(year,1,1,12,0);
+        var world = worlds.save(new World(owner,"World","Setting"));
+        var room = rooms.save(new WorldConversation(world,owner,"Pocket",WorldConversation.Visibility.PRIVATE,at));
+        var intro = intros.save(new WorldRoomIntro(room,"Start","Opening",0,at,"Home",java.util.List.of("normal"),java.util.List.of("phone")));
+        return sessionService.start(room.getId(),owner.getLoginId(),null,intro.getId());
+    }
+    private void assertOrder(Member owner, WorldRoomSession... expected) {
+        assertThat(sessionService.pockets(owner.getLoginId())).extracting(WorldRoomSession::getId)
+                .containsExactly(java.util.Arrays.stream(expected).map(WorldRoomSession::getId).toArray(Long[]::new));
+    }
+    @Test void latestProgressWinsAcrossDifferentStoryDatesWhileViewingAndSettingsDoNotReorder() {
+        var owner = listOwner("progress-order");
+        var future = listPocket(owner,2099);
+        var past = listPocket(owner,1889);
+        assertOrder(owner,past,future);
+        sessionService.pocket(future.getId(),owner.getLoginId());
+        dialogueService.history(future.getId(),null);
+        future.markPresent(LocalDateTime.now().plusHours(2));
+        sessionService.updatePocketSettings(future.getId(),owner.getLoginId(),"note","guide",false);
+        assertOrder(owner,past,future);
+        dialogueService.chat(future.getId(),"Continue");
+        assertOrder(owner,future,past);
+        future.updateSimulatedAt(LocalDateTime.of(1800,1,1,0,0));
+        assertOrder(owner,future,past);
+    }
+    @Test void continuationAndRerollMovePocketUpButSelectingOrEditingOldReplyDoesNot() {
+        var owner = listOwner("progress-actions");
+        var first = listPocket(owner,2000); var second = listPocket(owner,2100);
+        dialogueService.chat(first.getId(),"Hello");
+        var reply = messages.findTopBySessionIdOrderByIdDesc(first.getId()).orElseThrow();
+        dialogueService.chat(second.getId(),"Hello"); assertOrder(owner,second,first);
+        dialogueService.reroll(first.getId(),reply.getId()); assertOrder(owner,first,second);
+        dialogueService.continueScene(second.getId()); assertOrder(owner,second,first);
+        dialogueService.selectVariant(first.getId(),reply.getId(),1); assertOrder(owner,second,first);
+        dialogueService.editMessage(first.getId(),reply.getId(),"Corrected prose"); assertOrder(owner,second,first);
+    }
+    @Test void legacyPocketsUseReplyAndRerollTimesAndNeverUserMessageOrPresenceTimes() {
+        var owner = listOwner("progress-legacy");
+        var first = listPocket(owner,2099); var second = listPocket(owner,1889);
+        org.springframework.test.util.ReflectionTestUtils.setField(first,"lastProgressedAt",null);
+        org.springframework.test.util.ReflectionTestUtils.setField(second,"lastProgressedAt",null);
+        var at = LocalDateTime.of(2025,1,1,12,0);
+        var source = messages.save(new WorldRoomMessage(first,ChatRole.CHARACTER,"First",at));
+        variants.save(new WorldRoomMessageVariant(source,1,"First",at));
+        messages.save(new WorldRoomMessage(second,ChatRole.CHARACTER,"Second",at.plusDays(1)));
+        messages.save(new WorldRoomMessage(first,ChatRole.USER,"Unanswered user input",at.plusYears(20)));
+        first.markPresent(at.plusYears(30));
+        assertOrder(owner,second,first);
+        messages.save(new WorldRoomMessage(first,ChatRole.CHARACTER,"Legacy reply without a variant",at.plusDays(2)));
+        assertOrder(owner,first,second);
+        messages.save(new WorldRoomMessage(second,ChatRole.CHARACTER,"Later legacy reply",at.plusDays(3)));
+        assertOrder(owner,second,first);
+        variants.save(new WorldRoomMessageVariant(source,2,"Rerolled",at.plusDays(4)));
+        assertOrder(owner,first,second);
+    }
+    @Test void failedGenerationDoesNotChangeProgressOrder() {
+        var owner = listOwner("progress-failed");
+        var first = listPocket(owner,2099); var second = listPocket(owner,1889);
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenThrow(new IllegalStateException("Provider unavailable"));
+        assertThatThrownBy(() -> dialogueService.chat(first.getId(),"Hello")).isInstanceOf(IllegalStateException.class);
+        assertOrder(owner,second,first);
+    }
+
 }

@@ -21,7 +21,18 @@ public interface WorldRoomSessionRepository extends JpaRepository<WorldRoomSessi
             Long roomId,
             Long memberId
     );
-    List<WorldRoomSession> findByMemberIdOrderBySimulatedAtDescIdDesc(Long memberId);
+    // Legacy pockets use actual reply/variant creation times, never their fictional date or presence.
+    @org.springframework.data.jpa.repository.Query("""
+            select s from WorldRoomSession s where s.member.id = :memberId
+            order by coalesce(s.lastProgressedAt,
+                (select max(coalesce(v.createdAt, m.createdAt)) from WorldRoomMessage m
+                    left join WorldRoomMessageVariant v on v.message.id = m.id
+                    where m.session.id = s.id
+                    and m.role = com.example.projectmm.domain.chat.ChatRole.CHARACTER)) desc,
+                s.id desc
+            """)
+    List<WorldRoomSession> findByMemberIdOrderByProgressDesc(
+            @org.springframework.data.repository.query.Param("memberId") Long memberId);
     List<WorldRoomSession> findByRoomIdOrderByCreatedAtDescIdDesc(Long roomId);
     void deleteByRoomId(Long roomId);
 }

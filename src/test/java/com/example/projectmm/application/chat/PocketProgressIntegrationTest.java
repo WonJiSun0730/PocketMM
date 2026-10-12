@@ -99,6 +99,7 @@ class PocketProgressIntegrationTest {
         assertThat(result.lastReport().activities()).extracting(PocketActivityPlan.Activity::kind)
                 .containsExactly(PocketActivityPlan.Kind.WALK,PocketActivityPlan.Kind.COFFEE);
         assertThat(result.simulatedAt()).isEqualTo(story.plusMinutes(10));
+        assertThat(db(() -> sessions.findById(id).orElseThrow().getLastProgressedAt())).isEqualTo(now.plusMinutes(10));
         db(() -> {
             var player = states.findBySessionId(id).orElseThrow();
             assertThat(player.getLocation()).isEqualTo("Home");
@@ -115,6 +116,7 @@ class PocketProgressIntegrationTest {
             return null;
         });
         assertThat(progress.resume(id,login).lastReport().id()).isEqualTo(result.lastReport().id());
+        assertThat(db(() -> sessions.findById(id).orElseThrow().getLastProgressedAt())).isEqualTo(now.plusMinutes(10));
         verify(gateway,times(1)).generateWorldRoomTurn(any(),anyString());
     }
     @Test void disabledNeverCallsModelAndEnablingStartsNewAnchor() {

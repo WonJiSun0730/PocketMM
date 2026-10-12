@@ -68,6 +68,7 @@ public class WorldRoomSession {
     private java.util.List<String> initialInventory = new java.util.ArrayList<>();
 
     private LocalDateTime lastPresenceAt;
+    private LocalDateTime lastProgressedAt;
     private Boolean timeCheckEnabled;
     private String progressOperationId;
     private LocalDateTime progressOperationUntil;
@@ -207,6 +208,10 @@ public class WorldRoomSession {
             return null;
         }
         return value.trim();
+    }
+
+    public void markProgressed(LocalDateTime at) {
+        if (lastProgressedAt == null || at.isAfter(lastProgressedAt)) lastProgressedAt = at;
     }
 
     public void markPresent(LocalDateTime at) {

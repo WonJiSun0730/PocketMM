@@ -83,6 +83,7 @@ public class WorldRoomSessionService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Room intro not found"));
         var startedAt = intro.getInitialSimulatedAt() == null ? now() : intro.getInitialSimulatedAt();
         var session = sessions.save(new WorldRoomSession(room, member, player, intro, startedAt));
+        session.markProgressed(now());
         characters.findAllByWorldIdOrderByIdAsc(room.getWorld().getId())
                 .forEach(character -> sessionCasts.save(new WorldRoomSessionCast(session, character)));
         session.markCastRosterCaptured();
@@ -105,7 +106,7 @@ public class WorldRoomSessionService {
     public List<WorldRoomSession> pockets(String loginId) {
         var member = members.findByLoginId(loginId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
-        return sessions.findByMemberIdOrderBySimulatedAtDescIdDesc(member.getId());
+        return sessions.findByMemberIdOrderByProgressDesc(member.getId());
     }
 
     @Transactional(readOnly = true)
