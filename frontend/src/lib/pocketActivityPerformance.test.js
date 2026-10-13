@@ -46,12 +46,14 @@ test("sleep hides under the blanket and activity changes restore visibility",()=
  assert.equal(puppetPose(sleep,10,0,false).hidden,true)
  assert.ok(!puppetPose(talk,10,0).hidden)
 })
-test("interaction effects require the selected pair and close by only ten pixels together",()=>{
+test("friendship and affection move each selected participant twenty pixels toward the partner",()=>{
  const close={...talk,interaction:"CLOSENESS",interactionActorIds:["player","10"]}
  assert.deepEqual(interactionActors(close),["player","10"])
  assert.deepEqual(interactionActors({...close,interactionActorIds:["player","999"]}),[])
  assert.equal(closenessPixels(close,10,0),0)
- assert.equal(closenessPixels(close,10,5)+closenessPixels(close,"player",5),10)
+ assert.equal(closenessPixels(close,10,5),20)
+ assert.equal(closenessPixels(close,"player",5),20)
+ assert.equal(closenessPixels({...close,interaction:"AFFECTION"},10,5),20)
  assert.equal(closenessPixels(close,999,5),0)
  const intimacy={...close,interaction:"INTIMACY"}
  assert.equal(puppetPose(intimacy,10,2).hidden,true)

@@ -17,10 +17,10 @@
 .pocket-scene__bed .pocket-heart-stream--pillow svg:nth-child(even) { left:80%; }
 .pocket-sleep-stream { position:absolute; left:26%; top:32%; z-index:6; width:40px; height:20px; }
 .pocket-sleep-stream span { position:absolute; color:#FAF8EC; text-shadow:1px 1px #6F6A75; font:600 13px monospace; opacity:0; animation:pocket-sleep-rise 3.6s ease-in-out infinite; }
-.pocket-food-prop { position:absolute; left:var(--mouth-x,0px); top:16px; font-size:14px; animation:pocket-bite 2.4s ease-in-out infinite; }
+.pocket-food-prop { position:absolute; left:var(--mouth-x,0px); top:16px; font-size:21px; animation:pocket-bite 2.4s ease-in-out infinite; }
 @keyframes pocket-heart-float { 0% {opacity:0;transform:translate(0,0) scale(.7);} 15% {opacity:1;} 50% {transform:translate(-5px,-30px) scale(1);} 100% {opacity:0;transform:translate(5px,-65px) scale(.8);} }
 @keyframes pocket-sleep-rise { 0% {opacity:0;transform:translate(0,0) scale(.8);} 15% {opacity:1;} 55% {transform:translate(5px,-35px) scale(1);} 100% {opacity:0;transform:translate(-5px,-75px) scale(.9);} }
-@keyframes pocket-bite { 0%,100% {opacity:.2;transform:translate(10px,12px);} 35%,65% {opacity:1;transform:translate(0,0);} }
+@keyframes pocket-bite { 0%,100% {opacity:1;transform:translate(12px,16px);} 25% {opacity:1;transform:translate(2px,2px);} 35%,70% {opacity:0;transform:translate(0,0);} 82% {opacity:0;transform:translate(12px,16px);} 92% {opacity:1;transform:translate(12px,16px);} }
 @media(prefers-reduced-motion:reduce) {
  .pocket-heart-stream svg,.pocket-sleep-stream span,.pocket-food-prop {animation:none;opacity:1;}
  .pocket-heart-stream svg:not(:first-child),.pocket-sleep-stream span:not(:first-child) {display:none;}

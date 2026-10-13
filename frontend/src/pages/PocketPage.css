@@ -154,11 +154,14 @@
   position: absolute;
   transform: translate(-50%, -100%);
   min-width: 2.8rem;
+  width: max-content;
+  max-width: none;
+  white-space: nowrap;
   padding: .35rem .6rem;
-  border: 2px solid #4e4855;
-  border-radius: .85rem;
+  border: 0;
+  border-radius: 0;
   background: #fffdf6;
-  box-shadow: 0 3px 0 rgb(0 0 0 / 14%);
+  box-shadow: -2px 0 0 #4e4855, 2px 0 0 #4e4855, 0 -2px 0 #4e4855, 0 2px 0 #4e4855, 0 5px 0 rgb(0 0 0 / 14%);
   font-size: 1.5rem;
   line-height: 1.25;
   text-align: center;
@@ -166,15 +169,14 @@
 .pocket-scene__bubble::after {
   content: "";
   position: absolute;
-  left: calc(50% - .3rem);
-  bottom: -.4rem;
-  width: .6rem;
-  height: .6rem;
-  background: #fffdf6;
-  border-right: 2px solid #4e4855;
-  border-bottom: 2px solid #4e4855;
-  transform: rotate(45deg);
+  left: var(--tail-x,calc(50% - 6px));
+  bottom: -10px;
+  width: 12px;
+  height: 12px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' shape-rendering='crispEdges'%3E%3Cpath fill='%234e4855' d='M0 0h12v4h-2v2H8v2H6v2H4V6H2V4H0z'/%3E%3Cpath fill='%23fffdf6' d='M2 0h8v2H8v2H6v2H4V4H2z'/%3E%3C/svg%3E") no-repeat;
+  image-rendering: pixelated;
 }
+.pocket-scene__bubble > span { display:inline-flex; flex-wrap:nowrap; gap:2px; white-space:nowrap; }
 .pocket-activity-fallback {
   min-height: 180px;
   display: flex;

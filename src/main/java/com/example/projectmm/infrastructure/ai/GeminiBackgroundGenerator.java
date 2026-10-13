@@ -38,8 +38,9 @@ public class GeminiBackgroundGenerator {
                 %s
                 """.formatted(description);
         prompt += scenery ? """
-                Output ONLY the sparse distant scenery overlay matching the supplied background's
-                palette, horizon and scale. It is drawn above the background and behind the characters.
+                Output ONLY a transparent-ready overlay of isolated small props, matching the reference's
+                palette and scale. This is NOT a room reconstruction or a background extraction task.
+                It is drawn above the background and behind the characters.
                 Use only one or two modest scene-appropriate props near the sides; keep the centre
                 mostly empty. ALL empty areas and holes must be perfectly flat chroma key magenta
                 RGB(255,0,255), NOT a checkerboard or white. Do not use magenta in painted objects.
@@ -48,6 +49,10 @@ public class GeminiBackgroundGenerator {
                 Parks: a bench or litter bin. Streets: a traffic cone or small street sign.
                 Rooms: a plant pot or small furnishing appropriate to that room.
                 NO buildings, houses, archways, ruins, gates or disconnected landscape fragments.
+                The reference is for palette, lighting and placement ONLY. Never cut out or copy its
+                walls, windows, doors, ceiling, floor, terrain, sky or large scenery sections.
+                Draw one or two complete standalone props on the mask instead of masking the centre
+                of the reference image. If uncertain, use a modest plant pot, not architecture.
                 Match the reference ground line, perspective, pixel density and lighting exactly.
                 Props sit at the same ground depth as the actors, never miniature distant dioramas.
                 Keep each prop complete inside the canvas with a small margin, never cut off its edges.

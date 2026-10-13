@@ -189,6 +189,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     }
 
     function updateBubbles() {
+      const placed=[]
       for (const actor of bubbleActors) {
         const bubble = bubbleNodes.current.get(actor.id)
         actor.vrm.scene.updateMatrixWorld(true)
@@ -205,17 +206,39 @@ export default function PocketScene({ className = "", simulatedAt = "", location
           expression.style.left = `${expressionX}px`
           expression.style.setProperty("--speech-side",String(side))
           expression.style.setProperty("--anger-x",`${headX-expressionX-radius*.5}px`)
-          expression.style.setProperty("--mouth-x",`${headX-expressionX-8}px`)
+          expression.style.setProperty("--mouth-x",`${headX-expressionX-10.5}px`)
           expression.style.setProperty("--head-radius",`${radius}px`)
           expression.style.top = `${Math.max(25,Math.min(host.clientHeight-25,(1-headPosition.y)*host.clientHeight/2))}px`
         }
         if (!bubble) continue
         actor.head.getWorldPosition(headPosition)
-        headPosition.y += 0.55
+        headPosition.y = actor.vrm.scene.position.y + actor.topOffset
         headPosition.project(camera)
         bubble.hidden = headPosition.z < -1 || headPosition.z > 1 || Math.abs(headPosition.x) > 1.1
-        bubble.style.left = `${Math.max(6, Math.min(94, (headPosition.x + 1) * 50))}%`
-        bubble.style.top = `${Math.max(58, Math.min(host.clientHeight - 12, (1 - headPosition.y) * host.clientHeight / 2))}px`
+        const halfWidth=bubble.offsetWidth/2
+        const headX=(headPosition.x+1)*host.clientWidth/2
+        const centre=Math.max(halfWidth+4,Math.min(host.clientWidth-halfWidth-4,headX))
+        bubble.style.left = `${centre}px`
+        bubble.style.setProperty("--tail-x",`${halfWidth+headX-centre-6}px`)
+        // The pixel tail extends ten pixels below the body; leave another ten above the model.
+        bubble.style.top = `${Math.max(bubble.offsetHeight+4, Math.min(host.clientHeight-12,(1-headPosition.y)*host.clientHeight/2-20))}px`
+        if(actor.vrm.scene.visible) placed.push({bubble,centre,headX,halfWidth})
+      }
+      if(placed.length===2) {
+        const [left,right]=placed.sort((a,b)=>a.centre-b.centre)
+        const missing=left.halfWidth+right.halfWidth+6-(right.centre-left.centre)
+        if(missing>0 && 2*(left.halfWidth+right.halfWidth)+14<=host.clientWidth) {
+          left.centre=Math.max(left.halfWidth+4,left.centre-missing/2)
+          right.centre=Math.min(host.clientWidth-right.halfWidth-4,right.centre+missing/2)
+          if(right.centre-left.centre<left.halfWidth+right.halfWidth+6) {
+            left.centre=Math.max(left.halfWidth+4,right.centre-left.halfWidth-right.halfWidth-6)
+            right.centre=left.centre+left.halfWidth+right.halfWidth+6
+          }
+          for(const entry of placed) {
+            entry.bubble.style.left=`${entry.centre}px`
+            entry.bubble.style.setProperty("--tail-x",`${entry.halfWidth+entry.headX-entry.centre-6}px`)
+          }
+        }
       }
       if(heartNode.current && activityRef.current?.interaction !== "INTIMACY") {
         const pair=interactionActors(activityRef.current)
@@ -307,7 +330,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
           })
           idleActors.at(-1)(0,0,false)
           const head = vrm.humanoid?.getRawBoneNode("head") ?? vrm.scene
-          if (actorId != null) bubbleActors.push({ id: actorId, head, vrm, origin, radius:targetHeight*0.19, frontalSide:Math.random()<.5 ? -1 : 1 })
+          if (actorId != null) bubbleActors.push({ id: actorId, head, vrm, origin, topOffset:scaledBox.max.y, radius:targetHeight*0.19, frontalSide:Math.random()<.5 ? -1 : 1 })
           render()
           loadedModels++
           if (loadedModels === visibleModels.length) { activityStartedAt=idleTime;readyCallback.current?.(true) }

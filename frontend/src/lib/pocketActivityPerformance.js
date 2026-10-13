@@ -66,14 +66,14 @@ export function puppetPose(activity, actorId, seconds, motion = true) {
   if (activity.kind === "RUN") { pose.x=0;pose.y=Math.min(.035,pose.y) }
   return pose
 }
-// The caller supplies a calibrated world-to-screen scale; each participant approaches 5px.
+// Calibrated screen-space approach: each participant moves twenty pixels toward their partner.
 export function closenessPixels(activity, actorId, seconds, motion=true) {
   const pair=interactionActors(activity)
-  if(activity?.interaction!=="CLOSENESS" || !pair.includes(String(actorId))) return 0
+  if(!["CLOSENESS","AFFECTION"].includes(activity?.interaction) || !pair.includes(String(actorId))) return 0
   const t=Math.max(0,Number.isFinite(seconds)?seconds:0)
   const progress=motion ? Math.min(1,t/2.8) : 1
-  const hesitation=motion && progress<1 ? Math.sin(t*8)*.65*Math.sin(progress*Math.PI) : 0
-  return Math.min(5,Math.max(0,5*progress+hesitation))
+  const hesitation=motion && progress<1 ? Math.sin(t*8)*1.4*Math.sin(progress*Math.PI) : 0
+  return Math.min(20,Math.max(0,20*progress+hesitation))
 }
 
 // Identical cover scaling for still images and scrolling SVG/image tiles.
