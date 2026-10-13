@@ -15,6 +15,18 @@ import static org.mockito.Mockito.*;
 import static org.mockito.ArgumentMatchers.*;
 
 class GeminiBackgroundGeneratorTest {
+    @Test void classifiesProviderFailuresWithoutExposingResponseBodiesOrKeys() throws Exception {
+        for (int status : new int[]{400,401,403,404,429,503}) {
+            var http=mock(HttpClient.class);HttpResponse<InputStream> response=mock(HttpResponse.class);
+            when(response.statusCode()).thenReturn(status);
+            when(response.body()).thenReturn(new ByteArrayInputStream("private-provider-body test-only-key".getBytes()));
+            when(http.send(any(HttpRequest.class),any(HttpResponse.BodyHandler.class))).thenReturn(response);
+            var generator=new GeminiBackgroundGenerator("test-only-key","gemini-3.1-flash-lite-image",new JsonMapper(),http);
+            assertThatThrownBy(()->generator.generate("park",null,false)).hasMessageContaining("Gemini "+status)
+                    .hasMessageNotContaining("private-provider-body").hasMessageNotContaining("test-only-key");
+            verify(http,times(1)).send(any(HttpRequest.class),any(HttpResponse.BodyHandler.class));
+        }
+    }
     @Test void requestUsesImageModelRatioResolutionAndAReferenceForTheOverlay() throws Exception {
         var http=mock(HttpClient.class);
         HttpResponse<InputStream> response=mock(HttpResponse.class);
@@ -34,7 +46,8 @@ class GeminiBackgroundGeneratorTest {
             public void onComplete() { complete.complete(null); }
         });complete.get(2,TimeUnit.SECONDS);
         var json=new JsonMapper().readTree(out.toByteArray());
-        var config=json.path("generationConfig").path("responseFormat").path("image");
+        var config=json.path("generationConfig").path("imageConfig");
+        assertThat(json.path("generationConfig").has("responseFormat")).isFalse();
         assertThat(config.path("aspectRatio").asText()).isEqualTo("3:2");
         assertThat(config.path("imageSize").asText()).isEqualTo("1K");
         assertThat(json.path("contents").get(0).path("parts").get(0).path("text").asText()).contains("RGB(255,0,255)","behind the characters");
@@ -49,7 +62,7 @@ class GeminiBackgroundGeneratorTest {
         assertThatThrownBy(()->generator.generate("park",null,false)).hasMessageContaining("429").hasMessageNotContaining("private-body");
         verify(http,times(1)).send(any(HttpRequest.class),any(HttpResponse.BodyHandler.class));
         when(response.statusCode()).thenReturn(200);when(response.body()).thenReturn(new ByteArrayInputStream("{\"candidates\":[]}".getBytes()));
-        assertThatThrownBy(()->generator.generate("park",null,false)).hasMessageContaining("No generated image");
+        assertThatThrownBy(()->generator.generate("park",null,false)).hasMessageContaining("그림이 없어요");
         assertThat(new GeminiBackgroundGenerator("","model",new JsonMapper(),http).available()).isFalse();
     }
 }

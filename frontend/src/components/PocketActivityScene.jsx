@@ -99,10 +99,15 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
     {waiting && <div className="pocket-scene-loading" role="status" aria-live="polite">
       <span className="pocket-scene-loading__dots" aria-hidden="true"><i/><i/><i/></span>
       <p>{preparation === "ERROR" ? "주머니 안쪽이 아직 잘 보이지 않아요." : "주머니 안쪽을 들여다보고 있어요..."}</p>
+      {preparation === "ERROR" && <details className="pocket-scene-loading__details"><summary>문제 확인</summary>
+        <p>{renderError || images.error || background.error || (!background.automatic
+          ? "Pocket 설정에서 새 장소 자동 생성을 켜거나 배경을 첨부해 주세요."
+          : !background.available ? "이미지 생성 연결 설정을 확인해 주세요." : "장면 준비를 다시 시도해 주세요.")}</p>
+      </details>}
       {preparation === "ERROR" && <Button variant="outline" size="sm" onClick={async()=>{
         setRenderError(""); setRenderRevision(value=>value+1)
         if (background.asset) { images.retry(); background.reload() }
-        else { try { if (background.available) await background.generate(); else background.reload() } catch { setRenderError("주머니 안쪽을 준비하지 못했어요.") } }
+        else { try { if (background.available) await background.generate(); else background.reload() } catch (error) { setRenderError(error.message || "주머니 안쪽을 준비하지 못했어요.") } }
       }}>다시 들여다보기</Button>}
     </div>}
   </div>

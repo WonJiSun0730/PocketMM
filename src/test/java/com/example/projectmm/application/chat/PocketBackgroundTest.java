@@ -34,6 +34,21 @@ class PocketBackgroundTest {
         assertThat(PocketBackgroundMatcher.score("hqfoo", "제2시설", "hq")).isZero();
         assertThat(PocketBackgroundMatcher.score("공원", "사무실", "공원처럼 넓은")).isZero();
     }
+    @Test void missingImageConnectionAndProviderRejectionAreReportedSpecifically() throws Exception {
+        var generator=mock(GeminiBackgroundGenerator.class);
+        var service=new PocketBackgroundService(mock(WorldRoomSessionService.class),new PocketBackgroundStore(directory.toString(),new JsonMapper()),generator,true);
+        var context=new PocketBackgroundService.Context(9,"1-2","World");
+        try {
+            assertThat(service.resolve(context,"공원").error()).contains("Gemini 연결 설정");
+            when(generator.available()).thenReturn(true);
+            when(generator.generate(anyString(),isNull(),eq(false))).thenThrow(new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.BAD_GATEWAY,"이미지 생성 사용량 한도나 요청 제한에 걸렸어요. (Gemini 429)"));
+            service.request(context,"공원");
+            for(int i=0;i<100 && service.resolve(context,"공원").status().equals("GENERATING");i++) Thread.sleep(20);
+            assertThat(service.resolve(context,"공원").error()).contains("Gemini 429");
+            assertThat(service.resolve(context,"공원").asset()).isNull();
+        } finally { service.close(); }
+    }
     @Test void alphaOverlayClearsChromaAndHolesAndRejectsOpaqueOrEmptyScenery() throws Exception {
         byte[] prepared = PocketBackgroundImages.prepare(image(true,false),true,true);
         var png = ImageIO.read(new java.io.ByteArrayInputStream(prepared));

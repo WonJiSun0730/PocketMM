@@ -18,6 +18,7 @@ import java.util.concurrent.*;
 
 @Service
 public class PocketBackgroundService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PocketBackgroundService.class);
     public record Context(long sessionId, String scope, String worldDescription) {}
     public record SceneAsset(String id, String location, String backgroundUrl, String sceneryUrl, String source,
                              int width, int height) {}
@@ -53,8 +54,10 @@ public class PocketBackgroundService {
         var asset = store.match(context.scope(), location);
         if (asset.isPresent()) return result(context, "READY", asset.get(), location, null, catalog.automatic());
         Job job = jobs.get(key(context, location));
+        String unavailable = !enabled ? "이미지 생성 기능이 서버에서 꺼져 있어요."
+                : !generator.available() ? "이미지 생성용 Gemini 연결 설정이 없어요." : null;
         return new Result(job == null ? "MISSING" : job.status, null, false,
-                job == null ? null : job.error, catalog.automatic(), enabled && generator.available());
+                job == null ? unavailable : job.error, catalog.automatic(), enabled && generator.available());
     }
     public synchronized Result request(Context context, String requested) {
         String location = location(requested);
@@ -75,6 +78,7 @@ public class PocketBackgroundService {
         return resolve(context, location);
     }
     private void generate(Context context, Job job) {
+        String[] phase = {"CACHE"};
         try {
             store.locked(context.scope(), () -> {
                 // Recheck after acquiring the cross-process disk lock, including after a restart.
@@ -82,10 +86,13 @@ public class PocketBackgroundService {
                 String id = key(context, job.location).substring(key(context, job.location).lastIndexOf(':') + 1);
                 byte[] background = store.stagedBackground(context.scope(), id);
                 if (background == null) {
+                    phase[0] = "BACKGROUND";
                     background = PocketBackgroundImages.prepare(generator.generate(context.worldDescription() + "\nPlace: " + job.location, null, false), false, false);
                     store.stageBackground(context.scope(), id, background);
                 }
+                phase[0] = "SCENERY";
                 byte[] scenery = PocketBackgroundImages.prepare(generator.generate(context.worldDescription() + "\nPlace: " + job.location, background, true), true, true);
+                phase[0] = "STORE";
                 store.complete(context.scope(), id, job.location, "", "AI", scenery);
                 return null;
             });
@@ -93,7 +100,11 @@ public class PocketBackgroundService {
         } catch (Exception e) {
             // Never send a provider body, key or raw filesystem path to the player.
             job.error = e instanceof ResponseStatusException status ? status.getReason()
-                    : "배경을 만들지 못했어요. 기본 배경을 유지해요. 다시 시도할 수 있어요.";
+                    : e instanceof IOException ? "배경 파일을 저장하지 못했어요. 저장 공간과 권한을 확인해 주세요."
+                    : "주머니 안쪽을 준비하지 못했어요. 다시 시도할 수 있어요.";
+            // Log safe classification only, never provider bodies, prompts or API credentials.
+            log.warn("Pocket background failed: session={}, phase={}, cause={}, reason={}",
+                    context.sessionId(), phase[0], e.getClass().getSimpleName(), job.error);
             job.status = "FAILED";
         }
     }
