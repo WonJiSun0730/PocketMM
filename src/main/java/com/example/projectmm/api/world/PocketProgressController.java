@@ -28,6 +28,14 @@ public class PocketProgressController {
                     "관리자만 부재 시간 테스트를 사용할 수 있어요.");
         return progress.simulateAbsence(sessionId, auth.getName(), request.hours());
     }
+    @GetMapping("/reports/{reportId}") public PocketProgressService.StoryReport story(@PathVariable Long sessionId,
+            @PathVariable Long reportId, Authentication auth) {
+        return progress.readStory(sessionId,reportId,auth.getName());
+    }
+    @PostMapping("/reports/{reportId}/story") public PocketProgressService.StoryReport generateStory(@PathVariable Long sessionId,
+            @PathVariable Long reportId, Authentication auth) {
+        return progress.generateStory(sessionId,reportId,auth.getName());
+    }
     @DeleteMapping("/reports/{reportId}") public PocketProgressService.Status discard(@PathVariable Long sessionId,
             @PathVariable Long reportId, Authentication auth) {
         return progress.discardLatest(sessionId,auth.getName(),reportId);

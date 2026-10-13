@@ -20,12 +20,17 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
     }
     public record Activity(LocalDateTime start, LocalDateTime end, Kind kind,
             List<Long> characterIds, String location, String summary, Boolean playerInvolved, List<ActorCue> actorCues,
-            String interaction, List<String> interactionActorIds) {
+            String interaction, List<String> interactionActorIds, String brief) {
+        public Activity(LocalDateTime start,LocalDateTime end,Kind kind,List<Long> characterIds,String location,
+                String summary,Boolean playerInvolved,List<ActorCue> actorCues,String interaction,List<String> interactionActorIds) {
+            this(start,end,kind,characterIds,location,summary,playerInvolved,actorCues,interaction,interactionActorIds,null);
+        }
         public Activity(LocalDateTime start,LocalDateTime end,Kind kind,List<Long> characterIds,String location,
                 String summary,Boolean playerInvolved,List<ActorCue> actorCues) {
             this(start,end,kind,characterIds,location,summary,playerInvolved,actorCues,"NONE",List.of());
         }
         public Activity {
+            brief = brief == null || brief.isBlank() || brief.length() > 180 ? null : brief.trim();
             // Pre-autonomy reports have no participation flag; explicit null is also legacy data.
             playerInvolved = Boolean.TRUE.equals(playerInvolved);
             actorCues = actorCues == null ? List.of() : List.copyOf(actorCues);
@@ -80,7 +85,7 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
             String interaction=pair.size()==2 ? item.path("interaction").asText("NONE") : "NONE";
             result.add(new Activity(start, end, Kind.valueOf(item.path("kind").asText()),
                     List.copyOf(ids), location, summary, playerInvolved, actorCues(item,ids,playerInvolved),
-                    interaction,"NONE".equals(interaction) ? List.of() : pair));
+                    interaction,"NONE".equals(interaction) ? List.of() : pair, item.path("brief").asText(null)));
             involved.addAll(ids); previous = end;
         }
         if (!timingValid) {
@@ -93,7 +98,7 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
                 corrected.add(new Activity(from.plusNanos(intervalNanos * i / result.size()),
                         from.plusNanos(intervalNanos * (i + 1) / result.size()), activity.kind(),
                         activity.characterIds(), activity.location(), activity.summary(), activity.playerInvolved(), activity.actorCues(),
-                        activity.interaction(), activity.interactionActorIds()));
+                        activity.interaction(), activity.interactionActorIds(), activity.brief()));
             }
             result = corrected;
         }

@@ -9,6 +9,13 @@ public final class PocketActivityPrompt {
         int activityBudget=(int)Math.max(1,Math.min(8,minutes/15));
         return """
                 [POCKET ABSENCE ACTIVITY PLAN — STRUCTURED TASK, NOT LIVE ROLEPLAY]
+                Every activity must include a separate "brief" field: one short, warm Korean sentence
+                naming the participants and the actual action, using ~했어요 / ~했답니다.
+                Preserve the core outcome (a kiss, a meal's menu, a relationship realization) without
+                inventing one. A gentle emoticon or action emoji is welcome, but avoid baby talk.
+                Example: "밀리와 마르바스는 산책하다가 뽀뽀했어요! ^^=3❤"
+                Keep "summary" as the complete factual timeline; NEVER replace it with brief.
+                brief is display-only and MUST NOT determine memory or state changes.
                 The human user has returned after being away. Plan compact, chronological character activities
                 for this Pocket only, during the supplied story-time interval. There is no live user exchange.
                 NPCs should be more proactive than in live roleplay: choose plausible, reversible daily

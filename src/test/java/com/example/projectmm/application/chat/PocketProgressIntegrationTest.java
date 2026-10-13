@@ -128,6 +128,103 @@ class PocketProgressIntegrationTest {
             return null;
         });
     }
+    @Test void briefAndNovelAreDisplayOnlyAndCachedWithoutChangingTimelineOrMemory() {
+        enabledAfter(Duration.ofMinutes(20));
+        var raw = plan(story,story.plusMinutes(20)).replace("\"kind\":\"WALK\"", "\"kind\":\"WALK\",\"brief\":\"A와 B는 함께 산책했어요! 🍃\"");
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
+        var report = progress.resume(id,login).lastReport();
+        var source = db(() -> messages.findTopBySessionIdOrderByIdDesc(id).orElseThrow().getContent());
+        var memoryBefore = db(() -> memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(id).stream().map(com.example.projectmm.domain.memory.Memory::getSummary).toList());
+        var originalJson = db(() -> reports.findById(report.id()).orElseThrow().getActivitiesJson());
+        var castBefore = db(() -> sessionService.captureCastState(id));
+        assertThat(progress.readStory(id,report.id(),login).briefLogs().getFirst()).contains("10/08 15:00 ~ 15:10", "함께 산책했어요!");
+        verify(gateway,times(1)).generateWorldRoomTurn(any(),anyString());
+        assertThat(memoryBefore.toString()).contains("공원을 산책하며 이야기했다").doesNotContain("함께 산책했어요!");
+        when(gateway.generateWorldRoomTurn(any(),contains("ABSENCE NOVELIZATION"))).thenReturn(new WorldRoomTurn(
+                "**🍃 이야기**\n*바람이 불었다.*\n\"함께 걸으니 좋네요.\"",new WorldRoomCastChange(List.of(),List.of(a)),List.of(),999));
+        var result = progress.generateStory(id,report.id(),login);
+        assertThat(result.narrative()).contains("바람이 불었다");
+        assertThat(progress.generateStory(id,report.id(),login).narrative()).isEqualTo(result.narrative());
+        assertThat(progress.readStory(id,report.id(),login).narrative()).isEqualTo(result.narrative());
+        verify(gateway,times(2)).generateWorldRoomTurn(any(),anyString());
+        assertThat(db(() -> reports.findById(report.id()).orElseThrow().getActivitiesJson())).isEqualTo(originalJson);
+        assertThat(db(() -> messages.findTopBySessionIdOrderByIdDesc(id).orElseThrow().getContent())).isEqualTo(source);
+        assertThat(db(() -> memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(id).stream().map(com.example.projectmm.domain.memory.Memory::getSummary).toList())).isEqualTo(memoryBefore);
+        assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story.plusMinutes(20));
+        assertThat(db(() -> sessionService.captureCastState(id))).isEqualTo(castBefore);
+    }
+    @Test void novelUsesHistoricalSnapshotAndRejectsDuplicateRequestDuringGeneration() {
+        enabledAfter(Duration.ofMinutes(20));
+        var report = progress.resume(id,login).lastReport();
+        db(() -> { sessions.findById(id).orElseThrow().updateSimulatedAt(story.plusDays(2)); return null; });
+        when(gateway.generateWorldRoomTurn(any(),contains("ABSENCE NOVELIZATION"))).thenAnswer(call -> {
+            com.example.projectmm.domain.dialogue.WorldRoomDialogueContext context=call.getArgument(0);
+            assertThat(context.simulatedAt()).isEqualTo(story);
+            assertThat(progress.readStory(id,report.id(),login).generating()).isTrue();
+            assertThatThrownBy(() -> progress.generateStory(id,report.id(),login)).isInstanceOfSatisfying(ResponseStatusException.class,
+                    failure -> assertThat(failure.getStatusCode().value()).isEqualTo(409));
+            assertThat((String)call.getArgument(1)).contains("Core events", "new relationship change", "confirmed memory");
+            return new WorldRoomTurn("Saved prose",WorldRoomCastChange.none(),List.of(),0);
+        });
+        assertThat(progress.generateStory(id,report.id(),login).narrative()).isEqualTo("Saved prose");
+        verify(gateway,times(2)).generateWorldRoomTurn(any(),anyString());
+    }
+    @Test void failedNovelKeepsOriginalAndAllowsExplicitRetry() {
+        enabledAfter(Duration.ofMinutes(20));var report=progress.resume(id,login).lastReport();
+        var original=db(() -> reports.findById(report.id()).orElseThrow().getActivitiesJson());
+        when(gateway.generateWorldRoomTurn(any(),contains("ABSENCE NOVELIZATION"))).thenThrow(new IllegalStateException("fixture failure"));
+        assertThatThrownBy(() -> progress.generateStory(id,report.id(),login)).isInstanceOfSatisfying(ResponseStatusException.class,
+                failure -> assertThat(failure.getStatusCode().value()).isEqualTo(502));
+        var result=progress.readStory(id,report.id(),login);
+        assertThat(result.generating()).isFalse();assertThat(result.narrative()).isNull();
+        assertThat(result.activities()).isEqualTo(report.activities());
+        assertThat(db(() -> reports.findById(report.id()).orElseThrow().getActivitiesJson())).isEqualTo(original);
+        when(gateway.generateWorldRoomTurn(any(),contains("ABSENCE NOVELIZATION"))).thenReturn(new WorldRoomTurn("Retry prose",WorldRoomCastChange.none(),List.of(),0));
+        assertThat(progress.generateStory(id,report.id(),login).narrative()).isEqualTo("Retry prose");
+    }
+    @Test void legacyReportUsesEvaluationSnapshotWithoutCurrentContextOrRegenerationOnRead() {
+        enabledAfter(Duration.ofMinutes(20));var report=progress.resume(id,login).lastReport();
+        db(() -> {reports.findById(report.id()).orElseThrow().captureNarrativeContext(null);return null;});
+        when(gateway.generateWorldRoomTurn(any(),contains("ABSENCE NOVELIZATION"))).thenAnswer(call -> {
+            com.example.projectmm.domain.dialogue.WorldRoomDialogueContext context=call.getArgument(0);
+            assertThat(context.simulatedAt()).isEqualTo(story);
+            return new WorldRoomTurn("Legacy prose",WorldRoomCastChange.none(),List.of(),0);
+        });
+        assertThat(progress.generateStory(id,report.id(),login).narrative()).isEqualTo("Legacy prose");
+    }
+    @Test void foreignOrDeletedReportCannotGenerateOrReadStory() {
+        enabledAfter(Duration.ofMinutes(20));var report=progress.resume(id,login).lastReport();
+        assertThatThrownBy(() -> progress.readStory(id,report.id(),"unknown")).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> progress.generateStory(id,report.id()+100,"unknown")).isInstanceOf(ResponseStatusException.class);
+        progress.discardLatest(id,login,report.id());
+        assertThatThrownBy(() -> progress.generateStory(id,report.id(),login)).isInstanceOfSatisfying(ResponseStatusException.class,
+                failure -> assertThat(failure.getStatusCode().value()).isEqualTo(404));
+        verify(gateway,times(1)).generateWorldRoomTurn(any(),anyString());
+    }
+    @Test void deletingReportDuringNovelCallCannotResurrectTimelineOrCache() {
+        enabledAfter(Duration.ofMinutes(20));var report=progress.resume(id,login).lastReport();
+        when(gateway.generateWorldRoomTurn(any(),contains("ABSENCE NOVELIZATION"))).thenAnswer(call -> {
+            progress.discardLatest(id,login,report.id());
+            return new WorldRoomTurn("Deleted report prose",WorldRoomCastChange.none(),List.of(),0);
+        });
+        assertThatThrownBy(() -> progress.generateStory(id,report.id(),login)).isInstanceOfSatisfying(ResponseStatusException.class,
+                failure -> assertThat(failure.getStatusCode().value()).isEqualTo(404));
+        assertThat(reports.findById(report.id())).isEmpty();
+        assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
+        assertThat(memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(id)).isEmpty();
+    }
+    @Test void legacyReportMissingHistoricalContextNeverUsesFutureRpAsFallback() {
+        enabledAfter(Duration.ofMinutes(20));var report=progress.resume(id,login).lastReport();
+        db(() -> {
+            var original=reports.findById(report.id()).orElseThrow();original.captureNarrativeContext(null);
+            variants.findByMessageIdOrderByVariantNoAsc(original.getSourceMessageId()).forEach(v -> v.captureEvaluationContext(null));
+            return null;
+        });
+        assertThatThrownBy(() -> progress.generateStory(id,report.id(),login)).isInstanceOfSatisfying(ResponseStatusException.class,
+                failure -> assertThat(failure.getStatusCode().value()).isEqualTo(409));
+        assertThat(progress.readStory(id,report.id(),login).activities()).isEqualTo(report.activities());
+        verify(gateway,times(1)).generateWorldRoomTurn(any(),anyString());
+    }
     String plan(LocalDateTime from, LocalDateTime to) {
         var mid = from.plus(Duration.between(from,to).dividedBy(2));
         return """

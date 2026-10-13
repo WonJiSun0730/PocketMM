@@ -120,7 +120,7 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
       <span className="text-muted-foreground">지난 부재 활동 · {frames.length}개</span>
       <Button size="sm" variant="outline" disabled={disabled || !sceneModels.ready} onClick={() => select(0, true)}>다시보기</Button>
     </section>}
-    <PocketAbsenceDialog isDeveloper={isDeveloper} open={Boolean(activity) && sceneModels.ready} onClose={() => select(null)} display={activityDisplay}
+    <PocketAbsenceDialog sessionId={sessionId} report={report} isDeveloper={isDeveloper} open={Boolean(activity) && sceneModels.ready} onClose={() => select(null)} display={activityDisplay}
       activity={activity} index={index ?? 0} count={frames.length} playing={playing} disabled={disabled} waiting={waiting}
       onToggle={() => setPlaying(value => !value)} onSelect={select}
       onReplay={() => select(0, !window.matchMedia("(prefers-reduced-motion: reduce)").matches)}

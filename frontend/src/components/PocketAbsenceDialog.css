@@ -1,3 +1,4 @@
+@import url("https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/galmuri.css");
 .pocket-absence-dialog {
   width: 344px;
   max-width: calc(100vw - 24px);
@@ -45,3 +46,9 @@
 .pocket-absence-dialog__error { color: var(--destructive); font-size: 13px; line-height: 1.5; margin-bottom: 12px; }
 .pocket-absence-dialog button:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
 @media (max-width: 400px) { .pocket-absence-dialog__caption { font-size: 15px; } }
+
+.pocket-absence-device { position:relative; }
+.pocket-absence-screen-log { position:absolute; z-index:8; left:7%; right:7%; bottom:7%; display:flex; gap:6px; padding:7px 8px; max-height:38%; overflow-y:auto; border:2px solid #161616; background:#fff; color:#111; box-shadow:2px 2px 0 #161616; font-family:Galmuri11,"Malgun Gothic",monospace; font-size:12px; line-height:1.55; word-break:keep-all; overflow-wrap:anywhere; }
+.dark .pocket-absence-screen-log { border-color:#f4f4f4; background:#000; color:#fff; box-shadow:2px 2px 0 #f4f4f4; }
+.pocket-absence-screen-log p { margin:0; }
+.pocket-absence-screen-log > span { flex:none; }
