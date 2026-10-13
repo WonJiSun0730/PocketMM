@@ -44,6 +44,7 @@ class PocketProgressIntegrationTest {
     @Autowired WorldRoomPlayerStateRepository states;
     @Autowired WorldRoomMessageVariantRepository variants;
     @Autowired MemoryRepository memories;
+    @Autowired jakarta.persistence.EntityManager em;
     @Autowired MemberRepository members;
     @Autowired WorldRepository worlds;
     @Autowired WorldConversationRepository rooms;
@@ -81,6 +82,52 @@ class PocketProgressIntegrationTest {
         when(clock.now()).thenReturn(now);
     }
     @AfterEach void cleanup() { if (sessions.existsById(id)) sessionService.deletePocket(id, login); }
+    @Test void deletingPocketCleansCompressedEvidenceAndKeepsIndependentMemory() {
+        enabledAfter(Duration.ofMinutes(5)); progress.resume(id,login);
+        var dependencyIds = seedMemoryDependencies();
+        sessionService.deletePocket(id,login);
+        assertThat(sessions.existsById(id)).isFalse();
+        assertMemoryDependenciesRemoved(dependencyIds);
+    }
+    // The retained memories are outside the deleted Pocket, like shared character memories.
+    long[] seedMemoryDependencies() {
+        return db(() -> {
+            var source = memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(id).getFirst();
+            var actor = source.getCharacter();
+            var dependent = memories.save(new com.example.projectmm.domain.memory.Memory(actor,null,"compressed",2,20,story));
+            var transitive = memories.save(new com.example.projectmm.domain.memory.Memory(actor,null,"schema",2,20,story));
+            var retained = memories.save(new com.example.projectmm.domain.memory.Memory(actor,null,"unrelated",2,20,story));
+            em.persist(new com.example.projectmm.domain.memory.MemoryCompressionEvidence(dependent,
+                    com.example.projectmm.domain.memory.MemoryDetailLevel.PATTERN,source));
+            em.persist(new com.example.projectmm.domain.memory.MemoryCompressionEvidence(transitive,
+                    com.example.projectmm.domain.memory.MemoryDetailLevel.SCHEMA,dependent));
+            // A legacy provenance cycle must terminate safely during cleanup.
+            em.persist(new com.example.projectmm.domain.memory.MemoryCompressionEvidence(dependent,
+                    com.example.projectmm.domain.memory.MemoryDetailLevel.SCHEMA,transitive));
+            em.persist(new com.example.projectmm.domain.memory.MemoryAccessState(source,
+                    com.example.projectmm.domain.memory.MemoryAccessLevel.EXPLICIT,story));
+            em.persist(new com.example.projectmm.domain.memory.ProtectedMemoryDetail(dependent,"detail",
+                    com.example.projectmm.domain.memory.MemoryDetailSalience.HIGH,false));
+            em.persist(new com.example.projectmm.infrastructure.memory.MemoryEmbeddingEntity(transitive.getId(),"fingerprint","[1]"));
+            em.flush();
+            return new long[]{source.getId(),dependent.getId(),transitive.getId(),retained.getId()};
+        });
+    }
+    void assertMemoryDependenciesRemoved(long[] ids) {
+        assertThat(memories.findAllById(List.of(ids[0],ids[1],ids[2]))).isEmpty();
+        assertThat(memories.findById(ids[3])).isPresent();
+        db(() -> {
+            var targets = List.of(ids[0],ids[1],ids[2]);
+            assertThat(em.createQuery("select count(e) from MemoryCompressionEvidence e where e.memory.id in :ids or e.evidenceMemory.id in :ids",Long.class)
+                    .setParameter("ids",targets).getSingleResult()).isZero();
+            assertThat(em.createQuery("select count(s) from MemoryAccessState s where s.memory.id in :ids",Long.class)
+                    .setParameter("ids",targets).getSingleResult()).isZero();
+            assertThat(em.createQuery("select count(d) from ProtectedMemoryDetail d where d.memory.id in :ids",Long.class)
+                    .setParameter("ids",targets).getSingleResult()).isZero();
+            assertThat(em.find(com.example.projectmm.infrastructure.memory.MemoryEmbeddingEntity.class,ids[2])).isNull();
+            return null;
+        });
+    }
     String plan(LocalDateTime from, LocalDateTime to) {
         var mid = from.plus(Duration.between(from,to).dividedBy(2));
         return """
@@ -257,7 +304,9 @@ class PocketProgressIntegrationTest {
         var source = db(() -> messages.findTopBySessionIdOrderByIdDesc(id).orElseThrow().getId());
         assertThatThrownBy(() -> dialogue.reroll(id,source)).isInstanceOf(ResponseStatusException.class);
         assertThatThrownBy(() -> dialogue.editMessage(id,source,"altered")).isInstanceOf(ResponseStatusException.class);
+        var dependencyIds = seedMemoryDependencies();
         dialogue.deleteMessageAndFollowing(id,source);
+        assertMemoryDependenciesRemoved(dependencyIds);
         assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
         assertThat(progress.current(id,login).lastReport()).isNull();
         assertThat(db(() -> memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(id).size())).isZero();
@@ -265,7 +314,9 @@ class PocketProgressIntegrationTest {
     @Test void deletingRoomRemovesAbsenceReportsAndMemoriesBeforeSourceMessages() {
         enabledAfter(Duration.ofMinutes(5)); progress.resume(id,login);
         var roomId = db(() -> sessions.findById(id).orElseThrow().getRoom().getId());
+        var dependencyIds = seedMemoryDependencies();
         roomService.deleteRoom(roomId,login);
+        assertMemoryDependenciesRemoved(dependencyIds);
         assertThat(sessions.existsById(id)).isFalse();
         assertThat(reports.findTopBySessionIdOrderByIdDesc(id)).isEmpty();
         assertThat(memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(id)).isEmpty();
@@ -536,7 +587,9 @@ class PocketProgressIntegrationTest {
     @Test void rejectingLatestAbsenceRestoresTimelineAndRemovesDerivedMemoryWithoutGeneratingAgain() {
         enabledAfter(Duration.ofMinutes(5));
         var report = progress.resume(id,login).lastReport();
+        var dependencyIds = seedMemoryDependencies();
         var result = progress.discardLatest(id,login,report.id());
+        assertMemoryDependenciesRemoved(dependencyIds);
         assertThat(result.simulatedAt()).isEqualTo(story);
         assertThat(result.lastReport()).isNull();
         assertThat(db(() -> memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(id))).isEmpty();

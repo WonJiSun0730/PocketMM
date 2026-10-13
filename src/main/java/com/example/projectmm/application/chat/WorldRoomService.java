@@ -109,8 +109,7 @@ public class WorldRoomService {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "부재 활동을 정리 중이에요. 잠시 기다려 주세요.");
             var memoryIds = memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(pocket.getId())
                     .stream().map(com.example.projectmm.domain.memory.Memory::getId).toList();
-            if (!memoryIds.isEmpty()) memoryDetails.deleteByMemoryIdIn(memoryIds);
-            memories.deleteByWorldRoomSessionId(pocket.getId());
+            memories.deleteWithDependencies(memoryIds);
         }
         memories.flush();
         activityReports.deleteBySessionRoomId(roomId);

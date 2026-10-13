@@ -571,9 +571,7 @@ public class WorldRoomDialogueService {
             var memoryIds = derivedMemories.stream()
                     .map(com.example.projectmm.domain.memory.Memory::getId)
                     .toList();
-            memoryDetails.deleteByMemoryIdIn(memoryIds);
-            memories.deleteAll(derivedMemories);
-            memories.flush();
+            memories.deleteWithDependencies(memoryIds);
         }
 
         systemSnapshots.deleteByVariantMessageSessionIdAndVariantMessageIdGreaterThanEqual(

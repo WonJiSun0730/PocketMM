@@ -5,7 +5,7 @@
 .pocket-talk-lines i:first-child { left:4px; top:6px; width:18px; transform:rotate(-30deg); }
 .pocket-talk-lines i:last-child { left:4px; top:28px; width:18px; transform:rotate(30deg); }
 .pocket-anger-mark { position:absolute; left:var(--anger-x,0px); top:-12px; width:22px; height:22px; fill:none; stroke:#D84848; stroke-width:2.5; stroke-linecap:round; filter:drop-shadow(0 0 1px white); }
-.pocket-scene__backdrop--walking { background-repeat:repeat-x; background-position:50% var(--walk-y,50%); image-rendering:pixelated; animation:pocket-map-scroll 4s linear infinite; }
+.pocket-scene__backdrop--walking { background-repeat:repeat-x; background-position:50% var(--walk-y,50%); image-rendering:pixelated; animation:pocket-map-scroll 16s linear infinite; }
 .pocket-scene__backdrop--walking img { visibility:hidden; }
 .pocket-scene__bed { position:absolute; left:4%; right:4%; bottom:-4px; z-index:3; pointer-events:none; }
 .pocket-scene__bed svg { width:100%; display:block; }

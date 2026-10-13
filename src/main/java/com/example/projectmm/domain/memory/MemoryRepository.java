@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.Lock;
 import jakarta.persistence.LockModeType;
 
 public interface MemoryRepository
-        extends JpaRepository<Memory, Long> {
+        extends JpaRepository<Memory, Long>, MemoryDeletionOperations {
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from Memory m where m.id = :id")

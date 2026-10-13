@@ -170,10 +170,7 @@ public class WorldRoomSessionService {
                 .stream()
                 .map(com.example.projectmm.domain.memory.Memory::getId)
                 .toList();
-        if (!memoryIds.isEmpty()) {
-            protectedMemoryDetails.deleteByMemoryIdIn(memoryIds);
-        }
-        memories.deleteByWorldRoomSessionId(sessionId);
+        memories.deleteWithDependencies(memoryIds);
         activityReports.deleteBySessionId(sessionId);
 
         systemSnapshots.deleteByVariantMessageSessionId(sessionId);

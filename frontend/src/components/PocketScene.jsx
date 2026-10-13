@@ -440,7 +440,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     <div className="pocket-scene" data-player-present={Boolean(playerModel)} style={{ height: compact ? "100%" : `${sceneHeight}px`, filter: lookFilter(look) }}>
       <div className={`pocket-scene__backdrop ${walking ? "pocket-scene__backdrop--walking" : ""}`} data-daypart="day" aria-hidden="true"
         style={walking ? {backgroundImage:`url(${backgroundUrl})`,backgroundSize:`${tile.width}px ${rasterHeight}px`,"--walk-y":`${rasterTop}px`,
-          "--walk-x":`${tile.offset}px`,...(activity?.kind==="RUN" ? {animationDuration:"2s"} : {})} : undefined}>
+          "--walk-x":`${tile.offset}px`,...(activity?.kind==="RUN" ? {animationDuration:"6s"} : {})} : undefined}>
         <img src={backgroundUrl} alt="" onLoad={event=>{
           const image=event.currentTarget;if(image.naturalHeight>0)setImageAspect(image.naturalWidth/image.naturalHeight)
           if (generated) { try {
@@ -455,7 +455,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       </div>
       {sceneryUrl && <div className={`pocket-scene__backdrop pocket-scene__scenery ${walking ? "pocket-scene__backdrop--walking" : ""}`}
         data-daypart="day" aria-hidden="true" style={walking ? {
-          backgroundImage:`url(${sceneryUrl})`,backgroundSize:`${tile.width}px ${rasterHeight}px`,"--walk-x":`${tile.offset}px`,"--walk-y":`${rasterTop}px`,...(activity?.kind==="RUN" ? {animationDuration:"3.5s"} : {}),
+          backgroundImage:`url(${sceneryUrl})`,backgroundSize:`${tile.width}px ${rasterHeight}px`,"--walk-x":`${tile.offset}px`,"--walk-y":`${rasterTop}px`,...(activity?.kind==="RUN" ? {animationDuration:"10s"} : {}),
         } : undefined}>
         <img src={sceneryUrl} alt="" onError={() => { setFailedScenery(sceneryUrl); if (requireBackground) errorCallback.current?.("주머니 안쪽을 불러오지 못했어요.") }} style={rasterStyle} />
       </div>}
