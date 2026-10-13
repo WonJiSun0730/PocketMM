@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react"
-import { normalizeSceneAsset } from "@/lib/pocketBackgroundLayers"
+import { normalizeSceneAsset, backgroundPeriod } from "@/lib/pocketBackgroundLayers"
 
 const changes = new EventTarget()
 const cached = new Map()
-const keyFor = (sessionId, location) => `${sessionId}:${location.trim()}`
+const keyFor = (sessionId, location, period) => `${sessionId}:${location.trim()}:${period}`
 const empty = { status: "MISSING", asset: null, automatic: true, available: false, loaded: false }
 function publish(key, result) {
   const next = { ...result, loaded: true, asset: normalizeSceneAsset(result.asset) }
@@ -19,9 +19,10 @@ async function read(response) {
   return response.json()
 }
 
-export default function usePocketBackground(sessionId, location = "", { autoGenerate = true } = {}) {
-  const place = typeof location === "string" ? location.trim() : ""
-  const key = keyFor(sessionId, place)
+export default function usePocketBackground(sessionId, location = "", { autoGenerate = true, simulatedAt = "" } = {}) {
+  const place = typeof location === "string" && location.trim() ? location.trim() : ""
+  const period=backgroundPeriod(simulatedAt)
+  const key = keyFor(sessionId, place,period)
   const [snapshot, setSnapshot] = useState(() => ({ key, result: cached.get(key) ?? empty }))
   const [revision, setRevision] = useState(0)
   const result = snapshot.key === key ? snapshot.result : cached.get(key) ?? empty
@@ -38,13 +39,13 @@ export default function usePocketBackground(sessionId, location = "", { autoGene
       if (!active) return
       controller = new AbortController()
       try {
-        let next = await read(await fetch(`${url}?location=${encodeURIComponent(place)}`, {
+        let next = await read(await fetch(`${url}?location=${encodeURIComponent(place)}${simulatedAt ? `&simulatedAt=${encodeURIComponent(simulatedAt)}` : ""}`, {
           credentials: "include", signal: controller.signal,
         }))
         if (!active) return
         if (autoGenerate && next.status === "MISSING" && next.automatic && next.available) {
           next = await read(await fetch(url, { method: "POST", credentials: "include",
-            headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: place }), signal: controller.signal }))
+            headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: place, simulatedAt }), signal: controller.signal }))
         }
         if (!active) return
         publish(key, next)
@@ -58,15 +59,16 @@ export default function usePocketBackground(sessionId, location = "", { autoGene
   }, [key, sessionId, place, revision, autoGenerate])
   const generate = useCallback(async () => {
     const next = await read(await fetch(url, { method: "POST", credentials: "include",
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: place }) }))
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: place, simulatedAt }) }))
     publish(key, next); setRevision(value => value + 1)
-  }, [key, url, place])
+  }, [key, url, place,simulatedAt])
   const configure = useCallback(async automatic => {
     const next = await read(await fetch(`${url}/configuration`, { method: "PUT", credentials: "include",
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ automatic, location: place }) }))
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ automatic, location: place, simulatedAt }) }))
     publish(key, next); changes.dispatchEvent(new Event("reload")); setRevision(value => value + 1)
-  }, [key, url, place])
+  }, [key, url, place,simulatedAt])
   const upload = useCallback(async form => {
+    if (simulatedAt) form.set("simulatedAt",simulatedAt)
     const next = await read(await fetch(`${url}/upload`, { method: "POST", credentials: "include", body: form }))
     publish(key, next); changes.dispatchEvent(new Event("reload")); setRevision(value => value + 1)
   }, [key, url])

@@ -69,7 +69,7 @@ public final class PocketActivityPrompt {
                 Return the normal envelope with empty/zero state metadata. Serialize this object as a
                 STRING in reply, with no Markdown fences:
                 {"activities":[{"start":"ISO_LOCAL_DATETIME","end":"ISO_LOCAL_DATETIME",
-                "kind":"WALK|TALK|REST|WAIT|SLEEP|READ|WORK|MEAL|COFFEE|COOK|CARE|TRAVEL","characterIds":[1,2],
+                "kind":"WALK|RUN|TALK|REST|WAIT|SLEEP|READ|WORK|MEAL|DRINK|COFFEE|COOK|CARE|TRAVEL","characterIds":[1,2],
                 "playerInvolved":true,"location":"place","summary":"short activity",
                 "actorCues":[{"actorId":"player","emojis":["🤔","💤"],"emotion":"CALM","turn":0},
                 {"actorId":"1","emojis":["🛏️","✔️"],"emotion":"CALM","turn":1}]}],
@@ -88,12 +88,30 @@ public final class PocketActivityPrompt {
                 so retain existing injuries and possessions unless the activities explicitly change them.
                 The final location must match the last player-participating activity. NPC-only activities
                 must not alter playerState. Keep outer envelope metadata empty/zero; apply state only here.
+                MEAL DETAIL: name the actual food briefly in the summary, not just "ate a simple meal".
+                Example: "밀리는 샐러드로 간단하게 식사를 때웠다." Give that actor exactly ONE matching
+                food emoji, e.g. salad 🥗, noodles 🍜, rice 🍚, sandwich 🥪. Never add a second emoji
+                or a mood emoji for MEAL. If no suitable food emoji exists, use only 🍽️.
+                Choose a plausible menu consistent with the place, profile and established food facts.
+                Do not invent elaborate cooking or food changes merely to provide a visual icon.
                 For each participating actor, provide actorCues with actorId "player" or the NPC ID as
                 a string. Choose ONE topic-specific emoji where possible, at most TWO. A discussion of
                 sleep can use thoughtful/sleep icons for the client and bed/check icons for the counsellor;
                 do not use the same generic speaking icon for everyone. Emojis contain icons only, no text.
                 emotion is CALM, ANGRY, HAPPY or SAD, grounded in that actor's mood in this activity.
+                Optional pose is LIGHT (lively relaxed standing) or ARMS_CROSSED (folded arms when
+                appropriate to that actor and moment). Vary gestures naturally, never fold arms while
+                eating, drinking, running or asleep; do not make everyone use the same pose by default.
                 turn is the relative speaking order (0 first); alternating speakers will be animated.
+                VISUAL INTERACTION: optional interaction is NONE, CLOSENESS (a moment of growing
+                familiarity), AFFECTION (romantic kissing, affectionate embrace or romantic touch),
+                or INTIMACY (consensual intimacy between characters explicitly established as 19 or older).
+                interactionActorIds names exactly the two participants using "player" or NPC ID strings.
+                Ordinary friendly/family hugs are not romantic AFFECTION. Never invent intimacy just
+                to trigger an animation; require established mutual affection and intent. If ages are
+                missing, under 19 or consent unclear, do not use INTIMACY. Describe adult intimacy only
+                as sharing a private affectionate moment; no explicit sexual acts or anatomical detail.
+                RUN is actual running, DRINK is drinking (COFFEE for coffee); MEAL is eating.
                 SLEEP actors use 💤. Keep these cues scoped to this activity, not a permanent trait.
                 Always set pauseReason null and cover the full interval with connected activity.
                 Empty activities are valid when no meaningful activity is supported.

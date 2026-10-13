@@ -20,7 +20,7 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
   const frames = report?.activities ?? []
   const index = selection?.sessionId === sessionId && selection?.reportId === report?.id ? selection.index : null
   const activity = index != null ? frames[index] ?? null : null
-  const background = usePocketBackground(sessionId, activity ? activity.location || location || "장소 미설정" : "")
+  const background = usePocketBackground(sessionId, activity ? activity.location || location || "장소 미설정" : "", { simulatedAt:activity?.start })
   const images = usePocketSceneImages(activity ? background.asset : null)
   const [loadedModelKey, setLoadedModelKey] = useState(null)
   const [renderError, setRenderError] = useState("")

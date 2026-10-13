@@ -39,7 +39,17 @@ test("idle is animated, deterministic, bounded and does not accumulate bone rota
   update(100, 30)
   assert.ok(vrm.deltas.slice(-3).every(delta => delta <= 1 / 60))
   assert.ok(Math.abs(vrm.deltas.slice(-3).reduce((sum, delta) => sum + delta, 0) - 0.05) < 1e-8)
-  assert.ok(Math.abs(new Euler().setFromQuaternion(vrm.bones.get("chest").quaternion).x) <= 0.0091)
+  assert.ok(Math.abs(new Euler().setFromQuaternion(vrm.bones.get("chest").quaternion).x) <= 0.0161)
+})
+test("folded arms reset cleanly to light standing without moving the root",()=>{
+ const vrm=rig(), update=createStandingIdle(vrm),root=vrm.scene.position.clone()
+ update(2,0,false,"ARMS_CROSSED")
+ const folded=vrm.bones.get("rightLowerArm").quaternion.clone()
+ update(2,0,false,"ARMS_CROSSED")
+ assert.ok(folded.equals(vrm.bones.get("rightLowerArm").quaternion))
+ update(2,0,false,"LIGHT")
+ assert.ok(!folded.equals(vrm.bones.get("rightLowerArm").quaternion))
+ assert.deepEqual(vrm.scene.position,root)
 })
 
 test("reduced motion retains a static standing pose and missing optional bones are safe", () => {

@@ -442,6 +442,34 @@ class PocketProgressIntegrationTest {
         assertThat(progress.resume(id,login).lastReport().id()).isEqualTo(result.lastReport().id());
         verify(gateway,times(1)).generateWorldRoomTurn(any(),anyString());
     }
+    @Test void newActivityAnimationsAndInteractionMetadataSurviveStorageAndTimeRepair() {
+        progress.configure(id,login,true);
+        var raw="""
+            {"activities":[{"start":"broken","end":"broken","kind":"RUN","characterIds":[%d,%d],
+            "location":"Park","summary":"두 사람은 달렸다.","interaction":"CLOSENESS","interactionActorIds":["%d","%d"],
+            "actorCues":[{"actorId":"%d","emojis":["🏃"],"pose":"ARMS_CROSSED"}]},
+            {"start":"broken","end":"broken","kind":"DRINK","characterIds":[%d,%d],
+            "location":"Home","summary":"두 사람은 음료를 마셨다.","interaction":"AFFECTION","interactionActorIds":["%d","%d"]}],
+            "leaveCharacterIds":[],"pauseReason":null}
+            """.formatted(a,b,a,b,a,a,b,a,b);
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
+        progress.simulateAbsence(id,login,1);
+        var saved=progress.current(id,login).lastReport().activities();
+        assertThat(saved.getFirst().kind()).isEqualTo(PocketActivityPlan.Kind.RUN);
+        assertThat(saved.getFirst().interaction()).isEqualTo("CLOSENESS");
+        assertThat(saved.getFirst().interactionActorIds()).containsExactly(a.toString(),b.toString());
+        assertThat(saved.getFirst().actorCues().getFirst().pose()).isEqualTo("ARMS_CROSSED");
+        assertThat(saved.getLast().kind()).isEqualTo(PocketActivityPlan.Kind.DRINK);
+        assertThat(saved.getLast().interaction()).isEqualTo("AFFECTION");
+        assertThat(saved.getLast().end()).isEqualTo(story.plusHours(1));
+    }
+    @Test void interactionCannotTargetAnAbsentOrUnregisteredCharacter() {
+        progress.configure(id,login,true);
+        var raw=plan(story,story.plusHours(1)).replace("\"kind\":\"WALK\"", "\"kind\":\"WALK\",\"interaction\":\"INTIMACY\",\"interactionActorIds\":[\"99999999\",\""+a+"\"]");
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
+        var result=progress.simulateAbsence(id,login,1);
+        assertThat(result.lastReport().activities().getFirst().interaction()).isEqualTo("NONE");
+    }
     @Test void malformedDateDoesNotBypassParticipantValidationOrChangeStoryTime() {
         progress.configure(id,login,true);
         var raw=plan(story,story.plusHours(1)).replace(story.plusHours(1).toString(),"2026-10-46:00")

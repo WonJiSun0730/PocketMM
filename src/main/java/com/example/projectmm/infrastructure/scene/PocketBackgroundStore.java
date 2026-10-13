@@ -12,7 +12,14 @@ import java.util.*;
 
 @Component
 public class PocketBackgroundStore {
-    public record Asset(String id, String location, String keywords, String source, String createdAt) {}
+    public record Asset(String id, String location, String keywords, String source, String createdAt, String simulatedAt) {
+        public Asset(String id,String location,String keywords,String source,String createdAt) { this(id,location,keywords,source,createdAt,null); }
+    }
+    public static String daypart(String time) {
+        if(time==null || time.isBlank()) return "";
+        int hour=java.time.LocalDateTime.parse(time).getHour();
+        return hour<6 || hour>=20 ? "night" : hour<10 ? "morning" : "day";
+    }
     public record Catalog(boolean automatic, List<Asset> assets) {}
     public record Settings(boolean automatic) {}
     private final Path root;
@@ -43,7 +50,12 @@ public class PocketBackgroundStore {
         catch (IOException | RuntimeException e) { throw new IllegalStateException("배경 목록을 읽지 못했어요. 저장 상태를 확인해 주세요.", e); }
     }
     public Optional<Asset> match(String scope, String location) {
-        return catalog(scope).assets().stream().filter(a -> Files.isRegularFile(file(scope, a.id(), "background"))
+        return match(scope,location,"");
+    }
+    public Optional<Asset> match(String scope,String location,String period) {
+        return catalog(scope).assets().stream().filter(a -> period.isEmpty() || period.equals(daypart(a.simulatedAt()))
+                || (a.simulatedAt()==null && "UPLOAD".equals(a.source())))
+                .filter(a -> Files.isRegularFile(file(scope, a.id(), "background"))
                         && Files.isRegularFile(file(scope, a.id(), "scenery")))
                 .filter(a -> PocketBackgroundMatcher.score(location, a.location(), a.keywords()) > 0)
                 .max(Comparator.<Asset>comparingInt(a -> PocketBackgroundMatcher.score(location, a.location(), a.keywords()))
@@ -57,10 +69,13 @@ public class PocketBackgroundStore {
     }
     public void stageBackground(String scope, String id, byte[] bytes) throws IOException { atomic(file(scope, id, "background"), bytes); }
     public void complete(String scope, String id, String location, String keywords, String source, byte[] scenery) throws IOException {
+        complete(scope,id,location,keywords,source,scenery,null);
+    }
+    public void complete(String scope,String id,String location,String keywords,String source,byte[] scenery,String simulatedAt) throws IOException {
         atomic(file(scope, id, "scenery"), scenery);
         Catalog old = catalog(scope); var assets = new ArrayList<>(old.assets());
         assets.removeIf(a -> a.id().equals(id));
-        assets.add(new Asset(id, location, keywords == null ? "" : keywords, source, Instant.now().toString()));
+        assets.add(new Asset(id, location, keywords == null ? "" : keywords, source, Instant.now().toString(),simulatedAt));
         atomic(directory(scope).resolve("index.json"), mapper.writeValueAsBytes(new Catalog(old.automatic(), assets)));
     }
     public void configure(String scope, boolean automatic) throws IOException {

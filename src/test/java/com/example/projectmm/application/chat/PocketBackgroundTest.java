@@ -84,6 +84,22 @@ class PocketBackgroundTest {
         Files.delete(restarted.file("1-2",b,"scenery"));
         assertThat(restarted.match("1-2","상담실").orElseThrow().id()).isEqualTo(a);
     }
+    @Test void sceneStoryTimeSeparatesMorningDayNightRegardlessOfPlaceNameOrCreationTime() throws Exception {
+        var store=new PocketBackgroundStore(directory.toString(),new JsonMapper());
+        String night="1".repeat(32), day="2".repeat(32), morning="3".repeat(32);
+        for(String id:java.util.List.of(night,day,morning)) store.stageBackground("1-2",id,image(false,false));
+        store.complete("1-2",night,"공원","","AI",image(false,true),"2026-10-13T22:00:00");
+        store.complete("1-2",day,"공원","","AI",image(false,true),"2026-10-13T14:00:00");
+        store.complete("1-2",morning,"공원","","AI",image(false,true),"2026-10-14T08:00:00");
+        assertThat(store.match("1-2","공원","night").orElseThrow().id()).isEqualTo(night);
+        assertThat(store.match("1-2","공원","day").orElseThrow().id()).isEqualTo(day);
+        assertThat(store.match("1-2","공원","morning").orElseThrow().id()).isEqualTo(morning);
+        assertThat(PocketBackgroundStore.daypart("2026-10-13T06:00:00")).isEqualTo("morning");
+        assertThat(PocketBackgroundStore.daypart("2026-10-13T10:00:00")).isEqualTo("day");
+        assertThat(PocketBackgroundStore.daypart("2026-10-13T20:00:00")).isEqualTo("night");
+        var restarted=new PocketBackgroundStore(directory.toString(),new JsonMapper());
+        assertThat(restarted.match("1-2","공원","day").orElseThrow().simulatedAt()).contains("14:00");
+    }
     @Test void uploadedPairIsStoredWithoutAnAiCallAndInvalidSettingsDoNotWrite() throws Exception {
         var generator=mock(GeminiBackgroundGenerator.class);
         var store=new PocketBackgroundStore(directory.toString(),new JsonMapper());

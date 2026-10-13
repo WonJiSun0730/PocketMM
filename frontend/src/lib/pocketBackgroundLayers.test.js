@@ -1,7 +1,22 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { backgroundGeometry, normalizeSceneAsset } from "./pocketBackgroundLayers.js"
+import { backgroundGeometry, normalizeSceneAsset, backgroundContentBounds, backgroundPeriod } from "./pocketBackgroundLayers.js"
 import { walkDirection, puppetPose } from "./pocketActivityPerformance.js"
+test("large neutral placeholder bands are cropped together, but one-sided sky is preserved", () => {
+  const width=24,height=16,data=new Uint8ClampedArray(width*height*4)
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++) {
+    const i=(y*width+x)*4, band=y<4 || y>=12
+    data[i]=band?80:180;data[i+1]=band?80:120;data[i+2]=band?80:60;data[i+3]=255
+  }
+  assert.deepEqual(backgroundContentBounds(data,width,height),{top:.25,bottom:.75})
+  for(let y=12;y<16;y++)for(let x=0;x<width;x++)data[(y*width+x)*4+1]=120
+  assert.deepEqual(backgroundContentBounds(data,width,height),{top:0,bottom:1})
+})
+test("background periods use scene time rather than place name or wall clock", () => {
+  for(const [hour,period] of [[0,'night'],[5,'night'],[6,'morning'],[9,'morning'],[10,'day'],[19,'day'],[20,'night']])
+    assert.equal(backgroundPeriod(`2026-10-13T${String(hour).padStart(2,'0')}:00`),period)
+  assert.equal(backgroundPeriod(''),'')
+})
 
 test("square stage is 1.5 screens wide, keeps proportions and scrolls horizontally", () => {
   const right = backgroundGeometry(300, 300, 1)

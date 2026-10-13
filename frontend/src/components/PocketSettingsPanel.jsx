@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import PocketBackgroundPanel from "@/components/PocketBackgroundPanel"
 
-export default function PocketSettingsPanel({ sessionId, location, onError }) {
+export default function PocketSettingsPanel({ sessionId, location, simulatedAt, onError }) {
   const empty = { userNote: "", playGuide: "", noControlPlayer: false, aiProvider: "GEMINI", aiModel: "" }
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -82,7 +82,7 @@ export default function PocketSettingsPanel({ sessionId, location, onError }) {
     {open && <div className="border-t px-4 py-4 sm:px-6">
       {loading ? <p className="text-xs text-muted-foreground">설정을 불러오는 중...</p> :
         <div className="mx-auto grid max-w-2xl gap-5">
-          <PocketBackgroundPanel sessionId={sessionId} location={location} />
+          <PocketBackgroundPanel sessionId={sessionId} location={location} simulatedAt={simulatedAt} />
           <div className="grid gap-3 rounded-lg border bg-card p-3.5 sm:grid-cols-2">
             <label className="grid gap-1.5">
               <span className="text-sm font-medium">AI API</span>

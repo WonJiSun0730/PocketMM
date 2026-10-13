@@ -19,14 +19,24 @@ import java.util.concurrent.*;
 @Service
 public class PocketBackgroundService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PocketBackgroundService.class);
-    public record Context(long sessionId, String scope, String worldDescription) {}
+    public record Context(long sessionId, String scope, String worldDescription, String simulatedAt) {
+        public Context(long sessionId,String scope,String worldDescription) { this(sessionId,scope,worldDescription,null); }
+        public Context at(String value) {
+            if (value != null && !value.isBlank()) {
+                try { java.time.LocalDateTime.parse(value); }
+                catch (java.time.format.DateTimeParseException e) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"장면 시각을 확인해 주세요."); }
+            }
+            return new Context(sessionId,scope,worldDescription,value);
+        }
+        public String daypart() { return PocketBackgroundStore.daypart(simulatedAt); }
+    }
     public record SceneAsset(String id, String location, String backgroundUrl, String sceneryUrl, String source,
-                             int width, int height) {}
+                             int width, int height, String daypart, String simulatedAt) {}
     public record Result(String status, SceneAsset asset, boolean reused, String error, boolean automatic, boolean available) {}
     private static final class Job {
-        final String scope, location; final Instant created = Instant.now();
+        final String scope, location, daypart; final Instant created = Instant.now();
         volatile String status = "GENERATING", error;
-        Job(String scope, String location) { this.scope = scope; this.location = location; }
+        Job(String scope, String location, String daypart) { this.scope = scope; this.location = location; this.daypart=daypart; }
     }
     private final WorldRoomSessionService sessions;
     private final PocketBackgroundStore store;
@@ -51,7 +61,7 @@ public class PocketBackgroundService {
     public Result resolve(Context context, String location) {
         location = location(location);
         var catalog = store.catalog(context.scope());
-        var asset = store.match(context.scope(), location);
+        var asset = store.match(context.scope(), location, context.daypart());
         if (asset.isPresent()) return result(context, "READY", asset.get(), location, null, catalog.automatic());
         Job job = jobs.get(key(context, location));
         String unavailable = !enabled ? "이미지 생성 기능이 서버에서 꺼져 있어요."
@@ -67,10 +77,11 @@ public class PocketBackgroundService {
         jobs.entrySet().removeIf(e -> !e.getValue().status.equals("GENERATING") && e.getValue().created.isBefore(Instant.now().minusSeconds(1800)));
         // A similar place already generating shares that task rather than paying twice.
         for (Job job : jobs.values()) if (job.scope.equals(context.scope()) && job.status.equals("GENERATING")
+                && job.daypart.equals(context.daypart())
                 && PocketBackgroundMatcher.score(location, job.location, "") > 0) {
             jobs.put(key(context, location), job); return resolve(context, location);
         }
-        Job job = new Job(context.scope(), location); String key = key(context, location); jobs.put(key, job);
+        Job job = new Job(context.scope(), location,context.daypart()); String key = key(context, location); jobs.put(key, job);
         try { worker.submit(() -> generate(context, job)); }
         catch (RejectedExecutionException e) {
             jobs.remove(key, job); throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "배경 생성 요청이 많아요. 잠시 후 다시 시도해 주세요.");
@@ -82,18 +93,18 @@ public class PocketBackgroundService {
         try {
             store.locked(context.scope(), () -> {
                 // Recheck after acquiring the cross-process disk lock, including after a restart.
-                if (store.match(context.scope(), job.location).isPresent()) return null;
+                if (store.match(context.scope(), job.location, context.daypart()).isPresent()) return null;
                 String id = key(context, job.location).substring(key(context, job.location).lastIndexOf(':') + 1);
                 byte[] background = store.stagedBackground(context.scope(), id);
                 if (background == null) {
                     phase[0] = "BACKGROUND";
-                    background = PocketBackgroundImages.prepare(generator.generate(context.worldDescription() + "\nPlace: " + job.location, null, false), false, false);
+                    background = PocketBackgroundImages.prepare(generator.generate(context.worldDescription() + "\nScene time period: " + context.daypart() + "\nPlace: " + job.location, null, false), false, false);
                     store.stageBackground(context.scope(), id, background);
                 }
                 phase[0] = "SCENERY";
-                byte[] scenery = PocketBackgroundImages.prepare(generator.generate(context.worldDescription() + "\nPlace: " + job.location, background, true), true, true);
+                byte[] scenery = PocketBackgroundImages.prepare(generator.generate(context.worldDescription() + "\nScene time period: " + context.daypart() + "\nPlace: " + job.location, background, true), true, true);
                 phase[0] = "STORE";
-                store.complete(context.scope(), id, job.location, "", "AI", scenery);
+                store.complete(context.scope(), id, job.location, "", "AI", scenery, context.simulatedAt());
                 return null;
             });
             job.status = "READY";
@@ -122,7 +133,7 @@ public class PocketBackgroundService {
         String id = UUID.randomUUID().toString().replace("-", "");
         try { store.locked(context.scope(), () -> {
             store.stageBackground(context.scope(), id, bg);
-            store.complete(context.scope(), id, place, keywords, "UPLOAD", overlay); return null;
+            store.complete(context.scope(), id, place, keywords, "UPLOAD", overlay, context.simulatedAt()); return null;
         }); } catch (IOException e) { throw storageError(); }
         // Exact place match and newest upload take precedence on the next lookup.
         return resolve(context, place);
@@ -138,13 +149,14 @@ public class PocketBackgroundService {
     private Result result(Context context, String status, PocketBackgroundStore.Asset asset, String location, String error, boolean automatic) {
         String base = "/api/worlds/pockets/" + context.sessionId() + "/backgrounds/images/" + asset.id() + "/";
         return new Result(status, new SceneAsset(asset.id(), asset.location(), base + "background", base + "scenery",
-                asset.source(), PocketBackgroundImages.WIDTH, PocketBackgroundImages.HEIGHT),
+                asset.source(), PocketBackgroundImages.WIDTH, PocketBackgroundImages.HEIGHT,
+                PocketBackgroundStore.daypart(asset.simulatedAt()), asset.simulatedAt()),
                 !PocketBackgroundMatcher.normalize(location).equals(PocketBackgroundMatcher.normalize(asset.location())), error,
                 automatic, enabled && generator.available());
     }
     private String key(Context context, String location) {
         try { return context.scope() + ":" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
-                .digest(("pixel-v1:" + PocketBackgroundMatcher.normalize(location)).getBytes(StandardCharsets.UTF_8))).substring(0, 32); }
+                .digest(("pixel-v2:" + context.daypart() + ":" + PocketBackgroundMatcher.normalize(location)).getBytes(StandardCharsets.UTF_8))).substring(0, 32); }
         catch (java.security.NoSuchAlgorithmException e) { throw new IllegalStateException(e); }
     }
     private String location(String value) {

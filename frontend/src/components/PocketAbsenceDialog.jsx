@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react"
 import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { activitySymbol } from "@/lib/pocketActivityPlayback"
-import PocketSceneLookControls from "@/components/PocketSceneLookControls"
 import "./PocketAbsenceDialog.css"
 
 export default function PocketAbsenceDialog({ open, onClose, display, activity, index, count, playing,
@@ -18,7 +17,7 @@ export default function PocketAbsenceDialog({ open, onClose, display, activity, 
   }, [open])
   if (!open || !activity) return null
   const symbol = activitySymbol(activity.kind)
-  return createPortal(<dialog ref={dialog} className={"pocket-absence-dialog" + (isDeveloper ? " pocket-absence-dialog--admin" : "")}
+  return createPortal(<dialog ref={dialog} className="pocket-absence-dialog"
     aria-labelledby="pocket-absence-title" onCancel={event => { event.preventDefault(); onClose() }}>
     <header className="pocket-absence-dialog__header">
       <div><p className="pocket-absence-dialog__eyebrow">POCKET LIFE</p>
@@ -26,7 +25,7 @@ export default function PocketAbsenceDialog({ open, onClose, display, activity, 
       <Button variant="ghost" size="icon" aria-label="다마고치 화면 닫기" autoFocus onClick={onClose}>×</Button>
     </header>
     <div className="pocket-absence-dialog__stage-row"><div className="pocket-absence-device" aria-label="부재 활동 디스플레이">{display}</div>
-      {isDeveloper && <aside className="pocket-absence-dialog__look" aria-label="관리자 화면 분위기"><PocketSceneLookControls /></aside>}</div>
+</div>
     {!waiting && <div className="pocket-absence-dialog__caption" aria-live="polite">
       <p>{symbol.label}<span>{activity.location || "장소 미설정"}</span></p>
     </div>}

@@ -50,24 +50,6 @@
 
 .pocket-scene__scenery { z-index: 1; }
 .pocket-scene__scenery.pocket-scene__backdrop--walking { animation-duration: 7s; }
-.pocket-scene__scenery[data-daypart="night"]::after { content: none; }
-
-.pocket-scene__backdrop[data-daypart="evening"] {
-  filter: brightness(0.85) sepia(0.12) saturate(0.95);
-}
-
-.pocket-scene__backdrop[data-daypart="night"] {
-  filter: brightness(0.58) saturate(0.72);
-}
-
-.pocket-scene__backdrop[data-daypart="night"]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: rgba(32, 43, 85, 0.18);
-  pointer-events: none;
-}
-
 .pocket-scene__controls {
   display: flex;
   gap: 0.35rem;

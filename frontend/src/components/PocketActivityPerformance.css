@@ -1,14 +1,30 @@
 .pocket-scene__expressions { position:absolute; inset:0; z-index:5; pointer-events:none; }
 .pocket-scene__expression { position:absolute; width:34px; height:36px; transform:translateY(-50%); }
-.pocket-talk-lines { position:relative; display:block; width:34px; height:36px; color:#403D36; filter:drop-shadow(0 0 1px white); animation:pocket-speech-pulse .6s ease-in-out infinite alternate; }
+.pocket-talk-lines { position:relative; display:block; width:34px; height:36px; color:#403D36; filter:drop-shadow(0 0 1px white); transform:scaleX(var(--speech-side,1)); animation:pocket-speech-pulse .6s ease-in-out infinite alternate; }
 .pocket-talk-lines i { position:absolute; left:7px; top:17px; height:3px; width:21px; background:currentColor; border-radius:2px; transform-origin:0 50%; }
 .pocket-talk-lines i:first-child { left:4px; top:6px; width:18px; transform:rotate(-30deg); }
 .pocket-talk-lines i:last-child { left:4px; top:28px; width:18px; transform:rotate(30deg); }
-.pocket-anger-mark { position:absolute; left:calc(-1 * var(--head-radius,30px) - 12px); top:-12px; width:22px; height:22px; fill:none; stroke:#D84848; stroke-width:2.5; stroke-linecap:round; filter:drop-shadow(0 0 1px white); }
-.pocket-scene__backdrop--walking { background-repeat:repeat-x; background-position:50% 50%; image-rendering:pixelated; animation:pocket-map-scroll 4s linear infinite; }
+.pocket-anger-mark { position:absolute; left:var(--anger-x,0px); top:-12px; width:22px; height:22px; fill:none; stroke:#D84848; stroke-width:2.5; stroke-linecap:round; filter:drop-shadow(0 0 1px white); }
+.pocket-scene__backdrop--walking { background-repeat:repeat-x; background-position:50% var(--walk-y,50%); image-rendering:pixelated; animation:pocket-map-scroll 4s linear infinite; }
 .pocket-scene__backdrop--walking img { visibility:hidden; }
 .pocket-scene__bed { position:absolute; left:4%; right:4%; bottom:-4px; z-index:3; pointer-events:none; }
 .pocket-scene__bed svg { width:100%; display:block; }
-@keyframes pocket-map-scroll { to { background-position:calc(50% + var(--walk-x)) 50%; } }
-@keyframes pocket-speech-pulse { from { opacity:.75; transform:scale(.95); } to { opacity:1; transform:scale(1); } }
+.pocket-scene__bubble[data-in-bed="true"] { visibility:hidden; }
+.pocket-heart-stream { position:absolute; z-index:6; width:28px; height:28px; transform:translate(-50%,-50%); pointer-events:none; }
+.pocket-heart-stream svg { position:absolute; width:18px; height:17px; fill:#E782A2; shape-rendering:crispEdges; animation:pocket-heart-float 3.2s ease-in-out infinite; }
+.pocket-scene__bed .pocket-heart-stream--pillow { left:50%; top:32%; width:100%; height:20px; }
+.pocket-scene__bed .pocket-heart-stream--pillow svg { left:20%; }
+.pocket-scene__bed .pocket-heart-stream--pillow svg:nth-child(even) { left:80%; }
+.pocket-sleep-stream { position:absolute; left:26%; top:32%; z-index:6; width:40px; height:20px; }
+.pocket-sleep-stream span { position:absolute; color:#FAF8EC; text-shadow:1px 1px #6F6A75; font:600 13px monospace; opacity:0; animation:pocket-sleep-rise 3.6s ease-in-out infinite; }
+.pocket-food-prop { position:absolute; left:var(--mouth-x,0px); top:16px; font-size:14px; animation:pocket-bite 2.4s ease-in-out infinite; }
+@keyframes pocket-heart-float { 0% {opacity:0;transform:translate(0,0) scale(.7);} 15% {opacity:1;} 50% {transform:translate(-5px,-30px) scale(1);} 100% {opacity:0;transform:translate(5px,-65px) scale(.8);} }
+@keyframes pocket-sleep-rise { 0% {opacity:0;transform:translate(0,0) scale(.8);} 15% {opacity:1;} 55% {transform:translate(5px,-35px) scale(1);} 100% {opacity:0;transform:translate(-5px,-75px) scale(.9);} }
+@keyframes pocket-bite { 0%,100% {opacity:.2;transform:translate(10px,12px);} 35%,65% {opacity:1;transform:translate(0,0);} }
+@media(prefers-reduced-motion:reduce) {
+ .pocket-heart-stream svg,.pocket-sleep-stream span,.pocket-food-prop {animation:none;opacity:1;}
+ .pocket-heart-stream svg:not(:first-child),.pocket-sleep-stream span:not(:first-child) {display:none;}
+}
+@keyframes pocket-map-scroll { to { background-position:calc(50% + var(--walk-x)) var(--walk-y,50%); } }
+@keyframes pocket-speech-pulse { from { opacity:.75; transform:scaleX(var(--speech-side,1)) scale(.95); } to { opacity:1; transform:scaleX(var(--speech-side,1)) scale(1); } }
 @media(prefers-reduced-motion:reduce) { .pocket-talk-lines,.pocket-scene__backdrop--walking { animation:none; } }

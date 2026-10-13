@@ -2,6 +2,8 @@ export const ACTIVITY_FRAME_MS = 4000
 
 const activities = Object.freeze({
   WALK: { emoji: "🚶", label: "산책" },
+  RUN: { emoji: "🏃", label: "달리기" },
+  DRINK: { emoji: "🥤", label: "음료" },
   TALK: { emoji: "🗣️", label: "대화" },
   REST: { emoji: "🛋️", label: "휴식" },
   WAIT: { emoji: "⏳", label: "기다림" },

@@ -2,13 +2,13 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import usePocketBackground from "@/hooks/usePocketBackground"
 
-export default function PocketBackgroundPanel({ sessionId, location = "" }) {
+export default function PocketBackgroundPanel({ sessionId, location = "", simulatedAt = "" }) {
   const [place, setPlace] = useState("")
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const target = place.trim() || location || ""
   // Editing a place name must not create a paid image for every keystroke.
-  const scene = usePocketBackground(sessionId, target, { autoGenerate: false })
+  const scene = usePocketBackground(sessionId, target, { autoGenerate: false, simulatedAt })
   const busy = saving || scene.status === "GENERATING"
   async function run(action) {
     setSaving(true); setError("")

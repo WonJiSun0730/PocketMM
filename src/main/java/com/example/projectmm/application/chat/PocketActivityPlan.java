@@ -8,19 +8,29 @@ import java.util.*;
 public record PocketActivityPlan(List<Activity> activities, List<Long> leaveCharacterIds, String pauseReason, PlayerStatePatch playerState) {
     public enum Kind {
         WALK("🚶"), TALK("🗣️"), REST("🛋️"), WAIT("⏳"), SLEEP("💤"), READ("📖"),
-        WORK("📝"), MEAL("🍽️"), COFFEE("☕"), COOK("🍳"), CARE("🩺"), TRAVEL("🚗");
+        WORK("📝"), MEAL("🍽️"), COFFEE("☕"), COOK("🍳"), CARE("🩺"), TRAVEL("🚗"), RUN("🏃"), DRINK("🥤");
         private final String emoji;
         Kind(String emoji) { this.emoji = emoji; }
         public String emoji() { return emoji; }
     }
     public record PlayerStatePatch(String location, List<String> conditions, List<String> inventory) {}
-    public record ActorCue(String actorId, List<String> emojis, String emotion, Integer turn) {}
+    public record ActorCue(String actorId, List<String> emojis, String emotion, Integer turn, String pose) {
+        public ActorCue(String actorId,List<String> emojis,String emotion,Integer turn) { this(actorId,emojis,emotion,turn,"LIGHT"); }
+        public ActorCue { pose="ARMS_CROSSED".equals(pose) ? pose : "LIGHT"; }
+    }
     public record Activity(LocalDateTime start, LocalDateTime end, Kind kind,
-            List<Long> characterIds, String location, String summary, Boolean playerInvolved, List<ActorCue> actorCues) {
+            List<Long> characterIds, String location, String summary, Boolean playerInvolved, List<ActorCue> actorCues,
+            String interaction, List<String> interactionActorIds) {
+        public Activity(LocalDateTime start,LocalDateTime end,Kind kind,List<Long> characterIds,String location,
+                String summary,Boolean playerInvolved,List<ActorCue> actorCues) {
+            this(start,end,kind,characterIds,location,summary,playerInvolved,actorCues,"NONE",List.of());
+        }
         public Activity {
             // Pre-autonomy reports have no participation flag; explicit null is also legacy data.
             playerInvolved = Boolean.TRUE.equals(playerInvolved);
             actorCues = actorCues == null ? List.of() : List.copyOf(actorCues);
+            interaction = Set.of("CLOSENESS","AFFECTION","INTIMACY").contains(Objects.toString(interaction,"")) ? interaction : "NONE";
+            interactionActorIds = interactionActorIds == null ? List.of() : List.copyOf(interactionActorIds);
         }
     }
     public static PocketActivityPlan parse(String json, WorldRoomDialogueContext context,
@@ -59,8 +69,18 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
             var location = item.path("location").asText("").trim();
             if (summary.isBlank() || summary.length() > 400 || location.length() > 200)
                 throw new IllegalArgumentException("Invalid activity text");
+            var participants=new LinkedHashSet<String>();ids.forEach(id->participants.add(id.toString()));
+            if(playerInvolved) participants.add("player");
+            var pair=new ArrayList<String>();
+            if(item.path("interactionActorIds").isArray()) for(var actor:item.path("interactionActorIds")) {
+                String actorId=actor.asText("");
+                if(participants.contains(actorId) && !pair.contains(actorId)) pair.add(actorId);
+            }
+            if(!item.path("interactionActorIds").isArray() && participants.size()==2) pair.addAll(participants);
+            String interaction=pair.size()==2 ? item.path("interaction").asText("NONE") : "NONE";
             result.add(new Activity(start, end, Kind.valueOf(item.path("kind").asText()),
-                    List.copyOf(ids), location, summary, playerInvolved, actorCues(item,ids,playerInvolved)));
+                    List.copyOf(ids), location, summary, playerInvolved, actorCues(item,ids,playerInvolved),
+                    interaction,"NONE".equals(interaction) ? List.of() : pair));
             involved.addAll(ids); previous = end;
         }
         if (!timingValid) {
@@ -72,7 +92,8 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
                 var activity = result.get(i);
                 corrected.add(new Activity(from.plusNanos(intervalNanos * i / result.size()),
                         from.plusNanos(intervalNanos * (i + 1) / result.size()), activity.kind(),
-                        activity.characterIds(), activity.location(), activity.summary(), activity.playerInvolved(), activity.actorCues()));
+                        activity.characterIds(), activity.location(), activity.summary(), activity.playerInvolved(), activity.actorCues(),
+                        activity.interaction(), activity.interactionActorIds()));
             }
             result = corrected;
         }
@@ -120,7 +141,7 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
             String emotion = cue.path("emotion").asText("CALM").toUpperCase(Locale.ROOT);
             if (!Set.of("CALM","ANGRY","HAPPY","SAD").contains(emotion)) emotion = "CALM";
             int turn = cue.path("turn").asInt(cues.size());
-            cues.add(new ActorCue(actor,List.copyOf(emojis),emotion,Math.max(0,Math.min(8,turn))));
+            cues.add(new ActorCue(actor,List.copyOf(emojis),emotion,Math.max(0,Math.min(8,turn)),cue.path("pose").asText("LIGHT")));
         }
         return List.copyOf(cues);
     }

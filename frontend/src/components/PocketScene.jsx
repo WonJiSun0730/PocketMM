@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from "react"
 import * as THREE from "three"
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm"
-import { resolvePocketScene, resolvePocketDaypart } from "@/lib/pocketSceneRegistry"
+import { resolvePocketScene } from "@/lib/pocketSceneRegistry"
 import { getPocketBackground } from "@/lib/pocketSceneBackgrounds"
 import usePocketBackground from "@/hooks/usePocketBackground"
-import { backgroundGeometry } from "@/lib/pocketBackgroundLayers"
+import { backgroundContentBounds } from "@/lib/pocketBackgroundLayers"
 import { activitySymbol } from "@/lib/pocketActivityPlayback"
-import { actorCue, performanceActors, speakingActors, puppetPose, walkDirection, scrollingBackdrop } from "@/lib/pocketActivityPerformance"
+import { actorCue, performanceActors, interactionActors, closenessPixels, speakingActors, speechSide, puppetPose, walkDirection, scrollingBackdrop } from "@/lib/pocketActivityPerformance"
 import "./PocketActivityPerformance.css"
 import { createStandingIdle, settleStandingPhysics } from "@/lib/pocketStandingIdle"
 import usePocketSceneLook from "@/hooks/usePocketSceneLook"
@@ -18,6 +18,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
   const [look] = usePocketSceneLook()
   const bubbleNodes = useRef(new Map())
   const expressionNodes = useRef(new Map())
+  const heartNode = useRef(null)
   const activityRef = useRef(activity)
   const readyCallback = useRef(onModelsReady), errorCallback = useRef(onSceneError)
   readyCallback.current = onModelsReady; errorCallback.current = onSceneError
@@ -38,10 +39,10 @@ export default function PocketScene({ className = "", simulatedAt = "", location
   const [failedBackground, setFailedBackground] = useState(null)
   const [failedScenery, setFailedScenery] = useState(null)
   const [imageAspect,setImageAspect] = useState(1)
+  const [contentBounds,setContentBounds] = useState({url:"",top:0,bottom:1})
   const [backdropSize,setBackdropSize] = useState({width:300,height:300})
   const preset = resolvePocketScene(location)
-  const daypart = resolvePocketDaypart(simulatedAt)
-  const sceneBackground = usePocketBackground(backgroundAsset ? null : sessionId, location)
+  const sceneBackground = usePocketBackground(backgroundAsset ? null : sessionId, location, {simulatedAt})
   const generated = backgroundAsset || sceneBackground.asset
   const registeredBackground = getPocketBackground(sessionId, location)
   const requestedBackground = generated?.backgroundUrl || registeredBackground || preset.backgroundUrl
@@ -63,6 +64,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     let animationFrame = null
     let lastFrameTime = null
     let idleTime = 0
+    let activityStartedAt = 0
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)")
     const scene = new THREE.Scene()
     // Only actors are rendered in WebGL; the 2D backdrop lives behind its transparent canvas.
@@ -135,14 +137,14 @@ export default function PocketScene({ className = "", simulatedAt = "", location
 
     // Keep a soft ambient base, then let local lights define the room.
     scene.add(new THREE.HemisphereLight(
-      daypart === "day" ? 0xffffff : daypart === "evening" ? 0xfffbf2 : 0xd9e2ff,
-      daypart === "night" ? 0x30364b : 0x596071,
-      daypart === "day" ? 1.55 : daypart === "evening" ? 1.48 : 1.12,
+      0xffffff,
+      0x596071,
+      1.55,
     ))
 
     const key = new THREE.DirectionalLight(
-      daypart === "day" ? 0xffffff : daypart === "evening" ? 0xfffdf8 : 0xc9d5ff,
-      daypart === "day" ? 2.6 : daypart === "evening" ? 2.52 : 1.85,
+      0xffffff,
+      2.6,
     )
     key.position.set(4, 7, 5)
     key.castShadow = true
@@ -195,10 +197,15 @@ export default function PocketScene({ className = "", simulatedAt = "", location
           actor.head.getWorldPosition(headPosition)
           headPosition.y += 0.10
           headPosition.project(camera)
-          expression.hidden = headPosition.z < -1 || headPosition.z > 1 || Math.abs(headPosition.x) > 1.1
+          expression.hidden = !actor.vrm.scene.visible || headPosition.z < -1 || headPosition.z > 1 || Math.abs(headPosition.x) > 1.1
           const headX=(headPosition.x+1)*host.clientWidth/2
           const radius=Math.abs(actor.radius*camera.projectionMatrix.elements[0]*host.clientWidth/2)
-          expression.style.left = `${Math.max(3,Math.min(host.clientWidth-34,headX+radius+3))}px`
+          const side=speechSide(actor.vrm.scene.rotation.y,actor.frontalSide)
+          const expressionX=Math.max(3,Math.min(host.clientWidth-34,side>0 ? headX+radius+3 : headX-radius-3-34))
+          expression.style.left = `${expressionX}px`
+          expression.style.setProperty("--speech-side",String(side))
+          expression.style.setProperty("--anger-x",`${headX-expressionX-radius*.5}px`)
+          expression.style.setProperty("--mouth-x",`${headX-expressionX-8}px`)
           expression.style.setProperty("--head-radius",`${radius}px`)
           expression.style.top = `${Math.max(25,Math.min(host.clientHeight-25,(1-headPosition.y)*host.clientHeight/2))}px`
         }
@@ -209,6 +216,15 @@ export default function PocketScene({ className = "", simulatedAt = "", location
         bubble.hidden = headPosition.z < -1 || headPosition.z > 1 || Math.abs(headPosition.x) > 1.1
         bubble.style.left = `${Math.max(6, Math.min(94, (headPosition.x + 1) * 50))}%`
         bubble.style.top = `${Math.max(58, Math.min(host.clientHeight - 12, (1 - headPosition.y) * host.clientHeight / 2))}px`
+      }
+      if(heartNode.current && activityRef.current?.interaction !== "INTIMACY") {
+        const pair=interactionActors(activityRef.current)
+        const actors=bubbleActors.filter(actor=>pair.includes(String(actor.id)))
+        if(actors.length===2) {
+          const positions=actors.map(actor=>{const p=new THREE.Vector3();actor.head.getWorldPosition(p);p.project(camera);return p})
+          heartNode.current.style.left=`${(positions[0].x+positions[1].x+2)*host.clientWidth/4}px`
+          heartNode.current.style.top=`${Math.max(35,(2-positions[0].y-positions[1].y)*host.clientHeight/4)}px`
+        }
       }
     }
     projectBubbles.current = updateBubbles
@@ -262,21 +278,39 @@ export default function PocketScene({ className = "", simulatedAt = "", location
           settleStandingPhysics(vrm)
           const actorId = model.role === "player" ? "player" : model.source?.characterId ?? model.source?.id
           const origin = vrm.scene.position.clone(), restRotation = vrm.scene.rotation.clone()
+          const legBones=["leftUpperLeg","rightUpperLeg"].map(name=>{const bone=vrm.humanoid?.getNormalizedBoneNode?.(name);return bone ? {bone,rest:bone.rotation.clone()} : null})
           idleActors.push((time,delta,motion=true) => {
             // Absolute rest-relative offsets keep repeated playback from accumulating transforms.
-            const pose=puppetPose(activityRef.current,actorId,time,motion)
+            const elapsed=loadedModels<visibleModels.length ? 0 : Math.max(0,time-activityStartedAt)
+            const pose=puppetPose(activityRef.current,actorId,elapsed,motion)
+            vrm.scene.visible=!pose.hidden
             vrm.scene.position.copy(origin); vrm.scene.position.x+=pose.x; vrm.scene.position.y+=pose.y
+            const pair=interactionActors(activityRef.current), peers=bubbleActors.filter(a=>pair.includes(String(a.id)))
+            if(peers.length===2 && pair.includes(String(actorId))) {
+              const centre=peers.reduce((sum,a)=>sum+a.origin.x,0)/2
+              const pixelsPerUnit=Math.abs(camera.projectionMatrix.elements[0]*host.clientWidth/2)
+              vrm.scene.position.x+=Math.sign(centre-origin.x)*closenessPixels(activityRef.current,actorId,elapsed,motion)/Math.max(1,pixelsPerUnit)
+            }
             vrm.scene.rotation.copy(restRotation); vrm.scene.rotation.x+=pose.rx; vrm.scene.rotation.z+=pose.rz
-            if (activityRef.current && ["WALK","TRAVEL"].includes(activityRef.current.kind)
+            if (activityRef.current && ["WALK","TRAVEL","RUN"].includes(activityRef.current.kind)
                 && performanceActors(activityRef.current).includes(String(actorId))) vrm.scene.rotation.y=pose.ry
-            updateIdle(time,delta,motion)
+            const cue=actorCue(activityRef.current,actorId)
+            const action=["MEAL","DRINK","COFFEE","RUN","SLEEP"].includes(activityRef.current?.kind) || activityRef.current?.interaction==="INTIMACY"
+            updateIdle(time,delta,motion,action ? "LIGHT" : cue.pose)
+            legBones.forEach((entry,i)=>{if(entry){entry.bone.rotation.copy(entry.rest);entry.bone.rotation.x+=(i===0?1:-1)*pose.stride}})
+            if(pose.armRaise) {
+              const upper=vrm.humanoid?.getNormalizedBoneNode?.("rightUpperArm"),lower=vrm.humanoid?.getNormalizedBoneNode?.("rightLowerArm")
+              if(upper) upper.rotation.x-=pose.armRaise
+              if(lower) lower.rotation.x-=pose.armRaise*1.2
+            }
+            vrm.update?.(0)
           })
           idleActors.at(-1)(0,0,false)
           const head = vrm.humanoid?.getRawBoneNode("head") ?? vrm.scene
-          if (actorId != null) bubbleActors.push({ id: actorId, head, vrm, radius:targetHeight*0.19 })
+          if (actorId != null) bubbleActors.push({ id: actorId, head, vrm, origin, radius:targetHeight*0.19, frontalSide:Math.random()<.5 ? -1 : 1 })
           render()
           loadedModels++
-          if (loadedModels === visibleModels.length) readyCallback.current?.(true)
+          if (loadedModels === visibleModels.length) { activityStartedAt=idleTime;readyCallback.current?.(true) }
         },
         undefined,
         error => { console.error("[PocketScene] VRM load failed:", url, error); errorCallback.current?.("캐릭터를 준비하지 못했어요. 다시 들여다봐 주세요.") },
@@ -309,7 +343,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       idleActors.forEach(update => update(idleTime, delta))
       render()
     }
-    refreshPose.current = () => { idleActors.forEach(update=>update(idleTime,0,!reducedMotion.matches)); render() }
+    refreshPose.current = () => { activityStartedAt=idleTime;idleActors.forEach(update=>update(idleTime,0,!reducedMotion.matches)); render() }
     function motionChanged() {
       lastFrameTime = null
       if (reducedMotion.matches) idleActors.forEach(update => update(0, 0, false))
@@ -356,57 +390,73 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       VRMUtils.deepDispose(scene)
       projectBubbles.current = () => {}
     }
-  }, [zoom, sceneHeight, pixelHeight, daypart, sessionId, playerModel, characterModels, compact])
+  }, [zoom, sceneHeight, pixelHeight, sessionId, playerModel, characterModels, compact])
 
   useEffect(() => { refreshPose.current(); projectBubbles.current() }, [activity])
   const symbol = activitySymbol(activity?.kind)
   const speakers = speakingActors(activity)
   const speaker = speakers.length ? speakers[speakingIndex % speakers.length] : null
   const [walkX] = walkDirection(activity)
-  const walking = activity?.kind === "WALK" || activity?.kind === "TRAVEL"
+  const walking = ["WALK","TRAVEL","RUN"].includes(activity?.kind)
+  const intimate=activity?.interaction==="INTIMACY" && interactionActors(activity).length===2
+  const inBed=activity?.kind==="SLEEP" || intimate
+  const hearts=interactionActors(activity).length===2 && ["AFFECTION","INTIMACY"].includes(activity?.interaction)
+  const bounds=contentBounds.url === backgroundUrl ? contentBounds : {top:0,bottom:1}
+  const contentHeight=bounds.bottom-bounds.top
   const tile=generated && backgroundUrl === generated.backgroundUrl
-    ? backgroundGeometry(backdropSize.width,backdropSize.height,walkX)
+    ? scrollingBackdrop(backdropSize.width*1.5,backdropSize.height,imageAspect/contentHeight,walkX)
     : scrollingBackdrop(backdropSize.width,backdropSize.height,imageAspect,walkX)
+  const rasterHeight=tile.height/contentHeight
+  const rasterTop=backdropSize.height/2-(bounds.top+bounds.bottom)/2*rasterHeight
+  const rasterStyle={width:`${tile.width}px`,maxWidth:"none",height:`${rasterHeight}px`,position:"absolute",left:"50%",top:`${rasterTop}px`,transform:"translateX(-50%)"}
   const bubbleCharacters = activity ? characterModels.filter(model =>
     activity.characterIds.includes(model.source?.characterId ?? model.source?.id)) : []
   if (activity?.playerInvolved && playerModel) bubbleCharacters.push({ ...playerModel, bubbleId: "player" })
 
   return <div className={`pocket-scene-shell ${compact ? "pocket-scene-shell--compact" : ""} ${className}`}>
     <div className="pocket-scene" data-player-present={Boolean(playerModel)} style={{ height: compact ? "100%" : `${sceneHeight}px`, filter: lookFilter(look) }}>
-      <div className={`pocket-scene__backdrop ${walking ? "pocket-scene__backdrop--walking" : ""}`} data-daypart={daypart} aria-hidden="true"
-        style={walking ? {backgroundImage:`url(${backgroundUrl})`,backgroundSize:`${tile.width}px ${tile.height}px`,
-          "--walk-x":`${tile.offset}px`} : undefined}>
+      <div className={`pocket-scene__backdrop ${walking ? "pocket-scene__backdrop--walking" : ""}`} data-daypart="day" aria-hidden="true"
+        style={walking ? {backgroundImage:`url(${backgroundUrl})`,backgroundSize:`${tile.width}px ${rasterHeight}px`,"--walk-y":`${rasterTop}px`,
+          "--walk-x":`${tile.offset}px`,...(activity?.kind==="RUN" ? {animationDuration:"2s"} : {})} : undefined}>
         <img src={backgroundUrl} alt="" onLoad={event=>{
           const image=event.currentTarget;if(image.naturalHeight>0)setImageAspect(image.naturalWidth/image.naturalHeight)
+          if (generated) { try {
+            const canvas=document.createElement("canvas");canvas.width=image.naturalWidth;canvas.height=image.naturalHeight
+            const context=canvas.getContext("2d",{willReadFrequently:true});context.drawImage(image,0,0)
+            setContentBounds({url:backgroundUrl,...backgroundContentBounds(context.getImageData(0,0,canvas.width,canvas.height).data,canvas.width,canvas.height)})
+          } catch { setContentBounds({url:backgroundUrl,top:0,bottom:1}) } }
         }} style={generated && backgroundUrl === generated.backgroundUrl
-          ? {width:`${tile.width}px`,height:`${tile.height}px`,position:"absolute",left:"50%",top:"50%",transform:"translate(-50%, -50%)"}
+          ? rasterStyle
           : { transform: `scale(${zoom / 1.35})` }}
           onError={() => { setFailedBackground(requestedBackground); if (requireBackground) errorCallback.current?.("주머니 안쪽을 불러오지 못했어요.") }} />
       </div>
       {sceneryUrl && <div className={`pocket-scene__backdrop pocket-scene__scenery ${walking ? "pocket-scene__backdrop--walking" : ""}`}
-        data-daypart={daypart} aria-hidden="true" style={walking ? {
-          backgroundImage:`url(${sceneryUrl})`,backgroundSize:`${tile.width}px ${tile.height}px`,"--walk-x":`${tile.offset}px`,
+        data-daypart="day" aria-hidden="true" style={walking ? {
+          backgroundImage:`url(${sceneryUrl})`,backgroundSize:`${tile.width}px ${rasterHeight}px`,"--walk-x":`${tile.offset}px`,"--walk-y":`${rasterTop}px`,...(activity?.kind==="RUN" ? {animationDuration:"3.5s"} : {}),
         } : undefined}>
-        <img src={sceneryUrl} alt="" onError={() => { setFailedScenery(sceneryUrl); if (requireBackground) errorCallback.current?.("주머니 안쪽을 불러오지 못했어요.") }} style={{
-          width:`${tile.width}px`,height:`${tile.height}px`,position:"absolute",left:"50%",top:"50%",transform:"translate(-50%, -50%)",
-        }} />
+        <img src={sceneryUrl} alt="" onError={() => { setFailedScenery(sceneryUrl); if (requireBackground) errorCallback.current?.("주머니 안쪽을 불러오지 못했어요.") }} style={rasterStyle} />
       </div>}
       <div ref={hostRef} className="pocket-scene__viewport" aria-label="2D 배경과 3D 캐릭터 장면" />
-      {activity?.kind === "SLEEP" && <div className="pocket-scene__bed" aria-label="잠자는 캐릭터 앞의 침대">
+      {inBed && <div className="pocket-scene__bed" aria-label="캐릭터가 이불 안에 있는 침대">
         <svg viewBox="0 0 300 165" role="img" aria-label="도톰한 이불이 덮인 침대">
           <path fill="#8D7864" d="M8 55h284v110H8z"/>
           <rect x="13" y="48" width="274" height="104" rx="13" fill="#E7E0D2"/>
           <rect x="23" y="52" width="74" height="33" rx="12" fill="#FAF7F1"/>
+          {intimate && <rect x="202" y="52" width="74" height="33" rx="12" fill="#FAF7F1"/>}
           <path fill="#D9D1C1" d="M91 85Q100 17 170 20Q240 17 280 81L287 91v61H13V91h78z"/>
           <path fill="none" stroke="#B9B09F" strokeWidth="3" d="M91 85Q100 17 170 20Q240 17 280 81M13 104h274M25 110v36M275 110v36"/>
         </svg>
+        {intimate && <div ref={heartNode} className="pocket-heart-stream pocket-heart-stream--pillow" aria-label="베개 위로 떠오르는 픽셀 하트">{[0,1,2,3].map(i=><svg key={i} viewBox="0 0 12 11" style={{animationDelay:`${i*.8}s`}}><path d="M1 1h4v1h2V1h4v1h1v4h-1v1h-1v1H9v1H8v1H7v1H5v-1H4V9H3V8H2V7H1V6H0V2h1z"/></svg>)}</div>}
+        {activity?.kind==="SLEEP" && <div className="pocket-sleep-stream" aria-label="베개에서 떠오르는 Zzz">{[0,1,2].map(i=><span key={i} style={{animationDelay:`${i*1.2}s`}}>Zzz...</span>)}</div>}
       </div>}
+      {hearts && !intimate && <div ref={heartNode} className="pocket-heart-stream" aria-label="두 캐릭터 사이의 픽셀 하트"><svg viewBox="0 0 12 11"><path d="M1 1h4v1h2V1h4v1h1v4h-1v1h-1v1H9v1H8v1H7v1H5v-1H4V9H3V8H2V7H1V6H0V2h1z"/></svg></div>}
       <div className="pocket-scene__expressions" aria-hidden="true">{bubbleCharacters.map(model => {
         const id=model.bubbleId ?? model.source.characterId ?? model.source.id
         const cue=actorCue(activity,id)
         const talking=activity?.kind === "TALK" && String(id)===speaker
         return <div key={id} hidden className="pocket-scene__expression" ref={node=>{if(node)expressionNodes.current.set(id,node);else expressionNodes.current.delete(id)}}>
           {talking && <span className="pocket-talk-lines"><i/><i/><i/></span>}
+          {["MEAL","COFFEE","DRINK"].includes(activity?.kind) && <span className="pocket-food-prop">{activity.kind==="MEAL" ? cue.emojis[0] : activitySymbol(activity.kind).emoji}</span>}
           {cue.emotion === "ANGRY" && <svg className="pocket-anger-mark" viewBox="0 0 16 16"><path d="M4 0v4H0M12 0v4h4M4 16v-4H0M12 16v-4h4"/></svg>}
         </div>
       })}</div>
@@ -414,7 +464,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
         {bubbleCharacters.map(model => {
           const id = model.bubbleId ?? model.source.characterId ?? model.source.id
           const name = model.source.characterName ?? model.source.name
-          return <div key={id} hidden className="pocket-scene__bubble" data-character-id={id}
+          return <div key={id} hidden className="pocket-scene__bubble" data-in-bed={inBed && (activity?.kind==="SLEEP" ? performanceActors(activity).includes(String(id)) : interactionActors(activity).includes(String(id)))} data-character-id={id}
             aria-label={`${name} · ${symbol.label}`}
             ref={node => { if (node) bubbleNodes.current.set(id, node); else bubbleNodes.current.delete(id) }}>
             <span aria-hidden="true">{actorCue(activity,id).emojis.join("")}</span>

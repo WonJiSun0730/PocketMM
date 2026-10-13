@@ -16,17 +16,24 @@ export function createStandingIdle(vrm, phase = 0) {
     rotation.setFromEuler(angles.set(x, y, z))
     entry.bone.quaternion.copy(entry.rest).multiply(rotation)
   }
-  function update(elapsedSeconds, deltaSeconds, motionEnabled = true) {
+  function update(elapsedSeconds, deltaSeconds, motionEnabled = true, stance = "LIGHT") {
     const time = Number.isFinite(elapsedSeconds) ? elapsedSeconds : 0
     const breath = motionEnabled ? Math.sin(time * 1.65 + phase) : 0
     const sway = motionEnabled ? Math.sin(time * 0.75 + phase) : 0
-    pose("leftUpperArm", 0, 0, -1.35 + breath * 0.012)
-    pose("rightUpperArm", 0, 0, 1.35 - breath * 0.012)
-    pose("leftLowerArm", 0, 0.10, -0.05)
-    pose("rightLowerArm", 0, -0.10, 0.05)
-    pose("spine", 0, 0, sway * 0.006)
-    pose("chest", breath * 0.009, 0, sway * 0.004)
-    pose("head", breath * 0.004, sway * 0.015, -sway * 0.004)
+    if(stance === "ARMS_CROSSED") {
+      pose("leftUpperArm", -.55, -.30, -.75)
+      pose("rightUpperArm", -.55, .30, .75)
+      pose("leftLowerArm", -.9, .25, -1.05)
+      pose("rightLowerArm", -.9, -.25, 1.05)
+    } else {
+      pose("leftUpperArm", breath*.025, 0, -1.35 + breath * 0.025)
+      pose("rightUpperArm", -breath*.025, 0, 1.35 - breath * 0.025)
+      pose("leftLowerArm", 0, 0.10, -0.05)
+      pose("rightLowerArm", 0, -0.10, 0.05)
+    }
+    pose("spine", 0, 0, sway * 0.012)
+    pose("chest", breath * 0.016, 0, sway * 0.008)
+    pose("head", breath * 0.008, sway * 0.025, -sway * 0.008)
     const delta = Number.isFinite(deltaSeconds) ? Math.min(0.05, Math.max(0, deltaSeconds)) : 0
     if (delta === 0) vrm.update?.(0)
     else {
