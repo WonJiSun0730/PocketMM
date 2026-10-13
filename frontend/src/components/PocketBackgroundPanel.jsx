@@ -7,7 +7,8 @@ export default function PocketBackgroundPanel({ sessionId, location = "" }) {
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const target = place.trim() || location || ""
-  const scene = usePocketBackground(sessionId, target)
+  // Editing a place name must not create a paid image for every keystroke.
+  const scene = usePocketBackground(sessionId, target, { autoGenerate: false })
   const busy = saving || scene.status === "GENERATING"
   async function run(action) {
     setSaving(true); setError("")
@@ -34,10 +35,11 @@ export default function PocketBackgroundPanel({ sessionId, location = "" }) {
       <img className="aspect-[3/2] w-full rounded-md border [image-rendering:pixelated]" src={scene.asset.backgroundUrl} alt="저장된 배경" />
       <img className="aspect-[3/2] w-full rounded-md border bg-muted [image-rendering:pixelated]" src={scene.asset.sceneryUrl} alt="투명 원경" />
     </div>}
-    <p className="text-xs text-muted-foreground" role="status">{scene.status === "GENERATING" ? "배경을 만들고 있어요. 기본 배경으로 계속 재생할 수 있어요."
+    <p className="text-xs text-muted-foreground" role="status">{scene.status === "GENERATING" ? "주머니 안쪽을 준비하고 있어요. 준비가 끝나면 장면이 열려요."
       : scene.asset ? `${scene.reused ? "비슷한 장소의 저장 이미지를 사용해요" : "저장된 이미지를 사용해요"} · ${scene.asset.location}`
-      : scene.status === "FAILED" ? "배경을 불러오지 못했어요. 기본 배경을 유지해요."
-      : scene.available ? "저장 이미지가 없으면 기본 배경을 사용해요." : "서버의 이미지 생성 설정이 필요해요. 직접 첨부는 가능해요."}</p>
+      : scene.status === "FAILED" ? "배경을 준비하지 못했어요. 다시 시도할 수 있어요."
+      : scene.available ? scene.automatic ? "저장 이미지가 없으면 장면을 열 때 자동으로 준비해요." : "자동 생성이 꺼져 있어요. 저장 배경이나 첨부 이미지를 사용해요."
+      : "서버의 이미지 생성 설정이 필요해요. 직접 첨부는 가능해요."}</p>
     <Button type="button" size="sm" variant="outline" disabled={busy || !target || (!scene.available && scene.status !== "FAILED")}
       onClick={() => run(scene.available ? scene.generate : scene.reload)}>{scene.status === "FAILED"
         ? scene.available ? "생성 다시 시도" : "배경 다시 확인" : "저장 배경 찾기 / 새로 만들기"}</Button>

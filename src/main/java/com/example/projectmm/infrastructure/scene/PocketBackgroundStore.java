@@ -35,8 +35,9 @@ public class PocketBackgroundStore {
         Path path = directory(scope).resolve("index.json");
         Path settings = directory(scope).resolve("settings.json");
         try {
-            Catalog catalog = Files.exists(path) ? mapper.readValue(Files.readAllBytes(path), Catalog.class) : new Catalog(false, List.of());
-            boolean automatic = Files.exists(settings) ? mapper.readValue(Files.readAllBytes(settings), Settings.class).automatic() : catalog.automatic();
+            Catalog catalog = Files.exists(path) ? mapper.readValue(Files.readAllBytes(path), Catalog.class) : new Catalog(true, List.of());
+            // Only an explicit settings file means the user disabled generation. Old catalog defaults do not.
+            boolean automatic = !Files.exists(settings) || mapper.readValue(Files.readAllBytes(settings), Settings.class).automatic();
             return new Catalog(automatic, catalog.assets());
         }
         catch (IOException | RuntimeException e) { throw new IllegalStateException("배경 목록을 읽지 못했어요. 저장 상태를 확인해 주세요.", e); }

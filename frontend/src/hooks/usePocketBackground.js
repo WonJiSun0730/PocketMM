@@ -4,9 +4,9 @@ import { normalizeSceneAsset } from "@/lib/pocketBackgroundLayers"
 const changes = new EventTarget()
 const cached = new Map()
 const keyFor = (sessionId, location) => `${sessionId}:${location.trim()}`
-const empty = { status: "MISSING", asset: null, automatic: false, available: false }
+const empty = { status: "MISSING", asset: null, automatic: true, available: false, loaded: false }
 function publish(key, result) {
-  const next = { ...result, asset: normalizeSceneAsset(result.asset) }
+  const next = { ...result, loaded: true, asset: normalizeSceneAsset(result.asset) }
   cached.set(key, next)
   changes.dispatchEvent(new Event("change"))
   return next
@@ -14,12 +14,12 @@ function publish(key, result) {
 async function read(response) {
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))
-    throw new Error(body.detail || body.message || "배경을 불러오지 못했어요. 기본 배경을 사용해요.")
+    throw new Error(body.detail || body.message || "주머니 안쪽을 준비하지 못했어요. 다시 시도해 주세요.")
   }
   return response.json()
 }
 
-export default function usePocketBackground(sessionId, location = "") {
+export default function usePocketBackground(sessionId, location = "", { autoGenerate = true } = {}) {
   const place = typeof location === "string" ? location.trim() : ""
   const key = keyFor(sessionId, place)
   const [snapshot, setSnapshot] = useState(() => ({ key, result: cached.get(key) ?? empty }))
@@ -42,7 +42,7 @@ export default function usePocketBackground(sessionId, location = "") {
           credentials: "include", signal: controller.signal,
         }))
         if (!active) return
-        if (next.status === "MISSING" && next.automatic && next.available) {
+        if (autoGenerate && next.status === "MISSING" && next.automatic && next.available) {
           next = await read(await fetch(url, { method: "POST", credentials: "include",
             headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: place }), signal: controller.signal }))
         }
@@ -55,7 +55,7 @@ export default function usePocketBackground(sessionId, location = "") {
     }
     poll()
     return () => { active = false; clearTimeout(timer); controller?.abort() }
-  }, [key, sessionId, place, revision])
+  }, [key, sessionId, place, revision, autoGenerate])
   const generate = useCallback(async () => {
     const next = await read(await fetch(url, { method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" }, body: JSON.stringify({ location: place }) }))

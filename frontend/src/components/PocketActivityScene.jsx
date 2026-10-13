@@ -3,6 +3,9 @@ import { Button } from "@/components/ui/button"
 import PocketAbsenceDialog from "@/components/PocketAbsenceDialog"
 import { actorCue } from "@/lib/pocketActivityPerformance"
 import PocketScene from "@/components/PocketScene"
+import usePocketBackground from "@/hooks/usePocketBackground"
+import usePocketSceneImages from "@/hooks/usePocketSceneImages"
+import { scenePreparationState } from "@/lib/pocketScenePreparation"
 import { ACTIVITY_FRAME_MS, activitySymbol, activityParticipants, activityModels, nextActivityIndex, replayIncludesPlayer } from "@/lib/pocketActivityPlayback"
 
 export default function PocketActivityScene({ sessionId, report, freshReportId, characters, sceneModels,
@@ -14,6 +17,11 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
   const frames = report?.activities ?? []
   const index = selection?.sessionId === sessionId && selection?.reportId === report?.id ? selection.index : null
   const activity = index != null ? frames[index] ?? null : null
+  const background = usePocketBackground(sessionId, activity ? activity.location || location || "장소 미설정" : "")
+  const images = usePocketSceneImages(activity ? background.asset : null)
+  const [loadedModelKey, setLoadedModelKey] = useState(null)
+  const [renderError, setRenderError] = useState("")
+  const [renderRevision, setRenderRevision] = useState(0)
   const participantKey = (activity?.characterIds ?? []).join(",")
   const participants = useMemo(() => activityParticipants({
     characterIds: participantKey.split(",").filter(Boolean).map(Number),
@@ -32,6 +40,13 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
   }, [activity?.playerInvolved, replayAtCurrentPlace, sameCast, sceneModels.castModels, generatedReplayModels])
   const replayPlayer = (activity?.playerInvolved || replayAtCurrentPlace) ? sceneModels.playerModel : null
   const replayReady = (participants.length > 0 || (activity?.playerInvolved && replayPlayer)) && generatedReplayModels.length === participants.length
+  const modelKey = `${background.asset?.id}:${replayPlayer?.url ?? ""}:${replayModels.map(model=>`${model.url}:${model.height}`).join("|")}:${renderRevision}`
+  const preparation = renderError ? "ERROR" : scenePreparationState(background, images, !replayReady || loadedModelKey === modelKey)
+  const waiting = preparation !== "READY"
+  useEffect(() => {
+    if (!activity || !images.ready) setLoadedModelKey(null)
+    setRenderError("")
+  }, [activity?.location, images.ready, Boolean(activity)])
   const symbol = activitySymbol(activity?.kind)
   function select(next, shouldPlay = false) {
     setSelection(next == null ? null : { sessionId, reportId: report.id, index: next })
@@ -54,19 +69,22 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
     setPlaying(!window.matchMedia("(prefers-reduced-motion: reduce)").matches)
   }, [sessionId, report?.id, freshReportId, frames.length, disabled])
   useEffect(() => {
-    if (!playing || !activity || disabled || !visible) return
+    if (!playing || !activity || disabled || !visible || waiting) return
     const timer = setTimeout(() => {
       const next = nextActivityIndex(index, frames.length)
       if (next != null) setSelection({ sessionId, reportId: report.id, index: next })
       if (next == null) setPlaying(false)
     }, ACTIVITY_FRAME_MS)
     return () => clearTimeout(timer)
-  }, [playing, index, activity, frames.length, report?.id, sessionId, disabled, visible])
+  }, [playing, index, activity, frames.length, report?.id, sessionId, disabled, visible, waiting])
 
-  const activityDisplay = activity && (replayReady ? <PocketScene compact sessionId={sessionId}
+  const preparedDisplay = activity && background.asset && images.ready && (replayReady ? <PocketScene compact sessionId={sessionId}
+    key={renderRevision} requireBackground backgroundAsset={background.asset}
+    onModelsReady={ready=>setLoadedModelKey(ready ? modelKey : null)} onSceneError={setRenderError}
     simulatedAt={activity.start} location={activity.location} playerModel={replayPlayer}
     characterModels={replayModels} activity={activity} />
-    : <div className="pocket-activity-fallback pocket-activity-fallback--device">
+    : <div className="pocket-activity-fallback pocket-activity-fallback--device" style={{backgroundImage:`url(${background.asset.backgroundUrl})`}}>
+        <img className="pocket-activity-fallback__scenery" src={background.asset.sceneryUrl} alt="" />
         {(activity.playerInvolved || replayPlayer) && <div className="pocket-activity-person">
           <span>{sceneModels.playerModel?.source?.name || "플레이어"}</span>
           {activity.playerInvolved && <span className="pocket-activity-icon">{actorCue(activity,"player").emojis.join("")}</span>}
@@ -76,13 +94,25 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
           <span>{character.name ?? character.characterName}</span>
         </div>)}
       </div>)
+  const activityDisplay = activity && <div className="pocket-prepared-display" data-scene-ready={!waiting}>
+    {preparedDisplay && <div className="pocket-prepared-display__scene" style={{visibility:waiting ? "hidden" : "visible"}}>{preparedDisplay}</div>}
+    {waiting && <div className="pocket-scene-loading" role="status" aria-live="polite">
+      <span className="pocket-scene-loading__dots" aria-hidden="true"><i/><i/><i/></span>
+      <p>{preparation === "ERROR" ? "주머니 안쪽이 아직 잘 보이지 않아요." : "주머니 안쪽을 들여다보고 있어요..."}</p>
+      {preparation === "ERROR" && <Button variant="outline" size="sm" onClick={async()=>{
+        setRenderError(""); setRenderRevision(value=>value+1)
+        if (background.asset) { images.retry(); background.reload() }
+        else { try { if (background.available) await background.generate(); else background.reload() } catch { setRenderError("주머니 안쪽을 준비하지 못했어요.") } }
+      }}>다시 들여다보기</Button>}
+    </div>}
+  </div>
   return <div>
     {frames.length > 0 && <section aria-label="부재 활동 재생" className="mt-2 flex items-center justify-between gap-2 text-xs">
       <span className="text-muted-foreground">지난 부재 활동 · {frames.length}개</span>
       <Button size="sm" variant="outline" disabled={disabled} onClick={() => select(0, true)}>다시보기</Button>
     </section>}
     <PocketAbsenceDialog open={Boolean(activity)} onClose={() => select(null)} display={activityDisplay}
-      activity={activity} index={index ?? 0} count={frames.length} playing={playing} disabled={disabled}
+      activity={activity} index={index ?? 0} count={frames.length} playing={playing} disabled={disabled} waiting={waiting}
       onToggle={() => setPlaying(value => !value)} onSelect={select}
       onReplay={() => select(0, !window.matchMedia("(prefers-reduced-motion: reduce)").matches)}
       error={progressError} onDiscard={async () => {

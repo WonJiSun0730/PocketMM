@@ -64,7 +64,7 @@ class PocketBackgroundTest {
         var context=new PocketBackgroundService.Context(9,"1-2","World");
         try {
             assertThatThrownBy(()->service.configure(context,true," ")).hasMessageContaining("장소");
-            assertThat(store.catalog("1-2").automatic()).isFalse();
+            assertThat(store.catalog("1-2").automatic()).isTrue();
             var result=service.upload(context,"제2시설","비밀기지",image(false,false),image(false,true));
             assertThat(result.asset().source()).isEqualTo("UPLOAD");
             assertThat(service.resolve(context,"비밀기지").reused()).isTrue();
@@ -113,5 +113,14 @@ class PocketBackgroundTest {
     static void awaitReady(PocketBackgroundService service,PocketBackgroundService.Context context,String location) throws Exception {
         for(int i=0;i<200 && service.resolve(context,location).status().equals("GENERATING");i++) Thread.sleep(20);
         assertThat(service.resolve(context,location).status()).isEqualTo("READY");
+    }
+    @Test void newAndLegacyDefaultOffCatalogsGenerateAutomaticallyButExplicitOffSurvivesRestart() throws Exception {
+        var mapper=new JsonMapper();var store=new PocketBackgroundStore(directory.toString(),mapper);
+        assertThat(store.catalog("1-2").automatic()).isTrue();
+        Files.createDirectories(directory.resolve("1-2"));
+        Files.write(directory.resolve("1-2/index.json"),mapper.writeValueAsBytes(new PocketBackgroundStore.Catalog(false,java.util.List.of())));
+        assertThat(store.catalog("1-2").automatic()).isTrue();
+        store.configure("1-2",false);
+        assertThat(new PocketBackgroundStore(directory.toString(),mapper).catalog("1-2").automatic()).isFalse();
     }
 }

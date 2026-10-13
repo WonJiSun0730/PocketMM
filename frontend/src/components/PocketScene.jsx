@@ -11,11 +11,13 @@ import { actorCue, performanceActors, speakingActors, puppetPose, walkDirection,
 import "./PocketActivityPerformance.css"
 import { createStandingIdle, settleStandingPhysics } from "@/lib/pocketStandingIdle"
 
-export default function PocketScene({ className = "", simulatedAt = "", location = "", sessionId = null, playerModel = null, characterModels = [], activity = null, compact = false }) {
+export default function PocketScene({ className = "", simulatedAt = "", location = "", sessionId = null, playerModel = null, characterModels = [], activity = null, compact = false, backgroundAsset = null, requireBackground = false, onModelsReady, onSceneError }) {
   const hostRef = useRef(null)
   const bubbleNodes = useRef(new Map())
   const expressionNodes = useRef(new Map())
   const activityRef = useRef(activity)
+  const readyCallback = useRef(onModelsReady), errorCallback = useRef(onSceneError)
+  readyCallback.current = onModelsReady; errorCallback.current = onSceneError
   activityRef.current = activity
   const [speakingIndex, setSpeakingIndex] = useState(0)
   const actorKey = performanceActors(activity).join(",")
@@ -36,11 +38,11 @@ export default function PocketScene({ className = "", simulatedAt = "", location
   const [backdropSize,setBackdropSize] = useState({width:300,height:300})
   const preset = resolvePocketScene(location)
   const daypart = resolvePocketDaypart(simulatedAt)
-  const sceneBackground = usePocketBackground(sessionId, location)
-  const generated = sceneBackground.asset
+  const sceneBackground = usePocketBackground(backgroundAsset ? null : sessionId, location)
+  const generated = backgroundAsset || sceneBackground.asset
   const registeredBackground = getPocketBackground(sessionId, location)
   const requestedBackground = generated?.backgroundUrl || registeredBackground || preset.backgroundUrl
-  const backgroundUrl = failedBackground === requestedBackground ? preset.backgroundUrl : requestedBackground
+  const backgroundUrl = failedBackground === requestedBackground && !requireBackground ? preset.backgroundUrl : requestedBackground
   const sceneryUrl = generated && backgroundUrl === generated.backgroundUrl && failedScenery !== generated.sceneryUrl ? generated.sceneryUrl : null
 
   useEffect(() => {
@@ -50,6 +52,8 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     bubbleNodes.current.forEach(node => { node.hidden = true })
 
     let disposed = false
+    let loadedModels = 0
+    readyCallback.current?.(false)
     const idleActors = []
     const bubbleActors = []
     const headPosition = new THREE.Vector3()
@@ -224,6 +228,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
           const vrm = gltf.userData.vrm
           if (!vrm) {
             console.warn("[PocketScene] VRM data missing:", url)
+            errorCallback.current?.("캐릭터를 준비하지 못했어요. 다시 들여다봐 주세요.")
             VRMUtils.deepDispose(gltf.scene)
             return
           }
@@ -267,9 +272,11 @@ export default function PocketScene({ className = "", simulatedAt = "", location
           const head = vrm.humanoid?.getRawBoneNode("head") ?? vrm.scene
           if (actorId != null) bubbleActors.push({ id: actorId, head, vrm, radius:targetHeight*0.19 })
           render()
+          loadedModels++
+          if (loadedModels === visibleModels.length) readyCallback.current?.(true)
         },
         undefined,
-        error => console.error("[PocketScene] VRM load failed:", url, error),
+        error => { console.error("[PocketScene] VRM load failed:", url, error); errorCallback.current?.("캐릭터를 준비하지 못했어요. 다시 들여다봐 주세요.") },
       )
     }
 
@@ -279,6 +286,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
     ]
     const spacing = compact ? 1.45 : 1.65
     const startX = -((visibleModels.length - 1) * spacing) / 2
+    if (!visibleModels.length) readyCallback.current?.(true)
     visibleModels.forEach((model, index) => {
       const x = startX + index * spacing
       const z = 0.55 - Math.abs(index - (visibleModels.length - 1) / 2) * 0.08
@@ -370,13 +378,13 @@ export default function PocketScene({ className = "", simulatedAt = "", location
         }} style={generated && backgroundUrl === generated.backgroundUrl
           ? {width:`${tile.width}px`,height:`${tile.height}px`,position:"absolute",left:"50%",top:"50%",transform:"translate(-50%, -50%)"}
           : { transform: `scale(${zoom / 1.35})` }}
-          onError={() => setFailedBackground(requestedBackground)} />
+          onError={() => { setFailedBackground(requestedBackground); if (requireBackground) errorCallback.current?.("주머니 안쪽을 불러오지 못했어요.") }} />
       </div>
       {sceneryUrl && <div className={`pocket-scene__backdrop pocket-scene__scenery ${walking ? "pocket-scene__backdrop--walking" : ""}`}
         data-daypart={daypart} aria-hidden="true" style={walking ? {
           backgroundImage:`url(${sceneryUrl})`,backgroundSize:`${tile.width}px ${tile.height}px`,"--walk-x":`${tile.offset}px`,
         } : undefined}>
-        <img src={sceneryUrl} alt="" onError={() => setFailedScenery(sceneryUrl)} style={{
+        <img src={sceneryUrl} alt="" onError={() => { setFailedScenery(sceneryUrl); if (requireBackground) errorCallback.current?.("주머니 안쪽을 불러오지 못했어요.") }} style={{
           width:`${tile.width}px`,height:`${tile.height}px`,position:"absolute",left:"50%",top:"50%",transform:"translate(-50%, -50%)",
         }} />
       </div>}
