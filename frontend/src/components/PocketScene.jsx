@@ -313,7 +313,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
       renderer.domElement.style.height = "100%"
 
       const aspect = width / height
-      const viewHeight = compact ? Math.max(3.25 / zoom, visibleModels.length * 1.2 + 0.7) : 3.25 / zoom
+      const viewHeight = compact ? Math.max(3.25 / zoom, visibleModels.length * 1.2 + 0.7) / 0.8 : 3.25 / zoom
       camera.left = -(viewHeight * aspect) / 2
       camera.right = (viewHeight * aspect) / 2
       camera.top = viewHeight / 2
