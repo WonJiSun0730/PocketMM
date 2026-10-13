@@ -29,6 +29,9 @@ class PocketBackgroundTest {
         assertThat(PocketBackgroundMatcher.score("집으로 돌아가는 길", "집", "")).isZero();
         assertThat(PocketBackgroundMatcher.score("야외 카페", "실내 카페", "")).isZero();
         assertThat(PocketBackgroundMatcher.score("비밀기지", "제2시설", "비밀기지, 안전가옥")).isPositive();
+        assertThat(PocketBackgroundMatcher.score("비밀기지 내부", "제2시설", "비밀기지, 안전가옥")).isPositive();
+        assertThat(PocketBackgroundMatcher.score("hq lobby", "제2시설", "hq")).isPositive();
+        assertThat(PocketBackgroundMatcher.score("hqfoo", "제2시설", "hq")).isZero();
         assertThat(PocketBackgroundMatcher.score("공원", "사무실", "공원처럼 넓은")).isZero();
     }
     @Test void alphaOverlayClearsChromaAndHolesAndRejectsOpaqueOrEmptyScenery() throws Exception {

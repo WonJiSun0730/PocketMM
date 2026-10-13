@@ -49,10 +49,11 @@ public final class PocketBackgroundMatcher {
                     || query.contains(opposites.get(1)) && place.contains(opposites.get(0))) return 0;
         }
         if (!queryTypes.isEmpty() && !Collections.disjoint(queryTypes, savedTypes)) return 100;
-        // Explicit uploaded aliases can match an otherwise unknown place, but not a vague substring.
+        // Explicit uploaded keywords may cover a longer place name; known scene types still cannot conflict.
         for (String alias : (keywords == null ? "" : keywords).split("[,;\\n]")) {
             String normalized = normalize(alias);
-            if (normalized.length() >= 2 && query.equals(normalized)) return 200;
+            if (normalized.length() >= 2 && (normalized.matches("[a-z0-9 ]+")
+                    ? (" " + query + " ").contains(" " + normalized + " ") : query.contains(normalized))) return 200;
         }
         return 0;
     }
