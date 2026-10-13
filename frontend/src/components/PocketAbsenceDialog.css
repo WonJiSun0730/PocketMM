@@ -16,7 +16,7 @@
 .pocket-absence-dialog__eyebrow { color: var(--muted-foreground); font-size: 10px; letter-spacing: .12em; margin-bottom: 4px; }
 .pocket-absence-dialog h2 { font-size: 16px; font-weight: 600; }
 .pocket-absence-device { width: 300px; max-width: 100%; aspect-ratio: 1; overflow: hidden; border: 1px solid var(--border); border-radius: 18px; background: var(--muted); display:flex; align-items:center; justify-content:center; }
-.pocket-absence-device .pocket-scene-shell--compact { width:90%; height:90%; overflow:hidden; border-radius:12px; }
+.pocket-absence-device .pocket-scene-shell--compact { width:72%; height:72%; overflow:hidden; border-radius:12px; }
 .pocket-absence-device .pocket-scene { border: 0; border-radius: 0; }
 .pocket-activity-fallback--device { width:90%; height:90%; min-height: 0; border: 0; border-radius: 0; padding: 16px; }
 .pocket-absence-dialog__caption { margin-top: 14px; font-size: 14px; }
