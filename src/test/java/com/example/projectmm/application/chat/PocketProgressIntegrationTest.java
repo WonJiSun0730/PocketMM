@@ -68,9 +68,10 @@ class PocketProgressIntegrationTest {
             var world = worlds.save(new World(owner, "World", "A modern town"));
             var room = rooms.save(new WorldConversation(world, owner, "Home", WorldConversation.Visibility.PRIVATE, story));
             var intro = intros.save(new WorldRoomIntro(room, "Start", "At home", 0));
-            var first = new Character("A"); first.assignWorld(world); a = characters.save(first).getId();
-            var second = new Character("B"); second.assignWorld(world); b = characters.save(second).getId();
+            var first = new Character("A"); first.assignWorld(world); first.updateModel("/models/a.vrm",1.7); a = characters.save(first).getId();
+            var second = new Character("B"); second.assignWorld(world); second.updateModel("/models/b.vrm",1.8); b = characters.save(second).getId();
             var player = players.save(new PlayerProfile(number, "Player", "Student", null));
+            player.updateModel("/models/player.vrm",1.6);
             var session = sessionService.start(room.getId(), login, player.getId(), intro.getId());
             id = session.getId(); session.updateSimulatedAt(story);
             states.findBySessionId(id).orElseThrow().update("Home", List.of("tired"), List.of("phone"));
@@ -441,6 +442,40 @@ class PocketProgressIntegrationTest {
         assertThat(result.simulatedAt()).isEqualTo(story.plusHours(1));
         assertThat(progress.resume(id,login).lastReport().id()).isEqualTo(result.lastReport().id());
         verify(gateway,times(1)).generateWorldRoomTurn(any(),anyString());
+    }
+    @Test void missingPlayerModelBlocksEnableAndPreservesConfiguration() {
+        db(()->{sessionService.pocket(id,login).getPlayerProfile().updateModel(null,null);return null;});
+        assertThatThrownBy(()->progress.configure(id,login,true,30)).hasMessageContaining("플레이어 모델링");
+        assertThat(progress.current(id,login).enabled()).isFalse();
+        assertThat(progress.current(id,login).minimumAbsenceMinutes()).isEqualTo(15);
+        assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
+        verifyNoInteractions(gateway);
+    }
+    @Test void missingRegisteredNpcModelBlocksEnableEvenWhenNpcIsOffScene() {
+        db(()->{characters.findById(b).orElseThrow().updateModel(null,null);return null;});
+        assertThatThrownBy(()->progress.configure(id,login,true)).hasMessageContaining("캐릭터 모델링");
+        assertThat(progress.current(id,login).enabled()).isFalse();
+        verifyNoInteractions(gateway);
+    }
+    @Test void modelRemovedAfterEnableBlocksResumeAndCheatButOffRemainsAvailable() {
+        enabledAfter(Duration.ofHours(1));
+        db(()->{characters.findById(a).orElseThrow().updateModel(null,null);return null;});
+        assertThatThrownBy(()->progress.resume(id,login)).hasMessageContaining("캐릭터 모델링");
+        assertThatThrownBy(()->progress.simulateAbsence(id,login,1)).hasMessageContaining("캐릭터 모델링");
+        assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
+        assertThat(progress.current(id,login).lastReport()).isNull();
+        assertThat(progress.configure(id,login,false).enabled()).isFalse();
+        verifyNoInteractions(gateway);
+    }
+    @Test void modelRemovedDuringGenerationPreventsApplyingThePlan() {
+        progress.configure(id,login,true);
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenAnswer(call->{
+            db(()->{characters.findById(a).orElseThrow().updateModel(null,null);return null;});
+            return new WorldRoomTurn(plan(story,story.plusHours(1)),WorldRoomCastChange.none(),List.of(),0);
+        });
+        assertThatThrownBy(()->progress.simulateAbsence(id,login,1)).hasMessageContaining("캐릭터 모델링").isInstanceOf(ResponseStatusException.class);
+        assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
+        assertThat(progress.current(id,login).lastReport()).isNull();
     }
     @Test void newActivityAnimationsAndInteractionMetadataSurviveStorageAndTimeRepair() {
         progress.configure(id,login,true);

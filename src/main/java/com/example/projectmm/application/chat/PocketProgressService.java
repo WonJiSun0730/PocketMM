@@ -91,13 +91,26 @@ public class PocketProgressService {
         });
     }
     public Status configure(Long id, String loginId, boolean enabled) { return configure(id,loginId,enabled,null); }
+    private void requireModels(WorldRoomSession session) {
+        var player=session.getPlayerProfile();
+        if(player==null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"플레이어를 선택한 후 시간 체크를 켜 주세요.");
+        em.refresh(player);
+        if(!validModel(player.getModelUrl(),player.getModelHeight()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"플레이어 모델링을 등록한 후 시간 체크를 켜 주세요.");
+        var registered=sessionService.registeredCharacters(session.getId());
+        registered.forEach(em::refresh);
+        if(registered.isEmpty() || registered.stream().anyMatch(c->!validModel(c.getModelUrl(),c.getModelHeight())))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"포켓에 등록된 캐릭터 모델링을 모두 등록한 후 시간 체크를 켜 주세요.");
+    }
+    private boolean validModel(String url, Double height) {
+        return url!=null && !url.isBlank() && height!=null && Double.isFinite(height) && height>0;
+    }
     public Status configure(Long id, String loginId, boolean enabled, Integer minimumMinutes) {
         if (minimumMinutes != null && (minimumMinutes < 1 || minimumMinutes > 4320))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "부재 시작 시간은 1~4320분으로 설정해 주세요.");
         return tx(() -> {
             var session = owned(id, loginId, true); idle(session);
-            if (enabled && session.getPlayerProfile() == null)
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "플레이어를 선택한 후 시간 체크를 켜 주세요.");
+            if (enabled) requireModels(session);
             if (minimumMinutes != null) session.configureMinimumAbsence(minimumMinutes);
             // An identical request must never erase an outstanding absence.
             if (session.isTimeCheckEnabled() != enabled) session.configureTimeCheck(enabled, clock.now());
@@ -125,6 +138,7 @@ public class PocketProgressService {
         try {
             prepared = tx(() -> {
                 var session = owned(id, loginId, true); idle(session);
+                if(session.isTimeCheckEnabled()) requireModels(session);
                 if (testElapsed != null && (!session.isTimeCheckEnabled() || session.getPlayerProfile() == null))
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "플레이어를 선택하고 시간 체크를 켠 후 테스트해 주세요.");
                 session.clearProgressPause();
@@ -182,6 +196,7 @@ public class PocketProgressService {
     }
     private Status complete(Claim claim, PocketActivityPlan plan, String prompt, String raw) {
         var session = sessions.lockById(claim.sessionId()).orElseThrow(); em.refresh(session);
+        requireModels(session);
         if (!Objects.equals(session.getProgressOperationId(), claim.token()) || !session.progressInProgress(clock.now())
                 || !Objects.equals(session.getSimulatedAt(), claim.from()))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "포켓 상태가 바뀌었어요. 다시 확인해 주세요.");

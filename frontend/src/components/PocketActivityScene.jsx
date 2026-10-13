@@ -20,7 +20,7 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
   const frames = report?.activities ?? []
   const index = selection?.sessionId === sessionId && selection?.reportId === report?.id ? selection.index : null
   const activity = index != null ? frames[index] ?? null : null
-  const background = usePocketBackground(sessionId, activity ? activity.location || location || "장소 미설정" : "", { simulatedAt:activity?.start })
+  const background = usePocketBackground(sessionId, activity && sceneModels.ready ? activity.location || location || "장소 미설정" : "", { simulatedAt:activity?.start })
   const images = usePocketSceneImages(activity ? background.asset : null)
   const [loadedModelKey, setLoadedModelKey] = useState(null)
   const [renderError, setRenderError] = useState("")
@@ -58,19 +58,20 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
   useEffect(() => {
     if (disabled) setPlaying(false)
   }, [disabled])
+  useEffect(()=>{if(!sceneModels.ready) {setSelection(null);setPlaying(false)}},[sceneModels.ready])
   useEffect(() => {
     const visibility = () => setVisible(!document.hidden)
     document.addEventListener("visibilitychange", visibility)
     return () => document.removeEventListener("visibilitychange", visibility)
   }, [])
   useEffect(() => {
-    if (!report || freshReportId !== report.id || !frames.length || disabled) return
+    if (!report || freshReportId !== report.id || !frames.length || disabled || !sceneModels.ready) return
     const key = `${sessionId}:${report.id}`
     if (consumed.current === key) return
     consumed.current = key
     setSelection({ sessionId, reportId: report.id, index: 0 })
     setPlaying(!window.matchMedia("(prefers-reduced-motion: reduce)").matches)
-  }, [sessionId, report?.id, freshReportId, frames.length, disabled])
+  }, [sessionId, report?.id, freshReportId, frames.length, disabled,sceneModels.ready])
   useEffect(() => {
     if (!playing || !activity || disabled || !visible || waiting) return
     const timer = setTimeout(() => {
@@ -117,9 +118,9 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
   return <div>
     {frames.length > 0 && <section aria-label="부재 활동 재생" className="mt-2 flex items-center justify-between gap-2 text-xs">
       <span className="text-muted-foreground">지난 부재 활동 · {frames.length}개</span>
-      <Button size="sm" variant="outline" disabled={disabled} onClick={() => select(0, true)}>다시보기</Button>
+      <Button size="sm" variant="outline" disabled={disabled || !sceneModels.ready} onClick={() => select(0, true)}>다시보기</Button>
     </section>}
-    <PocketAbsenceDialog isDeveloper={isDeveloper} open={Boolean(activity)} onClose={() => select(null)} display={activityDisplay}
+    <PocketAbsenceDialog isDeveloper={isDeveloper} open={Boolean(activity) && sceneModels.ready} onClose={() => select(null)} display={activityDisplay}
       activity={activity} index={index ?? 0} count={frames.length} playing={playing} disabled={disabled} waiting={waiting}
       onToggle={() => setPlaying(value => !value)} onSelect={select}
       onReplay={() => select(0, !window.matchMedia("(prefers-reduced-motion: reduce)").matches)}

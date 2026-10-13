@@ -550,7 +550,7 @@ export default function PocketPage({ pocket, onBack }) {
             inventory: state.inventory ?? [],
             conditions: state.conditions ?? [],
           })} />}
-        <PocketProgressPanel isDeveloper={isDeveloper} progress={progress} characters={worldCharacters} disabled={messageSending} />
+        <PocketProgressPanel modelsReady={sceneModels.ready} modelError={sceneModels.blockedReason} isDeveloper={isDeveloper} progress={progress} characters={worldCharacters} disabled={messageSending} />
         <PocketSettingsPanel sessionId={session.id} location={sceneRuntimeState.location} simulatedAt={sceneRuntimeState.simulatedAt} onError={setError} />
       </div>
 
@@ -744,7 +744,7 @@ export default function PocketPage({ pocket, onBack }) {
             inventory: state.inventory ?? [],
             conditions: state.conditions ?? [],
           })} />}
-        <PocketProgressPanel isDeveloper={isDeveloper} progress={progress} characters={worldCharacters} disabled={messageSending} />
+        <PocketProgressPanel modelsReady={sceneModels.ready} modelError={sceneModels.blockedReason} isDeveloper={isDeveloper} progress={progress} characters={worldCharacters} disabled={messageSending} />
         <PocketSettingsPanel sessionId={session.id} location={sceneRuntimeState.location} simulatedAt={sceneRuntimeState.simulatedAt} onError={setError} />
       </div>
 
