@@ -43,3 +43,6 @@ build/
 ### OS ###
 .DS_Store
 Thumbs.db
+
+### Generated scene assets (persistent runtime data, not release files) ###
+/data/pocket-backgrounds/

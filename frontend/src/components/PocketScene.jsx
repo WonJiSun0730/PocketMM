@@ -4,6 +4,8 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { VRMLoaderPlugin, VRMUtils } from "@pixiv/three-vrm"
 import { resolvePocketScene, resolvePocketDaypart } from "@/lib/pocketSceneRegistry"
 import { getPocketBackground } from "@/lib/pocketSceneBackgrounds"
+import usePocketBackground from "@/hooks/usePocketBackground"
+import { backgroundGeometry } from "@/lib/pocketBackgroundLayers"
 import { activitySymbol } from "@/lib/pocketActivityPlayback"
 import { actorCue, performanceActors, speakingActors, puppetPose, walkDirection, scrollingBackdrop } from "@/lib/pocketActivityPerformance"
 import "./PocketActivityPerformance.css"
@@ -29,13 +31,17 @@ export default function PocketScene({ className = "", simulatedAt = "", location
   const [sceneHeight, setSceneHeight] = useState(260)
   const [pixelHeight, setPixelHeight] = useState(160)
   const [failedBackground, setFailedBackground] = useState(null)
+  const [failedScenery, setFailedScenery] = useState(null)
   const [imageAspect,setImageAspect] = useState(1)
   const [backdropSize,setBackdropSize] = useState({width:300,height:300})
   const preset = resolvePocketScene(location)
   const daypart = resolvePocketDaypart(simulatedAt)
+  const sceneBackground = usePocketBackground(sessionId, location)
+  const generated = sceneBackground.asset
   const registeredBackground = getPocketBackground(sessionId, location)
-  const requestedBackground = registeredBackground || preset.backgroundUrl
+  const requestedBackground = generated?.backgroundUrl || registeredBackground || preset.backgroundUrl
   const backgroundUrl = failedBackground === requestedBackground ? preset.backgroundUrl : requestedBackground
+  const sceneryUrl = generated && backgroundUrl === generated.backgroundUrl && failedScenery !== generated.sceneryUrl ? generated.sceneryUrl : null
 
   useEffect(() => {
     const host = hostRef.current
@@ -347,7 +353,9 @@ export default function PocketScene({ className = "", simulatedAt = "", location
   const speaker = speakers.length ? speakers[speakingIndex % speakers.length] : null
   const [walkX] = walkDirection(activity)
   const walking = activity?.kind === "WALK" || activity?.kind === "TRAVEL"
-  const tile=scrollingBackdrop(backdropSize.width,backdropSize.height,imageAspect,walkX)
+  const tile=generated && backgroundUrl === generated.backgroundUrl
+    ? backgroundGeometry(backdropSize.width,backdropSize.height,walkX)
+    : scrollingBackdrop(backdropSize.width,backdropSize.height,imageAspect,walkX)
   const bubbleCharacters = activity ? characterModels.filter(model =>
     activity.characterIds.includes(model.source?.characterId ?? model.source?.id)) : []
   if (activity?.playerInvolved && playerModel) bubbleCharacters.push({ ...playerModel, bubbleId: "player" })
@@ -359,9 +367,19 @@ export default function PocketScene({ className = "", simulatedAt = "", location
           "--walk-x":`${tile.offset}px`} : undefined}>
         <img src={backgroundUrl} alt="" onLoad={event=>{
           const image=event.currentTarget;if(image.naturalHeight>0)setImageAspect(image.naturalWidth/image.naturalHeight)
-        }} style={{ transform: `scale(${zoom / 1.35})` }}
+        }} style={generated && backgroundUrl === generated.backgroundUrl
+          ? {width:`${tile.width}px`,height:`${tile.height}px`,position:"absolute",left:"50%",top:"50%",transform:"translate(-50%, -50%)"}
+          : { transform: `scale(${zoom / 1.35})` }}
           onError={() => setFailedBackground(requestedBackground)} />
       </div>
+      {sceneryUrl && <div className={`pocket-scene__backdrop pocket-scene__scenery ${walking ? "pocket-scene__backdrop--walking" : ""}`}
+        data-daypart={daypart} aria-hidden="true" style={walking ? {
+          backgroundImage:`url(${sceneryUrl})`,backgroundSize:`${tile.width}px ${tile.height}px`,"--walk-x":`${tile.offset}px`,
+        } : undefined}>
+        <img src={sceneryUrl} alt="" onError={() => setFailedScenery(sceneryUrl)} style={{
+          width:`${tile.width}px`,height:`${tile.height}px`,position:"absolute",left:"50%",top:"50%",transform:"translate(-50%, -50%)",
+        }} />
+      </div>}
       <div ref={hostRef} className="pocket-scene__viewport" aria-label="2D 배경과 3D 캐릭터 장면" />
       {activity?.kind === "SLEEP" && <div className="pocket-scene__bed" aria-label="잠자는 캐릭터 앞의 침대">
         <svg viewBox="0 0 300 165" role="img" aria-label="도톰한 이불이 덮인 침대">

@@ -550,7 +550,7 @@ export default function PocketPage({ pocket, onBack }) {
             conditions: state.conditions ?? [],
           })} />}
         <PocketProgressPanel progress={progress} characters={worldCharacters} disabled={messageSending} />
-        <PocketSettingsPanel sessionId={session.id} onError={setError} />
+        <PocketSettingsPanel sessionId={session.id} location={sceneRuntimeState.location} onError={setError} />
       </div>
 
       <div>
@@ -744,7 +744,7 @@ export default function PocketPage({ pocket, onBack }) {
             conditions: state.conditions ?? [],
           })} />}
         <PocketProgressPanel progress={progress} characters={worldCharacters} disabled={messageSending} />
-        <PocketSettingsPanel sessionId={session.id} onError={setError} />
+        <PocketSettingsPanel sessionId={session.id} location={sceneRuntimeState.location} onError={setError} />
       </div>
 
       <div>

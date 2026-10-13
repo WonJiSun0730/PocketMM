@@ -8,6 +8,8 @@ Type=simple
 User=pocketmm
 Group=pocketmm
 WorkingDirectory=/opt/pocketmm
+StateDirectory=pocketmm
+Environment=POCKET_BACKGROUND_DIRECTORY=/var/lib/pocketmm/backgrounds
 EnvironmentFile=/etc/pocketmm/pocketmm.env
 ExecStart=/usr/bin/java -Xms128m -Xmx384m -jar /opt/pocketmm/pocketmm.jar
 Restart=on-failure
