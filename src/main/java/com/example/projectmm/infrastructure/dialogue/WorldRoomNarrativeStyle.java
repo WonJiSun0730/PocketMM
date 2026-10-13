@@ -50,6 +50,35 @@ final class WorldRoomNarrativeStyle {
                 """;
         return """
 
+                Narrative policy for live roleplay:
+                - Every description must serve a narrative function: character, emotion,
+                  relationship, conflict, an event, relevant world information, or atmosphere
+                  that supports the current beat. Text length and narrative progress are separate.
+                - Compress established ordinary procedures already authorized by the user,
+                  such as orientation, paperwork, assignment registration, or equipment checks.
+                  Do not expand a checklist merely to fill a long response. Compression does not
+                  authorize skipping an unresolved player choice or inventing their consent.
+                - Detail a procedure when the user shows interest in it or when the procedure
+                  itself creates tension, conflict, or a meaningful consequence. Cooking and
+                  other user-chosen everyday actions may remain richly concrete in that scope.
+                - Apply world rules implicitly. Do not repeatedly explain that each rule was
+                  followed. Explain rules when asked or when new information matters to the scene.
+                - Prefer a meaningful action, emotional shift, revealing reaction, or relational
+                  beat over repeated setup. A quiet moment of care or subtext can be enough;
+                  do not force a major incident, romance, or relationship advancement every turn.
+                  Follow the established genre and the user's desired pace rather than inserting
+                  an unrelated crisis. Leave an opening the user has a reason to respond to.
+
+                Absence-mode exception:
+                - For the current structured POCKET ABSENCE ACTIVITY PLAN task, ordinary meals,
+                  walks, tidying, rest, and small interactions are valid activities. There is no
+                  live-scene drama quota. Follow its slow activity budget and elapsed-time bounds;
+                  do not manufacture an incident for every minute or repeat a completed scene.
+                - Use the current absence task's explicit player participation rules and profile
+                  for delegated everyday activity; live-player authorship rules below govern live
+                  replies. Do not import absence delegation into a later live reply. Preserve the
+                  authoritative state, established relationships, and limits on irreversible choices.
+
                 Fiction-writing and pacing:
                 - Write a developed scene, not a terse status report or a paraphrase of the input.
                   Show purposeful action, concrete sensory detail, pauses, tone, and character

@@ -7,6 +7,33 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class WorldRoomPlayerAuthorshipPromptTest {
     @Test
+    void livePolicyCompressesRoutineWithoutForcingDramaOrTakingPlayerChoices() {
+        for (boolean strict : new boolean[]{false, true}) {
+            assertThat(WorldRoomNarrativeStyle.instruction(strict)).contains(
+                    "Text length and narrative progress are separate",
+                    "Compress established ordinary procedures already authorized by the user",
+                    "unresolved player choice or inventing their consent",
+                    "when the user shows interest", "Apply world rules implicitly",
+                    "A quiet moment of care or subtext can be enough",
+                    "do not force a major incident, romance, or relationship advancement every turn",
+                    "the user's desired pace");
+        }
+    }
+
+    @Test
+    void absencePolicyValuesSmallDailyActivitiesAndKeepsDelegationScoped() {
+        for (boolean strict : new boolean[]{false, true}) {
+            assertThat(WorldRoomNarrativeStyle.instruction(strict)).contains(
+                    "current structured POCKET ABSENCE ACTIVITY PLAN task",
+                    "walks, tidying, rest, and small interactions are valid activities",
+                    "slow activity budget and elapsed-time bounds",
+                    "do not manufacture an incident for every minute",
+                    "Do not import absence delegation into a later live reply",
+                    "limits on irreversible choices");
+        }
+    }
+
+    @Test
     void allowsProceduralDetailWithoutInventingPlayerIntentOrBlockingTheScene() {
         String prompt = WorldRoomNarrativeStyle.instruction(false);
         assertThat(prompt).contains("Fill routine procedural details within that action",
