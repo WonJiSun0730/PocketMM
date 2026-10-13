@@ -32,8 +32,10 @@ public final class PocketBackgroundImages {
                 // Nearest-neighbour sampling avoids blurred pixel edges and preserves alpha holes.
                 int rgba = source.getRGB(x * source.getWidth() / WIDTH, y * source.getHeight() / HEIGHT);
                 int red = (rgba >>> 16) & 255, green = (rgba >>> 8) & 255, blue = rgba & 255;
-                if (scenery && chromaKey && red > 170 && blue > 170 && green < 130
-                        && red - green > 80 && blue - green > 80) rgba = 0;
+                // Generated props may contain dark key-colour spill, not just flat bright magenta.
+                // Purple is forbidden in AI overlay objects; uploaded alpha art is left untouched.
+                if (scenery && chromaKey && red > 35 && blue > 35
+                        && Math.min(red, blue) - green > 20 && green < Math.min(red, blue) * .65) rgba = 0;
                 if (!scenery) rgba |= 0xff000000;
                 if ((rgba >>> 24) < 32) transparent++; else occupied++;
                 image.setRGB(x, y, rgba);

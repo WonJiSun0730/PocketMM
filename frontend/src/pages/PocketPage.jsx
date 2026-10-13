@@ -509,6 +509,7 @@ export default function PocketPage({ pocket, onBack }) {
 
       <section className={progress.status?.lastReport?.activities?.length ? "shrink-0 border-b bg-muted/10 px-4 py-3 sm:px-6" : "contents"}>
         <PocketActivityScene
+          isDeveloper={isDeveloper}
           sessionId={session.id}
           report={progress.status?.lastReport}
           freshReportId={progress.freshReportId}
@@ -549,7 +550,7 @@ export default function PocketPage({ pocket, onBack }) {
             inventory: state.inventory ?? [],
             conditions: state.conditions ?? [],
           })} />}
-        <PocketProgressPanel progress={progress} characters={worldCharacters} disabled={messageSending} />
+        <PocketProgressPanel isDeveloper={isDeveloper} progress={progress} characters={worldCharacters} disabled={messageSending} />
         <PocketSettingsPanel sessionId={session.id} location={sceneRuntimeState.location} onError={setError} />
       </div>
 
@@ -743,7 +744,7 @@ export default function PocketPage({ pocket, onBack }) {
             inventory: state.inventory ?? [],
             conditions: state.conditions ?? [],
           })} />}
-        <PocketProgressPanel progress={progress} characters={worldCharacters} disabled={messageSending} />
+        <PocketProgressPanel isDeveloper={isDeveloper} progress={progress} characters={worldCharacters} disabled={messageSending} />
         <PocketSettingsPanel sessionId={session.id} location={sceneRuntimeState.location} onError={setError} />
       </div>
 

@@ -50,7 +50,7 @@ class GeminiBackgroundGeneratorTest {
         assertThat(json.path("generationConfig").has("responseFormat")).isFalse();
         assertThat(config.path("aspectRatio").asText()).isEqualTo("3:2");
         assertThat(config.path("imageSize").asText()).isEqualTo("1K");
-        assertThat(json.path("contents").get(0).path("parts").get(0).path("text").asText()).contains("RGB(255,0,255)","behind the characters");
+        assertThat(json.path("contents").get(0).path("parts").get(0).path("text").asText()).contains("RGB(255,0,255)","behind the characters", "a bench or litter bin", "a traffic cone", "NO buildings", "never cut off");
         assertThat(json.path("contents").get(0).path("parts").get(1).path("inlineData").path("data").asText()).isEqualTo("AQI=");
     }
     @Test void providerErrorsAndEmptyImageResponseFailWithoutAutomaticPaidRetries() throws Exception {

@@ -23,6 +23,9 @@ public class PocketProgressController {
     }
     @PostMapping("/simulate") public PocketProgressService.Status simulate(@PathVariable Long sessionId,
             @RequestBody Simulation request, Authentication auth) {
+        if (auth == null || auth.getAuthorities().stream().noneMatch(a -> a.getAuthority().equals("ROLE_DEVELOPER")))
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.FORBIDDEN,
+                    "관리자만 부재 시간 테스트를 사용할 수 있어요.");
         return progress.simulateAbsence(sessionId, auth.getName(), request.hours());
     }
     @DeleteMapping("/reports/{reportId}") public PocketProgressService.Status discard(@PathVariable Long sessionId,

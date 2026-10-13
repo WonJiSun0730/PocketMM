@@ -10,9 +10,12 @@ import { activitySymbol } from "@/lib/pocketActivityPlayback"
 import { actorCue, performanceActors, speakingActors, puppetPose, walkDirection, scrollingBackdrop } from "@/lib/pocketActivityPerformance"
 import "./PocketActivityPerformance.css"
 import { createStandingIdle, settleStandingPhysics } from "@/lib/pocketStandingIdle"
+import usePocketSceneLook from "@/hooks/usePocketSceneLook"
+import { lookFilter } from "@/lib/pocketSceneLook"
 
 export default function PocketScene({ className = "", simulatedAt = "", location = "", sessionId = null, playerModel = null, characterModels = [], activity = null, compact = false, backgroundAsset = null, requireBackground = false, onModelsReady, onSceneError }) {
   const hostRef = useRef(null)
+  const [look] = usePocketSceneLook()
   const bubbleNodes = useRef(new Map())
   const expressionNodes = useRef(new Map())
   const activityRef = useRef(activity)
@@ -369,7 +372,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
   if (activity?.playerInvolved && playerModel) bubbleCharacters.push({ ...playerModel, bubbleId: "player" })
 
   return <div className={`pocket-scene-shell ${compact ? "pocket-scene-shell--compact" : ""} ${className}`}>
-    <div className="pocket-scene" data-player-present={Boolean(playerModel)} style={{ height: compact ? "100%" : `${sceneHeight}px` }}>
+    <div className="pocket-scene" data-player-present={Boolean(playerModel)} style={{ height: compact ? "100%" : `${sceneHeight}px`, filter: lookFilter(look) }}>
       <div className={`pocket-scene__backdrop ${walking ? "pocket-scene__backdrop--walking" : ""}`} data-daypart={daypart} aria-hidden="true"
         style={walking ? {backgroundImage:`url(${backgroundUrl})`,backgroundSize:`${tile.width}px ${tile.height}px`,
           "--walk-x":`${tile.offset}px`} : undefined}>

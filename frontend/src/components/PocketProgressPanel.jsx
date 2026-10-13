@@ -8,7 +8,7 @@ function time(value) {
     month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit", hour12: false,
   }).format(date)
 }
-export default function PocketProgressPanel({ progress, characters, disabled }) {
+export default function PocketProgressPanel({ progress, characters, disabled, isDeveloper = false }) {
   const { status, busy, error, configure, resume, simulate } = progress
   const [minutes,setMinutes]=useState(15)
   useEffect(()=>setMinutes(status?.minimumAbsenceMinutes ?? 15),[status?.minimumAbsenceMinutes])
@@ -28,13 +28,13 @@ export default function PocketProgressPanel({ progress, characters, disabled }) 
       <Button size="sm" variant="outline" disabled={busy || disabled || !Number.isInteger(Number(minutes)) || Number(minutes)<1 || Number(minutes)>4320}
         onClick={()=>configure(Boolean(status?.enabled),Number(minutes))}>저장</Button>
     </div>
-    <div className="mt-3 rounded-md border border-dashed p-2">
-      <p className="font-medium">부재 시간 테스트</p>
+    {isDeveloper && <details className="mt-3 rounded-md border border-dashed p-2">
+      <summary className="cursor-pointer font-medium">부재 시간 테스트</summary>
       <div className="mt-2 flex flex-wrap gap-2">{[1, 2, 3].map(hours =>
         <Button key={hours} size="sm" variant="outline" disabled={busy || disabled || !status?.enabled}
           onClick={() => simulate(hours)}>{hours}시간 경과</Button>)}</div>
       <p className="mt-2 leading-5 text-muted-foreground">기다리지 않고 부재 활동을 생성해요. 이야기 시각과 대화 기록에 반영돼요.</p>
-    </div>
+    </details>}
     {busy && <p role="status" className="mt-2">부재 활동을 확인하는 중…</p>}
     {error && <div className="mt-2 space-y-2"><p role="alert" className="text-destructive">{error}</p>
       <Button size="sm" variant="outline" disabled={busy} onClick={resume}>다시 확인</Button></div>}

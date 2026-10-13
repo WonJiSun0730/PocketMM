@@ -38,11 +38,18 @@ public class GeminiBackgroundGenerator {
         prompt += scenery ? """
                 Output ONLY the sparse distant scenery overlay matching the supplied background's
                 palette, horizon and scale. It is drawn above the background and behind the characters.
-                Use small distant architecture, foliage or room details near the sides; keep the centre
+                Use only one or two modest scene-appropriate props near the sides; keep the centre
                 mostly empty. ALL empty areas and holes must be perfectly flat chroma key magenta
                 RGB(255,0,255), NOT a checkerboard or white. Do not use magenta in painted objects.
                 At least 60 percent must be this plain magenta; at least some visible scenery remains.
                 Do not repaint the entire room or floor. Render the same full 3:2 canvas as the reference.
+                Parks: a bench or litter bin. Streets: a traffic cone or small street sign.
+                Rooms: a plant pot or small furnishing appropriate to that room.
+                NO buildings, houses, archways, ruins, gates or disconnected landscape fragments.
+                Match the reference ground line, perspective, pixel density and lighting exactly.
+                Props sit at the same ground depth as the actors, never miniature distant dioramas.
+                Keep each prop complete inside the canvas with a small margin, never cut off its edges.
+                Magenta is only a removable empty-space mask: never reflect it onto objects or outlines.
                 """ : """
                 Output the complete opaque background with a continuous ground/floor across the bottom.
                 The image spans 1.5 screen widths. Make side edges compatible for horizontal scrolling.

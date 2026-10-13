@@ -6,10 +6,13 @@ import PocketScene from "@/components/PocketScene"
 import usePocketBackground from "@/hooks/usePocketBackground"
 import usePocketSceneImages from "@/hooks/usePocketSceneImages"
 import { scenePreparationState } from "@/lib/pocketScenePreparation"
+import usePocketSceneLook from "@/hooks/usePocketSceneLook"
+import { lookFilter } from "@/lib/pocketSceneLook"
 import { ACTIVITY_FRAME_MS, activitySymbol, activityParticipants, activityModels, nextActivityIndex, replayIncludesPlayer } from "@/lib/pocketActivityPlayback"
 
 export default function PocketActivityScene({ sessionId, report, freshReportId, characters, sceneModels,
-  simulatedAt, location, disabled, onDiscard, progressError }) {
+  simulatedAt, location, disabled, onDiscard, progressError, isDeveloper = false }) {
+  const [look] = usePocketSceneLook()
   const [selection, setSelection] = useState(null)
   const [playing, setPlaying] = useState(false)
   const [visible, setVisible] = useState(!document.hidden)
@@ -83,7 +86,7 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
     onModelsReady={ready=>setLoadedModelKey(ready ? modelKey : null)} onSceneError={setRenderError}
     simulatedAt={activity.start} location={activity.location} playerModel={replayPlayer}
     characterModels={replayModels} activity={activity} />
-    : <div className="pocket-activity-fallback pocket-activity-fallback--device" style={{backgroundImage:`url(${background.asset.backgroundUrl})`}}>
+    : <div className="pocket-activity-fallback pocket-activity-fallback--device" style={{backgroundImage:`url(${background.asset.backgroundUrl})`, filter:lookFilter(look)}}>
         <img className="pocket-activity-fallback__scenery" src={background.asset.sceneryUrl} alt="" />
         {(activity.playerInvolved || replayPlayer) && <div className="pocket-activity-person">
           <span>{sceneModels.playerModel?.source?.name || "플레이어"}</span>
@@ -116,7 +119,7 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
       <span className="text-muted-foreground">지난 부재 활동 · {frames.length}개</span>
       <Button size="sm" variant="outline" disabled={disabled} onClick={() => select(0, true)}>다시보기</Button>
     </section>}
-    <PocketAbsenceDialog open={Boolean(activity)} onClose={() => select(null)} display={activityDisplay}
+    <PocketAbsenceDialog isDeveloper={isDeveloper} open={Boolean(activity)} onClose={() => select(null)} display={activityDisplay}
       activity={activity} index={index ?? 0} count={frames.length} playing={playing} disabled={disabled} waiting={waiting}
       onToggle={() => setPlaying(value => !value)} onSelect={select}
       onReplay={() => select(0, !window.matchMedia("(prefers-reduced-motion: reduce)").matches)}

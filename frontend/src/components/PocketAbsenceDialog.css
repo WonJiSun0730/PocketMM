@@ -12,6 +12,15 @@
   box-shadow: 0 18px 56px rgb(0 0 0 / 18%);
 }
 .pocket-absence-dialog::backdrop { background: rgb(18 18 24 / 58%); }
+.pocket-absence-dialog__stage-row { display:flex; gap:16px; align-items:flex-start; }
+.pocket-absence-dialog__look { width:220px; min-width:0; }
+.pocket-absence-dialog--admin { width:580px; }
+.pocket-absence-dialog--admin .pocket-absence-device { flex-shrink:0; }
+@media (max-width:620px) {
+  .pocket-absence-dialog--admin { width:344px; }
+  .pocket-absence-dialog__stage-row { flex-direction:column; }
+  .pocket-absence-dialog__look { width:100%; }
+}
 .pocket-absence-dialog__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .pocket-absence-dialog__eyebrow { color: var(--muted-foreground); font-size: 10px; letter-spacing: .12em; margin-bottom: 4px; }
 .pocket-absence-dialog h2 { font-size: 16px; font-weight: 600; }

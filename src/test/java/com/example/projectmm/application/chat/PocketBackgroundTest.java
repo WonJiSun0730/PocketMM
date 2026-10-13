@@ -58,6 +58,18 @@ class PocketBackgroundTest {
         assertThat(PocketBackgroundImages.prepare(image(false,true),true,false)).isNotEmpty();
         assertThatThrownBy(() -> PocketBackgroundImages.prepare(new byte[]{1,2,3},false,false)).hasMessageContaining("이미지");
     }
+    @Test void generatedDarkPurpleSpillIsRemovedWithoutChangingUploadedArt() throws Exception {
+        var source=ImageIO.read(new java.io.ByteArrayInputStream(image(true,false)));
+        source.setRGB(59,80,0xff713c79);
+        var out=new java.io.ByteArrayOutputStream();ImageIO.write(source,"png",out);
+        var generated=ImageIO.read(new java.io.ByteArrayInputStream(PocketBackgroundImages.prepare(out.toByteArray(),true,true)));
+        assertThat(generated.getRGB(59,80) >>> 24).isZero();
+        // Uploaded alpha artwork is not chroma-keyed, including deliberate purple objects.
+        source=ImageIO.read(new java.io.ByteArrayInputStream(image(false,true)));
+        source.setRGB(59,80,0xff713c79);out.reset();ImageIO.write(source,"png",out);
+        var uploaded=ImageIO.read(new java.io.ByteArrayInputStream(PocketBackgroundImages.prepare(out.toByteArray(),true,false)));
+        assertThat(uploaded.getRGB(59,80)).isEqualTo(0xff713c79);
+    }
     @Test void storedImagesSurviveRestartAreScopedAndExactUploadsWin() throws Exception {
         var store = new PocketBackgroundStore(directory.toString(),new JsonMapper());
         String a="a".repeat(32), b="b".repeat(32);
