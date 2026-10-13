@@ -5,6 +5,8 @@ import java.time.LocalDateTime;
 public final class PocketActivityPrompt {
     private PocketActivityPrompt() {}
     public static String build(LocalDateTime from, LocalDateTime to) {
+        long minutes=java.time.Duration.between(from,to).toMinutes();
+        int activityBudget=(int)Math.max(1,Math.min(8,minutes/15));
         return """
                 [POCKET ABSENCE ACTIVITY PLAN — STRUCTURED TASK, NOT LIVE ROLEPLAY]
                 The human user has returned after being away. Plan compact, chronological character activities
@@ -13,7 +15,8 @@ public final class PocketActivityPrompt {
                 activities from their profiles, world, current scene, energy, mood, and recalled memories.
                 They may initiate a walk, talk to each other, return home, work, read, rest, eat or drink coffee.
                 Keep the sequence connected: a shared walk and conversation followed by coffee at home
-                should remain two ordered activities, not unrelated summaries or a full novel.
+                should remain two ordered activities only when enough time is available. In a short
+                interval, continue just the current phase rather than rushing through the whole sequence.
                 Continue AFTER the latest recorded scene, never restart its introduction or replay an
                 encounter, greeting, arrival, or invitation that already happened. If the NPC has already
                 welcomed the player and offered a seat, do not narrate preparing for that meeting and
@@ -50,7 +53,14 @@ public final class PocketActivityPrompt {
                 life elsewhere. The human being away does not make the fictional player absent.
                 Use only registered roomCast IDs for NPCs; the player needs no NPC ID. do not invent participants. Respect prior departures:
                 off-screen NPC life does not authorize bringing them back into the player's scene.
-                Generate at most 8 concise Korean summaries, each at most 400 characters. Do not
+                SLOW EVERYDAY PACING: ordinarily spend 15-20 minutes on one meaningful activity.
+                Do not create a new event each minute or accelerate routine life to fill summaries.
+                One event may last much longer (sleep, work, recovery, reading). Minor gestures and
+                conversation replies belong inside that same activity, not separate incidents.
+                Do not pack a rapid chain of distinct decisions into one summary to bypass pacing.
+                Prefer fewer activities or an empty list when nothing meaningful happens.
+                Do not force an appointment to end or a new incident to begin just because time passed.
+                Generate at most %d concise Korean summaries, each at most 400 characters. Do not
                 generate detailed novel prose now; that belongs to a later explicit detail-view request.
                 Times must be inside the interval, strictly ordered, and non-overlapping.
                 Copy the exact supplied boundary times including seconds/fractions. A rounded minute
@@ -88,6 +98,6 @@ public final class PocketActivityPrompt {
                 Always set pauseReason null and cover the full interval with connected activity.
                 Empty activities are valid when no meaningful activity is supported.
                 Interval: %s through %s.
-                """.formatted(from, to);
+                """.formatted(activityBudget, from, to);
     }
 }

@@ -1,3 +1,4 @@
+import {enterSendsMessage,chatInputEnvironment} from "@/lib/chatInput"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, Menu, Pencil, RefreshCw, Send, Trash2, Wrench, X } from "lucide-react"
 
@@ -107,7 +108,7 @@ export default function PocketPage({ pocket, onBack }) {
   const progress = usePocketProgress(session.id, async () => {
     await refresh()
     refreshPlayerState()
-  })
+  }, messageSending)
   const sending = messageSending || progress.busy
 
   async function refreshMemoryInspector() {
@@ -453,7 +454,7 @@ export default function PocketPage({ pocket, onBack }) {
   }
 
   function handleKeyDown(event) {
-    if (event.key === "Enter" && !event.shiftKey) {
+    if (enterSendsMessage(event,chatInputEnvironment())) {
       event.preventDefault()
       sendMessage()
     }
@@ -720,7 +721,7 @@ export default function PocketPage({ pocket, onBack }) {
           <Button type="button" size="icon" className="size-11 shrink-0" disabled={loading || sending}
             onClick={sendMessage} aria-label="메시지 보내기"><Send className="size-4" /></Button>
         </div>
-        <p className="mx-auto mt-2 max-w-3xl text-center text-xs text-muted-foreground">Enter 전송 · 빈 입력으로 전송 시 장면 진행 · Shift + Enter 줄바꿈</p>
+        <p className="mx-auto mt-2 max-w-3xl text-center text-xs text-muted-foreground">PC: Enter 전송 · Shift + Enter 줄바꿈 / 모바일: Enter 줄바꿈 · 버튼으로 전송</p>
       </div>
       </section>
       <aside className="pocket-desktop-tools">

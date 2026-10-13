@@ -1,3 +1,4 @@
+import {enterSendsMessage,chatInputEnvironment} from "@/lib/chatInput"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ArrowLeft, Send } from "lucide-react"
 
@@ -305,7 +306,7 @@ export default function ChatPage({
   }
 
   function handleKeyDown(event) {
-    if (event.key === "Enter" && !event.shiftKey) {
+    if (enterSendsMessage(event,chatInputEnvironment())) {
       event.preventDefault()
       sendMessage()
     }

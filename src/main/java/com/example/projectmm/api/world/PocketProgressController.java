@@ -9,14 +9,14 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/worlds/pockets/{sessionId}/progress")
 public class PocketProgressController {
     private final PocketProgressService progress;
-    public record Configuration(boolean enabled) {}
+    public record Configuration(boolean enabled, Integer minimumAbsenceMinutes) {}
     public record Simulation(int hours) {}
     @GetMapping public PocketProgressService.Status current(@PathVariable Long sessionId, Authentication auth) {
         return progress.current(sessionId, auth.getName());
     }
     @PutMapping public PocketProgressService.Status configure(@PathVariable Long sessionId,
             @RequestBody Configuration request, Authentication auth) {
-        return progress.configure(sessionId, auth.getName(), request.enabled());
+        return progress.configure(sessionId, auth.getName(), request.enabled(), request.minimumAbsenceMinutes());
     }
     @PostMapping("/resume") public PocketProgressService.Status resume(@PathVariable Long sessionId, Authentication auth) {
         return progress.resume(sessionId, auth.getName());

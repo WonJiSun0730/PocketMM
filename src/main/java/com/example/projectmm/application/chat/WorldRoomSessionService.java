@@ -59,7 +59,7 @@ public class WorldRoomSessionService {
         var session = lockForMutation(id);
         if (session.isTimeCheckEnabled() && session.getProgressPauseReason() == null
                 && session.getLastPresenceAt() != null
-                && java.time.Duration.between(session.getLastPresenceAt(), now()).getSeconds() >= 60)
+                && java.time.Duration.between(session.getLastPresenceAt(), now()).getSeconds() >= session.minimumAbsenceMinutes() * 60L)
             throw new ResponseStatusException(HttpStatus.CONFLICT, "먼저 부재 활동을 확인해 주세요.");
         session.markPresent(now());
         return session;

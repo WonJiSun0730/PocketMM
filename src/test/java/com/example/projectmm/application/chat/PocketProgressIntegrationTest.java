@@ -90,8 +90,78 @@ class PocketProgressIntegrationTest {
             """.formatted(from,mid,a,b,mid,to,a,b);
     }
     void enabledAfter(Duration absence) {
-        progress.configure(id,login,true); when(clock.now()).thenReturn(now.plus(absence));
+        progress.configure(id,login,true,1); when(clock.now()).thenReturn(now.plus(absence));
         when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(plan(story,story.plus(absence)),WorldRoomCastChange.none(),List.of(),0));
+    }
+    @Test void concurrentReturnWaitsForDialogueCommitAndCannotApplyDuplicateAbsence() throws Exception {
+        when(clock.now()).thenAnswer(call -> LocalDateTime.now());
+        progress.configure(id,login,true,1);
+        var entered=new java.util.concurrent.CountDownLatch(1);
+        var release=new java.util.concurrent.CountDownLatch(1);
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenAnswer(call -> {
+            entered.countDown();
+            if (!release.await(5,java.util.concurrent.TimeUnit.SECONDS)) throw new IllegalStateException("test timed out");
+            return new WorldRoomTurn("reply",WorldRoomCastChange.none(),List.of(),0);
+        });
+        var workers=java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            var chat=workers.submit(() -> dialogue.chat(id,"hello"));
+            assertThat(entered.await(5,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            var returned=workers.submit(() -> progress.resume(id,login));
+            release.countDown();
+            assertThat(chat.get(10,java.util.concurrent.TimeUnit.SECONDS).reply()).isEqualTo("reply");
+            assertThat(returned.get(10,java.util.concurrent.TimeUnit.SECONDS).lastReport()).isNull();
+            assertThat(progress.resume(id,login).lastReport()).isNull();
+            assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
+            verify(gateway,times(1)).generateWorldRoomTurn(any(),anyString());
+            assertThat(db(() -> messages.findTopBySessionIdOrderByIdDesc(id).orElseThrow().getContent())).isEqualTo("reply");
+        } finally {release.countDown();workers.shutdownNow();}
+    }
+    @Test void defaultAbsenceStartsAtFifteenMinutesAndPromptPacesEvents() {
+        progress.configure(id,login,true);
+        assertThat(progress.current(id,login).minimumAbsenceMinutes()).isEqualTo(15);
+        when(clock.now()).thenReturn(now.plusMinutes(14));
+        assertThat(progress.resume(id,login).lastReport()).isNull();
+        verifyNoInteractions(gateway);
+        when(clock.now()).thenReturn(now.plusMinutes(29));
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(
+            plan(story,story.plusMinutes(15)),WorldRoomCastChange.none(),List.of(),0));
+        assertThat(progress.resume(id,login).lastReport()).isNotNull();
+        verify(gateway).generateWorldRoomTurn(any(),argThat(prompt -> prompt.contains("15-20 minutes")
+            && prompt.contains("at most 1 concise")));
+        assertThat(PocketActivityPrompt.build(story,story.plusMinutes(20))).contains("at most 1 concise");
+        assertThat(PocketActivityPrompt.build(story,story.plusHours(1))).contains("at most 4 concise");
+    }
+    @Test void configuredThresholdIsPersistedAndBoundaryGeneratesOnlyOnce() {
+        progress.configure(id,login,true,10);
+        assertThat(progress.current(id,login).minimumAbsenceMinutes()).isEqualTo(10);
+        when(clock.now()).thenReturn(now.plusMinutes(9));
+        assertThat(progress.resume(id,login).lastReport()).isNull();
+        verifyNoInteractions(gateway);
+        when(clock.now()).thenReturn(now.plusMinutes(19));
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(
+            plan(story,story.plusMinutes(10)),WorldRoomCastChange.none(),List.of(),0));
+        var report=progress.resume(id,login).lastReport();
+        assertThat(report).isNotNull();
+        assertThat(progress.resume(id,login).lastReport().id()).isEqualTo(report.id());
+        verify(gateway,times(1)).generateWorldRoomTurn(any(),anyString());
+    }
+    @Test void disablingAfterEnablePreservesAllStoryStateAndSkipsModel() {
+        progress.configure(id,login,true,5);
+        progress.configure(id,login,false,null);
+        when(clock.now()).thenReturn(now.plusDays(2));
+        var result=progress.resume(id,login);
+        assertThat(result.enabled()).isFalse();
+        assertThat(result.simulatedAt()).isEqualTo(story);
+        assertThat(result.lastReport()).isNull();
+        assertThat(db(() -> List.copyOf(states.findBySessionId(id).orElseThrow().getConditions()))).containsExactly("tired");
+        assertThat(db(() -> memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(id).size())).isZero();
+        verifyNoInteractions(gateway);
+    }
+    @Test void invalidThresholdDoesNotMutateConfiguration() {
+        assertThatThrownBy(() -> progress.configure(id,login,true,0)).isInstanceOf(ResponseStatusException.class);
+        assertThat(progress.current(id,login).enabled()).isFalse();
+        assertThat(progress.current(id,login).minimumAbsenceMinutes()).isEqualTo(15);
     }
     @Test void returnStoresOrderedActivitiesOnlyInPocketAndReentryDoesNotRepeat() {
         enabledAfter(Duration.ofMinutes(10));
@@ -151,7 +221,7 @@ class PocketProgressIntegrationTest {
         assertThat(db(() -> memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(id).size())).isZero();
     }
     @Test void elapsedIsCappedAndLegacyPauseCannotPermanentlyStopAutonomy() {
-        progress.configure(id,login,true); when(clock.now()).thenReturn(now.plusDays(8));
+        progress.configure(id,login,true,1); when(clock.now()).thenReturn(now.plusDays(8));
         when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(plan(story,story.plusDays(3)),WorldRoomCastChange.none(),List.of(),0));
         var capped = progress.resume(id,login);
         assertThat(capped.lastReport().capped()).isTrue();

@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
-export default function usePocketProgress(sessionId, onUpdated) {
+export default function usePocketProgress(sessionId, onUpdated, dialogueBusy = false) {
   const [status, setStatus] = useState(null)
   const [busy, setBusy] = useState(true)
   const [error, setError] = useState("")
   const [freshReportId, setFreshReportId] = useState(null)
+  const blocked = useRef(dialogueBusy)
+  blocked.current = dialogueBusy
+  const deferred = useRef(false)
+  const enabled = useRef(false)
   const updated = useRef(onUpdated)
   updated.current = onUpdated
   const scope = useRef(null)
@@ -29,7 +33,8 @@ export default function usePocketProgress(sessionId, onUpdated) {
         if (["/resume", "/simulate"].includes(suffix) && !active.ready) {
           const previous = await request("")
           if (scope.current !== active) return false
-          setStatus(previous)
+          setStatus(previous); enabled.current = Boolean(previous?.enabled)
+          if (suffix === "/resume" && !previous?.enabled) { active.ready=true; return true }
           active.reportId = previous?.lastReport?.id
         }
         const result = await request(suffix, options)
@@ -38,7 +43,7 @@ export default function usePocketProgress(sessionId, onUpdated) {
           setFreshReportId(result.lastReport.id)
         const changed = !active.ready || active.reportId !== result?.lastReport?.id || active.simulatedAt !== result?.simulatedAt
         if (options?.method === "DELETE") setFreshReportId(null)
-        setStatus(result); active.failed = false; active.ready = true; active.testHours = null
+        enabled.current=Boolean(result?.enabled); setStatus(result); active.failed = false; active.ready = true; active.testHours = null
         active.reportId = result?.lastReport?.id; active.simulatedAt = result?.simulatedAt
         if (refresh && changed) await updated.current?.()
         return true
@@ -52,31 +57,36 @@ export default function usePocketProgress(sessionId, onUpdated) {
     })()
     return active.pending
   }, [request])
-  const resume = useCallback(() => scope.current.testHours != null
-    ? run("/simulate", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hours: scope.current.testHours }) }, true)
-    : run("/resume", { method: "POST" }, true), [run])
+  const resume = useCallback(() => {
+    if (blocked.current) { deferred.current=true; return Promise.resolve(false) }
+    deferred.current=false
+    if (scope.current.ready && !enabled.current && scope.current.testHours == null) return Promise.resolve(true)
+    return scope.current.testHours != null
+      ? run("/simulate", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({hours:scope.current.testHours})},true)
+      : run("/resume",{method:"POST"},true)
+  },[run])
+  useEffect(()=>{if (!dialogueBusy && deferred.current && !document.hidden) resume()},[dialogueBusy,resume])
   const simulate = useCallback(hours => {
     if (scope.current.pending) return scope.current.pending
     scope.current.testHours = hours
     return resume()
   }, [resume])
   const discard = useCallback(reportId => run(`/reports/${reportId}`, { method: "DELETE" }, true), [run])
-  const configure = useCallback(enabled => run("", {
-    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }),
+  const configure = useCallback((enabled, minimumAbsenceMinutes) => run("", {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled, minimumAbsenceMinutes }),
   }, false), [run])
   useEffect(() => {
     let mounted = true
     const active = scope.current
     resume()
     const heartbeat = () => {
-      if (!mounted || !active.ready || active.pending || active.failed || document.hidden) return
+      if (blocked.current || !enabled.current || !mounted || !active.ready || active.pending || active.failed || document.hidden) return
       request("/presence", { method: "POST" }).catch(failure => {
         if (mounted && scope.current === active) { active.failed = true; setError(failure.message) }
       })
     }
     const hiddenPresence = () => {
-      if (active.ready && !active.pending && !active.failed)
+      if (!blocked.current && enabled.current && active.ready && !active.pending && !active.failed)
         request("/presence", { method: "POST", keepalive: true }).catch(() => {})
     }
     const visibility = () => { if (document.hidden) hiddenPresence(); else resume() }

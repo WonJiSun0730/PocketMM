@@ -41,7 +41,7 @@ public class PocketProgressService {
 
     public record Report(Long id, LocalDateTime from, LocalDateTime to, LocalDateTime processedAt,
             boolean capped, String pauseReason, List<PocketActivityPlan.Activity> activities) {}
-    public record Status(boolean enabled, LocalDateTime simulatedAt, String pauseReason, Report lastReport, boolean processing) {}
+    public record Status(boolean enabled, int minimumAbsenceMinutes, LocalDateTime simulatedAt, String pauseReason, Report lastReport, boolean processing) {}
     private record Claim(Long sessionId, String token, LocalDateTime from, LocalDateTime to,
             boolean capped, WorldRoomDialogueContext context) {}
     private record Prepared(Status status, Claim claim) {}
@@ -67,7 +67,7 @@ public class PocketProgressService {
             return new Report(r.getId(), r.getFromTime(), r.getToTime(), r.getProcessedAt(), r.isCapped(),
                     r.getPauseReason(), List.of(activities));
         }).orElse(null);
-        return new Status(session.isTimeCheckEnabled(), session.getSimulatedAt(), null,
+        return new Status(session.isTimeCheckEnabled(), session.minimumAbsenceMinutes(), session.getSimulatedAt(), null,
                 report, session.progressInProgress(clock.now()));
     }
     public Status current(Long id, String loginId) {
@@ -90,11 +90,15 @@ public class PocketProgressService {
             return status(session);
         });
     }
-    public Status configure(Long id, String loginId, boolean enabled) {
+    public Status configure(Long id, String loginId, boolean enabled) { return configure(id,loginId,enabled,null); }
+    public Status configure(Long id, String loginId, boolean enabled, Integer minimumMinutes) {
+        if (minimumMinutes != null && (minimumMinutes < 1 || minimumMinutes > 4320))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "부재 시작 시간은 1~4320분으로 설정해 주세요.");
         return tx(() -> {
             var session = owned(id, loginId, true); idle(session);
             if (enabled && session.getPlayerProfile() == null)
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "플레이어를 선택한 후 시간 체크를 켜 주세요.");
+            if (minimumMinutes != null) session.configureMinimumAbsence(minimumMinutes);
             // An identical request must never erase an outstanding absence.
             if (session.isTimeCheckEnabled() != enabled) session.configureTimeCheck(enabled, clock.now());
             return status(session);
@@ -105,7 +109,7 @@ public class PocketProgressService {
             var session = owned(id, loginId, true); idle(session);
             // A delayed heartbeat must not silently discard an unprocessed absence.
             if (session.isTimeCheckEnabled() && session.getLastPresenceAt() != null
-                    && Duration.between(session.getLastPresenceAt(), clock.now()).getSeconds() >= 60)
+                    && Duration.between(session.getLastPresenceAt(), clock.now()).getSeconds() >= session.minimumAbsenceMinutes() * 60L)
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "먼저 부재 활동을 확인해 주세요.");
             session.markPresent(clock.now()); return null;
         });
@@ -127,7 +131,7 @@ public class PocketProgressService {
                 var now = clock.now(); var presence = session.getLastPresenceAt();
                 if (!session.isTimeCheckEnabled() || session.getPlayerProfile() == null
                         || (testElapsed == null && (presence == null
-                        || Duration.between(presence, now).getSeconds() < 60))) {
+                        || Duration.between(presence, now).getSeconds() < session.minimumAbsenceMinutes() * 60L))) {
                     session.markPresent(now); return new Prepared(status(session), null);
                 }
                 var elapsed = testElapsed == null ? Duration.between(presence, now) : testElapsed;

@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 
 import { activitySymbol } from "@/lib/pocketActivityPlayback"
@@ -9,6 +10,8 @@ function time(value) {
 }
 export default function PocketProgressPanel({ progress, characters, disabled }) {
   const { status, busy, error, configure, resume, simulate } = progress
+  const [minutes,setMinutes]=useState(15)
+  useEffect(()=>setMinutes(status?.minimumAbsenceMinutes ?? 15),[status?.minimumAbsenceMinutes])
   const names = new Map(characters.map(c => [c.id ?? c.characterId, c.name ?? c.characterName]))
   const report = status?.lastReport
   return <section aria-label="시간 체크" className="border-b px-4 py-3 text-xs sm:px-6">
@@ -19,6 +22,12 @@ export default function PocketProgressPanel({ progress, characters, disabled }) 
         onClick={() => configure(!status?.enabled)}>{status?.enabled ? "ON" : "OFF"}</Button>
     </div>
     <p className="mt-2 leading-5 text-muted-foreground">복귀할 때 부재 시간을 반영하고 캐릭터 활동을 정리해요.</p>
+    <div className="mt-3 flex items-center gap-2">
+      <label>부재 시작 <input aria-label="최소 부재 시간(분)" type="number" min="1" max="4320" value={minutes}
+        onChange={event=>setMinutes(event.target.value)} className="w-16 rounded border bg-background p-1" />분</label>
+      <Button size="sm" variant="outline" disabled={busy || disabled || !Number.isInteger(Number(minutes)) || Number(minutes)<1 || Number(minutes)>4320}
+        onClick={()=>configure(Boolean(status?.enabled),Number(minutes))}>저장</Button>
+    </div>
     <div className="mt-3 rounded-md border border-dashed p-2">
       <p className="font-medium">부재 시간 테스트</p>
       <div className="mt-2 flex flex-wrap gap-2">{[1, 2, 3].map(hours =>

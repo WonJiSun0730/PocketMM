@@ -119,6 +119,7 @@ public class WorldRoomDialogueService {
                 context.simulatedAt()
         ));
 
+        session.markPresent(now());
         session.markProgressed(now());
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
     }
@@ -316,6 +317,7 @@ public class WorldRoomDialogueService {
 
         variant.captureEvaluationContext(captureEvaluationContext("CONTINUE", "[자동 전개]", continuationPrompt, generated.reply(), context));
 
+        session.markPresent(now());
         session.markProgressed(now());
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
     }
@@ -445,6 +447,7 @@ public class WorldRoomDialogueService {
 
         variant.captureEvaluationContext(captureEvaluationContext("REROLL", rerollBase, rerollPrompt, generated.reply(), context));
 
+        rerollSession.markPresent(now());
         rerollSession.markProgressed(now());
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
     }
@@ -510,6 +513,7 @@ public class WorldRoomDialogueService {
 
         variant.captureEvaluationContext(captureEvaluationContext("REGENERATE", userMessage.getContent(), userMessage.getContent(), generated.reply(), context));
 
+        session.markPresent(now());
         session.markProgressed(now());
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
     }
