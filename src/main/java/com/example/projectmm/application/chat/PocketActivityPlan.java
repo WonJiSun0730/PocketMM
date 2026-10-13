@@ -36,8 +36,15 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
         boolean timingValid = true;
         var previous = from;
         for (var item : node.path("activities")) {
-            var start = LocalDateTime.parse(item.path("start").asText());
-            var end = LocalDateTime.parse(item.path("end").asText());
+            LocalDateTime start, end;
+            try {
+                start = LocalDateTime.parse(item.path("start").asText());
+                end = LocalDateTime.parse(item.path("end").asText());
+            } catch (java.time.format.DateTimeParseException malformed) {
+                // The server's claimed interval is authoritative. Do not guess a broken date;
+                // use the existing ordered interval repair after validating all other fields.
+                start = from; end = to; timingValid = false;
+            }
             if (start.isBefore(previous) || !end.isAfter(start) || end.isAfter(to)) timingValid = false;
             var ids = new ArrayList<Long>();
             if (!item.path("characterIds").isArray()) throw new IllegalArgumentException("Missing participants");

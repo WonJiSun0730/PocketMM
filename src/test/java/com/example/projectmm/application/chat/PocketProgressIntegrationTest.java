@@ -429,6 +429,28 @@ class PocketProgressIntegrationTest {
                 .containsExactly(PocketActivityPlan.Kind.WALK,PocketActivityPlan.Kind.COFFEE);
         assertThat(activities).allMatch(activity -> activity.end().isAfter(activity.start()));
     }
+    @Test void malformedModelDateUsesClaimedIntervalAndDoesNotApplyTwice() {
+        progress.configure(id,login,true);
+        var raw=plan(story,story.plusHours(1)).replace(story.plusHours(1).toString(),"2026-10-46:00");
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
+        var result=progress.simulateAbsence(id,login,1);
+        var activities=result.lastReport().activities();
+        assertThat(activities.getFirst().start()).isEqualTo(story);
+        assertThat(activities.getFirst().end()).isEqualTo(activities.getLast().start());
+        assertThat(activities.getLast().end()).isEqualTo(story.plusHours(1));
+        assertThat(result.simulatedAt()).isEqualTo(story.plusHours(1));
+        assertThat(progress.resume(id,login).lastReport().id()).isEqualTo(result.lastReport().id());
+        verify(gateway,times(1)).generateWorldRoomTurn(any(),anyString());
+    }
+    @Test void malformedDateDoesNotBypassParticipantValidationOrChangeStoryTime() {
+        progress.configure(id,login,true);
+        var raw=plan(story,story.plusHours(1)).replace(story.plusHours(1).toString(),"2026-10-46:00")
+                .replace("[%d,%d]".formatted(a,b),"[999999999]");
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
+        assertThatThrownBy(()->progress.simulateAbsence(id,login,1)).isInstanceOf(ResponseStatusException.class);
+        assertThat(progress.current(id,login).simulatedAt()).isEqualTo(story);
+        assertThat(progress.current(id,login).lastReport()).isNull();
+    }
     @Test void soloPlayerCanContinueAtHomeWithoutBringingCounsellorAlong() {
         progress.configure(id,login,true);
         db(() -> { sessionService.applyCastChange(id,new WorldRoomCastChange(List.of(a),List.of())); return null; });
