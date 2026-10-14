@@ -17,7 +17,10 @@ function TokenNotice({ onCancel, onConfirm }) {
       <Button onClick={()=>{if(hideToday)hideTokenNoticeToday(window.localStorage);onConfirm()}}>이야기 만들기</Button></div>
   </dialog>,document.body)
 }
-export default function PocketAbsenceLog({ sessionId, reportId, report, fallback = "", index = null, disabled = false, hideBrief = false, showNarrative = true, isDeveloper = false, showOriginal = true }) {
+function UsageLine({ label, usage, shared = false }) {
+  return <p>{label} · {usage ? `${usage.provider} / ${usage.model} · 입력 ${usage.inputTokens.toLocaleString()} / 출력 ${usage.outputTokens.toLocaleString()} / 총 ${usage.totalTokens.toLocaleString()} 토큰` : "사용량 기록 없음"}{shared && " (원본과 동일 호출, 추가 토큰 없음)"}</p>
+}
+export default function PocketAbsenceLog({ sessionId, reportId, report, fallback = "", index = null, disabled = false, hideBrief = false, showNarrative = true, isDeveloper = false, showOriginal = true, allowGenerate = true }) {
   const [view,setView] = useState(null), [busy,setBusy]=useState(false), [error,setError]=useState(""), [notice,setNotice]=useState(false)
   const scope=useRef(null)
   const key=`${sessionId}:${reportId}`
@@ -77,8 +80,13 @@ export default function PocketAbsenceLog({ sessionId, reportId, report, fallback
 
     {generating && <p role="status" className="text-sm text-muted-foreground">그동안의 이야기를 펼치고 있어요…</p>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    {!view?.narrative && <Button size="sm" variant="outline" disabled={disabled || generating || reportId==null}
+    {allowGenerate && !view?.narrative && <Button size="sm" variant="outline" className={hideBrief ? "w-full h-8" : undefined} disabled={disabled || generating || reportId==null}
       onClick={()=>{if(needsTokenNotice(window.localStorage))setNotice(true);else generate()}}>자세히 보기</Button>}
+    {isDeveloper && view && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">생성 모델·토큰</summary><div className="mt-2 space-y-2">
+      <UsageLine label="원본 활동 기록" usage={view.originalUsage} />
+      <UsageLine label="간략 버전" usage={view.originalUsage} shared />
+      <UsageLine label="상세 서술" usage={view.narrativeUsage} />
+    </div></details>}
     {showOriginal && isDeveloper && view?.activities?.length > 0 && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">원본 활동 기록</summary>
       <div className="mt-2 space-y-2">{view.activities.map((activity,i)=><p key={i}>{activity.start} ~ {activity.end} · {activity.location}<br/>{activity.summary}</p>)}</div></details>}
     {notice && <TokenNotice onCancel={()=>setNotice(false)} onConfirm={generate} />}

@@ -8,6 +8,14 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class AiUsageTracker {
 
+    private static final ThreadLocal<CaptureSlot> capture = new ThreadLocal<>();
+    private static class CaptureSlot { final Long sessionId; Snapshot snapshot; CaptureSlot(Long id) {sessionId=id;} }
+    public record Captured<T>(T value, Snapshot usage) {}
+    public static <T> Captured<T> capture(Long sessionId, java.util.function.Supplier<T> work) {
+        var previous=capture.get();var slot=new CaptureSlot(sessionId);capture.set(slot);
+        try {return new Captured<>(work.get(),slot.snapshot);}
+        finally {if(previous==null)capture.remove();else capture.set(previous);}
+    }
     private final ConcurrentHashMap<Long, Snapshot> latest = new ConcurrentHashMap<>();
 
     public void record(
@@ -20,10 +28,13 @@ public class AiUsageTracker {
             long totalTokens
     ) {
         if (sessionId == null) return;
-        latest.put(sessionId, new Snapshot(
+        var snapshot = new Snapshot(
                 provider, model, inputTokens, cachedInputTokens,
                 outputTokens, totalTokens, Instant.now()
-        ));
+        );
+        latest.put(sessionId,snapshot);
+        var slot=capture.get();
+        if(slot!=null && java.util.Objects.equals(slot.sessionId,sessionId))slot.snapshot=snapshot;
     }
 
     public Snapshot latest(Long sessionId) {

@@ -6,7 +6,7 @@ import { activityCaption, activityPeriod } from "@/lib/pocketAbsenceLog"
 import "./PocketAbsenceDialog.css"
 
 export default function PocketAbsenceDialog({ open, onClose, display, activity, index, count, playing,
-  sessionId, report, isDeveloper = false, disabled, waiting = false, onToggle, onSelect, onReplay, onDiscard, error }) {
+  sessionId, report, allowGenerate = true, isDeveloper = false, disabled, waiting = false, onToggle, onSelect, onReplay, onDiscard, error }) {
   const dialog = useRef(null)
   useEffect(() => {
     if (!open) return
@@ -32,10 +32,10 @@ export default function PocketAbsenceDialog({ open, onClose, display, activity, 
       <Button variant="ghost" size="sm" disabled={disabled || waiting} onClick={onToggle}>{waiting ? "준비 중" : playing ? "일시정지" : "재생"}</Button>
       <Button variant="ghost" size="sm" disabled={disabled || waiting || index === count - 1} aria-label="다음 활동" onClick={() => onSelect(index + 1)}>›</Button>
     </div>
-    {!waiting && <div className="my-3"><PocketAbsenceLog sessionId={sessionId} reportId={report?.id} report={report} index={index} hideBrief showOriginal={false} showNarrative={false} isDeveloper={isDeveloper} disabled={disabled} /></div>}
+    {!waiting && <div className="my-3"><PocketAbsenceLog sessionId={sessionId} reportId={report?.id} report={report} index={index} hideBrief allowGenerate={allowGenerate} showOriginal={false} showNarrative={false} isDeveloper={isDeveloper} disabled={disabled} /></div>}
     {error && <p role="alert" className="pocket-absence-dialog__error">{error}</p>}
     <div className="pocket-absence-dialog__actions">
-      <Button disabled={disabled || waiting} onClick={onReplay}>다시보기</Button>
+      <Button size="sm" className="w-full h-8 col-span-2" disabled={disabled || waiting} onClick={onReplay}>다시보기</Button>
       <Button variant="ghost" className="pocket-absence-dialog__discard" disabled={disabled} onClick={onDiscard}>모르는 일이에요</Button>
     </div>
   </dialog>, document.body)

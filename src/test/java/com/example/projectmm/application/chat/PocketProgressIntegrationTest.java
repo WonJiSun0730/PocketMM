@@ -289,6 +289,37 @@ class PocketProgressIntegrationTest {
         assertThat(PocketActivityPlan.politeFallback("“쉬었다.”라고 말했다.")).isEqualTo("“쉬었다.”라고 말했어요.");
         assertThat(PocketActivityPlan.politeFallback("밀리는 쉬었어요. 오늘은 바다를 보았다.")).isEqualTo("밀리는 쉬었어요. 오늘은 바다를 보았어요.");
     }
+    @Test void newRoleplayClosesEarlierUnwrittenStoryWithoutCallingAiOrDeletingOriginal() {
+        enabledAfter(Duration.ofMinutes(20));var report=progress.resume(id,login).lastReport();
+        db(() -> {messages.save(new WorldRoomMessage(sessions.findById(id).orElseThrow(),ChatRole.USER,"Next roleplay",now.plusHours(1)));return null;});
+        assertThatThrownBy(() -> progress.generateStory(id,report.id(),login)).isInstanceOfSatisfying(ResponseStatusException.class,
+                e -> assertThat(e.getStatusCode().value()).isEqualTo(409));
+        assertThat(progress.readStory(id,report.id(),login).activities()).isEqualTo(report.activities());
+        assertThat(progress.readStory(id,report.id(),login).generating()).isFalse();
+        verify(gateway,times(1)).generateWorldRoomTurn(any(),anyString());
+    }
+    @Test void originalAndNovelUsageAreSavedPerReportAndReplayDoesNotReuseLatestCall() {
+        enabledAfter(Duration.ofMinutes(20));
+        var tracker=new com.example.projectmm.infrastructure.dialogue.AiUsageTracker();
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenAnswer(call -> {
+            tracker.record(id,"OPENAI","activity-model",100,20,50,150);
+            return new WorldRoomTurn(plan(story,story.plusMinutes(20)),WorldRoomCastChange.none(),List.of(),0);
+        });
+        var report=progress.resume(id,login).lastReport();
+        assertThat(progress.readStory(id,report.id(),login).originalUsage().path("model").asText()).isEqualTo("activity-model");
+        when(gateway.generateWorldRoomTurn(any(),contains("ABSENCE NOVELIZATION"))).thenAnswer(call -> {
+            tracker.record(id,"GEMINI","novel-model",200,0,80,280);
+            return new WorldRoomTurn("Novel prose",WorldRoomCastChange.none(),List.of(),0);
+        });
+        var generated=progress.generateStory(id,report.id(),login);
+        assertThat(generated.narrativeUsage().path("totalTokens").asLong()).isEqualTo(280);
+        tracker.record(id,"OPENAI","unrelated-later-call",5,0,5,10);
+        var saved=progress.readStory(id,report.id(),login);
+        assertThat(saved.originalUsage().path("totalTokens").asLong()).isEqualTo(150);
+        assertThat(saved.narrativeUsage().path("model").asText()).isEqualTo("novel-model");
+        assertThat(progress.generateStory(id,report.id(),login).narrativeUsage()).isEqualTo(saved.narrativeUsage());
+        verify(gateway,times(2)).generateWorldRoomTurn(any(),anyString());
+    }
     String plan(LocalDateTime from, LocalDateTime to) {
         var mid = from.plus(Duration.between(from,to).dividedBy(2));
         return """

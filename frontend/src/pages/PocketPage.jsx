@@ -512,6 +512,7 @@ export default function PocketPage({ pocket, onBack }) {
         <PocketActivityScene
           isDeveloper={isDeveloper}
           sessionId={session.id}
+          allowGenerate={!messages.some(m => m.absenceReportId == null && m.id > (messages.find(m => m.absenceReportId === progress.status?.lastReport?.id)?.id ?? -1))}
           report={progress.status?.lastReport}
           freshReportId={progress.freshReportId}
           onDiscard={progress.discard}
@@ -686,7 +687,7 @@ export default function PocketPage({ pocket, onBack }) {
               {editing === item.id ? <div className="space-y-2">
                 <Textarea autoFocus value={editText} onChange={e => setEditText(e.target.value)} className="min-h-32 resize-y text-base leading-7" />
                 <div className="flex justify-end gap-2"><Button size="sm" variant="ghost" onClick={() => setEditing(null)}><X className="mr-1 size-3.5"/>취소</Button><Button size="sm" onClick={() => editMessage(item)}>저장</Button></div>
-              </div> : isAbsence ? <PocketAbsenceLog sessionId={session.id} reportId={item.absenceReportId} isDeveloper={isDeveloper} fallback={item.content ?? item.message} disabled={sending} /> : <TypedPocketReply key={`${item.id}:${item.selectedVariantNo ?? 1}:${item.content ?? item.message}`}
+              </div> : isAbsence ? <PocketAbsenceLog sessionId={session.id} reportId={item.absenceReportId} allowGenerate={!messages.slice(index+1).some(m => m.absenceReportId == null)} isDeveloper={isDeveloper} fallback={item.content ?? item.message} disabled={sending} /> : <TypedPocketReply key={`${item.id}:${item.selectedVariantNo ?? 1}:${item.content ?? item.message}`}
                 text={item.content ?? item.message}
                 animate={isCharacter && !isAbsence && typingTarget===`${item.id}:${item.selectedVariantNo ?? 1}`}
                 onProgress={followTyping}>

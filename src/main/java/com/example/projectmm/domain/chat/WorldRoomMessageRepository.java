@@ -20,6 +20,8 @@ public interface WorldRoomMessageRepository extends JpaRepository<WorldRoomMessa
 
     void deleteBySessionIdAndIdGreaterThanEqual(Long sessionId, Long messageId);
 
+    boolean existsBySessionIdAndIdGreaterThanAndAbsenceReportIdIsNull(Long sessionId, Long messageId);
+
     boolean existsBySessionIdAndIdGreaterThan(Long sessionId, Long messageId);
 
     java.util.Optional<WorldRoomMessage> findTopBySessionIdAndIdGreaterThanEqualAndRoleOrderByIdAsc(

@@ -11,7 +11,7 @@ import { lookFilter } from "@/lib/pocketSceneLook"
 import { ACTIVITY_FRAME_MS, activitySymbol, activityParticipants, activityModels, nextActivityIndex, replayIncludesPlayer } from "@/lib/pocketActivityPlayback"
 
 export default function PocketActivityScene({ sessionId, report, freshReportId, characters, sceneModels,
-  simulatedAt, location, disabled, onDiscard, progressError, isDeveloper = false }) {
+  simulatedAt, location, disabled, allowGenerate = true, onDiscard, progressError, isDeveloper = false }) {
   const [look] = usePocketSceneLook()
   const [selection, setSelection] = useState(null)
   const [playing, setPlaying] = useState(false)
@@ -120,7 +120,7 @@ export default function PocketActivityScene({ sessionId, report, freshReportId, 
       <span className="text-muted-foreground">지난 부재 활동 · {frames.length}개</span>
       <Button size="sm" variant="outline" disabled={disabled || !sceneModels.ready} onClick={() => select(0, true)}>다시보기</Button>
     </section>}
-    <PocketAbsenceDialog sessionId={sessionId} report={report} isDeveloper={isDeveloper} open={Boolean(activity) && sceneModels.ready} onClose={() => select(null)} display={activityDisplay}
+    <PocketAbsenceDialog allowGenerate={allowGenerate} sessionId={sessionId} report={report} isDeveloper={isDeveloper} open={Boolean(activity) && sceneModels.ready} onClose={() => select(null)} display={activityDisplay}
       activity={activity} index={index ?? 0} count={frames.length} playing={playing} disabled={disabled} waiting={waiting}
       onToggle={() => setPlaying(value => !value)} onSelect={select}
       onReplay={() => select(0, !window.matchMedia("(prefers-reduced-motion: reduce)").matches)}

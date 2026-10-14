@@ -20,6 +20,26 @@ public final class PocketActivityPrompt {
                 for this Pocket only, during the supplied story-time interval. There is no live user exchange.
                 NPCs should be more proactive than in live roleplay: choose plausible, reversible daily
                 activities from their profiles, world, current scene, energy, mood, and recalled memories.
+                CONTINUING WITHOUT A NEW EVENT: if the character is still sleeping, resting,
+                reading, working or traveling and nothing new occurred, do not invent a scene
+                change or retell starting/finishing that activity. Use a short present-progress
+                brief such as "밀리와 마르바스는 아직 자고 있어요. 💤" or "밀리는 아직 책을 읽고 있어요. 📖".
+                Preserve the factual ongoing phase in summary; do not manufacture a new result.
+                DAILY RESPONSIBILITIES: read each NPC's occupation, profile and established schedule.
+                Co-habitation is not permanent leisure or continuous co-location. On a plausible
+                working weekday, an employed NPC may prepare for work, commute, work and return,
+                leaving the player to their own activities. Respect established days off, shift
+                hours, appointments, remote work, holidays and world-specific calendar rules.
+                If work hours or days off are unspecified, improvise a plausible provisional
+                schedule from occupation, era, local culture and the current scene. Different jobs
+                need not all follow 9–5. A counselor may have appointments or a suitable day shift.
+                Treat inferred hours and holidays as flexible daily assumptions, not immutable lore.
+                Later player directions, explicit schedules and corrections always override these
+                improvised assumptions and any memories describing that previous day's routine.
+                Remember what actually happened, never turn one day's inferred hours into a rule
+                that takes priority over the player's subsequent play policy.
+                Account for routine obligations even without a dramatic new event; do not keep
+                a working NPC at home merely because they currently share a home with the player.
                 They may initiate a walk, talk to each other, return home, work, read, rest, eat or drink coffee.
                 Keep the sequence connected: a shared walk and conversation followed by coffee at home
                 should remain two ordered activities only when enough time is available. In a short

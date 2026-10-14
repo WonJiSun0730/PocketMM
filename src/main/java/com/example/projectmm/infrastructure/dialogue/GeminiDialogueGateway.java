@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 @Component
 public class GeminiDialogueGateway implements DialogueGateway {
 
+    @Autowired(required=false) private AiUsageTracker usageTracker = new AiUsageTracker();
     private final String apiKey;
     private final String model;
     private final RestClient restClient;
@@ -197,6 +198,11 @@ public class GeminiDialogueGateway implements DialogueGateway {
         );
 
         String response = callGeminiWithRetry(request);
+        var root = objectMapper.readTree(response);
+        var usage = root.path("usageMetadata");
+        if (usage.isObject()) usageTracker.record(context.sessionId(),"GEMINI",model,
+                usage.path("promptTokenCount").asLong(0),usage.path("cachedContentTokenCount").asLong(0),
+                usage.path("candidatesTokenCount").asLong(0)+usage.path("thoughtsTokenCount").asLong(0),usage.path("totalTokenCount").asLong(0));
         return parseWorldRoomResponse(response, context);
     }
 

@@ -21,6 +21,10 @@ public class PocketActivityReport {
     @Column(columnDefinition = "LONGTEXT") private String narrativeText;
     @Column(length = 36) private String narrativeOperationId;
     private LocalDateTime narrativeOperationUntil;
+    @Column(columnDefinition="LONGTEXT") private String activityUsageJson;
+    @Column(columnDefinition="LONGTEXT") private String narrativeUsageJson;
+    public void captureActivityUsage(String json) {activityUsageJson=json;}
+    public void captureNarrativeUsage(String json) {narrativeUsageJson=json;}
     public void captureNarrativeContext(String json) { narrativeContextJson = json; }
     public boolean narrativeInProgress(LocalDateTime now) {
         return narrativeOperationId != null && narrativeOperationUntil != null && narrativeOperationUntil.isAfter(now);

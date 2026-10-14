@@ -182,7 +182,7 @@ public class OpenAiDialogueGateway implements DialogueGateway {
             if (reply.isBlank()) throw new IllegalStateException("OpenAI Pocket reply is blank");
 
             JsonNode usage = root.path("usage");
-            usageTracker.record(
+            if (usage.isObject()) usageTracker.record(
                     context.sessionId(),
                     "OPENAI",
                     model,

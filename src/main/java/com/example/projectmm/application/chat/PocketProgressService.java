@@ -74,7 +74,11 @@ public class PocketProgressService {
         return tx(() -> status(owned(id, loginId, false)));
     }
     public record StoryReport(Long id, List<PocketActivityPlan.Activity> activities, List<String> briefLogs,
-            String narrative, boolean generating) {}
+            String narrative, boolean generating, tools.jackson.databind.JsonNode originalUsage, tools.jackson.databind.JsonNode narrativeUsage) {
+        public StoryReport(Long id,List<PocketActivityPlan.Activity> activities,List<String> briefLogs,String narrative,boolean generating) {
+            this(id,activities,briefLogs,narrative,generating,null,null);
+        }
+    }
     private PocketActivityReport storyReport(Long id, Long reportId, String loginId, boolean lock) {
         owned(id,loginId,lock);
         return reports.findById(reportId).filter(r -> r.getSession().getId().equals(id))
@@ -91,7 +95,9 @@ public class PocketProgressService {
             String end = a.start().toLocalDate().equals(a.end().toLocalDate()) ? time.format(a.end()) : date.format(a.end());
             return date.format(a.start()) + " ~ " + end + " " + text;
         }).toList();
-        return new StoryReport(report.getId(),activities,logs,report.getNarrativeText(),report.narrativeInProgress(clock.now()));
+        return new StoryReport(report.getId(),activities,logs,report.getNarrativeText(),report.narrativeInProgress(clock.now()),
+                report.getActivityUsageJson()==null ? null : JSON.readTree(report.getActivityUsageJson()),
+                report.getNarrativeUsageJson()==null ? null : JSON.readTree(report.getNarrativeUsageJson()));
     }
     public StoryReport readStory(Long id, Long reportId, String loginId) {
         return tx(() -> storyView(storyReport(id,reportId,loginId,false)));
@@ -102,6 +108,8 @@ public class PocketProgressService {
             var report = storyReport(id,reportId,loginId,true);
             em.refresh(report);
             if (report.getNarrativeText() != null) return new StoryClaim(null,null,null,storyView(report));
+            if (report.getSourceMessageId() != null && messages.existsBySessionIdAndIdGreaterThanAndAbsenceReportIdIsNull(id,report.getSourceMessageId()))
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"이 활동 이후에 새 대화가 이어졌어요. 이전 활동의 자세히 보기는 종료됐어요.");
             if (report.narrativeInProgress(clock.now()))
                 throw new ResponseStatusException(HttpStatus.CONFLICT,"이 이야기를 펼치고 있어요. 잠시 후 다시 열어 주세요.");
             String snapshot = report.getNarrativeContextJson();
@@ -125,7 +133,7 @@ public class PocketProgressService {
         int maximumCharacters = awakeEpisodes == 0 ? 800 : awakeEpisodes <= 2 ? 2500 : awakeEpisodes <= 5 ? 5000 : 8000;
         String sceneRange = awakeEpisodes == 0 ? "1" : awakeEpisodes <= 2 ? "2–3" : awakeEpisodes <= 5 ? "3–5" : "5–7";
         try {
-            String text = gateway.generateWorldRoomTurn(claim.context(), """
+            var generated = com.example.projectmm.infrastructure.dialogue.AiUsageTracker.capture(id, () -> gateway.generateWorldRoomTurn(claim.context(), """
                     [ABSENCE NOVELIZATION — READ-ONLY RETELLING OF COMPLETED EVENTS]
                     Write a Korean novel-style retelling of ONLY the authoritative timeline below.
                     Use the supplied historical RP context, character profiles, speech styles,
@@ -166,7 +174,8 @@ public class PocketProgressService {
                     + "\nFor a varied timeline, aim for " + String.format(java.util.Locale.ROOT,"%,d–%,d",minimumCharacters,maximumCharacters) + " Korean characters including spaces, in "
                     + sceneRange + " coherent scenes. This is a quality guideline, not a minimum quota."
                     + " Write less for sleep-only or sparse events; never invent facts or pad text to meet it.\n"
-                    + claim.timeline()).reply();
+                    + claim.timeline()).reply());
+            String text=generated.value();
             if (text == null || text.isBlank() || text.length() > 30000)
                 throw new IllegalArgumentException("Invalid absence narrative");
             return tx(() -> {
@@ -174,6 +183,7 @@ public class PocketProgressService {
                 if (!Objects.equals(report.getNarrativeOperationId(),claim.token()))
                     throw new ResponseStatusException(HttpStatus.CONFLICT,"이야기 생성 상태가 바뀌었어요. 다시 열어 주세요.");
                 report.finishNarrative(claim.token(),text.trim());
+                if(generated.usage()!=null)report.captureNarrativeUsage(JSON.writeValueAsString(generated.usage()));
                 return storyView(report);
             });
         } catch (RuntimeException failure) {
@@ -292,11 +302,12 @@ public class PocketProgressService {
         String stage = "GENERATE";
         try {
             var prompt = PocketActivityPrompt.build(claim.from(), claim.to());
-            var raw = gateway.generateWorldRoomTurn(claim.context(), prompt).reply();
+            var generated = com.example.projectmm.infrastructure.dialogue.AiUsageTracker.capture(id, () -> gateway.generateWorldRoomTurn(claim.context(), prompt).reply());
+            var raw = generated.value();
             stage = "VALIDATE";
             var plan = PocketActivityPlan.parse(raw, claim.context(), claim.from(), claim.to());
             stage = "APPLY";
-            return tx(() -> complete(claim, plan, prompt, raw));
+            return tx(() -> complete(claim, plan, prompt, raw, generated.usage()));
         } catch (RuntimeException failure) {
             // The resolver logs only our public 502 message. Keep the actual cause server-side.
             LOG.warn("Pocket absence failed: sessionId={}, stage={}", id, stage, failure);
@@ -319,7 +330,7 @@ public class PocketProgressService {
                     reason + " 시간은 변경되지 않았어요. 다시 시도해 주세요.", failure);
         }
     }
-    private Status complete(Claim claim, PocketActivityPlan plan, String prompt, String raw) {
+    private Status complete(Claim claim, PocketActivityPlan plan, String prompt, String raw, com.example.projectmm.infrastructure.dialogue.AiUsageTracker.Snapshot usage) {
         var session = sessions.lockById(claim.sessionId()).orElseThrow(); em.refresh(session);
         requireModels(session);
         if (!Objects.equals(session.getProgressOperationId(), claim.token()) || !session.progressInProgress(clock.now())
@@ -339,6 +350,7 @@ public class PocketProgressService {
         var report = reports.save(new PocketActivityReport(session, claim.from(), appliedTo, clock.now(),
                 claim.capped(), plan.pauseReason(), JSON.writeValueAsString(plan.activities())));
         report.captureNarrativeContext(JSON.writeValueAsString(claim.context()));
+        if(usage!=null)report.captureActivityUsage(JSON.writeValueAsString(usage));
         var names = new HashMap<Long,String>();
         claim.context().roomCast().forEach(c -> names.put(c.characterId(), c.characterName()));
         var summary = new StringBuilder("[부재 활동]\n");

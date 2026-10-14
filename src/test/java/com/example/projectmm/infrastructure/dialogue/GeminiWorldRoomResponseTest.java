@@ -89,6 +89,27 @@ class GeminiWorldRoomResponseTest {
                 .isEmpty();
     }
 
+    @Test void capturesGeminiReportedUsageForTheExactPocketCall() {
+        var builder=org.springframework.web.client.RestClient.builder().baseUrl("https://generativelanguage.googleapis.com");
+        var server=org.springframework.test.web.client.MockRestServiceServer.bindTo(builder).build();
+        var tested=new GeminiDialogueGateway("test-key","test-model",mapper,builder.build());
+        var c=contextWithSystem(7L);
+        var context=new WorldRoomDialogueContext(9L,c.roomId(),c.roomTitle(),c.visibility(),c.simulatedAt(),c.world(),c.playerProfile(),
+                c.introTitle(),c.introContent(),c.recentMessages(),c.roomCast(),c.activeCast(),c.sessionSystems(),c.playerState(),c.recalledMemories(),
+                c.userNote(),c.pocketPlayGuide(),c.noControlPlayer(),c.aiProvider(),c.aiModel());
+        var response=mapper.readTree(envelope("{\"reply\":\"A quiet day.\",\"enterCharacterIds\":[],\"leaveCharacterIds\":[],\"systemChanges\":[],\"elapsedSeconds\":0}"));
+        var body=response.toString();
+        body=body.substring(0,body.length()-1)+",\"usageMetadata\":{\"promptTokenCount\":100,\"cachedContentTokenCount\":20,\"candidatesTokenCount\":40,\"thoughtsTokenCount\":10,\"totalTokenCount\":150}}";
+        server.expect(org.springframework.test.web.client.match.MockRestRequestMatchers.method(org.springframework.http.HttpMethod.POST))
+                .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess(body,org.springframework.http.MediaType.APPLICATION_JSON));
+        var captured=AiUsageTracker.capture(9L,()->tested.generateWorldRoomTurn(context,"Retell"));
+        assertThat(captured.usage().model()).isEqualTo("test-model");
+        assertThat(captured.usage().inputTokens()).isEqualTo(100);
+        assertThat(captured.usage().outputTokens()).isEqualTo(50);
+        assertThat(captured.usage().totalTokens()).isEqualTo(150);
+        server.verify();
+    }
+
     private WorldRoomDialogueContext contextWithSystem(Long systemId) {
         var world = new DialogueWorldContext(
                 1L,

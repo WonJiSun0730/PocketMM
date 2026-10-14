@@ -25,9 +25,12 @@ class PocketSimulationPermissionTest {
         var activity=new com.example.projectmm.application.chat.PocketActivityPlan.Activity(
                 java.time.LocalDateTime.now(),java.time.LocalDateTime.now().plusMinutes(10),
                 com.example.projectmm.application.chat.PocketActivityPlan.Kind.REST,List.of(1L),"Home","Original",false,List.of());
-        var view=new PocketProgressService.StoryReport(7L,List.of(activity),List.of("Brief"),"Saved prose",false);
+        var usage=new tools.jackson.databind.ObjectMapper().readTree("{\"model\":\"actual\",\"totalTokens\":150}");
+        var view=new PocketProgressService.StoryReport(7L,List.of(activity),List.of("Brief"),"Saved prose",false,usage,usage);
         when(service.readStory(eq(9L),eq(7L),anyString())).thenReturn(view);
         assertThat(controller.story(9L,7L,user).activities()).isEmpty();
+        assertThat(controller.story(9L,7L,user).originalUsage()).isNull();
+        assertThat(controller.story(9L,7L,admin).originalUsage()).isEqualTo(usage);
         assertThat(controller.story(9L,7L,user).briefLogs()).containsExactly("Brief");
         assertThat(controller.story(9L,7L,admin).activities()).containsExactly(activity);
         when(service.generateStory(eq(9L),eq(7L),eq("member"))).thenReturn(view);
