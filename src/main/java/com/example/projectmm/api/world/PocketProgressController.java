@@ -9,14 +9,14 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/worlds/pockets/{sessionId}/progress")
 public class PocketProgressController {
     private final PocketProgressService progress;
-    public record Configuration(boolean enabled, Integer minimumAbsenceMinutes) {}
+    public record Configuration(boolean enabled, Integer minimumAbsenceMinutes, Integer maximumAutoHours) {}
     public record Simulation(int hours) {}
     @GetMapping public PocketProgressService.Status current(@PathVariable Long sessionId, Authentication auth) {
         return progress.current(sessionId, auth.getName());
     }
     @PutMapping public PocketProgressService.Status configure(@PathVariable Long sessionId,
             @RequestBody Configuration request, Authentication auth) {
-        return progress.configure(sessionId, auth.getName(), request.enabled(), request.minimumAbsenceMinutes());
+        return progress.configure(sessionId, auth.getName(), request.enabled(), request.minimumAbsenceMinutes(), request.maximumAutoHours());
     }
     @PostMapping("/resume") public PocketProgressService.Status resume(@PathVariable Long sessionId, Authentication auth) {
         return progress.resume(sessionId, auth.getName());
@@ -28,13 +28,20 @@ public class PocketProgressController {
                     "관리자만 부재 시간 테스트를 사용할 수 있어요.");
         return progress.simulateAbsence(sessionId, auth.getName(), request.hours());
     }
+    public record StoryRequest(PocketProgressService.StoryLength length) {}
+    private PocketProgressService.StoryReport visibleStory(PocketProgressService.StoryReport report, Authentication auth) {
+        boolean administrator = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_DEVELOPER"));
+        return administrator ? report : new PocketProgressService.StoryReport(report.id(),java.util.List.of(),
+                report.briefLogs(),report.narrative(),report.generating());
+    }
     @GetMapping("/reports/{reportId}") public PocketProgressService.StoryReport story(@PathVariable Long sessionId,
             @PathVariable Long reportId, Authentication auth) {
-        return progress.readStory(sessionId,reportId,auth.getName());
+        return visibleStory(progress.readStory(sessionId,reportId,auth.getName()),auth);
     }
     @PostMapping("/reports/{reportId}/story") public PocketProgressService.StoryReport generateStory(@PathVariable Long sessionId,
-            @PathVariable Long reportId, Authentication auth) {
-        return progress.generateStory(sessionId,reportId,auth.getName());
+            @PathVariable Long reportId, @RequestBody(required=false) StoryRequest request, Authentication auth) {
+        return visibleStory(progress.generateStory(sessionId,reportId,auth.getName(),
+                request == null ? PocketProgressService.StoryLength.STANDARD : request.length()),auth);
     }
     @DeleteMapping("/reports/{reportId}") public PocketProgressService.Status discard(@PathVariable Long sessionId,
             @PathVariable Long reportId, Authentication auth) {

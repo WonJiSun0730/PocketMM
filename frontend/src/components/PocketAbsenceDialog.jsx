@@ -32,7 +32,7 @@ export default function PocketAbsenceDialog({ open, onClose, display, activity, 
       <Button variant="ghost" size="sm" disabled={disabled || waiting} onClick={onToggle}>{waiting ? "준비 중" : playing ? "일시정지" : "재생"}</Button>
       <Button variant="ghost" size="sm" disabled={disabled || waiting || index === count - 1} aria-label="다음 활동" onClick={() => onSelect(index + 1)}>›</Button>
     </div>
-    {!waiting && <div className="my-3"><PocketAbsenceLog sessionId={sessionId} reportId={report?.id} report={report} index={index} hideBrief disabled={disabled} /></div>}
+    {!waiting && <div className="my-3"><PocketAbsenceLog sessionId={sessionId} reportId={report?.id} report={report} index={index} hideBrief showNarrative={false} isDeveloper={isDeveloper} disabled={disabled} /></div>}
     {error && <p role="alert" className="pocket-absence-dialog__error">{error}</p>}
     <div className="pocket-absence-dialog__actions">
       <Button disabled={disabled || waiting} onClick={onReplay}>다시보기</Button>

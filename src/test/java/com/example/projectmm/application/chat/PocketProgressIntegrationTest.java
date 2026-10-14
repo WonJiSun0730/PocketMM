@@ -225,6 +225,44 @@ class PocketProgressIntegrationTest {
         assertThat(progress.readStory(id,report.id(),login).activities()).isEqualTo(report.activities());
         verify(gateway,times(1)).generateWorldRoomTurn(any(),anyString());
     }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints={1,12,24})
+    void configuredAutoAdvanceLimitBoundsActualTimeline(int hours) {
+        assertThat(progress.current(id,login).maximumAutoHours()).isEqualTo(24);
+        progress.configure(id,login,true,1,hours);
+        when(clock.now()).thenReturn(now.plusDays(2));
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(
+                plan(story,story.plusHours(hours)),WorldRoomCastChange.none(),List.of(),0));
+        var result=progress.resume(id,login);
+        assertThat(result.maximumAutoHours()).isEqualTo(hours);
+        assertThat(result.simulatedAt()).isEqualTo(story.plusHours(hours));
+        assertThat(result.lastReport().to()).isEqualTo(story.plusHours(hours));
+        assertThat(result.lastReport().capped()).isTrue();
+        assertThat(progress.resume(id,login).simulatedAt()).isEqualTo(result.simulatedAt());
+        verify(gateway,times(1)).generateWorldRoomTurn(any(),anyString());
+    }
+    @Test void invalidAutoAdvanceLimitCannotChangeSettingsOrPresence() {
+        progress.configure(id,login,true,15,12);
+        var before=db(() -> sessions.findById(id).orElseThrow().getLastPresenceAt());
+        for(var value:List.of(0,25)) assertThatThrownBy(() -> progress.configure(id,login,false,1,value))
+                .isInstanceOfSatisfying(ResponseStatusException.class,e -> assertThat(e.getStatusCode().value()).isEqualTo(400));
+        assertThat(progress.current(id,login).enabled()).isTrue();
+        assertThat(progress.current(id,login).minimumAbsenceMinutes()).isEqualTo(15);
+        assertThat(progress.current(id,login).maximumAutoHours()).isEqualTo(12);
+        assertThat(db(() -> sessions.findById(id).orElseThrow().getLastPresenceAt())).isEqualTo(before);
+    }
+    @Test void detailedNovelGroupsScenesAndUsesLengthAsQualityGuidelineWithoutRewritingCachedProse() {
+        enabledAfter(Duration.ofMinutes(20));var report=progress.resume(id,login).lastReport();
+        when(gateway.generateWorldRoomTurn(any(),contains("ABSENCE NOVELIZATION"))).thenAnswer(call -> {
+            String prompt=call.getArgument(1);
+            assertThat(prompt).contains("SCENE-FIRST", "Group related activities", "concrete action", "specific relevant established memory",
+                    "6,000–9,000", "4–7", "sleep-only", "DETAILED").doesNotContain("Each activity starts with a bold heading");
+            return new WorldRoomTurn("Scene-based prose",WorldRoomCastChange.none(),List.of(),0);
+        });
+        var result=progress.generateStory(id,report.id(),login,PocketProgressService.StoryLength.DETAILED);
+        assertThat(progress.generateStory(id,report.id(),login,PocketProgressService.StoryLength.CONCISE).narrative()).isEqualTo(result.narrative());
+        verify(gateway,times(2)).generateWorldRoomTurn(any(),anyString());
+    }
     String plan(LocalDateTime from, LocalDateTime to) {
         var mid = from.plus(Duration.between(from,to).dividedBy(2));
         return """
@@ -367,16 +405,16 @@ class PocketProgressIntegrationTest {
     }
     @Test void elapsedIsCappedAndLegacyPauseCannotPermanentlyStopAutonomy() {
         progress.configure(id,login,true,1); when(clock.now()).thenReturn(now.plusDays(8));
-        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(plan(story,story.plusDays(3)),WorldRoomCastChange.none(),List.of(),0));
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(plan(story,story.plusDays(1)),WorldRoomCastChange.none(),List.of(),0));
         var capped = progress.resume(id,login);
         assertThat(capped.lastReport().capped()).isTrue();
-        assertThat(capped.simulatedAt()).isEqualTo(story.plusDays(3));
+        assertThat(capped.simulatedAt()).isEqualTo(story.plusDays(1));
         progress.configure(id,login,false); progress.configure(id,login,true);
         when(clock.now()).thenReturn(now.plusDays(8).plusMinutes(10));
-        var paused = plan(story.plusDays(3),story.plusDays(3).plusMinutes(2)).replace("\"pauseReason\":null", "\"pauseReason\":\"플레이어의 선택을 기다립니다.\"");
+        var paused = plan(story.plusDays(1),story.plusDays(1).plusMinutes(2)).replace("\"pauseReason\":null", "\"pauseReason\":\"플레이어의 선택을 기다립니다.\"");
         when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(paused,WorldRoomCastChange.none(),List.of(),0));
         var result = progress.resume(id,login);
-        assertThat(result.simulatedAt()).isEqualTo(story.plusDays(3).plusMinutes(10));
+        assertThat(result.simulatedAt()).isEqualTo(story.plusDays(1).plusMinutes(10));
         assertThat(result.pauseReason()).isNull();
         assertThat(result.lastReport().pauseReason()).isNull();
         when(clock.now()).thenReturn(now.plusDays(8).plusMinutes(15));

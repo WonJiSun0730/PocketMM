@@ -11,6 +11,8 @@ function time(value) {
 export default function PocketProgressPanel({ progress, characters, disabled, isDeveloper = false, modelsReady = false, modelError = "" }) {
   const { status, busy, error, configure, resume, simulate } = progress
   const [minutes,setMinutes]=useState(15)
+  const [maximumHours,setMaximumHours]=useState(24)
+  useEffect(()=>setMaximumHours(status?.maximumAutoHours ?? 24),[status?.maximumAutoHours])
   useEffect(()=>setMinutes(status?.minimumAbsenceMinutes ?? 15),[status?.minimumAbsenceMinutes])
   const names = new Map(characters.map(c => [c.id ?? c.characterId, c.name ?? c.characterName]))
   const report = status?.lastReport
@@ -27,7 +29,14 @@ export default function PocketProgressPanel({ progress, characters, disabled, is
       <label>부재 시작 <input aria-label="최소 부재 시간(분)" type="number" min="1" max="4320" value={minutes}
         onChange={event=>setMinutes(event.target.value)} className="w-16 rounded border bg-background p-1" />분</label>
       <Button size="sm" variant="outline" disabled={busy || disabled || (status?.enabled && !modelsReady) || !Number.isInteger(Number(minutes)) || Number(minutes)<1 || Number(minutes)>4320}
-        onClick={()=>configure(Boolean(status?.enabled),Number(minutes))}>저장</Button>
+        onClick={()=>configure(Boolean(status?.enabled),Number(minutes),maximumHours)}>저장</Button>
+    </div>
+    <div className="mt-3 space-y-2">
+      <label htmlFor="absence-maximum-hours" className="flex justify-between"><span>최대 자동 전개</span><span>{maximumHours}시간</span></label>
+      <input id="absence-maximum-hours" aria-label="최대 자동 전개 시간" type="range" min="1" max="24" step="1" value={maximumHours}
+        disabled={busy || disabled} onChange={event=>setMaximumHours(Number(event.target.value))} className="w-full accent-primary" />
+      <div className="flex justify-between text-muted-foreground"><span>1시간</span><span>24시간</span></div>
+      <p className="text-muted-foreground">위의 저장을 눌러 적용해요. 부재가 더 길어도 이 시간까지만 전개해요.</p>
     </div>
     {isDeveloper && <details className="mt-3 rounded-md border border-dashed p-2">
       <summary className="cursor-pointer font-medium">부재 시간 테스트</summary>
@@ -42,7 +51,7 @@ export default function PocketProgressPanel({ progress, characters, disabled, is
     {report && <div className="mt-3 space-y-2">
       <p className="font-medium">지난 부재 활동</p>
       <p className="text-muted-foreground">{time(report.from)} → {time(report.to)}</p>
-      {report.capped && <p className="text-muted-foreground">최대 3일의 부재 시간을 반영했어요.</p>}
+      {report.capped && <p className="text-muted-foreground">설정한 자동 전개 상한까지만 반영했어요.</p>}
       {report.activities.length ? <ol className="space-y-2">{report.activities.map((activity, index) =>
         <li key={index} className="rounded-md border bg-muted/20 p-2 leading-5">
           <p>{briefActivity(activity)}</p>

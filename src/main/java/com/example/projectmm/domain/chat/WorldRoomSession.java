@@ -71,6 +71,9 @@ public class WorldRoomSession {
     private LocalDateTime lastProgressedAt;
     private Boolean timeCheckEnabled;
     private Integer minimumAbsenceMinutes;
+    private Integer maximumAutoHours;
+    public int maximumAutoHours() { return maximumAutoHours == null ? 24 : maximumAutoHours; }
+    public void configureMaximumAutoHours(int hours) { maximumAutoHours = hours; }
     public int minimumAbsenceMinutes() { return minimumAbsenceMinutes == null ? 15 : minimumAbsenceMinutes; }
     public void configureMinimumAbsence(int minutes) { minimumAbsenceMinutes = minutes; }
     private String progressOperationId;

@@ -72,8 +72,8 @@ export default function usePocketProgress(sessionId, onUpdated, dialogueBusy = f
     return resume()
   }, [resume])
   const discard = useCallback(reportId => run(`/reports/${reportId}`, { method: "DELETE" }, true), [run])
-  const configure = useCallback((enabled, minimumAbsenceMinutes) => run("", {
-    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled, minimumAbsenceMinutes }),
+  const configure = useCallback((enabled, minimumAbsenceMinutes, maximumAutoHours) => run("", {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled, minimumAbsenceMinutes, maximumAutoHours }),
   }, false), [run])
   useEffect(() => {
     let mounted = true
