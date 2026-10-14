@@ -87,13 +87,16 @@ export function scrollingBackdrop(width,height,aspect,direction) {
 export function hasSceneTransition(activity) {
   return performanceActors(activity).some(id => ["DEPART","ARRIVE"].includes(actorCue(activity,id).pose))
 }
-export function sceneTransition(pose, seconds, originX, halfWidth, motion=true, previousSide=0) {
-  const side=previousSide || (originX<0 ? -1 : 1)
+export function sceneTransition(pose, seconds, originX, halfWidth, motion=true, previousSide=0, centreSide=1) {
+  const x=Number.isFinite(originX) ? originX : 0
+  const remembered=previousSide===-1 || previousSide===1 ? previousSide : 0
+  const nearest=Math.abs(x)<1e-6 ? (centreSide<0 ? -1 : 1) : Math.sign(x)
+  const side=pose==="ARRIVE" && remembered ? remembered : nearest
   const time=Math.max(0,Number.isFinite(seconds)?seconds:0)
   const travelTime=Math.max(0,time-(pose==="DEPART" ? .45 : 0))
   const progress=motion ? Math.min(1,travelTime/3.2) : 1
   const eased=progress*progress*(3-2*progress)
-  const distance=Math.max(0,halfWidth+1-side*originX)
+  const distance=Math.max(0,Math.max(0,Number.isFinite(halfWidth)?halfWidth:0)+1-side*x)
   return {side, x:side*distance*(pose==="ARRIVE" ? 1-eased : eased), hidden:pose==="DEPART" && progress>=1,
     moving:motion && progress<1 && (pose!=="DEPART" || time>=.45),
     turn:motion ? Math.min(1,time/.45) : 1,
@@ -103,4 +106,11 @@ export function sceneTransition(pose, seconds, originX, halfWidth, motion=true, 
 // VRM front faces +Z; positive Y rotation points its front toward screen-right.
 export function transitionYaw(side, pose) {
   return Math.sign(side)*Math.PI/2*(pose==="ARRIVE" ? -1 : 1)
+}
+
+export function turnToward(from, to, progress) {
+  const start=Number.isFinite(from) ? from : 0
+  const target=Number.isFinite(to) ? to : start
+  const delta=Math.atan2(Math.sin(target-start),Math.cos(target-start))
+  return start+delta*Math.max(0,Math.min(1,Number.isFinite(progress)?progress:0))
 }

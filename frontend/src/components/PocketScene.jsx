@@ -7,7 +7,7 @@ import { getPocketBackground } from "@/lib/pocketSceneBackgrounds"
 import usePocketBackground from "@/hooks/usePocketBackground"
 import { backgroundContentBounds } from "@/lib/pocketBackgroundLayers"
 import { activitySymbol } from "@/lib/pocketActivityPlayback"
-import { actorCue, performanceActors, interactionActors, closenessPixels, speakingActors, speechSide, puppetPose, walkDirection, scrollingBackdrop, hasSceneTransition, sceneTransition, transitionYaw } from "@/lib/pocketActivityPerformance"
+import { actorCue, performanceActors, interactionActors, closenessPixels, speakingActors, speechSide, puppetPose, walkDirection, scrollingBackdrop, hasSceneTransition, sceneTransition, transitionYaw, turnToward } from "@/lib/pocketActivityPerformance"
 import "./PocketActivityPerformance.css"
 import { createStandingIdle, settleStandingPhysics } from "@/lib/pocketStandingIdle"
 import usePocketSceneLook from "@/hooks/usePocketSceneLook"
@@ -321,12 +321,12 @@ export default function PocketScene({ className = "", simulatedAt = "", location
             const cue=actorCue(activityRef.current,actorId)
             let transitionMoving=false
             if (["DEPART","ARRIVE"].includes(cue.pose)) {
-              const edge=sceneTransition(cue.pose,elapsed,origin.x,1/Math.abs(camera.projectionMatrix.elements[0]),motion,departureSides.current.get(String(actorId)))
-              departureSides.current.set(String(actorId),edge.side)
+              const edge=sceneTransition(cue.pose,elapsed,origin.x,1/Math.abs(camera.projectionMatrix.elements[0]),motion,departureSides.current.get(String(actorId)),model.role==="player" ? -1 : 1)
+              if(cue.pose==="DEPART") departureSides.current.set(String(actorId),edge.side)
               vrm.scene.position.x=origin.x+edge.x
               vrm.scene.visible=!edge.hidden
               const travelYaw=transitionYaw(edge.side,cue.pose)
-              vrm.scene.rotation.y=cue.pose==="DEPART" ? restRotation.y+(travelYaw-restRotation.y)*edge.turn : edge.moving ? travelYaw : restRotation.y
+              vrm.scene.rotation.y=cue.pose==="DEPART" ? turnToward(restRotation.y,travelYaw,edge.turn) : edge.moving ? travelYaw : restRotation.y
               pose.stride=edge.stride
               transitionMoving=edge.moving
               if(edge.moving) vrm.scene.position.y+=Math.abs(edge.stride)*.045

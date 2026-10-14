@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { sceneTransition, hasSceneTransition, transitionYaw } from './pocketActivityPerformance.js'
+import { sceneTransition, hasSceneTransition, transitionYaw, turnToward } from './pocketActivityPerformance.js'
 test('outings use nearest edge and arrivals return from the same edge',()=>{
  assert.ok(sceneTransition('DEPART',1,-1,4).x<0)
  assert.ok(sceneTransition('DEPART',1,1,4).x>0)
@@ -33,5 +33,24 @@ test('front direction follows travel rather than backing out',()=>{
  for(const side of [-1,1]) {
   assert.equal(Math.sign(Math.sin(transitionYaw(side,'DEPART'))),side)
   assert.equal(Math.sign(Math.sin(transitionYaw(side,'ARRIVE'))),-side)
+ }
+})
+
+test('new departures use current location, returns retain their departed edge',()=>{
+ assert.equal(sceneTransition('DEPART',1,-2,4,true,1).side,-1)
+ assert.equal(sceneTransition('DEPART',1,2,4,true,-1).side,1)
+ assert.equal(sceneTransition('ARRIVE',1,2,4,true,-1).side,-1)
+ assert.equal(sceneTransition('DEPART',1,0,4,true,0,-1).side,-1)
+ assert.equal(sceneTransition('DEPART',1,0,4,true,99,1).side,1)
+ assert.equal(sceneTransition('DEPART',1,NaN,NaN).side,1)
+})
+test('turns take shortest angle from existing facing on either side',()=>{
+ for(const x of [-2,2]) {
+  const target=transitionYaw(Math.sign(x),'DEPART')
+  for(const start of [-Math.PI*3,.37,-.37,Math.PI*3]) {
+   const finish=turnToward(start,target,1)
+   assert.ok(Math.abs(finish-start)<=Math.PI)
+   assert.ok(Math.abs(Math.sin(finish)-Math.sign(x))<1e-10)
+  }
  }
 })
