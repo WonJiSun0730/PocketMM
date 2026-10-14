@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { sceneTransition, hasSceneTransition, transitionYaw, turnToward } from './pocketActivityPerformance.js'
+import { sceneTransition, hasSceneTransition, transitionYaw, turnToward, puppetPose } from './pocketActivityPerformance.js'
 test('outings use nearest edge and arrivals return from the same edge',()=>{
  assert.ok(sceneTransition('DEPART',1,-1,4).x<0)
  assert.ok(sceneTransition('DEPART',1,1,4).x>0)
@@ -52,5 +52,15 @@ test('turns take shortest angle from existing facing on either side',()=>{
    assert.ok(Math.abs(finish-start)<=Math.PI)
    assert.ok(Math.abs(Math.sin(finish)-Math.sign(x))<1e-10)
   }
+ }
+})
+
+test('explicit scene transitions cannot inherit sleeping or eating transforms',()=>{
+ for(const kind of ['SLEEP','MEAL','RUN']) for(const stance of ['ARRIVE','DEPART','WAVE']) {
+  const pose=puppetPose({kind,playerInvolved:true,actorCues:[{actorId:'player',pose:stance}]},'player',4)
+  assert.equal(pose.hidden,undefined)
+  assert.equal(pose.rz,0)
+  assert.equal(pose.y,0)
+  assert.equal(pose.armRaise,0)
  }
 })

@@ -149,6 +149,19 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
         return cues.stream().map(c -> {
             String name=names.get(c.actorId());
             String pose=arrivalPose(summary,name,c.pose());
+            // A single NPC may be named differently in Korean narration than its Latin registration.
+            // Resolve only a unique explicit return subject, excluding the player's own name.
+            if("DEPART".equals(pose) && !"player".equals(c.actorId())
+                    && cues.stream().filter(other -> !"player".equals(other.actorId())).count()==1
+                    && name!=null && !summary.contains(name)) {
+                var subjects=java.util.regex.Pattern.compile("(?:^|[,;.!?]\\s*)([가-힣A-Za-z]+?)(?:은|는|이|가)\\s+").matcher(summary);
+                var arrivals=new ArrayList<String>();
+                while(subjects.find()) {
+                    String alias=subjects.group(1);
+                    if(!Objects.equals(alias,names.get("player")) && "ARRIVE".equals(arrivalPose(summary,alias,"DEPART"))) arrivals.add(alias);
+                }
+                if(arrivals.size()==1) pose="ARRIVE";
+            }
             return new ActorCue(c.actorId(),c.emojis(),c.emotion(),c.turn(),pose);
         }).toList();
     }

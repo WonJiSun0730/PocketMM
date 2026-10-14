@@ -17,4 +17,12 @@ class PocketSceneCueTest {
   assertEquals("DEPART",PocketActivityPlan.arrivalPose("마르바스는 밀리가 돌아왔다는 소식을 들었다.","마르바스","DEPART"));
   assertEquals("DEPART",PocketActivityPlan.arrivalPose("마르바스는 집으로 돌아왔고 다시 밖으로 나갔다.","마르바스","DEPART"));
  }
+ @Test void koreanReturnSubjectCanMatchOneLatinRegisteredNpc() {
+  var context=org.mockito.Mockito.mock(com.example.projectmm.domain.dialogue.WorldRoomDialogueContext.class);
+  org.mockito.Mockito.when(context.roomCast()).thenReturn(List.of(new com.example.projectmm.domain.dialogue.WorldRoomCharacterContext(10L,"Marbas",null,0,0,true)));
+  org.mockito.Mockito.when(context.playerProfile()).thenReturn(new com.example.projectmm.domain.dialogue.DialoguePlayerProfile("밀리",""));
+  var cues=List.of(new PocketActivityPlan.ActorCue("10",List.of(),"CALM",0,"DEPART"),new PocketActivityPlan.ActorCue("player",List.of(),"CALM",1,"LIGHT"));
+  assertEquals("ARRIVE",PocketActivityPlan.correctArrivalCues("마르바스는 상담실의 일과를 마치고 집으로 돌아왔고, 밀리는 그와 함께 귀가길을 보냈다.",cues,context).getFirst().pose());
+  assertEquals("DEPART",PocketActivityPlan.correctArrivalCues("밀리는 집으로 돌아왔다.",cues,context).getFirst().pose());
+ }
 }

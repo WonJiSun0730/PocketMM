@@ -46,6 +46,8 @@ export function walkDirection(activity) {
 export function puppetPose(activity, actorId, seconds, motion = true) {
   const pose = { x:0, y:0, rx:0, ry:0, rz:0, armRaise:0, stride:0 }
   if (!performanceActors(activity).includes(String(actorId))) return pose
+  // Explicit entrance/exit takes precedence over generic activity kinds (including sleep).
+  if (["DEPART","ARRIVE","WAVE"].includes(actorCue(activity,actorId).pose)) return pose
   if (activity.kind === "SLEEP" || (activity.interaction === "INTIMACY" && interactionActors(activity).includes(String(actorId)))) {
     const progress=motion ? Math.max(0,Math.min(1,(Number.isFinite(seconds)?seconds:0)/1.2)) : 1
     return {...pose,y:-.32*progress,rz:-Math.PI/2*progress,hidden:progress>=1}
