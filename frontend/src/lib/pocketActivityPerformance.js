@@ -99,3 +99,8 @@ export function sceneTransition(pose, seconds, originX, halfWidth, motion=true, 
     turn:motion ? Math.min(1,time/.45) : 1,
     stride:motion && progress<1 && (pose!=="DEPART" || time>=.45) ? Math.sin(travelTime*7)*.48 : 0}
 }
+
+// VRM front faces +Z; positive Y rotation points its front toward screen-right.
+export function transitionYaw(side, pose) {
+  return Math.sign(side)*Math.PI/2*(pose==="ARRIVE" ? -1 : 1)
+}

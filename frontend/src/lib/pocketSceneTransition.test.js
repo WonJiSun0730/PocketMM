@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { sceneTransition, hasSceneTransition } from './pocketActivityPerformance.js'
+import { sceneTransition, hasSceneTransition, transitionYaw } from './pocketActivityPerformance.js'
 test('outings use nearest edge and arrivals return from the same edge',()=>{
  assert.ok(sceneTransition('DEPART',1,-1,4).x<0)
  assert.ok(sceneTransition('DEPART',1,1,4).x>0)
@@ -27,4 +27,11 @@ test('departure turns before stepping, uses visible gait, and arrival settles',(
  assert.ok(Math.abs(walking.stride)>.4)
  assert.equal(walking.moving,true)
  assert.equal(sceneTransition('ARRIVE',4,1,4).stride,0)
+})
+
+test('front direction follows travel rather than backing out',()=>{
+ for(const side of [-1,1]) {
+  assert.equal(Math.sign(Math.sin(transitionYaw(side,'DEPART'))),side)
+  assert.equal(Math.sign(Math.sin(transitionYaw(side,'ARRIVE'))),-side)
+ }
 })

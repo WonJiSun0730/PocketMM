@@ -7,7 +7,7 @@ import { getPocketBackground } from "@/lib/pocketSceneBackgrounds"
 import usePocketBackground from "@/hooks/usePocketBackground"
 import { backgroundContentBounds } from "@/lib/pocketBackgroundLayers"
 import { activitySymbol } from "@/lib/pocketActivityPlayback"
-import { actorCue, performanceActors, interactionActors, closenessPixels, speakingActors, speechSide, puppetPose, walkDirection, scrollingBackdrop, hasSceneTransition, sceneTransition } from "@/lib/pocketActivityPerformance"
+import { actorCue, performanceActors, interactionActors, closenessPixels, speakingActors, speechSide, puppetPose, walkDirection, scrollingBackdrop, hasSceneTransition, sceneTransition, transitionYaw } from "@/lib/pocketActivityPerformance"
 import "./PocketActivityPerformance.css"
 import { createStandingIdle, settleStandingPhysics } from "@/lib/pocketStandingIdle"
 import usePocketSceneLook from "@/hooks/usePocketSceneLook"
@@ -325,7 +325,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
               departureSides.current.set(String(actorId),edge.side)
               vrm.scene.position.x=origin.x+edge.x
               vrm.scene.visible=!edge.hidden
-              const travelYaw=-edge.side*Math.PI/2*(cue.pose==="ARRIVE" ? -1 : 1)
+              const travelYaw=transitionYaw(edge.side,cue.pose)
               vrm.scene.rotation.y=cue.pose==="DEPART" ? restRotation.y+(travelYaw-restRotation.y)*edge.turn : edge.moving ? travelYaw : restRotation.y
               pose.stride=edge.stride
               transitionMoving=edge.moving
