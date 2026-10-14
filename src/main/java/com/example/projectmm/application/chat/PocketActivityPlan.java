@@ -6,6 +6,24 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 public record PocketActivityPlan(List<Activity> activities, List<Long> leaveCharacterIds, String pauseReason, PlayerStatePatch playerState) {
+    public static String politeFallback(String text) {
+        var endings = Map.ofEntries(Map.entry("하였다","했어요"),Map.entry("했다","했어요"),Map.entry("었다","었어요"),
+                Map.entry("았다","았어요"),Map.entry("였다","였어요"),Map.entry("됐다","됐어요"),Map.entry("갔다","갔어요"),
+                Map.entry("왔다","왔어요"),Map.entry("잤다","잤어요"),Map.entry("봤다","봤어요"),Map.entry("한다","해요"));
+        var ending = java.util.regex.Pattern.compile("(하였다|했다|었다|았다|였다|됐다|갔다|왔다|잤다|봤다|한다)(?=\\s*(?:[.!?。！？]|$|\\p{So}))");
+        var past = java.util.regex.Pattern.compile("([가-힣])다(?=\\s*(?:[.!?。！？]|$|\\p{So}))");
+        java.util.function.UnaryOperator<String> soften = part -> {
+            String mapped = ending.matcher(part).replaceAll(m -> endings.get(m.group()));
+            return past.matcher(mapped).replaceAll(m -> (m.group(1).charAt(0)-0xac00)%28==20 ? m.group(1)+"어요" : m.group());
+        };
+        var quotes = java.util.regex.Pattern.compile("\"[^\"\\n]*\"|“[^”\\n]*”|‘[^’\\n]*’|'[^'\\n]*'").matcher(text);
+        var result = new StringBuilder(); int previous = 0;
+        while (quotes.find()) {
+            result.append(soften.apply(text.substring(previous,quotes.start())));
+            result.append(quotes.group());previous=quotes.end();
+        }
+        return result.append(soften.apply(text.substring(previous))).toString();
+    }
     public enum Kind {
         WALK("🚶"), TALK("🗣️"), REST("🛋️"), WAIT("⏳"), SLEEP("💤"), READ("📖"),
         WORK("📝"), MEAL("🍽️"), COFFEE("☕"), COOK("🍳"), CARE("🩺"), TRAVEL("🚗"), RUN("🏃"), DRINK("🥤");

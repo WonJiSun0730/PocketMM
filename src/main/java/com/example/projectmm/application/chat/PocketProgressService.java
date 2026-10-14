@@ -87,8 +87,7 @@ public class PocketProgressService {
         var logs = activities.stream().map(a -> {
             String text = a.brief();
             // Legacy rows retain the complete summary; formatting never rewrites stored evidence.
-            if (text == null) text = a.summary().replace("했다.","했어요.").replace("한다.","해요.")
-                    .replace("하였다.","했어요.").replace("있었다.","있었어요.");
+            if (text == null) text = PocketActivityPlan.politeFallback(a.summary());
             String end = a.start().toLocalDate().equals(a.end().toLocalDate()) ? time.format(a.end()) : date.format(a.end());
             return date.format(a.start()) + " ~ " + end + " " + text;
         }).toList();

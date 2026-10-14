@@ -282,6 +282,13 @@ class PocketProgressIntegrationTest {
         });
         assertThat(progress.generateStory(id,report.id(),login).narrative()).isEqualTo("Scene prose");
     }
+    @Test void legacyCaptionPastEndingsArePoliteWithoutRewritingQuotedDialogue() {
+        assertThat(PocketActivityPlan.politeFallback("커피를 마셨다. 바다. 쓰다.")).isEqualTo("커피를 마셨어요. 바다. 쓰다.");
+        assertThat(PocketActivityPlan.politeFallback("책을 읽었다. 쉬었다! 밥을 먹었다 🥗")).isEqualTo("책을 읽었어요. 쉬었어요! 밥을 먹었어요 🥗");
+        assertThat(PocketActivityPlan.politeFallback("집에 갔다. 잠을 잤다. 돌아왔다.")).isEqualTo("집에 갔어요. 잠을 잤어요. 돌아왔어요.");
+        assertThat(PocketActivityPlan.politeFallback("“쉬었다.”라고 말했다.")).isEqualTo("“쉬었다.”라고 말했어요.");
+        assertThat(PocketActivityPlan.politeFallback("밀리는 쉬었어요. 오늘은 바다를 보았다.")).isEqualTo("밀리는 쉬었어요. 오늘은 바다를 보았어요.");
+    }
     String plan(LocalDateTime from, LocalDateTime to) {
         var mid = from.plus(Duration.between(from,to).dividedBy(2));
         return """
