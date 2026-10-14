@@ -80,3 +80,16 @@ test("physics rebases after placement and settles hidden with bounded steps and 
   assert.equal(settings.stiffness, 1.2)
   assert.doesNotThrow(() => settleStandingPhysics({}))
 })
+
+test("waving is rest-relative and restores standing arms",()=>{
+ const vrm=rig(), update=createStandingIdle(vrm), root=vrm.scene.position.clone()
+ update(1,0,true,"WAVE")
+ const first=vrm.bones.get("rightLowerArm").quaternion.clone()
+ update(1,0,true,"WAVE")
+ assert.ok(vrm.bones.get("rightLowerArm").quaternion.equals(first))
+ update(1.3,0,true,"WAVE")
+ assert.ok(!vrm.bones.get("rightLowerArm").quaternion.equals(first))
+ update(0,0,false,"LIGHT")
+ assert.ok(new Euler().setFromQuaternion(vrm.bones.get("rightUpperArm").quaternion).z>1)
+ assert.deepEqual(vrm.scene.position,root)
+})

@@ -129,6 +129,7 @@ public final class PocketActivityPrompt {
                 Optional pose is LIGHT (lively relaxed standing) or ARMS_CROSSED (folded arms when
                 appropriate to that actor and moment). Vary gestures naturally, never fold arms while
                 eating, drinking, running or asleep; do not make everyone use the same pose by default.
+                For actual outings/returns only, pose may be DEPART for the departing actor, ARRIVE for the returning/meeting actor, WAVE for the actor seeing them off or welcoming them. The subject of seeing off/sending someone is the waver, not the departing actor. Include only actual involved participants; never invent an outing. These poses are replay visuals only and never change cast membership.
                 turn is the relative speaking order (0 first); alternating speakers will be animated.
                 VISUAL INTERACTION: optional interaction is NONE, CLOSENESS (a moment of growing
                 familiarity), AFFECTION (romantic kissing, affectionate embrace or romantic touch),

@@ -28,7 +28,7 @@ export function actorCue(activity, actorId) {
   const meal=topics.find(e=>foodEmojis.has(e.replace(/\uFE0F/g,""))) || "🍽️"
   return { emojis: activity?.kind === "SLEEP" ? ["💤"] : activity?.kind === "MEAL" ? [meal] : topics,
     emotion: ["ANGRY", "HAPPY", "SAD"].includes(cue?.emotion) ? cue.emotion : "CALM",
-    pose: cue?.pose === "ARMS_CROSSED" ? "ARMS_CROSSED" : "LIGHT" }
+    pose: ["ARMS_CROSSED","DEPART","ARRIVE","WAVE"].includes(cue?.pose) ? cue.pose : "LIGHT" }
 }
 export function speakingActors(activity) {
   return performanceActors(activity).sort((a,b) =>
@@ -81,4 +81,17 @@ export function scrollingBackdrop(width,height,aspect,direction) {
   const ratio=Number.isFinite(aspect) && aspect>0 ? aspect : 1
   const tileWidth=Math.max(width,height*ratio),tileHeight=tileWidth/ratio
   return {width:tileWidth,height:tileHeight,offset:Math.sign(direction)*tileWidth}
+}
+
+// Screen-edge travel is independent of narrative location and cast membership.
+export function hasSceneTransition(activity) {
+  return performanceActors(activity).some(id => ["DEPART","ARRIVE"].includes(actorCue(activity,id).pose))
+}
+export function sceneTransition(pose, seconds, originX, halfWidth, motion=true, previousSide=0) {
+  const side=previousSide || (originX<0 ? -1 : 1)
+  const progress=motion ? Math.max(0,Math.min(1,(Number.isFinite(seconds)?seconds:0)/3.2)) : 1
+  const eased=progress*progress*(3-2*progress)
+  const distance=Math.max(0,halfWidth+1-side*originX)
+  return {side, x:side*distance*(pose==="ARRIVE" ? 1-eased : eased), hidden:pose==="DEPART" && progress>=1,
+    moving:progress<1}
 }

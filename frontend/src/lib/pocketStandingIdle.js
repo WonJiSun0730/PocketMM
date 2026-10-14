@@ -20,7 +20,12 @@ export function createStandingIdle(vrm, phase = 0) {
     const time = Number.isFinite(elapsedSeconds) ? elapsedSeconds : 0
     const breath = motionEnabled ? Math.sin(time * 1.65 + phase) : 0
     const sway = motionEnabled ? Math.sin(time * 0.75 + phase) : 0
-    if(stance === "ARMS_CROSSED") {
+    if(stance === "WAVE") {
+      pose("leftUpperArm", 0, 0, -1.35)
+      pose("leftLowerArm", 0, .10, -.05)
+      pose("rightUpperArm", -.25, 0, .35)
+      pose("rightLowerArm", -.2, 0, -1.7 + (motionEnabled ? Math.sin(time*5)*.3 : 0))
+    } else if(stance === "ARMS_CROSSED") {
       pose("leftUpperArm", -.55, -.30, -.75)
       pose("rightUpperArm", -.55, .30, .75)
       pose("leftLowerArm", -.9, .25, -1.05)

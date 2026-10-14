@@ -34,7 +34,7 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
     public record PlayerStatePatch(String location, List<String> conditions, List<String> inventory) {}
     public record ActorCue(String actorId, List<String> emojis, String emotion, Integer turn, String pose) {
         public ActorCue(String actorId,List<String> emojis,String emotion,Integer turn) { this(actorId,emojis,emotion,turn,"LIGHT"); }
-        public ActorCue { pose="ARMS_CROSSED".equals(pose) ? pose : "LIGHT"; }
+        public ActorCue { pose=Set.of("ARMS_CROSSED","DEPART","ARRIVE","WAVE").contains(Objects.toString(pose,"")) ? pose : "LIGHT"; }
     }
     public record Activity(LocalDateTime start, LocalDateTime end, Kind kind,
             List<Long> characterIds, String location, String summary, Boolean playerInvolved, List<ActorCue> actorCues,

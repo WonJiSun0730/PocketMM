@@ -7,7 +7,7 @@ import { getPocketBackground } from "@/lib/pocketSceneBackgrounds"
 import usePocketBackground from "@/hooks/usePocketBackground"
 import { backgroundContentBounds } from "@/lib/pocketBackgroundLayers"
 import { activitySymbol } from "@/lib/pocketActivityPlayback"
-import { actorCue, performanceActors, interactionActors, closenessPixels, speakingActors, speechSide, puppetPose, walkDirection, scrollingBackdrop } from "@/lib/pocketActivityPerformance"
+import { actorCue, performanceActors, interactionActors, closenessPixels, speakingActors, speechSide, puppetPose, walkDirection, scrollingBackdrop, hasSceneTransition, sceneTransition } from "@/lib/pocketActivityPerformance"
 import "./PocketActivityPerformance.css"
 import { createStandingIdle, settleStandingPhysics } from "@/lib/pocketStandingIdle"
 import usePocketSceneLook from "@/hooks/usePocketSceneLook"
@@ -19,6 +19,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
   const bubbleNodes = useRef(new Map())
   const expressionNodes = useRef(new Map())
   const heartNode = useRef(null)
+  const departureSides = useRef(new Map())
   const activityRef = useRef(activity)
   const readyCallback = useRef(onModelsReady), errorCallback = useRef(onSceneError)
   readyCallback.current = onModelsReady; errorCallback.current = onSceneError
@@ -318,8 +319,16 @@ export default function PocketScene({ className = "", simulatedAt = "", location
             if (activityRef.current && ["WALK","TRAVEL","RUN"].includes(activityRef.current.kind)
                 && performanceActors(activityRef.current).includes(String(actorId))) vrm.scene.rotation.y=pose.ry
             const cue=actorCue(activityRef.current,actorId)
+            if (["DEPART","ARRIVE"].includes(cue.pose)) {
+              const edge=sceneTransition(cue.pose,elapsed,origin.x,1/Math.abs(camera.projectionMatrix.elements[0]),motion,departureSides.current.get(String(actorId)))
+              departureSides.current.set(String(actorId),edge.side)
+              vrm.scene.position.x=origin.x+edge.x
+              vrm.scene.visible=!edge.hidden
+              vrm.scene.rotation.y=-edge.side*Math.PI/6*(cue.pose==="ARRIVE" ? -1 : 1)
+              pose.stride=motion && edge.moving ? Math.sin(elapsed*7)*.18 : 0
+            }
             const action=["MEAL","DRINK","COFFEE","RUN","SLEEP"].includes(activityRef.current?.kind) || activityRef.current?.interaction==="INTIMACY"
-            updateIdle(time,delta,motion,action ? "LIGHT" : cue.pose)
+            updateIdle(time,delta,motion,cue.pose==="WAVE" ? "WAVE" : action ? "LIGHT" : cue.pose)
             legBones.forEach((entry,i)=>{if(entry){entry.bone.rotation.copy(entry.rest);entry.bone.rotation.x+=(i===0?1:-1)*pose.stride}})
             if(pose.armRaise) {
               const upper=vrm.humanoid?.getNormalizedBoneNode?.("rightUpperArm"),lower=vrm.humanoid?.getNormalizedBoneNode?.("rightLowerArm")
@@ -420,7 +429,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
   const speakers = speakingActors(activity)
   const speaker = speakers.length ? speakers[speakingIndex % speakers.length] : null
   const [walkX] = walkDirection(activity)
-  const walking = ["WALK","TRAVEL","RUN"].includes(activity?.kind)
+  const walking = !hasSceneTransition(activity) && ["WALK","TRAVEL","RUN"].includes(activity?.kind)
   const intimate=activity?.interaction==="INTIMACY" && interactionActors(activity).length===2
   const inBed=activity?.kind==="SLEEP" || intimate
   const hearts=interactionActors(activity).length===2 && ["AFFECTION","INTIMACY"].includes(activity?.interaction)
