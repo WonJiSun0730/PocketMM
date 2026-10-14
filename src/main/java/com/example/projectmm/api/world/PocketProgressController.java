@@ -28,7 +28,6 @@ public class PocketProgressController {
                     "관리자만 부재 시간 테스트를 사용할 수 있어요.");
         return progress.simulateAbsence(sessionId, auth.getName(), request.hours());
     }
-    public record StoryRequest(PocketProgressService.StoryLength length) {}
     private PocketProgressService.StoryReport visibleStory(PocketProgressService.StoryReport report, Authentication auth) {
         boolean administrator = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_DEVELOPER"));
         return administrator ? report : new PocketProgressService.StoryReport(report.id(),java.util.List.of(),
@@ -39,9 +38,8 @@ public class PocketProgressController {
         return visibleStory(progress.readStory(sessionId,reportId,auth.getName()),auth);
     }
     @PostMapping("/reports/{reportId}/story") public PocketProgressService.StoryReport generateStory(@PathVariable Long sessionId,
-            @PathVariable Long reportId, @RequestBody(required=false) StoryRequest request, Authentication auth) {
-        return visibleStory(progress.generateStory(sessionId,reportId,auth.getName(),
-                request == null ? PocketProgressService.StoryLength.STANDARD : request.length()),auth);
+            @PathVariable Long reportId, Authentication auth) {
+        return visibleStory(progress.generateStory(sessionId,reportId,auth.getName()),auth);
     }
     @DeleteMapping("/reports/{reportId}") public PocketProgressService.Status discard(@PathVariable Long sessionId,
             @PathVariable Long reportId, Authentication auth) {

@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { briefActivity, legacyBriefLog, needsTokenNotice, hideTokenNoticeToday } from "./pocketAbsenceLog.js"
+import { briefActivity, activityCaption, activityPeriod, legacyBriefLog, needsTokenNotice, hideTokenNoticeToday } from "./pocketAbsenceLog.js"
 test("notice suppression lasts through the local calendar day only",()=>{
   const values=new Map();const storage={getItem:key=>values.get(key),setItem:(key,value)=>values.set(key,value)}
   const today=new Date(2026,9,13,15)
@@ -23,4 +23,11 @@ test("legacy display softens text without modifying its original",()=>{
   const original="[부재 활동]\n🚶 2026-10-13T15:56 ~ 2026-10-13T16:36 · A · Park\nA는 산책했다."
   assert.equal(legacyBriefLog(original),"🚶 10/13 15:56 ~ 16:36 A는 산책했어요.")
   assert.ok(original.includes("A는 산책했다."))
+})
+
+test("screen period and caption are separate without changing polite conversion",()=>{
+ const activity={start:"2026-10-14T23:55",end:"2026-10-15T00:10",brief:"밀리는 책을 읽었어요.",summary:"밀리는 책을 읽었다."}
+ assert.equal(activityPeriod(activity),"10/14 23:55 ~ 10/15 00:10")
+ assert.equal(activityCaption(activity),"밀리는 책을 읽었어요.")
+ assert.equal(activity.summary,"밀리는 책을 읽었다.")
 })

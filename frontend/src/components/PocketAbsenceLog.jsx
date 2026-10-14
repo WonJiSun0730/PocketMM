@@ -17,16 +17,15 @@ function TokenNotice({ onCancel, onConfirm }) {
       <Button onClick={()=>{if(hideToday)hideTokenNoticeToday(window.localStorage);onConfirm()}}>이야기 만들기</Button></div>
   </dialog>,document.body)
 }
-export default function PocketAbsenceLog({ sessionId, reportId, report, fallback = "", index = null, disabled = false, hideBrief = false, showNarrative = true, isDeveloper = false }) {
+export default function PocketAbsenceLog({ sessionId, reportId, report, fallback = "", index = null, disabled = false, hideBrief = false, showNarrative = true, isDeveloper = false, showOriginal = true }) {
   const [view,setView] = useState(null), [busy,setBusy]=useState(false), [error,setError]=useState(""), [notice,setNotice]=useState(false)
-  const [length,setLength]=useState("STANDARD")
   const scope=useRef(null)
   const key=`${sessionId}:${reportId}`
   if(scope.current?.key!==key) scope.current={key}
   const current=scope.current
   const base=`/api/worlds/pockets/${sessionId}/progress/reports/${reportId}`
   async function request(method="GET") {
-    const response=await fetch(`${base}${method==="POST" ? "/story" : ""}`,{method,credentials:"include",...(method==="POST" ? {headers:{"Content-Type":"application/json"},body:JSON.stringify({length})} : {})})
+    const response=await fetch(`${base}${method==="POST" ? "/story" : ""}`,{method,credentials:"include"})
     const data=await response.json().catch(()=>null)
     if(!response.ok)throw new Error(data?.detail || data?.message || "이야기를 불러오지 못했어요. 원본 활동은 그대로 남아 있어요.")
     return data
@@ -75,12 +74,12 @@ export default function PocketAbsenceLog({ sessionId, reportId, report, fallback
     {!hideBrief && <div className="space-y-2 text-sm leading-6">{visibleLogs.map((text,i)=><p key={i} className="whitespace-pre-wrap">{text}</p>)}{!logs.length && <p>조용히 시간을 보냈어요.</p>}</div>}
     {showNarrative && view?.narrative && <><hr className="my-4 border-border" /><RpText text={view.narrative} /></>}
     {!showNarrative && view?.narrative && <p className="text-xs text-muted-foreground">자세한 이야기는 채팅창에서 확인할 수 있어요.</p>}
-    {!view?.narrative && <label className="flex items-center justify-between gap-2 text-xs">이야기 분량<select aria-label="이야기 분량" value={length} onChange={event=>setLength(event.target.value)} disabled={busy || view?.generating} className="rounded border bg-background px-2 py-1"><option value="CONCISE">간결 · 1,000~2,000자</option><option value="STANDARD">표준 · 3,000~5,000자</option><option value="DETAILED">상세 · 6,000~9,000자</option></select></label>}
+
     {generating && <p role="status" className="text-sm text-muted-foreground">그동안의 이야기를 펼치고 있어요…</p>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {!view?.narrative && <Button size="sm" variant="outline" disabled={disabled || generating || reportId==null}
       onClick={()=>{if(needsTokenNotice(window.localStorage))setNotice(true);else generate()}}>자세히 보기</Button>}
-    {isDeveloper && view?.activities?.length > 0 && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">원본 활동 기록</summary>
+    {showOriginal && isDeveloper && view?.activities?.length > 0 && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">원본 활동 기록</summary>
       <div className="mt-2 space-y-2">{view.activities.map((activity,i)=><p key={i}>{activity.start} ~ {activity.end} · {activity.location}<br/>{activity.summary}</p>)}</div></details>}
     {notice && <TokenNotice onCancel={()=>setNotice(false)} onConfirm={generate} />}
   </section>

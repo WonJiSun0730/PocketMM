@@ -251,17 +251,36 @@ class PocketProgressIntegrationTest {
         assertThat(progress.current(id,login).maximumAutoHours()).isEqualTo(12);
         assertThat(db(() -> sessions.findById(id).orElseThrow().getLastPresenceAt())).isEqualTo(before);
     }
-    @Test void detailedNovelGroupsScenesAndUsesLengthAsQualityGuidelineWithoutRewritingCachedProse() {
+    @Test void novelAutomaticallyBudgetsEpisodesWithoutRewritingCachedProse() {
         enabledAfter(Duration.ofMinutes(20));var report=progress.resume(id,login).lastReport();
         when(gateway.generateWorldRoomTurn(any(),contains("ABSENCE NOVELIZATION"))).thenAnswer(call -> {
             String prompt=call.getArgument(1);
             assertThat(prompt).contains("SCENE-FIRST", "Group related activities", "concrete action", "specific relevant established memory",
-                    "6,000–9,000", "4–7", "sleep-only", "DETAILED").doesNotContain("Each activity starts with a bold heading");
+                    "1,500–2,500", "2–3", "sleep-only", "AUTOMATIC EPISODE BUDGET").doesNotContain("Each activity starts with a bold heading");
             return new WorldRoomTurn("Scene-based prose",WorldRoomCastChange.none(),List.of(),0);
         });
-        var result=progress.generateStory(id,report.id(),login,PocketProgressService.StoryLength.DETAILED);
-        assertThat(progress.generateStory(id,report.id(),login,PocketProgressService.StoryLength.CONCISE).narrative()).isEqualTo(result.narrative());
+        var result=progress.generateStory(id,report.id(),login);
+        assertThat(progress.generateStory(id,report.id(),login).narrative()).isEqualTo(result.narrative());
         verify(gateway,times(2)).generateWorldRoomTurn(any(),anyString());
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints={0,4,7})
+    void episodeCountsAutomaticallyChooseMediumLongOrSleepOnlyBudget(int awakeCount) {
+        enabledAfter(Duration.ofHours(2));
+        var activities=new java.util.ArrayList<PocketActivityPlan.Activity>();
+        int count=Math.max(1,awakeCount);
+        for(int i=0;i<count;i++) activities.add(new PocketActivityPlan.Activity(story.plusMinutes(i*15),story.plusMinutes((i+1)*15),
+                awakeCount==0 ? PocketActivityPlan.Kind.SLEEP : PocketActivityPlan.Kind.REST,List.of(a),"Home","Confirmed activity",false,List.of()));
+        String raw="{\"activities\":"+new tools.jackson.databind.ObjectMapper().writeValueAsString(activities)+",\"leaveCharacterIds\":[],\"pauseReason\":null}";
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
+        var report=progress.resume(id,login).lastReport();
+        when(gateway.generateWorldRoomTurn(any(),contains("ABSENCE NOVELIZATION"))).thenAnswer(call -> {
+            String prompt=call.getArgument(1);
+            assertThat(prompt).contains(awakeCount==0 ? "300–800" : awakeCount==4 ? "3,000–5,000" : "6,000–8,000");
+            assertThat(prompt).contains(awakeCount==0 ? "in 1 coherent scenes" : awakeCount==4 ? "in 3–5 coherent scenes" : "in 5–7 coherent scenes");
+            return new WorldRoomTurn("Scene prose",WorldRoomCastChange.none(),List.of(),0);
+        });
+        assertThat(progress.generateStory(id,report.id(),login).narrative()).isEqualTo("Scene prose");
     }
     String plan(LocalDateTime from, LocalDateTime to) {
         var mid = from.plus(Duration.between(from,to).dividedBy(2));
