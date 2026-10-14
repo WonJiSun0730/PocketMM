@@ -63,9 +63,9 @@ public class PocketProgressService {
     }
     private Status status(WorldRoomSession session) {
         var report = reports.findTopBySessionIdOrderByIdDesc(session.getId()).map(r -> {
-            var activities = JSON.readValue(r.getActivitiesJson(), PocketActivityPlan.Activity[].class);
+            var activities = replayActivities(r);
             return new Report(r.getId(), r.getFromTime(), r.getToTime(), r.getProcessedAt(), r.isCapped(),
-                    r.getPauseReason(), List.of(activities));
+                    r.getPauseReason(), activities);
         }).orElse(null);
         return new Status(session.isTimeCheckEnabled(), session.minimumAbsenceMinutes(), session.getSimulatedAt(), null,
                 report, session.progressInProgress(clock.now()), session.maximumAutoHours());
@@ -84,8 +84,17 @@ public class PocketProgressService {
         return reports.findById(reportId).filter(r -> r.getSession().getId().equals(id))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,"이 부재 활동을 찾을 수 없어요."));
     }
+    private List<PocketActivityPlan.Activity> replayActivities(PocketActivityReport report) {
+        var activities=List.of(JSON.readValue(report.getActivitiesJson(),PocketActivityPlan.Activity[].class));
+        String snapshot=report.getNarrativeContextJson();
+        if(snapshot==null) return activities;
+        var context=JSON.readValue(snapshot,WorldRoomDialogueContext.class);
+        return activities.stream().map(a -> new PocketActivityPlan.Activity(a.start(),a.end(),a.kind(),a.characterIds(),
+                a.location(),a.summary(),a.playerInvolved(),PocketActivityPlan.correctArrivalCues(a.summary(),a.actorCues(),context),
+                a.interaction(),a.interactionActorIds(),a.brief())).toList();
+    }
     private StoryReport storyView(PocketActivityReport report) {
-        var activities = List.of(JSON.readValue(report.getActivitiesJson(),PocketActivityPlan.Activity[].class));
+        var activities = replayActivities(report);
         var date = java.time.format.DateTimeFormatter.ofPattern("MM/dd HH:mm");
         var time = java.time.format.DateTimeFormatter.ofPattern("HH:mm");
         var logs = activities.stream().map(a -> {

@@ -102,7 +102,7 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
             if(!item.path("interactionActorIds").isArray() && participants.size()==2) pair.addAll(participants);
             String interaction=pair.size()==2 ? item.path("interaction").asText("NONE") : "NONE";
             result.add(new Activity(start, end, Kind.valueOf(item.path("kind").asText()),
-                    List.copyOf(ids), location, summary, playerInvolved, actorCues(item,ids,playerInvolved),
+                    List.copyOf(ids), location, summary, playerInvolved, correctArrivalCues(summary,actorCues(item,ids,playerInvolved),context),
                     interaction,"NONE".equals(interaction) ? List.of() : pair, item.path("brief").asText(null)));
             involved.addAll(ids); previous = end;
         }
@@ -141,6 +141,30 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
                     patch == null ? null : patch.inventory());
         }
         return new PocketActivityPlan(List.copyOf(result), List.copyOf(leaves), null, patch);
+    }
+    static List<ActorCue> correctArrivalCues(String summary, List<ActorCue> cues, WorldRoomDialogueContext context) {
+        var names=new LinkedHashMap<String,String>();
+        context.roomCast().forEach(c -> names.put(c.characterId().toString(),c.characterName()));
+        if(context.playerProfile()!=null) names.put("player",context.playerProfile().name());
+        return cues.stream().map(c -> {
+            String name=names.get(c.actorId());
+            String pose=arrivalPose(summary,name,c.pose());
+            return new ActorCue(c.actorId(),c.emojis(),c.emotion(),c.turn(),pose);
+        }).toList();
+    }
+    static String arrivalPose(String summary, String name, String pose) {
+        if(!"DEPART".equals(pose) || name==null || name.isBlank() || summary==null) return pose;
+        // Only correct an explicit subject's completed return, never "sent time" or another person's action.
+        var subject=java.util.regex.Pattern.compile(java.util.regex.Pattern.quote(name)+"(?:은|는|이|가)\\s+").matcher(summary);
+        if(!subject.find()) return pose;
+        String clause=summary.substring(subject.end()).split("[,;.!?\\n]",2)[0];
+        var nextSubject=java.util.regex.Pattern.compile("[가-힣A-Za-z]+(?:은|는|이|가)\\s+").matcher(clause);
+        if(nextSubject.find()) clause=clause.substring(0,nextSubject.start());
+        var arrival=java.util.regex.Pattern.compile("(?:돌아왔|귀가했|귀가하였|도착했|도착하였)(?:고|다|으며|어요|습니다)").matcher(clause);
+        if(!arrival.find()) return pose;
+        String after=clause.substring(arrival.end());
+        if(after.matches("(?s).*(?:외출했|떠났|나갔|출발했).*")) return pose;
+        return "ARRIVE";
     }
     private static List<ActorCue> actorCues(tools.jackson.databind.JsonNode item, List<Long> ids, boolean player) {
         var allowed = new HashSet<String>(); ids.forEach(id -> allowed.add(id.toString()));
