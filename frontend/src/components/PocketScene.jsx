@@ -302,7 +302,7 @@ export default function PocketScene({ className = "", simulatedAt = "", location
           settleStandingPhysics(vrm)
           const actorId = model.role === "player" ? "player" : model.source?.characterId ?? model.source?.id
           const origin = vrm.scene.position.clone(), restRotation = vrm.scene.rotation.clone()
-          const legBones=["leftUpperLeg","rightUpperLeg"].map(name=>{const bone=vrm.humanoid?.getNormalizedBoneNode?.(name);return bone ? {bone,rest:bone.rotation.clone()} : null})
+          const legBones=["leftUpperLeg","rightUpperLeg","leftLowerLeg","rightLowerLeg"].map(name=>{const bone=vrm.humanoid?.getNormalizedBoneNode?.(name);return bone ? {bone,rest:bone.rotation.clone()} : null})
           idleActors.push((time,delta,motion=true) => {
             // Absolute rest-relative offsets keep repeated playback from accumulating transforms.
             const elapsed=loadedModels<visibleModels.length ? 0 : Math.max(0,time-activityStartedAt)
@@ -319,17 +319,21 @@ export default function PocketScene({ className = "", simulatedAt = "", location
             if (activityRef.current && ["WALK","TRAVEL","RUN"].includes(activityRef.current.kind)
                 && performanceActors(activityRef.current).includes(String(actorId))) vrm.scene.rotation.y=pose.ry
             const cue=actorCue(activityRef.current,actorId)
+            let transitionMoving=false
             if (["DEPART","ARRIVE"].includes(cue.pose)) {
               const edge=sceneTransition(cue.pose,elapsed,origin.x,1/Math.abs(camera.projectionMatrix.elements[0]),motion,departureSides.current.get(String(actorId)))
               departureSides.current.set(String(actorId),edge.side)
               vrm.scene.position.x=origin.x+edge.x
               vrm.scene.visible=!edge.hidden
-              vrm.scene.rotation.y=-edge.side*Math.PI/6*(cue.pose==="ARRIVE" ? -1 : 1)
-              pose.stride=motion && edge.moving ? Math.sin(elapsed*7)*.18 : 0
+              const travelYaw=-edge.side*Math.PI/2*(cue.pose==="ARRIVE" ? -1 : 1)
+              vrm.scene.rotation.y=cue.pose==="DEPART" ? restRotation.y+(travelYaw-restRotation.y)*edge.turn : edge.moving ? travelYaw : restRotation.y
+              pose.stride=edge.stride
+              transitionMoving=edge.moving
+              if(edge.moving) vrm.scene.position.y+=Math.abs(edge.stride)*.045
             }
             const action=["MEAL","DRINK","COFFEE","RUN","SLEEP"].includes(activityRef.current?.kind) || activityRef.current?.interaction==="INTIMACY"
-            updateIdle(time,delta,motion,cue.pose==="WAVE" ? "WAVE" : action ? "LIGHT" : cue.pose)
-            legBones.forEach((entry,i)=>{if(entry){entry.bone.rotation.copy(entry.rest);entry.bone.rotation.x+=(i===0?1:-1)*pose.stride}})
+            updateIdle(time,delta,motion,cue.pose==="WAVE" ? "WAVE" : transitionMoving ? "WALK" : action ? "LIGHT" : cue.pose)
+            legBones.forEach((entry,i)=>{if(entry){entry.bone.rotation.copy(entry.rest);entry.bone.rotation.x+=i<2 ? (i===0?1:-1)*pose.stride : Math.max(0,(i===2?-1:1)*pose.stride)*1.2}})
             if(pose.armRaise) {
               const upper=vrm.humanoid?.getNormalizedBoneNode?.("rightUpperArm"),lower=vrm.humanoid?.getNormalizedBoneNode?.("rightLowerArm")
               if(upper) upper.rotation.x-=pose.armRaise

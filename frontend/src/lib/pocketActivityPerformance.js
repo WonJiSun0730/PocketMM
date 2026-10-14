@@ -89,9 +89,13 @@ export function hasSceneTransition(activity) {
 }
 export function sceneTransition(pose, seconds, originX, halfWidth, motion=true, previousSide=0) {
   const side=previousSide || (originX<0 ? -1 : 1)
-  const progress=motion ? Math.max(0,Math.min(1,(Number.isFinite(seconds)?seconds:0)/3.2)) : 1
+  const time=Math.max(0,Number.isFinite(seconds)?seconds:0)
+  const travelTime=Math.max(0,time-(pose==="DEPART" ? .45 : 0))
+  const progress=motion ? Math.min(1,travelTime/3.2) : 1
   const eased=progress*progress*(3-2*progress)
   const distance=Math.max(0,halfWidth+1-side*originX)
   return {side, x:side*distance*(pose==="ARRIVE" ? 1-eased : eased), hidden:pose==="DEPART" && progress>=1,
-    moving:progress<1}
+    moving:motion && progress<1 && (pose!=="DEPART" || time>=.45),
+    turn:motion ? Math.min(1,time/.45) : 1,
+    stride:motion && progress<1 && (pose!=="DEPART" || time>=.45) ? Math.sin(travelTime*7)*.48 : 0}
 }
