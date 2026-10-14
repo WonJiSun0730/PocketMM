@@ -320,6 +320,25 @@ class PocketProgressIntegrationTest {
         assertThat(progress.generateStory(id,report.id(),login).narrativeUsage()).isEqualTo(saved.narrativeUsage());
         verify(gateway,times(2)).generateWorldRoomTurn(any(),anyString());
     }
+    @Test void absenceDepartureMetadataCannotChangeUserControlledCastOrInvalidateActivities() {
+        db(() -> {sessionService.applyCastChange(id,new WorldRoomCastChange(List.of(a),List.of()));return null;});
+        var before=db(() -> sessionService.captureCastState(id));
+        enabledAfter(Duration.ofMinutes(20));
+        String repeated=plan(story,story.plusMinutes(20)).replace("\"leaveCharacterIds\":[]","\"leaveCharacterIds\":["+a+","+a+",999999]");
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(repeated,WorldRoomCastChange.none(),List.of(),0));
+        var result=progress.resume(id,login);
+        assertThat(result.lastReport()).isNotNull();
+        assertThat(result.simulatedAt()).isEqualTo(story.plusMinutes(20));
+        assertThat(db(() -> sessionService.captureCastState(id))).isEqualTo(before);
+        // Manual user controls still work and are preserved by later absence processing.
+        db(() -> {sessionService.applyCastChange(id,new WorldRoomCastChange(List.of(),List.of(a)));return null;});
+        var afterManual=db(() -> sessionService.captureCastState(id));
+        when(clock.now()).thenReturn(now.plusMinutes(40));
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(
+                plan(result.simulatedAt(),result.simulatedAt().plusMinutes(20)),WorldRoomCastChange.none(),List.of(),0));
+        progress.resume(id,login);
+        assertThat(db(() -> sessionService.captureCastState(id))).isEqualTo(afterManual);
+    }
     String plan(LocalDateTime from, LocalDateTime to) {
         var mid = from.plus(Duration.between(from,to).dividedBy(2));
         return """
@@ -767,7 +786,7 @@ class PocketProgressIntegrationTest {
             """.formatted(story,story.plusHours(1),a);
         when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(new WorldRoomTurn(raw,WorldRoomCastChange.none(),List.of(),0));
         var result = progress.simulateAbsence(id,login,1);
-        assertThat(db(() -> sessionService.captureCastState(id))).noneMatch(cast -> cast.active());
+        assertThat(db(() -> sessionService.captureCastState(id))).anyMatch(cast -> cast.characterId().equals(a) && cast.active());
         assertThat(result.lastReport().activities().getFirst().characterIds()).isEmpty();
         assertThat(result.lastReport().activities().getFirst().playerInvolved()).isTrue();
         assertThat(db(() -> states.findBySessionId(id).orElseThrow().getLocation())).isEqualTo("Home");

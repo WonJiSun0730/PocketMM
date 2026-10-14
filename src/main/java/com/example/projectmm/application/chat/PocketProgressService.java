@@ -346,7 +346,7 @@ public class PocketProgressService {
         var playerJson = JSON.writeValueAsString(playerSnapshot);
         var appliedTo = plan.appliedUntil(claim.from(), claim.to());
         session.updateSimulatedAt(appliedTo);
-        sessionService.applyCastChange(session.getId(), new WorldRoomCastChange(List.of(), plan.leaveCharacterIds()));
+        // Only explicit user cast controls may change membership or active selection.
         var report = reports.save(new PocketActivityReport(session, claim.from(), appliedTo, clock.now(),
                 claim.capped(), plan.pauseReason(), JSON.writeValueAsString(plan.activities())));
         report.captureNarrativeContext(JSON.writeValueAsString(claim.context()));

@@ -101,11 +101,11 @@ public final class PocketActivityPrompt {
                 "actorCues":[{"actorId":"player","emojis":["🤔","💤"],"emotion":"CALM","turn":0},
                 {"actorId":"1","emojis":["🛏️","✔️"],"emotion":"CALM","turn":1}]}],
                 "leaveCharacterIds":[],"pauseReason":null,"playerState":null}
-                leaveCharacterIds may include only currently active participants who actually finish
-                outside the player's final scene. An active NPC who stays behind when the player leaves
-                belongs in leaveCharacterIds even if not otherwise included in an activity. Departures
-                track the player's scene, not whether that NPC stops living elsewhere. Do not auto-enter
-                absent characters.
+                leaveCharacterIds MUST always be []. The user's cast selection and active status
+                are controlled only by explicit user operations, never by absence narration.
+                Going out, commuting, working elsewhere, separation or returning home are in-story
+                events only. Describe their locations and actual participants without system
+                departures, automatic entries, or modifying the cast selection.
                 Match kind to the action being summarized: TALK for a consultation/conversation, WAIT
                 for briefly waiting, REST for awake rest, SLEEP only for actual sleep, COOK for preparing
                 food, CARE for treatment, TRAVEL for transport. Never use sleep for sitting quietly.

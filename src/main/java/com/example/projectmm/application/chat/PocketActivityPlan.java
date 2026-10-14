@@ -120,14 +120,9 @@ public record PocketActivityPlan(List<Activity> activities, List<Long> leaveChar
             }
             result = corrected;
         }
-        if (!node.path("leaveCharacterIds").isArray()) throw new IllegalArgumentException("Missing scene departures");
-        var active = context.activeCast().stream().map(c -> c.characterId()).collect(java.util.stream.Collectors.toSet());
+        // Absence narration cannot change the user's cast selection. Going out is a story
+        // event, not a system departure; legacy AI departure metadata is ignored entirely.
         var leaves = new ArrayList<Long>();
-        for (var id : node.path("leaveCharacterIds")) {
-            if (!id.isIntegralNumber() || !active.contains(id.asLong()) || leaves.contains(id.asLong()))
-                throw new IllegalArgumentException("Invalid scene departure");
-            leaves.add(id.asLong());
-        }
         // Older model outputs must not leave autonomous simulation permanently waiting for a user.
         PlayerStatePatch patch = null;
         var lastPlayerActivity = result.stream().filter(Activity::playerInvolved).reduce((x,y) -> y).orElse(null);
