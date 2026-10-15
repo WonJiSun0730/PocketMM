@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [feat/pocket-test-export]
+    branches: [main, feat/pocket-test-export]
 jobs:
   frontend:
     runs-on: ubuntu-latest
@@ -20,6 +20,11 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run lint
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pocketmm-frontend-dist
+          path: frontend/dist/
+          retention-days: 7
   backend:
     runs-on: ubuntu-latest
     steps:
@@ -31,3 +36,8 @@ jobs:
           cache: maven
       - run: chmod +x mvnw
       - run: ./mvnw -B -DskipTests package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pocketmm-backend-jar
+          path: target/projectmm-0.0.1-SNAPSHOT.jar
+          retention-days: 7
