@@ -42,6 +42,7 @@ public class WorldRoomDialogueService {
 
     private final WorldRoomContextBuilder contextBuilder;
     private final DialogueGateway dialogueGateway;
+    private final com.example.projectmm.application.memory.PocketMemoryInspectorService testMemoryInspector;
     private final WorldRoomSessionService sessionService;
     private final WorldRoomSessionRepository sessions;
     private final WorldRoomPlayerStateRepository playerStates;
@@ -118,6 +119,8 @@ public class WorldRoomDialogueService {
         variant.captureUserSceneSetup(sceneSetup);
 
         variant.captureTestDiagnostics(toTestDiagnostics(measured.usage()));
+        variant.captureTestMemoryBefore(objectMapper.writeValueAsString(testMemoryInspector.latest(sessionId)));
+        variant.captureTestMemoryAfter(objectMapper.writeValueAsString(testMemoryInspector.latest(sessionId)));
         variant.captureEvaluationContext(captureEvaluationContext("CHAT", userMessage, userMessage, generated.reply(), context));
         events.publishEvent(new PocketUserSpeechCommitted(
                 sessionId,
@@ -325,6 +328,8 @@ public class WorldRoomDialogueService {
         savePlayerStateSnapshot(variant, beforePlayerState, sessionId);
 
         variant.captureTestDiagnostics(toTestDiagnostics(measured.usage()));
+        variant.captureTestMemoryBefore(objectMapper.writeValueAsString(testMemoryInspector.latest(sessionId)));
+        variant.captureTestMemoryAfter(objectMapper.writeValueAsString(testMemoryInspector.latest(sessionId)));
         variant.captureEvaluationContext(captureEvaluationContext("CONTINUE", "[자동 전개]", continuationPrompt, generated.reply(), context));
 
         session.markPresent(now());
@@ -457,6 +462,8 @@ public class WorldRoomDialogueService {
         target.selectVariant(variantNo, generated.reply());
 
         variant.captureTestDiagnostics(toTestDiagnostics(measured.usage()));
+        variant.captureTestMemoryBefore(objectMapper.writeValueAsString(testMemoryInspector.latest(sessionId)));
+        variant.captureTestMemoryAfter(objectMapper.writeValueAsString(testMemoryInspector.latest(sessionId)));
         variant.captureEvaluationContext(captureEvaluationContext("REROLL", rerollBase, rerollPrompt, generated.reply(), context));
 
         rerollSession.markPresent(now());
@@ -525,6 +532,8 @@ public class WorldRoomDialogueService {
         variant.captureUserSceneSetup(sceneSetup);
 
         variant.captureTestDiagnostics(toTestDiagnostics(measured.usage()));
+        variant.captureTestMemoryBefore(objectMapper.writeValueAsString(testMemoryInspector.latest(sessionId)));
+        variant.captureTestMemoryAfter(objectMapper.writeValueAsString(testMemoryInspector.latest(sessionId)));
         variant.captureEvaluationContext(captureEvaluationContext("REGENERATE", userMessage.getContent(), userMessage.getContent(), generated.reply(), context));
 
         session.markPresent(now());
