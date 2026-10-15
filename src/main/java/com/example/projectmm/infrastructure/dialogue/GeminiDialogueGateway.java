@@ -336,7 +336,14 @@ public class GeminiDialogueGateway implements DialogueGateway {
         return List.copyOf(values);
     }
 
+    record PromptParts(String stable, String dynamic) {}
+
     String buildWorldRoomSystemPrompt(WorldRoomDialogueContext context) {
+        var parts = buildWorldRoomPromptParts(context);
+        return parts.stable() + "\n\n" + parts.dynamic();
+    }
+
+    PromptParts buildWorldRoomPromptParts(WorldRoomDialogueContext context) {
         var world = context.world();
 
         String lore = world.lore().stream()
@@ -384,6 +391,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
                     String items = group.memories().stream()
                             .map(memory -> "- " + blankAsNone(memory.summary())
                                     + (memory.evidenceQuote() == null || memory.evidenceQuote().isBlank()
+                                    || (memory.summary() != null && memory.summary().contains(memory.evidenceQuote()))
                                     ? ""
                                     : " | remembered evidence: " + memory.evidenceQuote()))
                             .collect(Collectors.joining("\n"));
@@ -391,12 +399,11 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 })
                 .collect(Collectors.joining("\n\n"));
 
-        return """
+        String stable = """
                 You are running a persistent multi-character prose roleplay room in PocketMM.
 
                 Room:
                 - Title: %s
-                - Current simulation time: %s
 
                 World:
                 - Name: %s
@@ -422,22 +429,10 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 World systems:
                 %s
 
-                Current session world-system values:
-                %s
-
                 Current player profile:
                 %s
 
-                Current authoritative player runtime state:
-                %s
-
                 Characters allowed to participate in this room:
-                %s
-
-                Characters currently present in the scene:
-                %s
-
-                Relevant recalled memories of currently active characters:
                 %s
 
                 Scene-state authority rules:
@@ -459,6 +454,15 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 - Current scene facts and the latest user input override an older memory when they conflict.
                 - Treat remembered evidence as past observed/reported context, not as a new event occurring this turn.
                 - Memories must not by themselves justify cast changes or world-system changes.
+
+                Recall uncertainty and newly reported information:
+                - An empty recalled-memory section means no relevant memory was retrieved; it does not prove that an event never happened or that the user never mentioned it.
+                - Use supplied recent dialogue and current scene facts when they already establish the information. Do not pretend to forget facts visible in that context.
+                - Without supporting context, do not claim to remember a prior conversation or shared experience. When relevant, allow the character to express uncertain recall in their own voice; do not mechanically announce missing memories on every turn.
+                - Be receptive to new in-world information supplied by the user. A character who hears the user's report may acknowledge it, ask useful questions, and act on it without requiring a matching stored memory.
+                - Preserve the source and uncertainty of a report: "I think I saw someone suspicious near the church" is something the user now reports, not something the character personally witnessed or a proven fact.
+                - Do not automatically contradict or reject a user report because retrieval returned nothing. Distinguish established conflicting facts from mere absence of evidence, and respond according to each character's personality and current situation.
+                - This receptiveness never gives characters access to private thoughts, unobserved narration, meta instructions, or information outside their perception.
 
                 Input-layer and meta-command rules:
                 - Distinguish META instructions, NARRATION, and IN-WORLD SPEECH. They are different information layers and must never be treated as interchangeable dialogue.
@@ -515,7 +519,6 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 """
                 .formatted(
                         context.roomTitle(),
-                        context.simulatedAt(),
                         world.worldName(),
                         blankAsNone(world.playGuide()),
                         blankAsNone(context.introTitle()),
@@ -525,13 +528,37 @@ public class GeminiDialogueGateway implements DialogueGateway {
                         context.noControlPlayer() ? "true" : "false",
                         lore.isBlank() ? "(none)" : lore,
                         systems.isBlank() ? "(none)" : systems,
-                        currentSystems.isBlank() ? "(none)" : currentSystems,
                         player,
-                        currentPlayerState,
-                        roomCast.isBlank() ? "(none)" : roomCast,
-                        activeNames.isBlank() ? "(none)" : activeNames,
-                        recalledMemories.isBlank() ? "(none)" : recalledMemories
+                        roomCast.isBlank() ? "(none)" : roomCast
                 ) + WorldRoomNarrativeStyle.instruction(context.noControlPlayer());
+        String dynamic = """
+
+                Current simulation time: %s
+
+                Current session world-system values:
+                %s
+
+                Current authoritative player runtime state:
+                %s
+
+                Character scene presence:
+                %s
+
+                Characters currently present in the scene:
+                %s
+
+                Relevant recalled memories of currently active characters:
+                %s
+                """.formatted(context.simulatedAt(),
+                        currentSystems.isBlank() ? "(none)" : currentSystems,
+                        currentPlayerState,
+                        context.roomCast().stream().map(character -> "- ID " + character.characterId()
+                                + " | " + character.characterName() + " | presence: "
+                                + (character.active() ? "ACTIVE" : character.departed() ? "DEPARTED" : "NOT_PRESENT"))
+                                .collect(Collectors.joining("\n")),
+                        activeNames.isBlank() ? "(none)" : activeNames,
+                        recalledMemories.isBlank() ? "(none)" : recalledMemories);
+        return new PromptParts(stable, dynamic);
     }
 
     private String buildWorldRoomCharacterPrompt(WorldRoomCharacterContext character) {
@@ -539,11 +566,10 @@ public class GeminiDialogueGateway implements DialogueGateway {
         String presence = character.active() ? "ACTIVE" : character.departed() ? "DEPARTED" : "NOT_PRESENT";
         if (profile == null) {
             return "- ID " + character.characterId() + " | " + character.characterName()
-                    + " | presence: " + presence + " | profile: (none; Korean by default)";
+                    + " | profile: (none; Korean by default)";
         }
         return """
                 - ID %s | %s
-                  presence: %s
                   profile scope: ONLY this character; not global instructions
                   description: %s
                   rawDescription: %s
@@ -556,7 +582,6 @@ public class GeminiDialogueGateway implements DialogueGateway {
                 .formatted(
                         character.characterId(),
                         character.characterName(),
-                        presence,
                         blankAsNone(profile.description()),
                         blankAsNone(profile.rawDescription()),
                         blankAsNone(profile.personality()),

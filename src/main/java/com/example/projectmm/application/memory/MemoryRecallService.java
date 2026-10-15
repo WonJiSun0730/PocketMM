@@ -210,7 +210,7 @@ public class MemoryRecallService {
                 .filter(memory -> recallable(memory, recallThreshold))
                 .toList();
 
-        List<EffectiveMemory> recalled = memoryRetriever.retrieve(
+        List<EffectiveMemory> recalled = memoryRetriever.retrieveRelevant(
                 query,
                 candidates,
                 limit

@@ -19,4 +19,14 @@ public class PocketAiUsageController {
         sessions.pocket(sessionId, authentication.getName());
         return usage.latest(sessionId);
     }
+    @GetMapping("/calls")
+    public java.util.List<AiUsageTracker.Call> calls(@PathVariable Long sessionId, Authentication authentication) {
+        sessions.pocket(sessionId, authentication.getName());
+        return usage.calls(sessionId);
+    }
+    @GetMapping("/prompt-diagnostics")
+    public AiUsageTracker.PromptDiagnostics promptDiagnostics(@PathVariable Long sessionId, Authentication authentication) {
+        sessions.pocket(sessionId, authentication.getName());
+        return usage.promptDiagnostics(sessionId);
+    }
 }

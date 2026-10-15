@@ -2,13 +2,13 @@ package com.example.projectmm.infrastructure.time;
 
 import com.example.projectmm.application.time.AiTimeParser;
 import com.example.projectmm.domain.time.AiTimeParseResult;
-import org.springframework.context.annotation.Profile;
+import com.example.projectmm.infrastructure.ai.ConditionalOnGeminiKey;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 
 @Component
-@Profile("!gemini")
+@ConditionalOnGeminiKey(false)
 public class NoOpAiTimeParser implements AiTimeParser {
 
     @Override

@@ -1,3 +1,5 @@
+import AiCallUsage from "../components/AiCallUsage";
+import PromptTokenUsage from "../components/PromptTokenUsage";
 import {enterSendsMessage,chatInputEnvironment} from "@/lib/chatInput"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, Menu, Pencil, RefreshCw, Send, Trash2, Wrench, X } from "lucide-react"
@@ -85,6 +87,8 @@ export default function PocketPage({ pocket, onBack }) {
   const [memoryInspector, setMemoryInspector] = useState([])
   const [memoryDiff, setMemoryDiff] = useState(null)
   const [aiUsage, setAiUsage] = useState(null)
+  const [aiCalls, setAiCalls] = useState([])
+  const [promptDiagnostics, setPromptDiagnostics] = useState(null)
   const [hasOlderMessages, setHasOlderMessages] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [playerStateRefreshKey, setPlayerStateRefreshKey] = useState(0)
@@ -132,6 +136,13 @@ export default function PocketPage({ pocket, onBack }) {
     try {
       const response = await fetch(`/api/worlds/pockets/${session.id}/ai-usage`, { credentials: "include" })
       if (response.ok) setAiUsage(await response.json())
+      const [callsResponse, diagnosticResponse] = await Promise.all([
+        fetch(`/api/worlds/pockets/${session.id}/ai-usage/calls`, { credentials: "include" }),
+        fetch(`/api/worlds/pockets/${session.id}/ai-usage/prompt-diagnostics`, { credentials: "include" }),
+      ])
+      setAiCalls(callsResponse.ok ? await callsResponse.json() : [])
+      const diagnosticText = diagnosticResponse.ok ? await diagnosticResponse.text() : ""
+      setPromptDiagnostics(diagnosticText ? JSON.parse(diagnosticText) : null)
     } catch {
       setAiUsage(null)
     }
@@ -573,12 +584,16 @@ export default function PocketPage({ pocket, onBack }) {
             <p className="mb-2 text-xs font-semibold">AI 사용량 · 최근 OpenAI 턴</p>
             {aiUsage
               ? <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <span>{aiUsage.model}</span>
+                  <PromptTokenUsage usage={aiUsage} />
+                  <AiCallUsage calls={aiCalls} diagnostics={promptDiagnostics} />
+                    <span>{aiUsage.model}</span>
                   <span>입력 <strong className="text-foreground">{aiUsage.inputTokens?.toLocaleString()}</strong></span>
-                  <span>캐시 <strong className="text-foreground">{aiUsage.cachedInputTokens?.toLocaleString()}</strong></span>
+                  <span>일반 입력 <strong className="text-foreground">{aiUsage.ordinaryInputTokens == null ? "미제공" : aiUsage.ordinaryInputTokens.toLocaleString()}</strong></span>
+                  <span>캐시 읽기 <strong className="text-foreground">{aiUsage.cachedInputTokens?.toLocaleString()}</strong></span>
+                  <span>캐시 쓰기 <strong className="text-foreground">{aiUsage.cacheWriteTokens == null ? "미제공" : aiUsage.cacheWriteTokens.toLocaleString()}</strong></span>
                   <span>출력 <strong className="text-foreground">{aiUsage.outputTokens?.toLocaleString()}</strong></span>
                   <span>총 <strong className="text-foreground">{aiUsage.totalTokens?.toLocaleString()}</strong></span>
-                  <span title="표준 텍스트 토큰 기준 예상액 · 캐시 쓰기·추가 도구·세금 제외">예상 비용 <strong className="text-foreground">{aiUsage.estimatedCostUsd == null ? "단가 미설정" : `$${Number(aiUsage.estimatedCostUsd).toFixed(6)}`}</strong></span>
+                  <span title="표준 텍스트 토큰 기준 예상액 · 캐시 쓰기 포함 · 추가 도구·세금 제외">예상 비용 <strong className="text-foreground">{aiUsage.estimatedCostUsd == null ? "산정 불가" : `$${Number(aiUsage.estimatedCostUsd).toFixed(6)}`}</strong></span>
                 </div>
               : <p className="text-xs text-muted-foreground">아직 기록된 OpenAI 토큰 사용량이 없습니다.</p>}
           </div>
@@ -767,12 +782,16 @@ export default function PocketPage({ pocket, onBack }) {
             <p className="mb-2 text-xs font-semibold">AI 사용량 · 최근 OpenAI 턴</p>
             {aiUsage
               ? <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <span>{aiUsage.model}</span>
+                  <PromptTokenUsage usage={aiUsage} />
+                  <AiCallUsage calls={aiCalls} diagnostics={promptDiagnostics} />
+                    <span>{aiUsage.model}</span>
                   <span>입력 <strong className="text-foreground">{aiUsage.inputTokens?.toLocaleString()}</strong></span>
-                  <span>캐시 <strong className="text-foreground">{aiUsage.cachedInputTokens?.toLocaleString()}</strong></span>
+                  <span>일반 입력 <strong className="text-foreground">{aiUsage.ordinaryInputTokens == null ? "미제공" : aiUsage.ordinaryInputTokens.toLocaleString()}</strong></span>
+                  <span>캐시 읽기 <strong className="text-foreground">{aiUsage.cachedInputTokens?.toLocaleString()}</strong></span>
+                  <span>캐시 쓰기 <strong className="text-foreground">{aiUsage.cacheWriteTokens == null ? "미제공" : aiUsage.cacheWriteTokens.toLocaleString()}</strong></span>
                   <span>출력 <strong className="text-foreground">{aiUsage.outputTokens?.toLocaleString()}</strong></span>
                   <span>총 <strong className="text-foreground">{aiUsage.totalTokens?.toLocaleString()}</strong></span>
-                  <span title="표준 텍스트 토큰 기준 예상액 · 캐시 쓰기·추가 도구·세금 제외">예상 비용 <strong className="text-foreground">{aiUsage.estimatedCostUsd == null ? "단가 미설정" : `$${Number(aiUsage.estimatedCostUsd).toFixed(6)}`}</strong></span>
+                  <span title="표준 텍스트 토큰 기준 예상액 · 캐시 쓰기 포함 · 추가 도구·세금 제외">예상 비용 <strong className="text-foreground">{aiUsage.estimatedCostUsd == null ? "산정 불가" : `$${Number(aiUsage.estimatedCostUsd).toFixed(6)}`}</strong></span>
                 </div>
               : <p className="text-xs text-muted-foreground">아직 기록된 OpenAI 토큰 사용량이 없습니다.</p>}
           </div>

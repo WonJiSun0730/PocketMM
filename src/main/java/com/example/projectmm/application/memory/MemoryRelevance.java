@@ -32,6 +32,16 @@ final class MemoryRelevance {
         return queryGrams.size();
     }
 
+    static int selectionOverlap(String query, String memory) {
+        var queryGrams = grams(query);
+        var memoryGrams = grams(memory);
+        // Shared grammatical endings alone are not evidence of a shared topic.
+        var grammar = Set.of("한다", "했다", "하다", "이다", "있다", "없다", "라고", "하고", "하는", "하며", "해요", "어요", "아요", "니다", "기억");
+        queryGrams.removeAll(grammar);
+        queryGrams.retainAll(memoryGrams);
+        return queryGrams.size();
+    }
+
     private static void removeRecallNoise(
             Set<String> grams
     ) {

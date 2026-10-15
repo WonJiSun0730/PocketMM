@@ -3,7 +3,7 @@ package com.example.projectmm.infrastructure.time;
 import com.example.projectmm.application.time.AiTimeParser;
 import com.example.projectmm.domain.time.AiTimeParseResult;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
+import com.example.projectmm.infrastructure.ai.ConditionalOnGeminiKey;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-@Profile("gemini")
+@ConditionalOnGeminiKey
 public class GeminiTimeParser implements AiTimeParser {
 
     private final String apiKey;

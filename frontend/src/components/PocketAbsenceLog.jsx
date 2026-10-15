@@ -18,7 +18,13 @@ function TokenNotice({ onCancel, onConfirm }) {
   </dialog>,document.body)
 }
 function UsageLine({ label, usage, shared = false }) {
-  return <p>{label} · {usage ? `${usage.provider} / ${usage.model} · 입력 ${usage.inputTokens.toLocaleString()} / 출력 ${usage.outputTokens.toLocaleString()} / 총 ${usage.totalTokens.toLocaleString()} 토큰` : "사용량 기록 없음"}{shared && " (원본과 동일 호출, 추가 토큰 없음)"}</p>
+  return <p>{label} · {usage ? `${usage.provider} / ${usage.model} · 입력 ${usage.inputTokens.toLocaleString()} / 출력 ${usage.outputTokens.toLocaleString()} / 총 ${usage.totalTokens.toLocaleString()} 토큰` : "사용량 기록 없음"}
+    {usage && !shared && <>
+      {` · 일반 입력 ${usage.ordinaryInputTokens == null ? "미제공" : usage.ordinaryInputTokens.toLocaleString()} / 캐시 읽기 ${usage.cachedInputTokens == null ? "미제공" : usage.cachedInputTokens.toLocaleString()} / 캐시 쓰기 ${usage.cacheWriteTokens == null ? "미제공" : usage.cacheWriteTokens.toLocaleString()}`}
+      {` · 예상 비용 ${usage.estimatedCostUsd == null ? "산정 불가" : `$${Number(usage.estimatedCostUsd).toFixed(6)}`}`}
+    </>}
+    {shared && " (원본과 동일 호출, 추가 토큰 없음)"}
+  </p>
 }
 export default function PocketAbsenceLog({ sessionId, reportId, report, fallback = "", index = null, disabled = false, hideBrief = false, showNarrative = true, isDeveloper = false, showOriginal = true, allowGenerate = true }) {
   const [view,setView] = useState(null), [busy,setBusy]=useState(false), [error,setError]=useState(""), [notice,setNotice]=useState(false)

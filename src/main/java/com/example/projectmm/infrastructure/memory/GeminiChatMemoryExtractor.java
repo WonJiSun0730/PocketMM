@@ -7,9 +7,7 @@ import com.example.projectmm.domain.memory.MemoryDetailSalience;
 import com.example.projectmm.domain.memory.MemoryFact;
 import com.example.projectmm.domain.memory.SemanticMemory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
-import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -20,9 +18,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-@Component
-@Profile("gemini")
 public class GeminiChatMemoryExtractor implements ChatMemoryExtractor {
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.example.projectmm.infrastructure.dialogue.AiUsageTracker usageTracker = new com.example.projectmm.infrastructure.dialogue.AiUsageTracker();
     private final String apiKey;
     private final String model;
     private final ObjectMapper mapper;
@@ -52,8 +50,15 @@ public class GeminiChatMemoryExtractor implements ChatMemoryExtractor {
     }
 
     private List<ChatMemoryCandidate> extractWithRequest(Map<String, Object> request) {
-        String response = client.post().uri("/v1beta/models/{model}:generateContent", model)
-                .header("x-goog-api-key", apiKey).body(request).retrieve().body(String.class);
+        String response = usageTracker.accountRequest(com.example.projectmm.infrastructure.dialogue.AiUsageTracker.currentSessionId(),"GEMINI",model, () -> client.post().uri("/v1beta/models/{model}:generateContent", model)
+                .header("x-goog-api-key", apiKey).body(request).retrieve().body(String.class));
+        var usage=mapper.readTree(response).path("usageMetadata");
+        if(usage.isObject()) usageTracker.record(
+                com.example.projectmm.infrastructure.dialogue.AiUsageTracker.currentSessionId(),"GEMINI",model,
+                usage.path("promptTokenCount").asLong(0),usage.path("cachedContentTokenCount").asLong(0),
+                usage.path("candidatesTokenCount").asLong(0)+usage.path("thoughtsTokenCount").asLong(0),
+                usage.path("totalTokenCount").asLong(0));
+        else usageTracker.recordUnavailable(com.example.projectmm.infrastructure.dialogue.AiUsageTracker.currentSessionId(),"GEMINI",model,"USAGE_NOT_REPORTED");
         return parseResponse(response);
     }
 
@@ -162,6 +167,12 @@ public class GeminiChatMemoryExtractor implements ChatMemoryExtractor {
         a question or surrounding speech may be saved. Skip generic actions with no continuity
         value, filler, repeated facts already stated in the same turn, OOC/prompt instructions,
         private thoughts, and narration that is not observable or communicated in the scene.
+
+        Do not turn a request to summarize, recall, inspect, wait or continue into a memory
+        merely because it mentions an old clue. Preserve actual factual disclosures inside
+        such requests, but omit the request and generic waiting/looking/opening-a-notebook
+        actions when they add no durable observable fact. Do not include those surrounding
+        actions in a spoken quote. Never label private thoughts as communicated facts.
 
         Quotes must be complete enough to preserve meaning, 2-400 characters, and EXACT
         substrings of the input. Never summarize, reword, translate or combine fragments.
@@ -329,7 +340,11 @@ public class GeminiChatMemoryExtractor implements ChatMemoryExtractor {
         for (JsonNode part : candidate.path("content").path("parts")) {
             if (!part.path("thought").asBoolean(false)) json.append(part.path("text").asText(""));
         }
-        JsonNode memories = mapper.readTree(json.toString()).path("memories");
+        return parseCandidates(json.toString());
+    }
+
+    List<ChatMemoryCandidate> parseCandidates(String json) {
+        JsonNode memories = mapper.readTree(json).path("memories");
         if (!memories.isArray() || memories.size() > 3) {
             throw new IllegalArgumentException("Invalid memory extraction shape");
         }

@@ -70,7 +70,7 @@ class GeminiMemoryCompressorTest {
     }
 
     @Test
-    void profilesSelectExactlyOneCompressorAndFallbackRemainsConservative() {
+    void keyAvailabilitySelectsExactlyOneCompressorAndFallbackRemainsConservative() {
         var context = new ApplicationContextRunner()
                 .withBean(ObjectMapper.class, () -> mapper)
                 .withBean(MemoryAccessStateRepository.class, () -> mock(MemoryAccessStateRepository.class))
@@ -87,14 +87,14 @@ class GeminiMemoryCompressorTest {
                         RuleBasedMemoryCompressor.class,
                         GeminiMemoryCompressor.class
                 )
-                .withPropertyValues("gemini.api-key=test");
+                .withPropertyValues("gemini.api-key=");
         context.run(app -> {
             assertThat(app).hasSingleBean(MemoryCompressor.class);
             assertThat(app.getBean(MemoryCompressor.class)).isInstanceOf(RuleBasedMemoryCompressor.class);
             assertThat(app.getBean(MemoryCompressor.class).compress(memory(1, "unchanged"), MemoryDetailLevel.SUMMARY, List.of()))
                     .isEqualTo(new MemoryCompressorOutput("unchanged", List.of()));
         });
-        context.withPropertyValues("spring.profiles.active=gemini").run(app -> {
+        context.withPropertyValues("spring.profiles.active=prod", "gemini.api-key=test").run(app -> {
             assertThat(app).hasSingleBean(MemoryCompressor.class);
             assertThat(app.getBean(MemoryCompressor.class)).isInstanceOf(GeminiMemoryCompressor.class);
         });

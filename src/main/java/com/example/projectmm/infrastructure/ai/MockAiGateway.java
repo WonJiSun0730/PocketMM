@@ -5,11 +5,11 @@ import com.example.projectmm.domain.ai.AiContext;
 import com.example.projectmm.domain.ai.AiDecision;
 import com.example.projectmm.domain.relationship.RelationshipDelta;
 import com.example.projectmm.domain.simulation.StateDelta;
-import org.springframework.context.annotation.Profile;
+import com.example.projectmm.infrastructure.ai.ConditionalOnGeminiKey;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("!gemini")
+@ConditionalOnGeminiKey(false)
 public class MockAiGateway implements AiGateway {
 
     @Override

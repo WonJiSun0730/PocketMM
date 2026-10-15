@@ -48,7 +48,7 @@ class WorldRoomHistoryIntegrationTest {
     @MockitoBean TimeInterpreter timeInterpreter;
 
     @Test
-    void aiContextUsesLatestFiftyMessagesWhileUiCanPageOlderHistory() {
+    void aiContextUsesSixTurnsWhileUiCanPageAllOriginalHistory() {
         PasswordEncoder encoder = mock(PasswordEncoder.class);
         when(encoder.encode("password")).thenReturn("encoded");
 
@@ -83,9 +83,18 @@ class WorldRoomHistoryIntegrationTest {
 
         var context = contextBuilder.buildSession(session.getId());
 
-        assertThat(context.recentMessages()).hasSize(50);
-        assertThat(context.recentMessages().get(0).content()).isEqualTo("message-11");
-        assertThat(context.recentMessages().get(49).content()).isEqualTo("message-60");
+        assertThat(context.recentMessages()).hasSize(12);
+        assertThat(context.recentMessages().get(0).content()).isEqualTo("message-49");
+        assertThat(context.recentMessages().get(11).content()).isEqualTo("message-60");
+
+        // Reroll must not include its target or future messages.
+        var boundary = messages.findTop50BySessionIdOrderByIdDesc(session.getId()).stream()
+                .filter(message -> message.getContent().equals("message-49")).findFirst().orElseThrow();
+        var before = contextBuilder.buildSessionBeforeMessage(session.getId(), boundary.getId());
+        assertThat(before.recentMessages()).hasSize(12);
+        assertThat(before.recentMessages().getFirst().content()).isEqualTo("message-37");
+        assertThat(before.recentMessages().getLast().content()).isEqualTo("message-48");
+        assertThat(messages.count()).isEqualTo(60);
 
         var firstPage = dialogueService.history(session.getId(), null);
 

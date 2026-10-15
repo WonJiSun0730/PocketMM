@@ -57,6 +57,14 @@ public class MemoryRetrievalRanker
                 .toList();
     }
 
+    public boolean isRelevant(String query, EffectiveMemory memory) {
+        if (query == null || query.isBlank() || memory.accessLevel() == com.example.projectmm.domain.memory.MemoryAccessLevel.BLOCKED) return false;
+        String evidence = memory.evidenceQuote() == null || memory.evidenceQuote().isBlank()
+                ? memory.summary() : memory.evidenceQuote();
+        return MemoryRelevance.selectionOverlap(query, evidence) >= (query.strip().length() <= 3 ? 1 : 2)
+                || MemoryRelevance.structuredBonus(query, memory.fact()) > 0;
+    }
+
     private int relevance(
             String query,
             EffectiveMemory memory

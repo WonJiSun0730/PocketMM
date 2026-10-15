@@ -2,7 +2,7 @@ package com.example.projectmm.infrastructure.ai;
 
 import com.example.projectmm.application.memory.MemoryEmbeddingProvider;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
+import com.example.projectmm.infrastructure.ai.ConditionalOnGeminiKey;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-@Profile("gemini")
+@ConditionalOnGeminiKey
 public class GeminiMemoryEmbeddingProvider
         implements MemoryEmbeddingProvider {
 

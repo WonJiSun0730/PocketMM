@@ -17,6 +17,17 @@ class MemoryRetrievalRankerTest {
             new MemoryRetrievalRanker();
 
     @Test
+    void pocketSelectionDoesNotFillUnusedSlotsWithUnrelatedMemories() {
+        var now = LocalDateTime.of(2026, 10, 15, 12, 0);
+        var key = memory(1L, "은색 열쇠에는 제비 문양이 있다", 50, now, null);
+        var cake = memory(2L, "딸기 케이크를 좋아한다", 99, now, null);
+        assertThat(ranker.retrieveRelevant("은색 열쇠 문양을 확인한다", List.of(cake, key), 5))
+                .extracting(EffectiveMemory::memoryId).containsExactly(1L);
+        assertThat(ranker.retrieveRelevant("마차를 부른다", List.of(cake, key), 5)).isEmpty();
+        assertThat(ranker.retrieveRelevant("", List.of(cake, key), 5)).isEmpty();
+    }
+
+    @Test
     void ranksLexicallyRelevantMemoryFirst() {
 
         LocalDateTime now =

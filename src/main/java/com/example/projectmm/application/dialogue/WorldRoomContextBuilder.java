@@ -121,13 +121,14 @@ public class WorldRoomContextBuilder {
                 ))
                 .toList();
 
-        var recentMessages = (beforeMessageId == null
-                ? messages.findTop50BySessionIdOrderByCreatedAtDescIdDesc(sessionId)
-                : messages.findTop50BySessionIdAndIdLessThanOrderByIdDesc(sessionId, beforeMessageId))
-                .stream()
-                .sorted(java.util.Comparator.comparing(WorldRoomMessage::getCreatedAt)
-                        .thenComparing(WorldRoomMessage::getId))
-                .toList();
+        long exclusiveEnd = beforeMessageId == null ? Long.MAX_VALUE : beforeMessageId;
+        var turnStarts = messages.findBySessionIdAndRoleAndIdLessThanOrderByIdDesc(
+                sessionId, ChatRole.USER, exclusiveEnd, org.springframework.data.domain.PageRequest.of(0, 7));
+        long firstId = turnStarts.isEmpty() ? 0L : turnStarts.getLast().getId();
+        var availableMessages = messages.findBySessionIdAndIdGreaterThanEqualAndIdLessThanOrderByIdAsc(
+                sessionId, firstId, exclusiveEnd);
+
+        var recentMessages = PocketHistoryWindow.recent(availableMessages, 6);
 
         String memoryQuery = recentMessages.stream()
                 .filter(message -> message.getRole() == ChatRole.USER)

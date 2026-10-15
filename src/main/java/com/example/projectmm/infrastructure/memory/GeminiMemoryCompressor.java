@@ -6,7 +6,7 @@ import com.example.projectmm.domain.memory.Memory;
 import com.example.projectmm.domain.memory.MemoryDetailLevel;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
+import com.example.projectmm.infrastructure.ai.ConditionalOnGeminiKey;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-@Profile("gemini")
+@ConditionalOnGeminiKey
 public class GeminiMemoryCompressor implements MemoryCompressor {
     private final String apiKey;
     private final String model;

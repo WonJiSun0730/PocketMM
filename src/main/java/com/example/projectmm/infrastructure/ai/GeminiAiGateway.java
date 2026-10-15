@@ -12,7 +12,7 @@ import com.example.projectmm.domain.memory.MemoryAccessChange;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Profile;
+import com.example.projectmm.infrastructure.ai.ConditionalOnGeminiKey;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -21,7 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Component
-@Profile("gemini")
+@ConditionalOnGeminiKey
 public class GeminiAiGateway implements AiGateway {
 
     private final String apiKey;

@@ -18,6 +18,12 @@ public interface WorldRoomMessageRepository extends JpaRepository<WorldRoomMessa
 
     List<WorldRoomMessage> findTop50BySessionIdAndIdLessThanOrderByIdDesc(Long sessionId, Long beforeId);
 
+    List<WorldRoomMessage> findBySessionIdAndRoleAndIdLessThanOrderByIdDesc(
+            Long sessionId, ChatRole role, Long beforeId, org.springframework.data.domain.Pageable page);
+
+    List<WorldRoomMessage> findBySessionIdAndIdGreaterThanEqualAndIdLessThanOrderByIdAsc(
+            Long sessionId, Long firstId, Long beforeId);
+
     void deleteBySessionIdAndIdGreaterThanEqual(Long sessionId, Long messageId);
 
     boolean existsBySessionIdAndIdGreaterThanAndAbsenceReportIdIsNull(Long sessionId, Long messageId);

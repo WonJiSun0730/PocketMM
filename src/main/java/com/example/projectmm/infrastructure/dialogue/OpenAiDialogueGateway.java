@@ -58,7 +58,11 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                 ? defaultModel
                 : context.aiModel().trim();
         String resolvedUserMessage = userMessage == null ? "" : userMessage.trim();
-        String instructions = promptBuilder.buildWorldRoomSystemPrompt(context) + """
+        var promptParts = promptBuilder.buildWorldRoomPromptParts(context);
+        // Mock/custom builders may expose only the legacy combined method.
+        if (promptParts == null) promptParts = new GeminiDialogueGateway.PromptParts(
+                promptBuilder.buildWorldRoomSystemPrompt(context), "");
+        String instructions = promptParts.stable() + """
 
                 Return the response using the supplied strict JSON schema.
                 Narrative-time rules:
@@ -135,9 +139,15 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                 "required", List.of("reply", "enterCharacterIds", "leaveCharacterIds", "systemChanges", "elapsedSeconds", "locationChange", "addedConditions", "removedConditions", "addedInventory", "removedInventory")
         );
 
+        var tokenEstimate = PromptTokenBreakdown.estimate(instructions + "\n" + promptParts.dynamic(), input, objectMapper.writeValueAsString(schema));
+        input.add(0, Map.of("role", "developer", "content", promptParts.dynamic()));
+        input.add(0, Map.of("role", "developer", "content", List.of(Map.of(
+                "type", "input_text", "text", instructions,
+                "prompt_cache_breakpoint", Map.of("mode", "explicit")))));
+        usageTracker.recordPromptDiagnostics(context.sessionId(), model, instructions, promptParts.dynamic());
         Map<String, Object> request = Map.of(
                 "model", model,
-                "instructions", instructions,
+                "prompt_cache_options", Map.of("mode", "explicit"),
                 "input", input,
                 "reasoning", Map.of("effort", "none"),
                 "store", false,
@@ -149,19 +159,37 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                 ))
         );
 
-        String response = restClient.post()
+        String response = usageTracker.accountRequest(context.sessionId(),"OPENAI",model, () -> restClient.post()
                 .uri("/v1/responses")
                 .headers(headers -> headers.setBearerAuth(apiKey))
                 .body(request)
                 .retrieve()
-                .body(String.class);
+                .body(String.class));
 
-        return parseResponse(response, context, model);
+        return parseResponse(response, context, model, tokenEstimate);
     }
 
     private WorldRoomTurn parseResponse(String response, WorldRoomDialogueContext context, String model) {
+        return parseResponse(response, context, model, null);
+    }
+
+    private WorldRoomTurn parseResponse(String response, WorldRoomDialogueContext context, String model,
+                                       PromptTokenBreakdown breakdown) {
         try {
             JsonNode root = objectMapper.readTree(response);
+            JsonNode usage = root.path("usage");
+            if (usage.isObject()) usageTracker.record(
+                    context.sessionId(),
+                    "OPENAI",
+                    model,
+                    usage.path("input_tokens").asLong(0),
+                    usage.path("input_tokens_details").path("cached_tokens").asLong(0),
+                    usage.path("input_tokens_details").path("cache_write_tokens").isIntegralNumber()
+                            ? usage.path("input_tokens_details").path("cache_write_tokens").asLong() : null,
+                    usage.path("output_tokens").asLong(0),
+                    usage.path("total_tokens").asLong(0), breakdown
+            );
+            else usageTracker.recordUnavailable(context.sessionId(),"OPENAI",model,"USAGE_NOT_REPORTED");
             String payload = null;
             for (JsonNode item : root.path("output")) {
                 if (!"message".equals(item.path("type").asText())) continue;
@@ -181,16 +209,7 @@ public class OpenAiDialogueGateway implements DialogueGateway {
             String reply = turn.path("reply").asText();
             if (reply.isBlank()) throw new IllegalStateException("OpenAI Pocket reply is blank");
 
-            JsonNode usage = root.path("usage");
-            if (usage.isObject()) usageTracker.record(
-                    context.sessionId(),
-                    "OPENAI",
-                    model,
-                    usage.path("input_tokens").asLong(0),
-                    usage.path("input_tokens_details").path("cached_tokens").asLong(0),
-                    usage.path("output_tokens").asLong(0),
-                    usage.path("total_tokens").asLong(0)
-            );
+
 
             return new WorldRoomTurn(
                     reply,

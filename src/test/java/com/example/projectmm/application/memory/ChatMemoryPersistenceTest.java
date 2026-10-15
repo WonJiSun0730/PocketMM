@@ -28,7 +28,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.*;
 
 @DataJpaTest(properties = {"spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.show-sql=false"}, showSql = false)
+        "spring.jpa.hibernate.ddl-auto=create-drop", "spring.jpa.show-sql=false", "gemini.api-key="}, showSql = false)
 @Import({
         ChatMemoryWriter.class,
         MemoryRecallService.class,

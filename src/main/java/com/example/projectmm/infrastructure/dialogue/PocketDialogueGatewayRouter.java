@@ -18,6 +18,18 @@ public class PocketDialogueGatewayRouter implements DialogueGateway {
     private final OpenAiDialogueGateway openAi;
 
     @Override
+    public String initializeWorldRoomScene(WorldRoomDialogueContext context, boolean timeUnset, String opening) {
+        return AiUsageTracker.withPurpose(context.sessionId(),"INITIAL_SCENE",
+                () -> DialogueGateway.super.initializeWorldRoomScene(context,timeUnset,opening));
+    }
+
+    @Override
+    public String setupWorldRoomScene(WorldRoomDialogueContext context, String input) {
+        return AiUsageTracker.withPurpose(context.sessionId(),"SCENE_SETUP",
+                () -> DialogueGateway.super.setupWorldRoomScene(context,input));
+    }
+
+    @Override
     public String generate(DialogueContext context, String userMessage) {
         return gemini.generate(context, userMessage);
     }
