@@ -1,3 +1,4 @@
+import PocketQaPanel from "@/components/PocketQaPanel";
 import AiCallUsage from "../components/AiCallUsage";
 import PromptTokenUsage from "../components/PromptTokenUsage";
 import {enterSendsMessage,chatInputEnvironment} from "@/lib/chatInput"
@@ -605,6 +606,7 @@ export default function PocketPage({ pocket, onBack }) {
           <ChevronDown className={`ml-auto size-3.5 transition-transform ${devOpen ? "rotate-180" : ""}`} />
         </button>
         {devOpen && <div className="border-t px-4 py-3 sm:px-6">
+          <PocketQaPanel sessionId={session.id} />
           <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
             <span>SESSION #{session.id}</span>
             <span>시뮬레이션 시각 {session.simulatedAt ?? "-"}</span>
@@ -811,6 +813,7 @@ export default function PocketPage({ pocket, onBack }) {
           <ChevronDown className={`ml-auto size-3.5 transition-transform ${devOpen ? "rotate-180" : ""}`} />
         </button>
         {devOpen && <div className="border-t px-4 py-3 sm:px-6">
+          <PocketQaPanel sessionId={session.id} />
           <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
             <span>SESSION #{session.id}</span>
             <span>시뮬레이션 시각 {session.simulatedAt ?? "-"}</span>
