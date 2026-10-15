@@ -38,7 +38,7 @@ export async function collectPocketTestData({ base, sessionId, metadata }) {
     if (message.role === "USER") {
       turns.push({ turn: turns.length + 1, userMessage: message, replies: [] })
     } else if (message.role === "CHARACTER") {
-      const reply = { message, variants: variants[index] ?? [] }
+      const reply = { message, variants: (variants[index] ?? []).map(variant => ({ ...variant, aiUsageAtGeneration: variant.testDiagnosticsJson ? JSON.parse(variant.testDiagnosticsJson) : null })) }
       if (turns.length) turns[turns.length - 1].replies.push(reply)
       else turns.push({ turn: 0, userMessage: null, replies: [reply] })
     }
