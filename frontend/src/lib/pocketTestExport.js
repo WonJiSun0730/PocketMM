@@ -10,12 +10,14 @@ export async function collectPocketTestData({ base, sessionId, metadata }) {
   for (;;) {
     const page = await readJson(`${base}/messages${before == null ? "" : `?before=${before}`}`)
     if (!page.length) break
-    messages.unshift(...[...page].reverse())
+    messages.unshift(...page)
     if (page.length < 15) break
-    const next = page[0].id
+    const next = Math.min(...page.map(message => message.id))
     if (next === before) throw new Error("대화 페이지가 반복되어 내보내기를 중단했어요.")
     before = next
   }
+  // API pages are newest-first; normalize globally before matching each USER to its reply.
+  messages.sort((a, b) => a.id - b.id)
   const variants = await Promise.all(messages.map(async message => {
     if (message.role !== "CHARACTER") return null
     return readJson(`${base}/messages/${message.id}/variants`)
