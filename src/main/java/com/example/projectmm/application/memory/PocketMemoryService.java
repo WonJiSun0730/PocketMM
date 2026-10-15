@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -29,7 +30,7 @@ public class PocketMemoryService {
     private boolean enabled = true;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void rememberUserSpeech(Long sessionId, Long sourceMessageId, String userMessage, LocalDateTime at) {
+    public void rememberUserSpeech(Long sessionId, Long sourceMessageId, String userMessage, LocalDateTime at, List<Long> audienceCharacterIds) {
         if (!enabled || userMessage == null || userMessage.isBlank() || userMessage.length() > 4000) return;
         try {
             var session = sessions.findById(sessionId)
@@ -37,9 +38,13 @@ public class PocketMemoryService {
             var source = messages.findById(sourceMessageId)
                     .filter(message -> message.getSession().getId().equals(sessionId))
                     .orElseThrow(() -> new IllegalArgumentException("Pocket source message not found: " + sourceMessageId));
+            var spoken = SpokenText.from(userMessage);
+            if (spoken.isBlank() || audienceCharacterIds == null || audienceCharacterIds.isEmpty()) return;
             var candidates = com.example.projectmm.infrastructure.dialogue.AiUsageTracker.withScope(
-                    sessionId, "MEMORY_EXTRACTION", () -> extractor.extractNarrative(userMessage));
-            var activeCasts = casts.findBySessionIdAndActiveTrueOrderByEnteredAtAscIdAsc(sessionId);
+                    sessionId, "MEMORY_EXTRACTION", () -> extractor.extractNarrative(spoken));
+            var activeCasts = casts.findBySessionIdOrderByIdAsc(sessionId).stream()
+                    .filter(cast -> audienceCharacterIds.contains(cast.getCharacter().getId()))
+                    .toList();
             log.info("Pocket memory capture session={} sourceMessage={} candidates={} activeCasts={}",
                     sessionId, sourceMessageId, candidates.size(), activeCasts.size());
             for (var cast : activeCasts) {
@@ -47,7 +52,7 @@ public class PocketMemoryService {
                         session,
                         source,
                         cast.getCharacter(),
-                        userMessage,
+                        spoken,
                         candidates,
                         at
                 );
