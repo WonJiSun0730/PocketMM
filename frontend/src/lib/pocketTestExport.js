@@ -47,6 +47,8 @@ export async function collectPocketTestData({ base, sessionId, metadata }) {
         })))
         const previous = new Map(flatten(before).map(memory => [memory.id, memory]))
         const current = flatten(after)
+        const currentIds = new Set(current.map(memory => memory.id))
+        const deleted = [...previous.values()].filter(memory => !currentIds.has(memory.id))
         const added = current.filter(memory => !previous.has(memory.id))
         const updated = current.filter(memory => previous.has(memory.id) && JSON.stringify(previous.get(memory.id)) !== JSON.stringify(memory))
         return {
@@ -55,7 +57,8 @@ export async function collectPocketTestData({ base, sessionId, metadata }) {
           memoryInspectorBefore: before,
           memoryInspectorAfter: after,
           memoryDiffAtTurn: before && after ? {
-            added, updated,
+            added, updated, deleted,
+            compressed: updated.filter(memory => previous.get(memory.id)?.detailLevel !== memory.detailLevel),
             note: "저장된 전체 기억 스냅샷 비교입니다. 생성 후 별도 작업으로 발생한 변경은 포함되지 않을 수 있습니다.",
           } : null,
         }
