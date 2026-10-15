@@ -6,6 +6,11 @@ public record PocketUserSpeechCommitted(
         Long sessionId,
         Long sourceMessageId,
         String userMessage,
-        LocalDateTime at
+        LocalDateTime at,
+        java.util.List<Long> audienceCharacterIds
 ) {
+    public PocketUserSpeechCommitted(Long sessionId, Long sourceMessageId, String userMessage, LocalDateTime at) {
+        this(sessionId, sourceMessageId, userMessage, at, java.util.List.of());
+    }
 }
+
