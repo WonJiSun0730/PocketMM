@@ -35,6 +35,22 @@ public class PocketMemoryInspectorService {
     }
 
     @Transactional(readOnly = true)
+    public List<CharacterMemories> snapshotAll(Long sessionId) {
+        var all = memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(sessionId);
+        return casts.findBySessionIdOrderByIdAsc(sessionId).stream()
+                .map(cast -> new CharacterMemories(
+                        cast.getCharacter().getId(),
+                        cast.getCharacter().getName(),
+                        cast.isActive(),
+                        all.stream()
+                                .filter(memory -> memory.getCharacter().getId().equals(cast.getCharacter().getId()))
+                                .map(MemoryItem::from)
+                                .toList()
+                ))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public TurnDiff latestTurnDiff(Long sessionId) {
         var sessionMemories = memories.findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(sessionId);
         if (sessionMemories.isEmpty()) {

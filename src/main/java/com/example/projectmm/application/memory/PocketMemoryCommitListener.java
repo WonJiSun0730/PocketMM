@@ -10,6 +10,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 public class PocketMemoryCommitListener {
 
     private final PocketMemoryService pocketMemoryService;
+    private final PocketTurnTestSnapshotService testSnapshots;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onUserSpeechCommitted(PocketUserSpeechCommitted event) {
@@ -20,5 +21,6 @@ public class PocketMemoryCommitListener {
                 event.at(),
                 event.audienceCharacterIds()
         );
+        testSnapshots.captureAfterExtraction(event.sessionId(), event.sourceMessageId());
     }
 }
