@@ -10,7 +10,7 @@ export async function collectPocketTestData({ base, sessionId, metadata }) {
   for (;;) {
     const page = await readJson(`${base}/messages${before == null ? "" : `?before=${before}`}`)
     if (!page.length) break
-    messages.unshift(...page)
+    messages.unshift(...[...page].reverse())
     if (page.length < 15) break
     const next = page[0].id
     if (next === before) throw new Error("대화 페이지가 반복되어 내보내기를 중단했어요.")
