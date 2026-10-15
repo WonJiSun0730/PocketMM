@@ -17,7 +17,8 @@ public class PocketMemoryCommitListener {
                 event.sessionId(),
                 event.sourceMessageId(),
                 event.userMessage(),
-                event.at()
+                event.at(),
+                event.audienceCharacterIds()
         );
     }
 }
