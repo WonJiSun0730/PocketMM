@@ -30,6 +30,11 @@ class WorldRoomCharacterContinuityPromptTest {
         String studentProfile = profiles.substring(profiles.indexOf("ID 20"));
         assertThat(marbasProfile).doesNotContain("presence:").contains("rawDescription: Speak British English with Korean translation.");
         assertThat(studentProfile).contains("Korean by default").doesNotContain("British English");
+        assertThat(marbasProfile).contains("[IDENTITY]", "[SOUL]")
+                .contains("speechStyle: British English");
+        assertThat(marbasProfile.indexOf("[IDENTITY]"))
+                .isLessThan(marbasProfile.indexOf("[SOUL]"));
+        assertThat(studentProfile).doesNotContain("[SOUL]");
         assertThat(prompt).contains("ID 10 | Marbas | presence: DEPARTED", "ID 20 | 수험생 A | presence: ACTIVE");
         assertThat(prompt).contains("Later departures and the latest user direction take precedence.",
                 "Do not invent a school visit", "모든 등장인물이 나올 것");
