@@ -57,6 +57,15 @@ public class WorldRoomMessageVariant {
 
     public void captureTestDiagnostics(String json) { this.testDiagnosticsJson = json; }
 
+    @Column(columnDefinition = "LONGTEXT")
+    private String testMemoryBeforeJson;
+
+    @Column(columnDefinition = "LONGTEXT")
+    private String testMemoryAfterJson;
+
+    public void captureTestMemoryBefore(String json) { this.testMemoryBeforeJson = json; }
+    public void captureTestMemoryAfter(String json) { this.testMemoryAfterJson = json; }
+
     public void captureEvaluationContext(String json) { this.evaluationContextJson = json; }
 
     public void captureUserSceneSetup(String json) {
