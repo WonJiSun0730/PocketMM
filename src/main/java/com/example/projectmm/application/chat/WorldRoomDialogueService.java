@@ -35,6 +35,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class WorldRoomDialogueService {
 
+    private static String toTestDiagnostics(com.example.projectmm.infrastructure.dialogue.AiUsageTracker.Snapshot usage) {
+        if (usage == null) return null;
+        return objectMapper.writeValueAsString(usage);
+    }
+
     private final WorldRoomContextBuilder contextBuilder;
     private final DialogueGateway dialogueGateway;
     private final WorldRoomSessionService sessionService;
@@ -83,7 +88,8 @@ public class WorldRoomDialogueService {
         var context = contextBuilder.buildSession(sessionId);
         var beforeCast = sessionService.captureCastState(sessionId);
         var beforeSystems = sessionService.captureSystemState(sessionId);
-        var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage);
+        var measured = com.example.projectmm.infrastructure.dialogue.AiUsageTracker.capture(sessionId, () -> dialogueGateway.generateWorldRoomTurn(context, userMessage));
+        var generated = measured.value();
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
         applySceneLocation(sessionId, generated);
@@ -111,6 +117,7 @@ public class WorldRoomDialogueService {
         savePlayerStateSnapshot(variant, beforePlayerState, sessionId);
         variant.captureUserSceneSetup(sceneSetup);
 
+        variant.captureTestDiagnostics(toTestDiagnostics(measured.usage()));
         variant.captureEvaluationContext(captureEvaluationContext("CHAT", userMessage, userMessage, generated.reply(), context));
         events.publishEvent(new PocketUserSpeechCommitted(
                 sessionId,
@@ -290,7 +297,8 @@ public class WorldRoomDialogueService {
         var continuationPrompt = com.example.projectmm.application.dialogue.WorldRoomContinuationPrompt
                 .build(session.isNoControlPlayer(), continuationNo);
         var beforePlayerState = capturePlayerState(sessionId);
-        var generated = dialogueGateway.generateWorldRoomTurn(context, continuationPrompt);
+        var measured = com.example.projectmm.infrastructure.dialogue.AiUsageTracker.capture(sessionId, () -> dialogueGateway.generateWorldRoomTurn(context, continuationPrompt));
+        var generated = measured.value();
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
         applySceneLocation(sessionId, generated);
@@ -316,6 +324,7 @@ public class WorldRoomDialogueService {
         sessionService.saveTimeSnapshot(variant, beforeTime, session.getSimulatedAt());
         savePlayerStateSnapshot(variant, beforePlayerState, sessionId);
 
+        variant.captureTestDiagnostics(toTestDiagnostics(measured.usage()));
         variant.captureEvaluationContext(captureEvaluationContext("CONTINUE", "[자동 전개]", continuationPrompt, generated.reply(), context));
 
         session.markPresent(now());
@@ -422,7 +431,8 @@ public class WorldRoomDialogueService {
                 || (precedingMessage != null && precedingMessage.getRole() == ChatRole.USER
                 && applyExplicitTimeChange(rerollSession, rerollBase));
         var context = contextBuilder.buildSessionBeforeMessage(sessionId, target.getId());
-        var generated = dialogueGateway.generateWorldRoomTurn(context, rerollPrompt);
+        var measured = com.example.projectmm.infrastructure.dialogue.AiUsageTracker.capture(sessionId, () -> dialogueGateway.generateWorldRoomTurn(context, rerollPrompt));
+        var generated = measured.value();
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
         applySceneLocation(sessionId, generated);
@@ -446,6 +456,7 @@ public class WorldRoomDialogueService {
         variant.captureUserSceneSetup(sceneSetup);
         target.selectVariant(variantNo, generated.reply());
 
+        variant.captureTestDiagnostics(toTestDiagnostics(measured.usage()));
         variant.captureEvaluationContext(captureEvaluationContext("REROLL", rerollBase, rerollPrompt, generated.reply(), context));
 
         rerollSession.markPresent(now());
@@ -484,7 +495,8 @@ public class WorldRoomDialogueService {
         String sceneSetup = applySceneInstruction(session, userMessage.getContent(), selected.getUserSceneSetupJson());
         boolean explicitTimeChanged = sceneSetupHasTime(sceneSetup) || applyExplicitTimeChange(session, userMessage.getContent());
         var context = contextBuilder.buildSession(sessionId);
-        var generated = dialogueGateway.generateWorldRoomTurn(context, userMessage.getContent());
+        var measured = com.example.projectmm.infrastructure.dialogue.AiUsageTracker.capture(sessionId, () -> dialogueGateway.generateWorldRoomTurn(context, userMessage.getContent()));
+        var generated = measured.value();
         var applied = sessionService.applyCastChange(sessionId, generated.castChange());
         var appliedSystems = sessionService.applySystemChanges(sessionId, generated.systemChanges());
         applySceneLocation(sessionId, generated);
@@ -512,6 +524,7 @@ public class WorldRoomDialogueService {
         savePlayerStateSnapshot(variant, beforePlayerState, sessionId);
         variant.captureUserSceneSetup(sceneSetup);
 
+        variant.captureTestDiagnostics(toTestDiagnostics(measured.usage()));
         variant.captureEvaluationContext(captureEvaluationContext("REGENERATE", userMessage.getContent(), userMessage.getContent(), generated.reply(), context));
 
         session.markPresent(now());
