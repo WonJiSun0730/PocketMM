@@ -56,7 +56,7 @@ export async function collectPocketTestData({ base, sessionId, metadata }) {
           memoryInspectorAfter: after,
           memoryDiffAtTurn: before && after ? {
             added, updated,
-            note: "최신 5개 기억 스냅샷 비교입니다. 5개 범위를 벗어난 변경은 포함되지 않을 수 있습니다.",
+            note: "저장된 전체 기억 스냅샷 비교입니다. 생성 후 별도 작업으로 발생한 변경은 포함되지 않을 수 있습니다.",
           } : null,
         }
       }) }
@@ -72,9 +72,9 @@ export async function collectPocketTestData({ base, sessionId, metadata }) {
     currentSnapshot: { playerState, usage, calls, promptDiagnostics: diagnostics, memoryDiff: diff, memoryInspector: inspector },
     notes: [
       "모든 대화와 리롤 버전은 서버에 저장된 기록을 조회했습니다.",
-      "현재 장면·메모리 Diff·Memory Inspector·AI 사용량은 내보내기 시점의 스냅샷입니다. 과거 각 턴 당시의 상태로 해석하면 안 됩니다.",
+      "currentSnapshot 필드만 내보내기 시점의 값입니다. 각 variants 항목의 memoryInspectorBefore/After, memoryDiffAtTurn, aiUsageAtGeneration은 생성 시점에 저장된 값입니다.",
       "새 답변은 버전별 AI 사용량 및 기억 스냅샷을 포함합니다. 기존 답변은 소급되지 않습니다.",
-      "기억 Diff는 캐릭터별 최신 5개 기억만 비교하므로 일부 변경을 놓칠 수 있습니다.",
+      "기억 Diff는 생성 전과 추출 완료 후의 전체 기억 스냅샷 비교입니다.",
     ],
   }
 }
