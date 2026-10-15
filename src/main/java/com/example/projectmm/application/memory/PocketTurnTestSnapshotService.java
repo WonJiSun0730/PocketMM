@@ -29,6 +29,6 @@ public class PocketTurnTestSnapshotService {
         var message = reply.get();
         int selectedNo = message.getSelectedVariantNo() == null ? 1 : message.getSelectedVariantNo();
         variants.findByMessageIdAndVariantNo(message.getId(), selectedNo).ifPresent(variant ->
-                variant.captureTestMemoryAfter(mapper.writeValueAsString(inspector.latest(sessionId))));
+                variant.captureTestMemoryAfter(mapper.writeValueAsString(inspector.snapshotAll(sessionId))));
     }
 }
