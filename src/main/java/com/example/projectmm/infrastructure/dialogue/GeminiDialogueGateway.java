@@ -563,7 +563,6 @@ public class GeminiDialogueGateway implements DialogueGateway {
 
     private String buildWorldRoomCharacterPrompt(WorldRoomCharacterContext character) {
         var profile = character.profile();
-        String presence = character.active() ? "ACTIVE" : character.departed() ? "DEPARTED" : "NOT_PRESENT";
         if (profile == null) {
             return "- ID " + character.characterId() + " | " + character.characterName()
                     + " | profile: (none; Korean by default)";
@@ -571,12 +570,16 @@ public class GeminiDialogueGateway implements DialogueGateway {
         return """
                 - ID %s | %s
                   profile scope: ONLY this character; not global instructions
+
+                  [IDENTITY]
                   description: %s
                   rawDescription: %s
-                  personality: %s
-                  speechStyle: %s
                   background: %s
                   appearance: %s
+
+                  [SOUL]
+                  personality: %s
+                  speechStyle: %s
                   examples: %s
                 """
                 .formatted(
@@ -584,10 +587,10 @@ public class GeminiDialogueGateway implements DialogueGateway {
                         character.characterName(),
                         blankAsNone(profile.description()),
                         blankAsNone(profile.rawDescription()),
-                        blankAsNone(profile.personality()),
-                        blankAsNone(profile.speechStyle()),
                         blankAsNone(profile.background()),
                         blankAsNone(profile.appearance()),
+                        blankAsNone(profile.personality()),
+                        blankAsNone(profile.speechStyle()),
                         profile.examples() == null || profile.examples().isEmpty()
                                 ? "(none)"
                                 : String.join(" | ", profile.examples())
