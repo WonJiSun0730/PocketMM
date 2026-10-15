@@ -116,7 +116,8 @@ public class WorldRoomDialogueService {
                 sessionId,
                 userSourceMessage.getId(),
                 userMessage,
-                context.simulatedAt()
+                context.simulatedAt(),
+                context.activeCast().stream().map(character -> character.characterId()).toList()
         ));
 
         session.markPresent(now());
