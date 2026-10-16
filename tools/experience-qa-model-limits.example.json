@@ -1,0 +1,17 @@
+{
+  "gpt-5.6-luna": {
+    "maximumOutputTokens": null,
+    "source": "",
+    "checkedAt": ""
+  },
+  "gpt-5.6-terra": {
+    "maximumOutputTokens": null,
+    "source": "",
+    "checkedAt": ""
+  },
+  "gpt-5.6-sol": {
+    "maximumOutputTokens": null,
+    "source": "",
+    "checkedAt": ""
+  }
+}

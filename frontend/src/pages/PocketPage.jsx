@@ -1,3 +1,4 @@
+import PocketExperienceQaPanel from "@/components/PocketExperienceQaPanel";
 import PocketQaPanel from "@/components/PocketQaPanel";
 import AiCallUsage from "../components/AiCallUsage";
 import PromptTokenUsage from "../components/PromptTokenUsage";
@@ -607,6 +608,7 @@ export default function PocketPage({ pocket, onBack }) {
         </button>
         {devOpen && <div className="border-t px-4 py-3 sm:px-6">
           <PocketQaPanel sessionId={session.id} />
+          <PocketExperienceQaPanel sessionId={session.id} />
           <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
             <span>SESSION #{session.id}</span>
             <span>시뮬레이션 시각 {session.simulatedAt ?? "-"}</span>
@@ -814,6 +816,7 @@ export default function PocketPage({ pocket, onBack }) {
         </button>
         {devOpen && <div className="border-t px-4 py-3 sm:px-6">
           <PocketQaPanel sessionId={session.id} />
+          <PocketExperienceQaPanel sessionId={session.id} />
           <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
             <span>SESSION #{session.id}</span>
             <span>시뮬레이션 시각 {session.simulatedAt ?? "-"}</span>

@@ -1,5 +1,57 @@
 {
-  "gpt-5.6-luna": {"input":0.20,"cached":0.02,"written":0.25,"output":1.20,"largeContextThreshold":272000,"largeInputMultiplier":2,"largeOutputMultiplier":1.5,"source":"https://developers.openai.com/api/docs/models/gpt-5.6-luna","checkedAt":"2026-10-15"},
-  "gpt-5.6-terra": {"input":2.00,"cached":0.20,"written":2.50,"output":12.00,"largeContextThreshold":272000,"largeInputMultiplier":2,"largeOutputMultiplier":1.5,"source":"https://developers.openai.com/api/docs/models/gpt-5.6-terra","checkedAt":"2026-10-15"},
-  "gpt-5.6-sol": {"input":4.00,"cached":0.40,"written":5.00,"output":20.00,"largeContextThreshold":272000,"largeInputMultiplier":2,"largeOutputMultiplier":1.5,"source":"https://developers.openai.com/api/docs/pricing","checkedAt":"2026-10-15"}
+    "gpt-5.6-luna":  {
+                         "input":  0.20,
+                         "cached":  0.02,
+                         "written":  0.25,
+                         "output":  1.20,
+                         "largeContextThreshold":  272000,
+                         "largeInputMultiplier":  2,
+                         "largeOutputMultiplier":  1.5,
+                         "source":  "https://developers.openai.com/api/docs/models/gpt-5.6-luna",
+                         "checkedAt":  "2026-10-15"
+                     },
+    "gpt-5.6-terra":  {
+                          "input":  2.00,
+                          "cached":  0.20,
+                          "written":  2.50,
+                          "output":  12.00,
+                          "largeContextThreshold":  272000,
+                          "largeInputMultiplier":  2,
+                          "largeOutputMultiplier":  1.5,
+                          "source":  "https://developers.openai.com/api/docs/models/gpt-5.6-terra",
+                          "checkedAt":  "2026-10-15"
+                      },
+    "gpt-5.6-sol":  {
+                        "input":  4.00,
+                        "cached":  0.40,
+                        "written":  5.00,
+                        "output":  20.00,
+                        "largeContextThreshold":  272000,
+                        "largeInputMultiplier":  2,
+                        "largeOutputMultiplier":  1.5,
+                        "source":  "https://developers.openai.com/api/docs/pricing",
+                        "checkedAt":  "2026-10-15"
+                    },
+    "gemini-embedding-001":  {
+                                 "input":  0.15,
+                                 "cached":  0.15,
+                                 "written":  0.15,
+                                 "output":  0,
+                                 "source":  "https://developers.googleblog.com/en/gemini-embedding-available-gemini-api/",
+                                 "checkedAt":  "2026-10-16",
+                                 "largeContextThreshold":  0,
+                                 "largeInputMultiplier":  1,
+                                 "largeOutputMultiplier":  1
+                             },
+    "gemini-3.5-flash-lite":  {
+                                  "input":  0.3,
+                                  "cached":  0.03,
+                                  "written":  0.3,
+                                  "output":  2.5,
+                                  "source":  "https://ai.google.dev/gemini-api/docs/pricing",
+                                  "checkedAt":  "2026-10-16",
+                                  "largeContextThreshold":  0,
+                                  "largeInputMultiplier":  1,
+                                  "largeOutputMultiplier":  1
+                              }
 }

@@ -125,7 +125,7 @@ public final class QaUiService {
                     .orElseThrow(()->new IOException("Configured Maven installation has no classworlds launcher"));
         }
         Path java=Path.of(System.getProperty("java.home"),"bin",System.getProperty("os.name","").toLowerCase(Locale.ROOT).contains("win")?"java.exe":"java");
-        var command=new ArrayList<String>(List.of(java.toString(),"--enable-native-access=ALL-UNNAMED","-classpath",boot.toString(),
+        var command=new ArrayList<String>(List.of(java.toString(),"-Djava.io.tmpdir="+workspace,"--enable-native-access=ALL-UNNAMED","-classpath",boot.toString(),
                 "-Dclassworlds.conf="+home.resolve("bin/m2.conf"),"-Dmaven.home="+home,"-Dmaven.multiModuleProjectDirectory="+workspace,
                 "org.codehaus.plexus.classworlds.launcher.Launcher","-o","-Dpocket.qa.execute=true","-Dpocket.qa.run-id="+meta.id(),
                 "-Dpocket.qa.config="+path(meta.id()).resolve("config.json"),"-Dtest=PersonaQaExecutionTest"));

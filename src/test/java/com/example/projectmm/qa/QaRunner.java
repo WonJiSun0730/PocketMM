@@ -20,7 +20,13 @@ public final class QaRunner {
         }
         public Usage atTurn(int value) {return new Usage(role,model,purpose,input,cached,written,output,status,usd,callId,value);}
     }
-    public record Generation(String text, List<Usage> calls, String error) {}
+    public record Diagnostic(String at, String phase, String exceptionType) {}
+    static Diagnostic diagnostic(String phase, Throwable error) {
+        return new Diagnostic(Instant.now().toString(),phase,error==null?null:error.getClass().getName());
+    }
+    public record Generation(String text, List<Usage> calls, String error, List<Diagnostic> diagnostics) {
+        public Generation(String text,List<Usage> calls,String error) {this(text,calls,error,List.of());}
+    }
     public record Outcome(String reply, List<String> memories, String evaluationJson, String diagnosticsJson,
                           String memoryBeforeJson, String memoryAfterJson, List<Usage> calls, String error) {}
     public interface Persona { Generation next(PersonaInput input); }
@@ -39,6 +45,7 @@ public final class QaRunner {
         public List<Usage> calls=new ArrayList<>();
         public Map<String,BigDecimal> reconciledCosts=new HashMap<>();
         public List<String> audit=new ArrayList<>();
+        public List<Diagnostic> diagnostics=new ArrayList<>();
         public BigDecimal heldUsd=BigDecimal.ZERO;
         public State() {}
         public BigDecimal cost(Usage c) {return c.usd()==null?reconciledCosts.get(c.callId()):c.usd();}
@@ -52,8 +59,15 @@ public final class QaRunner {
     private final ObjectMapper mapper=new ObjectMapper();
     private final Persona persona;
     private final Target target;
+    private final int maximumPersonaCharacters;
     public QaRunner(Path directory, Persona persona, Target target) throws IOException {
-        this.directory=directory; this.persona=persona; this.target=target; Files.createDirectories(directory);
+        this(directory,persona,target,4000);
+    }
+    /** New simulation modes may preserve the service's unrestricted input; legacy QA keeps 4000. */
+    public QaRunner(Path directory, Persona persona, Target target, int maximumPersonaCharacters) throws IOException {
+        if(maximumPersonaCharacters<0)throw new IllegalArgumentException("Invalid maximum persona characters");
+        this.directory=directory;this.persona=persona;this.target=target;this.maximumPersonaCharacters=maximumPersonaCharacters;
+        Files.createDirectories(directory);
     }
     public State create(QaSpec spec, QaScenarios scenarios) throws IOException {
         try(var channel=FileChannel.open(directory.resolve("run.lock"),CREATE,WRITE); var lock=channel.lock()) {
@@ -99,15 +113,18 @@ public final class QaRunner {
                 s.heldUsd=s.spec.turnReservationUsd();
                 s.pendingInput=scenario.messageFor(number);
                 if(s.pendingInput==null) {
-                    s.stage="PERSONA_IN_FLIGHT";s.status="RUNNING";save(s);
+                    s.stage="PERSONA_IN_FLIGHT";s.status="RUNNING";s.diagnostics.add(diagnostic("PERSONA_REQUEST_STARTED",null));save(s);
                     var history=s.turns.subList(Math.max(0,s.turns.size()-s.spec.recentTurns()),s.turns.size()).stream()
                             .map(t->new Exchange(t.input(),t.outcome().reply())).toList();
                     Generation generated;
                     try {generated=persona.next(new PersonaInput(s.spec.persona(),number,history));}
-                    catch(RuntimeException e) {uncertain(s,"PERSONA",s.spec.personaModel(),"Persona failed with uncertain usage; inspect provider before retry");return s;}
+                    catch(RuntimeException e) {s.diagnostics.add(diagnostic("PERSONA_FAILED",e));uncertain(s,"PERSONA",s.spec.personaModel(),"Persona failed with uncertain usage; inspect provider before retry");return s;}
+                    s.diagnostics.addAll(generated.diagnostics());
+                    s.diagnostics.add(diagnostic("PERSONA_RETURNED",null));
                     s.addCalls(generated.calls(),number);
+                    s.diagnostics.add(diagnostic("PERSONA_USAGE_CHECKPOINT",null));save(s);
                     if(s.spec.paid()&&generated.calls().isEmpty()) {uncertain(s,"PERSONA",s.spec.personaModel(),"Paid persona returned no usage record");return s;}
-                    if(generated.error()!=null||generated.text()==null||generated.text().isBlank()||generated.text().length()>4000) {
+                    if(generated.error()!=null||generated.text()==null||generated.text().isBlank()||(maximumPersonaCharacters>0&&generated.text().length()>maximumPersonaCharacters)) {
                         review(s,"Persona output failed validation; charged calls retained");return s;
                     }
                     s.pendingInput=generated.text();
@@ -118,17 +135,19 @@ public final class QaRunner {
             if(s.knownUsd().compareTo(s.spec.budgetUsd())>0) {
                 s.status="BUDGET_STOP";s.reason="Persona exceeded budget; target not called";save(s);return s;
             }
-            s.stage="TARGET_IN_FLIGHT";s.status="RUNNING";save(s);
+            s.stage="TARGET_IN_FLIGHT";s.status="RUNNING";s.diagnostics.add(diagnostic("TARGET_REQUEST_STARTED",null));save(s);
             long start=System.nanoTime();
             Outcome outcome;
             try {outcome=target.send(id,s.pendingInput);}
-            catch(RuntimeException e) {uncertain(s,"TARGET",s.spec.targetModel(),"Target failed with uncertain usage; inspect durable receipt and provider");return s;}
+            catch(RuntimeException e) {s.diagnostics.add(diagnostic("TARGET_FAILED",e));uncertain(s,"TARGET",s.spec.targetModel(),"Target failed with uncertain usage; inspect durable receipt and provider");return s;}
             finish(s,scenario,id,number,outcome,(System.nanoTime()-start)/1_000_000);
             return s;
         }
     }
     private void finish(State s,QaScenarios scenario,String id,int number,Outcome outcome,long latency) throws IOException {
+        s.diagnostics.add(diagnostic("TARGET_RESPONSE_RECEIVED",null));
         s.addCalls(outcome.calls(),number);
+        s.diagnostics.add(diagnostic("TARGET_USAGE_CHECKPOINT",null));save(s);
         if(s.spec.paid()&&outcome.calls().stream().noneMatch(c->c.role().equals("TARGET"))) {
             uncertain(s,"TARGET",s.spec.targetModel(),"Paid target returned no usage record");return;
         }
@@ -145,11 +164,28 @@ public final class QaRunner {
         s.addCalls(List.of(new Usage(role,model,"UNCERTAIN_REQUEST",0,0,null,0,"UNKNOWN",null)),s.turns.size()+1);
         review(s,reason);
     }
-    private void save(State s) throws IOException {s.updatedAt=Instant.now().toString();atomic(directory.resolve("run.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(s));}
+    private void save(State s) throws IOException {
+        s.updatedAt=Instant.now().toString();
+        try {atomic(directory.resolve("run.json"),mapper.writerWithDefaultPrettyPrinter().writeValueAsString(s));}
+        catch(IOException e) {
+            // Checkpoint may be unavailable: emit only safe metadata, never exception messages.
+            System.err.printf("QA checkpoint failure at=%s stage=%s exceptionType=%s%n",Instant.now(),s.stage,e.getClass().getName());
+            throw e;
+        }
+    }
     private void atomic(Path path,String content) throws IOException {
         var temp=Files.createTempFile(directory,"checkpoint-",".tmp");
         try {Files.writeString(temp,content);try(var f=FileChannel.open(temp,WRITE)){f.force(true);}
-            Files.move(temp,path,StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);
+            // Windows readers can briefly hold the destination. Retry only this local move;
+            // never repeat a provider request or downgrade atomic durability.
+            for(int attempt=0;;attempt++) {
+                try {Files.move(temp,path,StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);break;}
+                catch(AccessDeniedException e) {
+                    if(attempt>=4)throw e;
+                    try {Thread.sleep(25L << attempt);}
+                    catch(InterruptedException interrupted) {Thread.currentThread().interrupt();throw new IOException("Checkpoint move interrupted",interrupted);}
+                }
+            }
         } finally {Files.deleteIfExists(temp);}
     }
     /** Explicit retry is safe only when a durable successful receipt already exists. */

@@ -15,7 +15,7 @@ public final class QaDatabaseInitializer implements ApplicationContextInitialize
         Path db=root.resolve(id).resolve("database").normalize();
         if(!db.startsWith(root))throw new IllegalArgumentException("QA path escaped workspace");
         context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("isolated-qa-database",Map.of(
-                "spring.datasource.url","jdbc:h2:file:"+db.toString().replace('\\','/')+";MODE=MySQL;DB_CLOSE_ON_EXIT=FALSE",
+                "spring.datasource.url","jdbc:h2:file:"+db.toString().replace('\\','/')+";MODE=MySQL;DB_CLOSE_ON_EXIT=FALSE;MAX_COMPACT_TIME=0",
                 "spring.datasource.driver-class-name","org.h2.Driver","spring.datasource.username","sa","spring.datasource.password","",
                 "spring.jpa.hibernate.ddl-auto","update","spring.jpa.properties.hibernate.dialect","org.hibernate.dialect.H2Dialect",
                 "spring.sql.init.mode","never","gemini.api-key","","openai.api-key","")));

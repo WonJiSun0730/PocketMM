@@ -70,8 +70,8 @@ class QaRunnerTest {
         assertThat(scenario.evaluate(16,"서문이 아니고 동문이야",List.of()).result()).isEqualTo("UNEVALUATED");
         var runner=new QaRunner(dir,QaEnvironment.mockPersona(),new Target());runner.create(QaSpec.mock("report",20),scenario);
         for(int i=0;i<20;i++)runner.step();QaReports.write(dir,runner.read());
-        assertThat(Files.readString(dir.resolve("report.md"))).contains("무료 모의 실행","UNEVALUATED");
-        assertThat(Files.readString(dir.resolve("calls.csv"))).startsWith("call,turn,call_id,role,model");
+        assertThat(java.nio.file.Files.readString(dir.resolve("report.md"))).contains("무료 모의 실행","UNEVALUATED");
+        assertThat(java.nio.file.Files.readString(dir.resolve("calls.csv"))).startsWith("call,turn,call_id,role,model");
     }
     @Test void paidExecutionRequiresRunSpecificApprovalAndAllPrices() {
         var mock=QaSpec.mock("paid",20);
@@ -105,5 +105,16 @@ class QaRunnerTest {
         var state=runner.step();assertThat(state.status).isEqualTo("REVIEW_REQUIRED");assertThat(state.turns).hasSize(1);
         runner.authorizeRetry(Map.of(state.calls.getFirst().callId(),BigDecimal.ZERO),"Mock provider; zero external cost verified");
         assertThat(runner.step().status).isEqualTo("COMPLETED");assertThat(target.sends).isEqualTo(1);
+    }
+    @Test void personaExceptionIsSafeDurableAndNeverAutomaticallyRetried() throws Exception {
+        var count=new AtomicInteger();
+        var runner=new QaRunner(dir,input->{count.incrementAndGet();throw new IllegalStateException("secret-payload");},new Target());
+        runner.create(QaSpec.mock("safe-diagnostics",1),new QaScenarios(List.of()));
+        var state=runner.step();
+        assertThat(state.status).isEqualTo("REVIEW_REQUIRED");
+        assertThat(runner.read().diagnostics).extracting(QaRunner.Diagnostic::phase).contains("PERSONA_REQUEST_STARTED","PERSONA_FAILED");
+        assertThat(java.nio.file.Files.readString(dir.resolve("run.json"))).doesNotContain("secret-payload");
+        assertThatThrownBy(()->PersonaQaExecutionTest.requireSuccessfulExecution(state)).isInstanceOf(AssertionError.class).hasMessageContaining("REVIEW_REQUIRED");
+        runner.step();assertThat(count.get()).isEqualTo(1);
     }
 }

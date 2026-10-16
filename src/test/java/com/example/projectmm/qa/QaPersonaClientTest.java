@@ -48,4 +48,19 @@ class QaPersonaClientTest {
         assertThatThrownBy(()->new QaSpec(s.runId(),s.turns(),true,s.approval(),s.persona(),"gpt-5.6-terra",s.targetModel(),s.extractionModel(),
                 s.budgetUsd(),s.turnReservationUsd(),s.prices(),s.recentTurns(),true)).hasMessageContaining("must use gpt-5.6-luna");
     }
+    @Test void malformedResponseRecordsSafeFailureAndDoesNotRetry() {
+        var builder=RestClient.builder().baseUrl("https://api.openai.com");
+        var server=MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("https://api.openai.com/v1/responses"))
+                .andRespond(withSuccess("secret-response-not-json",MediaType.APPLICATION_JSON));
+        var result=new QaPersonaClient(spec(),"secret-key",builder.build())
+                .next(new QaRunner.PersonaInput(spec().persona(),1,List.of()));
+        assertThat(result.error()).contains("no automatic retry");
+        assertThat(result.diagnostics()).extracting(QaRunner.Diagnostic::phase)
+                .contains("REQUEST_STARTED","RESPONSE_RECEIVED");
+        assertThat(result.diagnostics().getLast().exceptionType()).isNotBlank();
+        assertThat(result.diagnostics()).allSatisfy(d->assertThat(java.time.Instant.parse(d.at())).isNotNull());
+        assertThat(new ObjectMapper().writeValueAsString(result)).doesNotContain("secret-key","secret-response-not-json");
+        server.verify();
+    }
 }

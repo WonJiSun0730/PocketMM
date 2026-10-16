@@ -25,6 +25,7 @@ import java.nio.file.*;
 @AutoConfigureTestDatabase(replace=AutoConfigureTestDatabase.Replace.NONE)
 @ContextConfiguration(initializers=QaDatabaseInitializer.class)
 @Import(QaEnvironment.class)
+@org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 @Transactional(propagation=Propagation.NOT_SUPPORTED)
 class PersonaQaExecutionTest {
     @Autowired QaSpec spec;
@@ -39,6 +40,11 @@ class PersonaQaExecutionTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired DialogueGateway gateway;
     @Autowired QaSpendGuard guard;
+
+    static void requireSuccessfulExecution(QaRunner.State state) {
+        if(java.util.Set.of("REVIEW_REQUIRED","FAILED","BUDGET_STOP").contains(state.status))
+            throw new AssertionError("QA status="+state.status+" stage="+state.stage+"; review run.json diagnostics. Automatic retry prohibited.");
+    }
 
     @Test void executeApprovedIsolatedRun() throws Exception {
         if(!spec.runId().equals(System.getProperty("pocket.qa.run-id")))throw new IllegalArgumentException("Run ID mismatch");
@@ -70,7 +76,7 @@ class PersonaQaExecutionTest {
             runner.create(spec,scenario);
         }
         if(!runner.read().spec.equals(spec))throw new IllegalArgumentException("Checkpoint config mismatch");
-        if(Boolean.getBoolean("pocket.qa.recover")) {QaReports.write(path,runner.recoverCommitted());return;}
+        if(Boolean.getBoolean("pocket.qa.recover")) {var recovered=runner.recoverCommitted();QaReports.write(path,recovered);requireSuccessfulExecution(recovered);return;}
         if(System.getProperty("pocket.qa.reconcile")!=null) {
             var reconciliation=mapper.readTree(Files.readString(Path.of(System.getProperty("pocket.qa.reconcile"))));
             var costs=new java.util.HashMap<String,java.math.BigDecimal>();
@@ -86,6 +92,8 @@ class PersonaQaExecutionTest {
             System.out.printf("QA %s %d/%d %s knownUSD=%s unknown=%s%n",spec.runId(),state.turns.size(),spec.turns(),state.status,state.knownUsd(),state.unknownCost());
             if(!state.status.equals("RUNNING"))break;
         }
-        QaReports.write(path,runner.read());
+        var finalState=runner.read();
+        QaReports.write(path,finalState);
+        requireSuccessfulExecution(finalState);
     }
 }
