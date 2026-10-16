@@ -911,7 +911,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
                         relationshipFacts,
                         context.contentMode(),
                         contentModeInstruction
-                );
+                ) + PromptModules.narrator();
     }
 
     private String buildCharacterProfilePrompt(

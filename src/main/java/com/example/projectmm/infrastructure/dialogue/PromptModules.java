@@ -13,7 +13,7 @@ public final class PromptModules {
 
     PromptModules(ClassLoader loader) {
         var loaded=new LinkedHashMap<String,Map<String,String>>();
-        for(String name:List.of("SYSTEM","SCENE")) {
+        for(String name:List.of("SYSTEM","SCENE","NARRATOR")) {
             String path="prompts/"+name+".md";
             try(var input=loader.getResourceAsStream(path)) {
                 if(input==null)throw new IllegalStateException("Required prompt resource is missing: "+path);
@@ -21,6 +21,7 @@ public final class PromptModules {
             } catch(IOException ex) {throw new IllegalStateException("Cannot read required prompt resource: "+path,ex);}
         }
         modules=Map.copyOf(loaded);
+        required("NARRATOR","narrator.expression");
         for(String key:List.of("world.setup","world.context-template","world.authority","world.character-output","legacy.resolved-input","legacy.setup","legacy.memory-character","legacy.perception")) required("SYSTEM",key);
         for(String key:List.of("world.player-settings","world.cast","legacy.continue","legacy.time","legacy.prose-conventions","legacy.scene-focus","legacy.authorship","live.strict","live.elaborate","live.pacing","continuation.progress","continuation.strict","continuation.low","continuation.moderate","continuation.high","continuation.delegated-intro","continuation.delegated-end")) required("SCENE",key);
     }
@@ -42,5 +43,6 @@ public final class PromptModules {
         if(sections==null||!sections.containsKey(key))throw new IllegalStateException("Required prompt section is missing: "+module+"/"+key);
         return sections.get(key);
     }
+    public static String narrator() { return "\n" + section("NARRATOR", "narrator.expression"); }
     public static void validate() { DEFAULT.required("SYSTEM","world.setup");DEFAULT.required("SCENE","live.pacing"); }
 }
