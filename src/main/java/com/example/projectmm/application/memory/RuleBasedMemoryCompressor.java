@@ -8,7 +8,7 @@ import com.example.projectmm.infrastructure.ai.ConditionalOnGeminiKey;
 import java.util.List;
 
 @Component
-@ConditionalOnGeminiKey(false)
+@com.example.projectmm.infrastructure.ai.ConditionalOnTextKey(false)
 public class RuleBasedMemoryCompressor
         implements MemoryCompressor {
 

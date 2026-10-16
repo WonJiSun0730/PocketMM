@@ -39,22 +39,40 @@ public class ExperienceEnvironment {
     @Bean AiUsageTracker qaUsage() { return new AiUsageTracker(); }
     @Bean ExperienceTransport qaSpendGuard(QaSpec spec) throws java.io.IOException {return new ExperienceTransport(spec,ExperienceExecutionTest.directory());}
     @Bean TransactionTemplate qaTransactions(PlatformTransactionManager manager) { return new TransactionTemplate(manager); }
-    @Bean TimeInterpreter qaTime(QaSpec spec,ObjectMapper mapper,ExperienceTransport guard) throws java.io.IOException {
+    @Bean com.example.projectmm.infrastructure.ai.TextProviderRouting qaTextRouting(QaSpec spec,ObjectMapper mapper,AiUsageTracker usage,ExperienceTransport guard) throws java.io.IOException {
+        var snapshot=ExperienceExecutionTest.snapshot();
+        if (spec.paid() && (!"OPENAI".equals(snapshot.extractorProvider()) ||
+                java.util.stream.Stream.of(snapshot.extractorModel(),snapshot.timeModel(),snapshot.compressorModel(),snapshot.embeddingModel())
+                    .filter(java.util.Objects::nonNull).anyMatch(m->m.startsWith("gemini"))))
+            throw new IllegalStateException("이전 Gemini 보조 호출 설정은 차단되었습니다. OpenAI 설정으로 새 QA 실행을 만드세요.");
+        var env=new org.springframework.core.env.StandardEnvironment();
+        var props=new java.util.HashMap<String,Object>();
+        props.put("openai.api-key",spec.paid()?key():"");
+        if(snapshot.timeModel()!=null)props.put("openai.time-model",snapshot.timeModel());
+        if(snapshot.compressorModel()!=null)props.put("openai.compression-model",snapshot.compressorModel());
+        if(snapshot.embeddingModel()!=null)props.put("openai.embedding-model",snapshot.embeddingModel());
+        env.getPropertySources().addFirst(new org.springframework.core.env.MapPropertySource("qa-openai",props));
+        var routing=new com.example.projectmm.infrastructure.ai.TextProviderRouting(null,env,mapper,usage) {
+            @Override public boolean openAi() {return true;}
+        };
+        ReflectionTestUtils.setField(routing,"client",qaClient(guard));return routing;
+    }
+    @Bean TimeInterpreter qaTime(QaSpec spec,ObjectMapper mapper,ExperienceTransport guard,com.example.projectmm.infrastructure.ai.TextProviderRouting routing) throws java.io.IOException {
         var snapshot=ExperienceExecutionTest.snapshot();
         com.example.projectmm.application.time.AiTimeParser parser=new com.example.projectmm.infrastructure.time.NoOpAiTimeParser();
         if(spec.paid()&&snapshot.timeModel()!=null) {
-            var gemini=new com.example.projectmm.infrastructure.time.GeminiTimeParser(geminiKey(),snapshot.timeModel(),mapper);
-            ReflectionTestUtils.setField(gemini,"restClient",geminiClient(guard));parser=(input,time)->AiUsageTracker.withScope(AiUsageTracker.currentSessionId(),"TIME_INTERPRETATION",()->gemini.parse(input,time));
+            var gemini=new com.example.projectmm.infrastructure.time.GeminiTimeParser("",snapshot.timeModel(),mapper);
+            ReflectionTestUtils.setField(gemini,"textRouting",routing);parser=(input,time)->AiUsageTracker.withScope(AiUsageTracker.currentSessionId(),"TIME_INTERPRETATION",()->gemini.parse(input,time));
         }
         return new HybridTimeInterpreter(new RuleBasedTimeInterpreter(),new AiTimeInterpreter(parser,new TimeChangeResolver()));
     }
     @Bean MemoryRetriever qaRetriever(QaSpec spec,ObjectMapper mapper,ExperienceTransport guard,
-            com.example.projectmm.infrastructure.memory.MemoryEmbeddingJpaRepository repository) throws java.io.IOException {
+            com.example.projectmm.infrastructure.memory.MemoryEmbeddingJpaRepository repository,com.example.projectmm.infrastructure.ai.TextProviderRouting routing) throws java.io.IOException {
         MemoryEmbeddingProvider provider=new UnavailableMemoryEmbeddingProvider();var snapshot=ExperienceExecutionTest.snapshot();
         if(spec.paid()&&snapshot.embeddingModel()!=null) {
-            var gemini=new com.example.projectmm.infrastructure.ai.GeminiMemoryEmbeddingProvider(geminiKey(),snapshot.embeddingModel(),mapper);
-            ReflectionTestUtils.setField(gemini,"restClient",geminiClient(guard));
-            provider=text->AiUsageTracker.withScope(AiUsageTracker.currentSessionId(),"MEMORY_EMBEDDING",()->gemini.embed(text));
+            var gemini=new com.example.projectmm.infrastructure.ai.GeminiMemoryEmbeddingProvider("",snapshot.embeddingModel(),mapper);
+            ReflectionTestUtils.setField(gemini,"textRouting",routing);
+            provider=gemini;
         }
         var store=new com.example.projectmm.infrastructure.memory.JpaMemoryEmbeddingStore(repository,mapper);
         return new HybridMemoryRetriever(provider,new CachedMemoryEmbeddingService(provider,store),new MemoryRetrievalRanker());
@@ -65,11 +83,11 @@ public class ExperienceEnvironment {
         return new com.example.projectmm.infrastructure.memory.MemoryCompressionPromptBuilder(access,provenance,detail);
     }
     @Bean MemoryCompressor qaCompressor(QaSpec spec, ObjectMapper mapper, ExperienceTransport guard,
-            com.example.projectmm.infrastructure.memory.MemoryCompressionPromptBuilder prompts) throws java.io.IOException {
+            com.example.projectmm.infrastructure.memory.MemoryCompressionPromptBuilder prompts,com.example.projectmm.infrastructure.ai.TextProviderRouting routing) throws java.io.IOException {
         var snapshot=ExperienceExecutionTest.snapshot();
         if(!spec.paid()||snapshot.compressorModel()==null)return new RuleBasedMemoryCompressor();
-        var compressor=new com.example.projectmm.infrastructure.memory.GeminiMemoryCompressor(geminiKey(),snapshot.compressorModel(),mapper,prompts);
-        ReflectionTestUtils.setField(compressor,"client",geminiClient(guard));return (memory,level,related)->AiUsageTracker.withScope(AiUsageTracker.currentSessionId(),"MEMORY_COMPRESSION",()->compressor.compress(memory,level,related));
+        var compressor=new com.example.projectmm.infrastructure.memory.GeminiMemoryCompressor("",snapshot.compressorModel(),mapper,prompts);
+        ReflectionTestUtils.setField(compressor,"textRouting",routing);return (memory,level,related)->AiUsageTracker.withScope(AiUsageTracker.currentSessionId(),"MEMORY_COMPRESSION",()->compressor.compress(memory,level,related));
     }
     @Bean QaSpec qaSpec() throws java.io.IOException {
         if(!Boolean.getBoolean("pocket.qa.execute"))return QaSpec.mock("integration",100);
@@ -83,10 +101,7 @@ public class ExperienceEnvironment {
             try {
                 var snapshot=ExperienceExecutionTest.snapshot();
                 if(!snapshot.memoryEnabled()||snapshot.extractorProvider().equals("NONE"))return text->List.of();
-                if(snapshot.extractorProvider().equals("GEMINI")) {
-                    var extractor=new com.example.projectmm.infrastructure.memory.GeminiChatMemoryExtractor(geminiKey(),snapshot.extractorModel(),mapper);
-                    ReflectionTestUtils.setField(extractor,"usageTracker",usage);ReflectionTestUtils.setField(extractor,"client",geminiClient(guard));return extractor;
-                }
+                if(!snapshot.extractorProvider().equals("OPENAI"))throw new IllegalStateException("OpenAI QA only: auxiliary provider blocked");
                 var extractor=new OpenAiChatMemoryExtractor(key(),snapshot.extractorModel(),mapper);
                 ReflectionTestUtils.setField(extractor,"usageTracker",usage);ReflectionTestUtils.setField(extractor,"client",qaClient(guard));return extractor;
             } catch(java.io.IOException e){throw new java.io.UncheckedIOException(e);}
@@ -113,10 +128,6 @@ public class ExperienceEnvironment {
                 return new WorldRoomTurn(reply,WorldRoomCastChange.none(),List.of(),60);
             }
         };
-    }
-    static String geminiKey(){return System.getenv().getOrDefault("POCKET_EXPERIENCE_GEMINI_API_KEY","");}
-    static org.springframework.web.client.RestClient geminiClient(ExperienceTransport guard) {
-        return org.springframework.web.client.RestClient.builder().baseUrl("https://generativelanguage.googleapis.com").requestInterceptor(guard).build();
     }
     static String key() {
         String key=System.getenv("POCKET_QA_OPENAI_API_KEY");

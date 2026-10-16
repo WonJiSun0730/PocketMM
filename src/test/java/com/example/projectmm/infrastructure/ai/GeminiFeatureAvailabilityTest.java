@@ -19,7 +19,7 @@ class GeminiFeatureAvailabilityTest {
         var context=new AnnotationConfigApplicationContext();
         context.getEnvironment().setActiveProfiles(profiles);
         context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("test",Map.of(
-                "gemini.api-key",key,"gemini.model","test-model","gemini.time-model","test-time")));
+                "openai.api-key","","gemini.api-key",key,"gemini.model","test-model","gemini.time-model","test-time")));
         context.registerBean(ObjectMapper.class,()->new ObjectMapper());
         context.register(GeminiAiGateway.class,MockAiGateway.class,GeminiTimeParser.class,NoOpAiTimeParser.class,
                 GeminiCatchUpNarrativeGateway.class,FallbackCatchUpNarrativeGateway.class,GeminiMemoryEmbeddingProvider.class);

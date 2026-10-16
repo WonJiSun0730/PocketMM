@@ -24,6 +24,9 @@ import java.util.Map;
 @ConditionalOnGeminiKey
 public class GeminiAiGateway implements AiGateway {
 
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.example.projectmm.infrastructure.ai.TextProviderRouting textRouting;
+
     private final String apiKey;
     private final String model;
     private final RestClient restClient;
@@ -56,7 +59,7 @@ public class GeminiAiGateway implements AiGateway {
                 createRequest(context);
 
         String response =
-                restClient.post()
+                textRouting != null && textRouting.openAi() ? textRouting.text(request,"SIMULATION_DECISION") : restClient.post()
                         .uri(
                                 "/v1beta/models/{model}:generateContent",
                                 model

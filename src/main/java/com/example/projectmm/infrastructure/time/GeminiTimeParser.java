@@ -16,8 +16,11 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-@ConditionalOnGeminiKey
+@com.example.projectmm.infrastructure.ai.ConditionalOnTextKey
 public class GeminiTimeParser implements AiTimeParser {
+
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.example.projectmm.infrastructure.ai.TextProviderRouting textRouting;
 
     private final String apiKey;
     private final String model;
@@ -25,7 +28,7 @@ public class GeminiTimeParser implements AiTimeParser {
     private final ObjectMapper objectMapper;
 
     public GeminiTimeParser(
-            @Value("${gemini.api-key}") String apiKey,
+            @Value("${gemini.api-key:}") String apiKey,
             @Value("${gemini.time-model}") String model,
             ObjectMapper objectMapper
     ) {
@@ -50,6 +53,8 @@ public class GeminiTimeParser implements AiTimeParser {
             return noMatch();
         }
 
+        if ((textRouting == null || !textRouting.openAi()) && (apiKey == null || apiKey.isBlank())) return noMatch();
+
         try {
             Map<String, Object> request =
                     createRequest(
@@ -58,7 +63,7 @@ public class GeminiTimeParser implements AiTimeParser {
                     );
 
             String response =
-                    restClient.post()
+                    textRouting != null && textRouting.openAi() ? textRouting.text(request,"TIME_INTERPRETATION") : restClient.post()
                             .uri(
                                     "/v1beta/models/{model}:generateContent",
                                     model

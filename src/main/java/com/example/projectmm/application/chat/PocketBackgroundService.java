@@ -38,6 +38,16 @@ public class PocketBackgroundService {
         volatile String status = "GENERATING", error;
         Job(String scope, String location, String daypart) { this.scope = scope; this.location = location; this.daypart=daypart; }
     }
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.example.projectmm.domain.chat.WorldRoomSessionRepository pocketSessions;
+    private static final String IMAGE_BLOCKED="이미지 생성은 별도 Gemini 기능입니다. OpenAI 포켓에서는 Gemini 이미지 호출을 차단하며, 저장 이미지와 직접 첨부는 사용할 수 있어요.";
+    private boolean imageBlocked(Context context) {
+        return pocketSessions!=null && pocketSessions.findById(context.sessionId())
+                .map(s->"OPENAI".equalsIgnoreCase(s.getAiProvider())).orElse(true);
+    }
+    private void requireImageProvider(Context context) {
+        if(imageBlocked(context))throw new ResponseStatusException(HttpStatus.CONFLICT,IMAGE_BLOCKED);
+    }
     private final WorldRoomSessionService sessions;
     private final PocketBackgroundStore store;
     private final GeminiBackgroundGenerator generator;
@@ -64,12 +74,13 @@ public class PocketBackgroundService {
         var asset = store.match(context.scope(), location, context.daypart());
         if (asset.isPresent()) return result(context, "READY", asset.get(), location, null, catalog.automatic());
         Job job = jobs.get(key(context, location));
-        String unavailable = !enabled ? "이미지 생성 기능이 서버에서 꺼져 있어요."
+        String unavailable = imageBlocked(context) ? IMAGE_BLOCKED : !enabled ? "이미지 생성 기능이 서버에서 꺼져 있어요."
                 : !generator.available() ? "이미지 생성용 Gemini 연결 설정이 없어요." : null;
         return new Result(job == null ? "MISSING" : job.status, null, false,
-                job == null ? unavailable : job.error, catalog.automatic(), enabled && generator.available());
+                job == null ? unavailable : job.error, catalog.automatic(), enabled && generator.available() && !imageBlocked(context));
     }
     public synchronized Result request(Context context, String requested) {
+        requireImageProvider(context);
         String location = location(requested);
         Result current = resolve(context, location);
         if (current.asset() != null || current.status().equals("GENERATING")) return current;
@@ -97,10 +108,12 @@ public class PocketBackgroundService {
                 String id = key(context, job.location).substring(key(context, job.location).lastIndexOf(':') + 1);
                 byte[] background = store.stagedBackground(context.scope(), id);
                 if (background == null) {
+                    requireImageProvider(context);
                     phase[0] = "BACKGROUND";
                     background = PocketBackgroundImages.prepare(generator.generate(context.worldDescription() + "\nScene time period: " + context.daypart() + "\nPlace: " + job.location, null, false), false, false);
                     store.stageBackground(context.scope(), id, background);
                 }
+                requireImageProvider(context);
                 phase[0] = "SCENERY";
                 byte[] scenery = PocketBackgroundImages.prepare(generator.generate(context.worldDescription() + "\nScene time period: " + context.daypart() + "\nPlace: " + job.location, background, true), true, true);
                 phase[0] = "STORE";
@@ -120,6 +133,7 @@ public class PocketBackgroundService {
         }
     }
     public Result configure(Context context, boolean automatic, String location) {
+        if(automatic)requireImageProvider(context);
         location = location(location);
         try { store.configure(context.scope(), automatic); }
         catch (IOException e) { throw storageError(); }
@@ -152,7 +166,7 @@ public class PocketBackgroundService {
                 asset.source(), PocketBackgroundImages.WIDTH, PocketBackgroundImages.HEIGHT,
                 PocketBackgroundStore.daypart(asset.simulatedAt()), asset.simulatedAt()),
                 !PocketBackgroundMatcher.normalize(location).equals(PocketBackgroundMatcher.normalize(asset.location())), error,
-                automatic, enabled && generator.available());
+                automatic, enabled && generator.available() && !imageBlocked(context));
     }
     private String key(Context context, String location) {
         try { return context.scope() + ":" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")

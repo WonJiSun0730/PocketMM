@@ -83,7 +83,8 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
         if(budgetBlocked)throw new IllegalStateException("Budget policy already blocked this run; no further HTTP requests permitted");
         if(uncertain){budgetEvent("REVIEW_REQUIRED","Unknown prior charge; automatic retry prohibited");throw new IllegalStateException("Unknown prior charge; automatic retry prohibited");}
         var json=mapper.readTree(body);boolean gemini=request.getURI().getHost().equals("generativelanguage.googleapis.com");
-        boolean embedding=request.getURI().getPath().endsWith(":embedContent");
+        if(gemini)block("OpenAI QA에서 Gemini 요청을 전송 전에 차단했습니다. 새 실행을 만드세요.");
+        boolean embedding=request.getURI().getPath().equals("/v1/embeddings");
         String model=gemini?request.getURI().getPath().replaceFirst(".*/models/","").replaceFirst(":.*",""):json.path("model").asText();
         String provider=gemini?"GEMINI":"OPENAI";
         Object scope=((ThreadLocal<?>)org.springframework.test.util.ReflectionTestUtils.getField(com.example.projectmm.infrastructure.dialogue.AiUsageTracker.class,"scope")).get();
@@ -154,8 +155,8 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
         try {
             var response=execution.execute(request,body);byte[] bytes=response.getBody().readAllBytes();var root=mapper.readTree(bytes);
             var u=root.path(gemini?"usageMetadata":"usage");var d=u.path("input_tokens_details");
-            long in=u.path(gemini?"promptTokenCount":"input_tokens").asLong(-1),cache=(gemini?u.path("cachedContentTokenCount"):d.path("cached_tokens")).asLong(gemini?0:-1);
-            Long write=gemini?Long.valueOf(0):d.path("cache_write_tokens").isIntegralNumber()?Long.valueOf(d.path("cache_write_tokens").asLong()):null;
+            long in=u.path(gemini?"promptTokenCount":embedding?"prompt_tokens":"input_tokens").asLong(-1),cache=embedding?0:(gemini?u.path("cachedContentTokenCount"):d.path("cached_tokens")).asLong(gemini?0:-1);
+            Long write=gemini||embedding?Long.valueOf(0):d.path("cache_write_tokens").isIntegralNumber()?Long.valueOf(d.path("cache_write_tokens").asLong()):null;
             long out=embedding?0:gemini?u.path("candidatesTokenCount").asLong(0)+u.path("thoughtsTokenCount").asLong(0):u.path("output_tokens").asLong(-1);
             BigDecimal cost=rate.cost(in,cache,write,out);
             if(cost==null)uncertain=true;else spent=spent.add(cost);

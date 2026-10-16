@@ -61,6 +61,7 @@ public class WorldRoomContextBuilder {
     }
 
     private WorldRoomDialogueContext buildSession(Long sessionId, Long beforeMessageId) {
+        return com.example.projectmm.infrastructure.dialogue.AiUsageTracker.withScope(sessionId, "MEMORY_EMBEDDING", () -> {
         var session = sessions.findById(sessionId)
                 .orElseThrow(() -> new IllegalArgumentException("World room session not found. sessionId=" + sessionId));
         var room = session.getRoom();
@@ -225,6 +226,8 @@ public class WorldRoomContextBuilder {
                 session.getAiProvider() == null ? "GEMINI" : session.getAiProvider(),
                 session.getAiModel()
         );
+    
+        });
     }
 
     @Transactional(readOnly = true)

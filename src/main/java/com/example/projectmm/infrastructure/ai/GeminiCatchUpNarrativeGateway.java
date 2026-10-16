@@ -18,6 +18,9 @@ import java.util.Map;
 public class GeminiCatchUpNarrativeGateway
         implements CatchUpNarrativeGateway {
 
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.example.projectmm.infrastructure.ai.TextProviderRouting textRouting;
+
     private final String apiKey;
     private final String model;
     private final RestClient restClient;
@@ -119,7 +122,7 @@ public class GeminiCatchUpNarrativeGateway
                 );
 
         String response =
-                restClient.post()
+                textRouting != null && textRouting.openAi() ? textRouting.text(request,"ABSENCE_NARRATIVE") : restClient.post()
                         .uri(
                                 "/v1beta/models/{model}:generateContent",
                                 model

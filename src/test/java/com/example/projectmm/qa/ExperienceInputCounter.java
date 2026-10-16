@@ -12,12 +12,19 @@ final class ExperienceInputCounter {
         return value!=null&&value.matches("[a-zA-Z0-9_.-]{1,80}")?value:"unknown";
     }
     static long count(String provider,String model,JsonNode request,boolean embedding) {
+        if(!provider.equals("OPENAI"))throw new IllegalStateException("OpenAI QA blocks other provider token counters before HTTP");
+        if(embedding && provider.equals("OPENAI")) {
+            if(!java.util.Set.of("text-embedding-3-small","text-embedding-3-large").contains(model) || !request.path("input").isString())
+                throw new IllegalStateException("Verified embedding tokenizer unavailable; request blocked");
+            return com.knuddels.jtokkit.Encodings.newDefaultEncodingRegistry()
+                    .getEncoding(com.knuddels.jtokkit.api.EncodingType.CL100K_BASE).countTokens(request.path("input").asText());
+        }
         var factory=new org.springframework.http.client.JdkClientHttpRequestFactory(java.net.http.HttpClient.newBuilder()
                 .connectTimeout(java.time.Duration.ofSeconds(15)).build());
         factory.setReadTimeout(java.time.Duration.ofSeconds(30));
         RestClient client=RestClient.builder().requestFactory(factory).build();
         String response;
-        if(provider.equals("OPENAI")) {
+        {
             // Token counting accepts input-shaping fields, not generation controls.
             var countRequest=M.createObjectNode();
             for(String field:List.of("model","input","instructions","reasoning","text",
@@ -40,16 +47,10 @@ final class ExperienceInputCounter {
                 throw new IllegalStateException("OpenAI token count HTTP "+e.getStatusCode().value()
                         +" (type="+safe(type)+", code="+safe(code)+", param="+safe(param)+")");
             }
-        } else {
-            var payload=M.createObjectNode();
-            if(embedding)payload.putArray("contents").add(request.path("content"));
-            else {var content=(tools.jackson.databind.node.ObjectNode)request.deepCopy();content.put("model","models/"+model);payload.set("generateContentRequest",content);}
-            response=client.post().uri("https://generativelanguage.googleapis.com/v1beta/models/"+model+":countTokens")
-                    .header("x-goog-api-key",ExperienceEnvironment.geminiKey()).contentType(MediaType.APPLICATION_JSON)
-                    .body(payload).retrieve().body(String.class);
         }
-        JsonNode count=M.readTree(response).path(provider.equals("OPENAI")?"input_tokens":"totalTokens");
+        JsonNode count=M.readTree(response).path("input_tokens");
         if(!count.isIntegralNumber()||!count.canConvertToLong()||count.asLong()<0)throw new IllegalStateException("Provider input count unavailable");
         return count.asLong();
     }
 }
+

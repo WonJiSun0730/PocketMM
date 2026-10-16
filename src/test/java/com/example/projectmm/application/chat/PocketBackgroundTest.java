@@ -22,6 +22,22 @@ class PocketBackgroundTest {
             image.setRGB(x,y,x<60 ? 0xff6d8059 : alpha ? 0 : magenta ? 0xffff00ff : 0xffded4bc);
         var out = new ByteArrayOutputStream(); ImageIO.write(image,"png",out); return out.toByteArray();
     }
+    @Test void openAiPocketBlocksGeminiGenerationAndAutomaticEnableBeforeNetwork() throws Exception {
+        var generator=mock(GeminiBackgroundGenerator.class);when(generator.available()).thenReturn(true);
+        var repository=mock(com.example.projectmm.domain.chat.WorldRoomSessionRepository.class);
+        var session=mock(com.example.projectmm.domain.chat.WorldRoomSession.class);
+        when(session.getAiProvider()).thenReturn("OPENAI");when(repository.findById(9L)).thenReturn(java.util.Optional.of(session));
+        var service=new PocketBackgroundService(mock(WorldRoomSessionService.class),new PocketBackgroundStore(directory.toString(),new JsonMapper()),generator,true);
+        org.springframework.test.util.ReflectionTestUtils.setField(service,"pocketSessions",repository);
+        var context=new PocketBackgroundService.Context(9,"1-2","World");
+        try {
+            assertThat(service.resolve(context,"공원").available()).isFalse();
+            assertThat(service.resolve(context,"공원").error()).contains("별도 Gemini 기능");
+            assertThatThrownBy(()->service.request(context,"공원")).hasMessageContaining("차단");
+            assertThatThrownBy(()->service.configure(context,true,"공원")).hasMessageContaining("차단");
+            verify(generator,never()).generate(anyString(),any(),anyBoolean());
+        } finally {service.close();}
+    }
     @Test void placeKeywordsReuseAliasesWithoutCrossingIncompatibleScenes() {
         assertThat(PocketBackgroundMatcher.score("심리상담센터 상담실", "상담실", "")).isPositive();
         assertThat(PocketBackgroundMatcher.score("counseling room", "상담실", "")).isPositive();

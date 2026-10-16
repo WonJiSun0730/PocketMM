@@ -18,11 +18,11 @@ class ExperienceBudgetTest {
   var s=QaSpec.mock("hard-cap",100);
   var rate=new QaSpec.Rate(new BigDecimal("4"),new BigDecimal("0.4"),new BigDecimal("5"),new BigDecimal("20"),272000,new BigDecimal("2"),new BigDecimal("1.5"),"FIXTURE","2026-10-16");
   return new QaSpec(s.runId(),100,true,s.runId(),s.persona(),"gpt-5.6-luna","gpt-5.6-sol","gemini-3.5-flash-lite",budget,new BigDecimal("0.000001"),
-   Map.of("gpt-5.6-sol",rate,"gpt-5.6-luna",rate,"gemini-3.5-flash-lite",rate,"gemini-embedding-001",rate),6,true);
+   Map.of("gpt-5.6-sol",rate,"gpt-5.6-luna",rate,"gemini-3.5-flash-lite",rate,"text-embedding-3-small",rate),6,true);
  }
  ExperienceTransport transport(BigDecimal budget,long input) throws Exception {
   var manifest=m.createObjectNode();manifest.set("budgetPolicy",m.valueToTree(ExperienceBudgetPolicy.create(List.of(900L,1100L,800L))));
-  manifest.set("maximumOutputTokens",m.valueToTree(Map.of("gpt-5.6-sol",128000,"gpt-5.6-luna",128000,"gemini-3.5-flash-lite",65536,"gemini-embedding-001",0)));
+  manifest.set("maximumOutputTokens",m.valueToTree(Map.of("gpt-5.6-sol",128000,"gpt-5.6-luna",128000,"gemini-3.5-flash-lite",65536,"text-embedding-3-small",0)));
   Files.writeString(dir.resolve("manifest.json"),m.writeValueAsString(manifest));
   return new ExperienceTransport(spec(budget),dir,(p,model,j,e)->input);
  }
@@ -80,18 +80,25 @@ class ExperienceBudgetTest {
   var json=(tools.jackson.databind.node.ObjectNode)m.readTree(body());json.put("max_output_tokens",2048);
   t.intercept(req(),m.writeValueAsBytes(json),(r,b)->{assertThat(m.readTree(b).path("max_output_tokens").asLong()).isEqualTo(2048);return response(1000,0,1);}).close();
  }
- @Test void geminiThinkingIsIncludedInCombinedOutputCapAndEmbeddingReservesNoOutput() throws Exception {
+ @Test void geminiCallsAreBlockedBeforeTokenCountingOrNetwork() throws Exception {
+  var t=transport(BigDecimal.TEN,1000);var sent=new AtomicInteger();
+  for(String operation:List.of("generateContent","embedContent")) {
+   var request=new MockClientHttpRequest(HttpMethod.POST,URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-test:"+operation));
+   assertThatThrownBy(()->t.intercept(request,"{}".getBytes(),(r,b)->{sent.incrementAndGet();return response(1,0,1);}))
+       .isInstanceOf(IllegalStateException.class);
+  }
+  assertThat(sent.get()).isZero();assertThat(t.budgetBlocked).isTrue();
+ }
+ @Test void openAiEmbeddingReservesInputOnlyAndSettlesPromptTokens() throws Exception {
   var t=transport(BigDecimal.TEN,1000);
-  var req=new MockClientHttpRequest(HttpMethod.POST,URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent"));
-  t.intercept(req,"{\"contents\":[{\"parts\":[{\"text\":\"기억\"}]}],\"generationConfig\":{\"maxOutputTokens\":2048}}".getBytes(),(r,b)->{
-   assertThat(m.readTree(b).path("generationConfig").path("maxOutputTokens").asLong()).isEqualTo(2048);
-   return new MockClientHttpResponse("{\"usageMetadata\":{\"promptTokenCount\":1000,\"candidatesTokenCount\":20,\"thoughtsTokenCount\":100},\"candidates\":[{\"finishReason\":\"STOP\"}]}".getBytes(),HttpStatus.OK);
+  var request=new MockClientHttpRequest(HttpMethod.POST,URI.create("https://api.openai.com/v1/embeddings"));
+  t.intercept(request,"{\"model\":\"text-embedding-3-small\",\"input\":\"memory\"}".getBytes(),(r,b)->{
+   assertThat(m.readTree(b).has("max_output_tokens")).isFalse();
+   return new MockClientHttpResponse("{\"data\":[{\"embedding\":[0.1]}],\"usage\":{\"prompt_tokens\":1000,\"total_tokens\":1000}}".getBytes(),HttpStatus.OK);
   }).close();
-  assertThat(budget().path("additionalThoughtBoundTokens").asLong()).isZero();
-  assertThat(budget().path("actualUsd").decimalValue()).isEqualByComparingTo("0.0064");
-  req=new MockClientHttpRequest(HttpMethod.POST,URI.create("https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent"));
-  t.intercept(req,"{\"content\":{\"parts\":[{\"text\":\"기억\"}]}}".getBytes(),(r,b)->new MockClientHttpResponse("{\"usageMetadata\":{\"promptTokenCount\":1000}}".getBytes(),HttpStatus.OK)).close();
   assertThat(budget().path("outputCapTokens").asLong()).isZero();
+  assertThat(budget().path("actualUsd").decimalValue()).isEqualByComparingTo("0.004");
+  assertThat(budget().path("reservedUsd").decimalValue()).isZero();
  }
  @Test void recentTwelveResponseDistributionChangesForecastAndTargetHeadroomOnly() {
   var samples=new ArrayList<Long>();for(int i=0;i<12;i++)samples.add(4000L);samples.add(90000L);

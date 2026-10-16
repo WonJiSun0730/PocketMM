@@ -85,8 +85,8 @@ export default function PocketSettingsPanel({ sessionId, location, simulatedAt, 
           <PocketBackgroundPanel sessionId={sessionId} location={location} simulatedAt={simulatedAt} />
           <div className="grid gap-3 rounded-lg border bg-card p-3.5 sm:grid-cols-2">
             <label className="grid gap-1.5">
-              <span className="text-sm font-medium">AI API</span>
-              <span className="text-xs text-muted-foreground">이 Pocket의 다음 응답부터 사용할 provider예요.</span>
+              <span className="text-sm font-medium">텍스트 AI 제공자</span>
+              <span className="text-xs text-muted-foreground">대화·시간 해석·기억 추출·임베딩·압축·부재 서사에 적용돼요. OpenAI 오류 시 Gemini로 전환하지 않아요.</span>
               <select value={draft.aiProvider}
                 onChange={event => setDraft(current => ({
                   ...current,

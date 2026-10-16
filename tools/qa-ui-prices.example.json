@@ -53,5 +53,16 @@
                                   "largeContextThreshold":  0,
                                   "largeInputMultiplier":  1,
                                   "largeOutputMultiplier":  1
-                              }
+                              },
+    "text-embedding-3-small": {
+        "input": 0.02,
+        "cached": 0.02,
+        "written": 0.02,
+        "output": 0,
+        "largeContextThreshold": 0,
+        "largeInputMultiplier": 1,
+        "largeOutputMultiplier": 1,
+        "source": "https://developers.openai.com/api/docs/models/text-embedding-3-small",
+        "checkedAt": "2026-10-16"
+    }
 }

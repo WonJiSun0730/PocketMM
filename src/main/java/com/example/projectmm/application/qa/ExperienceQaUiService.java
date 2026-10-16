@@ -69,7 +69,8 @@ public final class ExperienceQaUiService {
             if((!maxima.path(model).path("maximumOutputTokens").isIntegralNumber()||maxima.path(model).path("maximumOutputTokens").asLong(-1)<(model.equals(snapshot.embeddingModel())?0:1))||maxima.path(model).path("source").asText().isBlank()||maxima.path(model).path("checkedAt").asText().isBlank())
                 throw bad("요청을 변경하지 않고 지출을 예약하려면 검증된 모델 최대 출력 정보가 필요해요: "+model);
         }
-        if((snapshot.extractorProvider().equals("GEMINI")||snapshot.compressorModel()!=null)&&(geminiKey==null||geminiKey.isBlank()))throw bad("실서비스와 동일한 Gemini 기억 처리를 위한 서버 키가 필요해요.");
+        if(snapshot.extractorProvider().equals("GEMINI")||java.util.stream.Stream.of(snapshot.extractorModel(),snapshot.compressorModel(),snapshot.timeModel(),snapshot.embeddingModel()).filter(java.util.Objects::nonNull).anyMatch(model->model.startsWith("gemini")))
+            throw bad("이전 Gemini 보조 호출 설정은 차단되었어요. OpenAI 설정으로 새 테스트를 만들어 주세요.");
     }
     private JsonNode limits() {
         try {return limitsFile==null?mapper.createObjectNode():mapper.readTree(Files.readString(limitsFile));}
@@ -278,7 +279,7 @@ public final class ExperienceQaUiService {
         if(cache!=null&&!cache.isBlank())command.add("-Dmaven.repo.local="+cache);
         if(meta.paid())command.add("-Dpocket.qa.approve="+meta.id());
         command.add("test");
-        long pid=worker.launch(List.copyOf(command),workspace,Map.of("POCKET_QA_OPENAI_API_KEY",meta.paid()?apiKey:"","POCKET_EXPERIENCE_GEMINI_API_KEY",meta.paid()?geminiKey:""),path(meta.id()).resolve("worker.log"));
+        long pid=worker.launch(List.copyOf(command),workspace,Map.of("POCKET_QA_OPENAI_API_KEY",meta.paid()?apiKey:"","POCKET_EXPERIENCE_GEMINI_API_KEY",""),path(meta.id()).resolve("worker.log"));
         var updated=meta.withPid(pid);writeMeta(updated);return updated;
     }
     private View view(Meta meta) throws IOException {

@@ -43,7 +43,7 @@ public class CachedMemoryEmbeddingService {
         }
 
         String fingerprint =
-                fingerprint(document);
+                fingerprint(embeddingProvider.cacheNamespace()+"\n"+document);
 
         var cached =
                 embeddingStore.find(memoryId);
