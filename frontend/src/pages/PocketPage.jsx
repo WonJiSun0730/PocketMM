@@ -81,10 +81,6 @@ export default function PocketPage({ pocket, onBack }) {
     if (!dialog) return
     if (mobileToolsOpen) dialog.showModal()
     else dialog.close()
-    const media=window.matchMedia("(min-width:1280px)")
-    const resized=()=>{if(media.matches)setMobileToolsOpen(false)}
-    media.addEventListener("change",resized)
-    return ()=>media.removeEventListener("change",resized)
   },[mobileToolsOpen,pickerMode])
   const [devSystemValues, setDevSystemValues] = useState({})
   const [memoryInspector, setMemoryInspector] = useState([])
@@ -519,13 +515,6 @@ export default function PocketPage({ pocket, onBack }) {
           <h1 className="truncate font-medium leading-none">{room.title}</h1>
           <p className="mt-1 text-xs text-muted-foreground">{world.name} · POCKET</p>
         </div>
-        <Button type="button" variant="outline" size="sm" className="hidden shrink-0 lg:inline-flex"
-          disabled={exportingTestData || sending} onClick={exportTestData}
-          aria-label="장기 테스트 기록 JSON 내보내기">
-          {exportingTestData ? "기록 수집 중..." : "테스트 기록 내보내기"}
-        </Button>
-        <Button type="button" variant="ghost" size="sm" disabled={sending}
-          onClick={() => { setIssueNotice(""); setIssueManagerOpen(true) }}>문제 기록 관리</Button>
         {issueNotice && <p role="status" className="text-xs text-muted-foreground">{issueNotice}</p>}
         <Button
           type="button"
@@ -571,6 +560,8 @@ export default function PocketPage({ pocket, onBack }) {
             onClick={()=>setMobileToolsOpen(false)}><X className="size-4" /></Button>
         </div>
         <div className="border-b px-4 py-3">
+          <Button type="button" variant="outline" className="mb-2 w-full" disabled={sending}
+            onClick={() => { setMobileToolsOpen(false); setIssueNotice(""); setIssueManagerOpen(true) }}>문제 기록 관리 / 내보내기</Button>
           <Button type="button" variant="outline" className="w-full" disabled={exportingTestData || sending}
             onClick={exportTestData}>{exportingTestData ? "기록 수집 중..." : "장기 테스트 기록 내보내기 (.json)"}</Button>
           <p className="mt-2 text-xs text-muted-foreground">전체 대화·리롤 버전과 현재 AI 사용량·장면·메모리 진단을 저장합니다.</p>
@@ -764,7 +755,7 @@ export default function PocketPage({ pocket, onBack }) {
 
       <div className="shrink-0 border-t bg-card p-3 sm:p-4">
         <div className="mx-auto flex max-w-3xl items-end gap-2">
-          <Textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown}
+          <Textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} enterKeyHint="enter"
             placeholder="행동이나 대사를 입력해 주세요." disabled={loading || sending} rows={1}
             className="max-h-36 min-h-11 resize-none text-base" />
           <Button type="button" size="icon" className="size-11 shrink-0" disabled={loading || sending}
@@ -774,14 +765,6 @@ export default function PocketPage({ pocket, onBack }) {
       </div>
       </section>
       <aside className="pocket-desktop-tools">
-        <div className="shrink-0 border-b px-4 py-3">
-          <Button type="button" variant="outline" className="w-full"
-            disabled={exportingTestData || sending} onClick={exportTestData}
-            aria-label="장기 테스트 기록 JSON 내보내기">
-            {exportingTestData ? "기록 수집 중..." : "장기 테스트 기록 내보내기 (.json)"}
-          </Button>
-          <p className="mt-2 text-xs text-muted-foreground">전체 대화, 리롤, 턴별 AI 사용량과 메모리 변경 기록을 저장합니다.</p>
-        </div>
         <div className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span>현재 장면 · {cast.length ? cast.map(item => item.characterName ?? item.name).join(" · ") : "등장인물 없음"}</span>

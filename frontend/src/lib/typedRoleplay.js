@@ -1,5 +1,5 @@
 const segmenter = new Intl.Segmenter("ko", { granularity: "grapheme" })
-export const TYPE_INTERVAL_MS = 22
+export const TYPE_INTERVAL_MS = 22 / 1.3
 export function roleplaySegments(text) {
   return (text ?? "").split(/(\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|\*[^*]+\*)/g).map(part => {
     const markers=part.match(/^(\*{1,3})[^*]+\1$/)?.[1]?.length ?? 0
