@@ -127,7 +127,7 @@ public class WorldService {
     }
 
     private WorldResponse toResponse(World world) {
-        return new WorldResponse(world.getId(), world.getName(), world.getDescription());
+        return new WorldResponse(world.getId(), world.getName(), world.getDescription(), world.getCoverImageUrl());
     }
 
     private WorldLoreResponse toLoreResponse(WorldLoreCategory category, List<WorldLoreItem> entries) {

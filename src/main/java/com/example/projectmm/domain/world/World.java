@@ -27,6 +27,9 @@ public class World {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(name = "cover_image_url", length = 2048)
+    private String coverImageUrl;
+
     @Lob
     @Column(name = "play_guide", columnDefinition = "TEXT")
     private String playGuide;
@@ -39,6 +42,10 @@ public class World {
 
     public void updatePlayGuide(String playGuide) {
         this.playGuide = playGuide;
+    }
+
+    public void updateCoverImageUrl(String coverImageUrl) {
+        this.coverImageUrl = coverImageUrl;
     }
 
     public void updateMetadata(String name, String description) {
