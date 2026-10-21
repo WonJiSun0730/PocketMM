@@ -6,6 +6,11 @@ import java.util.List;
 
 public interface WorldRoomMessageRepository extends JpaRepository<WorldRoomMessage, Long> {
 
+    interface WorldTurnCount { Long getWorldId(); Long getTurns(); }
+
+    @org.springframework.data.jpa.repository.Query("select m.session.room.world.id as worldId, count(m) as turns from WorldRoomMessage m where m.session.room.world.id in :worldIds and m.role = com.example.projectmm.domain.chat.ChatRole.CHARACTER and m.absenceReportId is null group by m.session.room.world.id")
+    List<WorldTurnCount> countTurnsByWorldIds(@org.springframework.data.repository.query.Param("worldIds") List<Long> worldIds);
+
     java.util.Optional<WorldRoomMessage> findTopBySessionIdOrderByIdDesc(Long sessionId);
 
     List<WorldRoomMessage> findTop50BySessionIdOrderByCreatedAtDescIdDesc(Long sessionId);

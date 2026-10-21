@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { ArrowLeft, BookOpen, ChevronRight, MessageCircle, Pencil, Plus, Save, Sparkles, Trash2, Users, X } from "lucide-react"
 
 import PlayerProfilePicker from "@/components/PlayerProfilePicker"
+import WorldPublicationPanel from "@/components/WorldPublicationPanel"
+import "./PublishedWorldsPage.css"
 import { newWorldSystem, prepareWorldSystems } from "@/lib/worldSystemForm"
 import "./WorldPage.css"
 
@@ -14,7 +16,8 @@ const categories = [
   { id: "HISTORY", label: "세계 사건 / 역사", maxCharacters: 1000, maxEntries: 10 },
 ]
 
-export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
+export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket, onOpenPublished }) {
+  const [publicationWorld, setPublicationWorld] = useState(null)
   const [worlds, setWorlds] = useState([])
   const [selectedWorld, setSelectedWorld] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState(categories[0])
@@ -459,6 +462,8 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
         </button>
       </header>
 
+      {publicationWorld && <WorldPublicationPanel key={publicationWorld.id} world={publicationWorld} onClose={() => setPublicationWorld(null)} onOpenPublished={onOpenPublished} />}
+
       <div className="world-maker-layout">
         <aside className="world-list-panel">
           <div className="world-panel-heading"><strong>내 월드</strong><button onClick={openCreateWorld} type="button" aria-label="월드 추가"><Plus size={17} /></button></div>
@@ -481,6 +486,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket }) {
           ) : (
             <>
               <div className="world-title-row"><div><span className="world-eyebrow">EDITING</span><div className="world-name-line"><h2>{selectedWorld.name}</h2><button className="world-edit-meta" onClick={openEditWorld} type="button" aria-label="월드 정보 수정"><Pencil size={14} /></button><button className="world-delete" onClick={deleteWorld} type="button" aria-label="월드 삭제"><Trash2 size={14} /></button></div>{selectedWorld.description && <p className="world-private-description">{selectedWorld.description}</p>}</div>{message && <span className="world-message">{message}</span>}</div>
+              <div className="world-publication-entry"><button type="button" onClick={() => setPublicationWorld(selectedWorld)}>월드 배포 관리</button></div>
               <div className="world-cast-summary"><Users size={15}/><span>월드 연결 캐릭터 {worldCharacters.length}명</span>{worldCharacters.length > 0 && <span className="world-cast-names">{worldCharacters.map((character) => character.name).join(" · ")}</span>}{worldCharacters.length > 0 && <div className="world-cast-actions">{worldCharacters.map((character) => <button key={character.id} type="button" onClick={() => onOpenWorldChat?.(selectedWorld, character)}><MessageCircle size={13}/>{character.name}과 대화</button>)}</div>}</div>
               <div className="world-room-summary">
                 <div className="world-room-summary-heading"><strong>인트로</strong><span>{worldRooms.reduce((sum, room) => sum + (roomIntros[room.id]?.length ?? 0), 0)}개</span></div>

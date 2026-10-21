@@ -30,6 +30,20 @@ public class World {
     @Column(name = "cover_image_url", length = 2048)
     private String coverImageUrl;
 
+    @Column(columnDefinition = "TEXT")
+    private String hashtags;
+
+    @Column(name = "published_at")
+    private java.time.LocalDateTime publishedAt;
+
+    public void updateHashtags(String hashtags) { this.hashtags = hashtags; }
+
+    public void publish() {
+        if (publishedAt == null) publishedAt = java.time.LocalDateTime.now();
+    }
+
+    public void unpublish() { publishedAt = null; }
+
     @Lob
     @Column(name = "play_guide", columnDefinition = "TEXT")
     private String playGuide;

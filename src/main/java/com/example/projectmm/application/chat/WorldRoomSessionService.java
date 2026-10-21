@@ -67,10 +67,23 @@ public class WorldRoomSessionService {
 
     @Transactional
     public WorldRoomSession start(Long roomId, String loginId, Long playerProfileId, Long introId) {
+        return startInternal(roomId, loginId, playerProfileId, introId, null);
+    }
+
+    @Transactional
+    public WorldRoomSession startPublished(Long worldId, Long roomId, String loginId, Long playerProfileId, Long introId) {
+        return startInternal(roomId, loginId, playerProfileId, introId, worldId);
+    }
+
+    private WorldRoomSession startInternal(Long roomId, String loginId, Long playerProfileId, Long introId, Long publishedWorldId) {
         var room = room(roomId);
+        boolean published = publishedWorldId != null;
+        if (published && (!room.getWorld().getId().equals(publishedWorldId) || room.getWorld().getPublishedAt() == null)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Published world not found");
+        }
         var member = members.findByLoginId(loginId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Member not found"));
-        if (room.getVisibility() == WorldConversation.Visibility.PRIVATE
+        if (!published && room.getVisibility() == WorldConversation.Visibility.PRIVATE
                 && (room.getOwner() == null || !room.getOwner().getId().equals(member.getId()))) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "World room not found");
         }

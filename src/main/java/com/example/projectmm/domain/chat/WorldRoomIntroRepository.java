@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface WorldRoomIntroRepository extends JpaRepository<WorldRoomIntro, Long> {
+    List<WorldRoomIntro> findByRoomWorldIdOrderByRoomIdAscSortOrderAscIdAsc(Long worldId);
     List<WorldRoomIntro> findByRoomIdOrderBySortOrderAscIdAsc(Long roomId);
     Optional<WorldRoomIntro> findByIdAndRoomId(Long id, Long roomId);
     void deleteByRoomId(Long roomId);

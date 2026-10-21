@@ -469,7 +469,7 @@
     z-index: 30;
     height: 64px;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     border-top: 1px solid var(--border);
     background: color-mix(in srgb, var(--card) 96%, transparent);
   }
