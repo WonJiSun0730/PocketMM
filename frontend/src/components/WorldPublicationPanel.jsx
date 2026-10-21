@@ -4,7 +4,13 @@ import { Button } from "@/components/ui/button"
 async function read(response) {
   if (!response.ok) {
     let message = "변경하지 못했어요. 연결과 입력 내용을 확인해 주세요."
-    try { const data = await response.json(); message = data.detail || data.message || message } catch { /* empty error body */ }
+    try {
+      const data = await response.json()
+      message = data.detail || data.message || message
+      if (response.status === 404 && /No static resource/i.test(message)) {
+        message = "실행 중인 서버에 월드 배포 기능이 반영되지 않았어요. 최신 백엔드를 빌드하고 다시 시작한 뒤 재시도해 주세요."
+      }
+    } catch { /* empty error body */ }
     throw new Error(message)
   }
   return response.json()
@@ -18,14 +24,19 @@ export default function WorldPublicationPanel({ world, onClose, onOpenPublished 
   const [error, setError] = useState("")
   const [notice, setNotice] = useState("")
   const [busy, setBusy] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   useEffect(() => {
     dialog.current?.showModal()
     const controller = new AbortController()
+    setLoading(true); setError("")
     fetch(`/api/worlds/${world.id}/publication`, { signal: controller.signal }).then(read).then(data => {
-      setSettings(data); setTags(data.hashtags.map(tag => `#${tag}`).join(" "))
+      if (controller.signal.aborted) return
+      setSettings(data); setTags((data.hashtags ?? []).map(tag => `#${tag}`).join(" "))
     }).catch(e => { if (e.name !== "AbortError") setError(e.message) })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [world.id])
+  }, [world.id, loadAttempt])
 
   async function save(action) {
     if (busy || !settings) return
@@ -58,7 +69,7 @@ export default function WorldPublicationPanel({ world, onClose, onOpenPublished 
     <p className="publication-help">{world.name}의 표지와 해시태그를 준비하고 다른 이용자에게 공개하세요.</p>
     {error && <p role="alert" className="publication-error">{error}</p>}
     {notice && <p role="status" className="publication-help">{notice}</p>}
-    {!settings ? <p>배포 정보를 불러오는 중…</p> : <>
+    {loading ? <p role="status">배포 정보를 불러오는 중…</p> : !settings ? <Button variant="outline" onClick={() => setLoadAttempt(value => value + 1)}>다시 불러오기</Button> : <>
       <div className="publication-cover-setting">
         {settings.coverImageUrl ? <img src={settings.coverImageUrl} alt={`${world.name} 표지`} /> : <div className="publication-cover-empty">월드 표지</div>}
         <label>표지 이미지<input disabled={busy} type="file" accept="image/png,image/jpeg" onChange={e => {
