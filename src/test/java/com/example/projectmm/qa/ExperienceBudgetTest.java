@@ -30,6 +30,22 @@ class ExperienceBudgetTest {
  byte[] body(){return "{\"model\":\"gpt-5.6-sol\",\"reasoning\":{\"effort\":\"none\"},\"input\":[{\"role\":\"user\",\"content\":\"장면을 이어간다\"}],\"text\":{\"format\":{\"name\":\"pocket_turn\"}}}".getBytes(java.nio.charset.StandardCharsets.UTF_8);}
  MockClientHttpResponse response(long in,long cache,long out) {return new MockClientHttpResponse(("{\"status\":\"completed\",\"usage\":{\"input_tokens\":"+in+",\"input_tokens_details\":{\"cached_tokens\":"+cache+",\"cache_write_tokens\":0},\"output_tokens\":"+out+"}}").getBytes(),HttpStatus.OK);}
  JsonNode budget() throws java.io.IOException{return m.readTree(Files.readString(dir.resolve("budget.json")));}
+ @Test void postResponseLocalSaveFailurePreservesKnownReceiptAndNeverResendsHttp() throws Exception {
+  var t=transport(new BigDecimal("4"),1000);var sent=new AtomicInteger();
+  assertThatThrownBy(()->t.intercept(req(),body(),(r,b)->{
+   sent.incrementAndGet();
+   Files.delete(dir.resolve("budget.json"));
+   Files.createDirectory(dir.resolve("budget.json"));
+   return response(1000,0,100);
+  })).isInstanceOf(java.io.IOException.class);
+  var recorded=t.since(Set.of());
+  assertThat(recorded).hasSize(1);
+  assertThat(recorded.getFirst().usd()).isEqualByComparingTo("0.006");
+  assertThat(recorded.getFirst().status()).isEqualTo("completed");
+  assertThat(Files.readString(dir.resolve("ledger.jsonl"))).contains("LOCAL_PERSISTENCE_FAILED");
+  assertThatThrownBy(()->t.intercept(req(),body(),(r,b)->{sent.incrementAndGet();return response(1000,0,100);}));
+  assertThat(sent.get()).isEqualTo(1);
+ }
  @Test void fourDollarHardCapStopsBeforeNextHttpEvenAtEveryMaximumAndReleasesUnusedReservation() throws Exception {
   var t=transport(new BigDecimal("4"),1000);var sent=new AtomicInteger();
   while(!t.budgetBlocked) {

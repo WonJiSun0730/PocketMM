@@ -69,7 +69,8 @@ class ExperienceExecutionTest {
             if(transport.budgetBlocked&&!state.unknownCost()) {
                 state.status="BUDGET_STOP";state.reason="하드캡 정책에 따라 다음 호출 전 중단했습니다. 예산 상세의 입력 계수·출력 상한·최대 예약액·잔액·중단 사유를 확인하세요.";
                 var temp=Files.createTempFile(path,"experience-state-",".tmp");Files.writeString(temp,mapper.writerWithDefaultPrettyPrinter().writeValueAsString(state));
-                Files.move(temp,path.resolve("run.json"),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);
+                try { QaAtomicFiles.replace(temp,path.resolve("run.json")); }
+                finally { Files.deleteIfExists(temp); }
             }
             QaReports.write(path,state);
             var events=Files.exists(path.resolve("ledger.jsonl"))?Files.readAllLines(path.resolve("ledger.jsonl")).stream().filter(line->!line.isBlank()).map(mapper::readTree).toList():List.<tools.jackson.databind.JsonNode>of();

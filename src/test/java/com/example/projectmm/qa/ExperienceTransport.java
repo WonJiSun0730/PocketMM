@@ -35,7 +35,11 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
             var b=java.nio.ByteBuffer.wrap(bytes);while(b.hasRemaining())c.write(b);c.force(true);
         }
         Path temp=Files.createTempFile(directory,"budget-",".tmp");
-        try {Files.write(temp,bytes);Files.move(temp,directory.resolve("budget.json"),StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);}
+        try {
+            Files.write(temp,bytes);
+            try(var channel=FileChannel.open(temp,StandardOpenOption.WRITE)){channel.force(true);}
+            QaAtomicFiles.replace(temp,directory.resolve("budget.json"));
+        }
         finally {Files.deleteIfExists(temp);}
     }
     private void block(String reason) throws IOException {budgetBlocked=true;budgetEvent("BLOCKED",reason);throw new IllegalStateException(reason);}
@@ -177,7 +181,17 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
                 public void close(){response.close();}
             };
         } catch(IOException|RuntimeException e) {
-            uncertain=true;budgetEvent("REVIEW_REQUIRED","통신 또는 응답 처리 오류: 예약 유지, 자동 재시도 금지.");record(new Receipt(id,Instant.now().toString(),"FAILED",role,provider,model,purpose,0,0,null,0,"UNKNOWN",null,e.getClass().getName()));
+            uncertain=true;
+            var received=calls.get(id);
+            boolean known=received!=null&&received.usd()!=null;
+            try {budgetEvent("REVIEW_REQUIRED",known?"응답 사용량은 기록됐지만 로컬 정산 저장에 실패했습니다. 추가 유료 호출 차단.":"통신 또는 응답 처리 오류: 예약 유지, 자동 재시도 금지.");}
+            catch(IOException saveError){e.addSuppressed(saveError);}
+            // A local write failure cannot erase a durably recorded provider receipt.
+            try {
+                record(known?new Receipt(id,Instant.now().toString(),"LOCAL_PERSISTENCE_FAILED",role,provider,model,purpose,
+                        received.input(),received.cached(),received.written(),received.output(),received.status(),received.usd(),e.getClass().getName())
+                        :new Receipt(id,Instant.now().toString(),"FAILED",role,provider,model,purpose,0,0,null,0,"UNKNOWN",null,e.getClass().getName()));
+            } catch(IOException saveError){e.addSuppressed(saveError);}
             if(e instanceof IOException)throw new IOException("Experience request failed: "+e.getClass().getName());
             throw new IllegalStateException("Experience request failed: "+e.getClass().getName());
         }
