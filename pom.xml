@@ -168,6 +168,8 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <excludedGroups>live</excludedGroups>
+                    <tempDir>surefire</tempDir>
+                    <argLine>-Djava.io.tmpdir="${project.build.directory}"</argLine>
                 </configuration>
             </plugin>
 		</plugins>
@@ -191,3 +193,4 @@
 	</profiles>
 
 </project>
+

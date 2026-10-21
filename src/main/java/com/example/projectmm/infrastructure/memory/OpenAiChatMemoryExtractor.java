@@ -14,6 +14,7 @@ import java.util.*;
 public class OpenAiChatMemoryExtractor implements ChatMemoryExtractor {
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private com.example.projectmm.infrastructure.dialogue.AiUsageTracker usageTracker = new com.example.projectmm.infrastructure.dialogue.AiUsageTracker();
+    public void setUsageTracker(com.example.projectmm.infrastructure.dialogue.AiUsageTracker tracker) {this.usageTracker=tracker;}
     private final String apiKey;
     private final String model;
     private final ObjectMapper mapper;
@@ -31,6 +32,7 @@ public class OpenAiChatMemoryExtractor implements ChatMemoryExtractor {
     @Override public List<ChatMemoryCandidate> extract(String text) { return extract(text,false); }
     @Override public List<ChatMemoryCandidate> extractNarrative(String text) { return extract(text,true); }
     private List<ChatMemoryCandidate> extract(String text,boolean narrative) {
+        if(apiKey==null||apiKey.isBlank())throw new IllegalStateException("Selected memory provider API key is missing; fallback blocked");
         String response=usageTracker.accountRequest(com.example.projectmm.infrastructure.dialogue.AiUsageTracker.currentSessionId(),"OPENAI",model, () -> client.post().uri("/v1/responses").headers(h->h.setBearerAuth(apiKey))
                 .body(createRequest(text,narrative)).retrieve().body(String.class));
         recordUsage(response);

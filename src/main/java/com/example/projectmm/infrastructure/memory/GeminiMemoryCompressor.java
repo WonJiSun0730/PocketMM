@@ -18,8 +18,11 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-@ConditionalOnGeminiKey
+@com.example.projectmm.infrastructure.ai.ConditionalOnTextKey
 public class GeminiMemoryCompressor implements MemoryCompressor {
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.example.projectmm.infrastructure.ai.TextProviderRouting textRouting;
+
     private final String apiKey;
     private final String model;
     private final ObjectMapper mapper;
@@ -27,7 +30,7 @@ public class GeminiMemoryCompressor implements MemoryCompressor {
     private final RestClient client;
 
     @Autowired
-    public GeminiMemoryCompressor(@Value("${gemini.api-key}") String apiKey,
+    public GeminiMemoryCompressor(@Value("${gemini.api-key:}") String apiKey,
                                   @Value("${gemini.compression-model:${gemini.memory-model:gemini-3.5-flash-lite}}") String model,
                                   ObjectMapper mapper, MemoryCompressionPromptBuilder prompts) {
         this(apiKey, model, mapper, prompts, clientBuilder());
@@ -51,14 +54,15 @@ public class GeminiMemoryCompressor implements MemoryCompressor {
 
     @Override
     public MemoryCompressorOutput compress(Memory memory, MemoryDetailLevel targetLevel, List<Memory> relatedMemories) {
+        return com.example.projectmm.infrastructure.dialogue.AiUsageTracker.withScope(memory.getWorldRoomSession()==null ? com.example.projectmm.infrastructure.dialogue.AiUsageTracker.currentSessionId() : memory.getWorldRoomSession().getId(), "MEMORY_COMPRESSION", () -> {
         var prompt = prompts.prepare(memory, targetLevel, relatedMemories);
-        if (prompt.isEmpty() || apiKey == null || apiKey.isBlank()) return null;
+        if (prompt.isEmpty() || ((textRouting == null || !textRouting.openAi()) && (apiKey == null || apiKey.isBlank()))) return null;
         try {
             var schema = Map.of("type", "object", "required", List.of("summary"),
                     "properties", Map.of("summary", Map.of("type", List.of("string", "null"))));
             var request = Map.of("contents", List.of(Map.of("parts", List.of(Map.of("text", prompt.get().text())))),
                     "generationConfig", Map.of("responseMimeType", "application/json", "responseJsonSchema", schema));
-            String response = client.post().uri("/v1beta/models/{model}:generateContent", model)
+            String response = textRouting != null && textRouting.openAi() ? textRouting.text(request,"MEMORY_COMPRESSION") : client.post().uri("/v1beta/models/{model}:generateContent", model)
                     .header("x-goog-api-key", apiKey).body(request).retrieve().body(String.class);
             String summary = parseResponse(response);
             return summary == null ? null : new MemoryCompressorOutput(summary, prompt.get().evidenceMemoryIds());
@@ -66,6 +70,8 @@ public class GeminiMemoryCompressor implements MemoryCompressor {
             // 실패한 압축으로 원문/단계를 바꾸거나 추가 유료 재시도를 하지 않는다.
             return null;
         }
+    
+        });
     }
 
     String parseResponse(String response) {

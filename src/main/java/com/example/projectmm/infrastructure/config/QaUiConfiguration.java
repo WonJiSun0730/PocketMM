@@ -9,7 +9,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 
 @Configuration(proxyBeanMethods=false)
-@Profile("!prod & !production")
+@Profile("(!prod & !production) | qa-ui")
 @ConditionalOnProperty(name="app.qa-ui.enabled",havingValue="true")
 public class QaUiConfiguration {
     @Bean QaUiService qaUiService(Environment env,ObjectMapper mapper) throws java.io.IOException {
@@ -21,9 +21,9 @@ public class QaUiConfiguration {
                     public long launch(java.util.List<String> command,Path directory,java.util.Map<String,String> environment,Path log) throws java.io.IOException {
                         var channel=java.nio.channels.FileChannel.open(directory.resolve("target/pocket-qa/ui-worker-global.lock"),java.nio.file.StandardOpenOption.CREATE,java.nio.file.StandardOpenOption.WRITE);
                         var lock=channel.tryLock();if(lock==null){channel.close();throw new java.io.IOException("Another UI QA worker is active");}
-                        var builder=new ProcessBuilder(command).directory(directory.toFile()).redirectErrorStream(true).redirectOutput(log.toFile());
+                        var builder=new ProcessBuilder(QaWorkerProcess.command(command, env, directory)).directory(directory.toFile()).redirectErrorStream(true).redirectOutput(log.toFile());
                         try {
-                            builder.environment().putAll(environment);var process=builder.start();
+                            QaWorkerProcess.isolateEnvironment(builder.environment());builder.environment().putAll(environment);var process=builder.start();
                             process.onExit().whenComplete((p,e)->{try{lock.release();channel.close();}catch(java.io.IOException ignored){}});
                             return process.pid();
                         } catch(java.io.IOException|RuntimeException ex) {lock.release();channel.close();throw ex;}

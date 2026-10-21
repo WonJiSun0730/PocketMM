@@ -14,6 +14,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class PocketDialogueGatewayRouter implements DialogueGateway {
 
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.example.projectmm.domain.chat.WorldRoomSessionRepository sessions;
     private final GeminiDialogueGateway gemini;
     private final OpenAiDialogueGateway openAi;
 
@@ -31,16 +33,28 @@ public class PocketDialogueGatewayRouter implements DialogueGateway {
 
     @Override
     public String generate(DialogueContext context, String userMessage) {
+        requireLegacyProvider();
         return gemini.generate(context, userMessage);
     }
 
     @Override
     public DialogueTurn generateTurn(DialogueContext context, String userMessage) {
+        requireLegacyProvider();
         return gemini.generateTurn(context, userMessage);
+    }
+
+    private void requireLegacyProvider() {
+        Long id=AiUsageTracker.currentSessionId();
+        if(sessions!=null && id!=null && sessions.findById(id).map(s->"OPENAI".equalsIgnoreCase(s.getAiProvider())).orElse(true))
+            throw new IllegalStateException("Legacy dialogue cannot serve an OpenAI Pocket; Gemini call blocked");
     }
 
     @Override
     public WorldRoomTurn generateWorldRoomTurn(WorldRoomDialogueContext context, String userMessage) {
+        if (sessions != null && context.sessionId() != null) {
+            var session=sessions.findById(context.sessionId()).orElseThrow();
+            context=context.withAiSelection(session.getAiProvider(),session.getAiModel());
+        }
         String provider = context.aiProvider() == null ? "GEMINI" : context.aiProvider();
         return "OPENAI".equalsIgnoreCase(provider)
                 ? openAi.generateWorldRoomTurn(context, userMessage)

@@ -17,6 +17,7 @@ export default function PocketBackgroundPanel({ sessionId, location = "", simula
   return <section className="grid gap-3 rounded-lg border bg-card p-3.5" aria-label="장소 배경">
     <div><h3 className="text-sm font-medium">장소 배경</h3>
       <p className="mt-1 text-xs leading-5 text-muted-foreground">저장된 비슷한 장소를 우선 사용해요. 새 장소만 배경과 투명 원경을 만들어 서버에 저장해요.</p></div>
+    <p className="text-xs text-muted-foreground">이미지 생성은 별도 Gemini 기능이에요. OpenAI 포켓에서는 Gemini 생성이 차단되며 저장 이미지와 직접 첨부를 사용할 수 있어요.</p>
     <label className="grid gap-1.5 text-xs">장소
       <input className="h-9 rounded-md border bg-background px-3 text-sm" maxLength={200}
         value={place} placeholder={location || "배경을 만들 장소를 입력해 주세요"} onChange={e => setPlace(e.target.value)} />

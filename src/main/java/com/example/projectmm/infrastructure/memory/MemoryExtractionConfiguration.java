@@ -13,20 +13,24 @@ public class MemoryExtractionConfiguration {
     private static final Logger log=LoggerFactory.getLogger(MemoryExtractionConfiguration.class);
 
     @Bean
-    public ChatMemoryExtractor chatMemoryExtractor(Environment environment, ObjectMapper mapper) {
-        String gemini=environment.getProperty("gemini.api-key", "");
-        String openai=environment.getProperty("openai.api-key", "");
-        if (!gemini.isBlank()) {
-            log.info("Memory extraction backend: GEMINI (independent of dialogue provider and profiles)");
-            return new GeminiChatMemoryExtractor(gemini,
-                    environment.getProperty("gemini.memory-model", "gemini-3.5-flash-lite"),mapper);
-        }
-        if (!openai.isBlank()) {
-            log.info("Memory extraction backend: OPENAI (independent of dialogue provider and profiles)");
-            return new OpenAiChatMemoryExtractor(openai,
-                    environment.getProperty("openai.memory-model", "gpt-5.6-luna"),mapper);
-        }
-        log.warn("Memory extraction unavailable: neither Gemini nor OpenAI API key is configured");
-        return new NoOpChatMemoryExtractor();
+    public ChatMemoryExtractor chatMemoryExtractor(Environment environment, ObjectMapper mapper,
+            com.example.projectmm.infrastructure.ai.TextProviderRouting routing,
+            com.example.projectmm.infrastructure.dialogue.AiUsageTracker usage) {
+        var gemini=new GeminiChatMemoryExtractor(environment.getProperty("gemini.api-key", ""),
+                environment.getProperty("gemini.memory-model", "gemini-3.5-flash-lite"),mapper);
+        var openai=new OpenAiChatMemoryExtractor(environment.getProperty("openai.api-key", ""),
+                environment.getProperty("openai.memory-model", "gpt-5.6-luna"),mapper);
+        gemini.setUsageTracker(usage);openai.setUsageTracker(usage);
+        return new ChatMemoryExtractor() {
+            private ChatMemoryExtractor selected() {
+                // Legacy chat has no Pocket provider choice. Preserve its existing key-based backend.
+                if(com.example.projectmm.infrastructure.dialogue.AiUsageTracker.currentSessionId()==null)
+                    return !environment.getProperty("gemini.api-key", "").isBlank()?gemini:
+                            !environment.getProperty("openai.api-key", "").isBlank()?openai:new NoOpChatMemoryExtractor();
+                return routing.openAi()?openai:gemini;
+            }
+            public java.util.List<com.example.projectmm.domain.memory.ChatMemoryCandidate> extract(String text) {return selected().extract(text);}
+            public java.util.List<com.example.projectmm.domain.memory.ChatMemoryCandidate> extractNarrative(String text) {return selected().extractNarrative(text);}
+        };
     }
 }

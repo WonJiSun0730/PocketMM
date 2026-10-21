@@ -14,7 +14,7 @@ import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@Profile("!prod & !production")
+@Profile("(!prod & !production) | qa-ui")
 @ConditionalOnProperty(name="app.qa-ui.enabled",havingValue="true")
 @RequestMapping("/api/worlds/pockets/{sessionId}/qa")
 public class PocketQaController {

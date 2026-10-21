@@ -90,6 +90,11 @@ public record WorldRoomDialogueContext(
         );
     }
 
+    public WorldRoomDialogueContext withAiSelection(String provider,String model) {
+        return new WorldRoomDialogueContext(sessionId,roomId,roomTitle,visibility,simulatedAt,world,playerProfile,
+                introTitle,introContent,recentMessages,roomCast,activeCast,sessionSystems,playerState,recalledMemories,
+                userNote,pocketPlayGuide,noControlPlayer,provider,model);
+    }
     public record CharacterMemories(
             Long characterId,
             String characterName,

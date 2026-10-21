@@ -21,6 +21,7 @@ import java.util.Map;
 public class GeminiChatMemoryExtractor implements ChatMemoryExtractor {
     @org.springframework.beans.factory.annotation.Autowired(required=false)
     private com.example.projectmm.infrastructure.dialogue.AiUsageTracker usageTracker = new com.example.projectmm.infrastructure.dialogue.AiUsageTracker();
+    public void setUsageTracker(com.example.projectmm.infrastructure.dialogue.AiUsageTracker tracker) {this.usageTracker=tracker;}
     private final String apiKey;
     private final String model;
     private final ObjectMapper mapper;
@@ -50,6 +51,7 @@ public class GeminiChatMemoryExtractor implements ChatMemoryExtractor {
     }
 
     private List<ChatMemoryCandidate> extractWithRequest(Map<String, Object> request) {
+        if(apiKey==null||apiKey.isBlank())throw new IllegalStateException("Selected memory provider API key is missing; fallback blocked");
         String response = usageTracker.accountRequest(com.example.projectmm.infrastructure.dialogue.AiUsageTracker.currentSessionId(),"GEMINI",model, () -> client.post().uri("/v1beta/models/{model}:generateContent", model)
                 .header("x-goog-api-key", apiKey).body(request).retrieve().body(String.class));
         var usage=mapper.readTree(response).path("usageMetadata");

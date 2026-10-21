@@ -12,9 +12,12 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-@ConditionalOnGeminiKey
+@com.example.projectmm.infrastructure.ai.ConditionalOnTextKey
 public class GeminiMemoryEmbeddingProvider
         implements MemoryEmbeddingProvider {
+
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.example.projectmm.infrastructure.ai.TextProviderRouting textRouting;
 
     private final String apiKey;
     private final String model;
@@ -22,7 +25,7 @@ public class GeminiMemoryEmbeddingProvider
     private final ObjectMapper objectMapper;
 
     public GeminiMemoryEmbeddingProvider(
-            @Value("${gemini.api-key}") String apiKey,
+            @Value("${gemini.api-key:}") String apiKey,
             @Value("${gemini.embedding-model:gemini-embedding-001}")
             String model,
             ObjectMapper objectMapper
@@ -48,6 +51,9 @@ public class GeminiMemoryEmbeddingProvider
             return List.of();
         }
 
+        if (textRouting != null && textRouting.openAi()) return textRouting.embed(text);
+        if (apiKey == null || apiKey.isBlank()) return List.of();
+
         Map<String, Object> request =
                 createRequest(text);
 
@@ -66,6 +72,10 @@ public class GeminiMemoryEmbeddingProvider
                         .body(String.class);
 
         return parseEmbedding(response);
+    }
+
+    @Override public String cacheNamespace() {
+        return textRouting != null && textRouting.openAi() ? "OPENAI:"+textRouting.model("MEMORY_EMBEDDING") : "GEMINI:"+model;
     }
 
     Map<String, Object> createRequest(

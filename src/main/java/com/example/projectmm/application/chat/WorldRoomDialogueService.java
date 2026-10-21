@@ -77,6 +77,7 @@ public class WorldRoomDialogueService {
 
     @Transactional
     public WorldRoomTurn chat(Long sessionId, String userMessage) {
+        return com.example.projectmm.infrastructure.dialogue.AiUsageTracker.withScope(sessionId, "ROLEPLAY", () -> {
         var session = sessionService.lockForDialogue(sessionId);
 
         initializeSceneIfNeeded(session, userMessage);
@@ -138,6 +139,8 @@ public class WorldRoomDialogueService {
         session.markPresent(now());
         session.markProgressed(now());
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
+    
+        });
     }
 
     private record PlayerStateSnapshot(String location, List<String> conditions, List<String> inventory) {}
@@ -292,6 +295,7 @@ public class WorldRoomDialogueService {
 
     @Transactional
     public WorldRoomTurn continueScene(Long sessionId) {
+        return com.example.projectmm.infrastructure.dialogue.AiUsageTracker.withScope(sessionId, "ROLEPLAY", () -> {
         var session = sessionService.lockForDialogue(sessionId);
 
         initializeSceneIfNeeded(session, null);
@@ -340,6 +344,8 @@ public class WorldRoomDialogueService {
         session.markPresent(now());
         session.markProgressed(now());
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
+    
+        });
     }
 
     @Transactional
@@ -405,6 +411,7 @@ public class WorldRoomDialogueService {
 
     @Transactional
     public WorldRoomTurn reroll(Long sessionId, Long messageId) {
+        return com.example.projectmm.infrastructure.dialogue.AiUsageTracker.withScope(sessionId, "ROLEPLAY", () -> {
         var rerollSession = sessionService.lockForDialogue(sessionId);
         var target = messages.findById(messageId)
                 .filter(item -> item.getSession().getId().equals(sessionId))
@@ -474,10 +481,13 @@ public class WorldRoomDialogueService {
         rerollSession.markPresent(now());
         rerollSession.markProgressed(now());
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
+    
+        });
     }
 
     @Transactional
     public WorldRoomTurn regenerate(Long sessionId, Long messageId) {
+        return com.example.projectmm.infrastructure.dialogue.AiUsageTracker.withScope(sessionId, "ROLEPLAY", () -> {
         var session = sessionService.lockForDialogue(sessionId);
         var target = messages.findById(messageId)
                 .filter(item -> item.getSession().getId().equals(sessionId))
@@ -544,6 +554,8 @@ public class WorldRoomDialogueService {
         session.markPresent(now());
         session.markProgressed(now());
         return new WorldRoomTurn(generated.reply(), applied, appliedSystems);
+    
+        });
     }
 
     @Transactional(readOnly = true)

@@ -87,7 +87,7 @@ class GeminiMemoryCompressorTest {
                         RuleBasedMemoryCompressor.class,
                         GeminiMemoryCompressor.class
                 )
-                .withPropertyValues("gemini.api-key=");
+                .withPropertyValues("gemini.api-key=", "openai.api-key=");
         context.run(app -> {
             assertThat(app).hasSingleBean(MemoryCompressor.class);
             assertThat(app.getBean(MemoryCompressor.class)).isInstanceOf(RuleBasedMemoryCompressor.class);

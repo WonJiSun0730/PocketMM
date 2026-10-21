@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 
 @Component
-@ConditionalOnGeminiKey(false)
+@com.example.projectmm.infrastructure.ai.ConditionalOnTextKey(false)
 public class NoOpAiTimeParser implements AiTimeParser {
 
     @Override

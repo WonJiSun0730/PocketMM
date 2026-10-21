@@ -56,9 +56,14 @@ public final class QaPersonaClient implements QaRunner.Persona {
     }
     @Override public QaRunner.Generation next(QaRunner.PersonaInput input) {
         var calls=new ArrayList<QaRunner.Usage>();
+        var diagnostics=new ArrayList<QaRunner.Diagnostic>();
+        String phase="REQUEST_PREPARATION";
         try {
+            var payload=request(input);
+            phase="REQUEST_STARTED";diagnostics.add(QaRunner.diagnostic(phase,null));
             String response=client.post().uri("/v1/responses").header("Authorization","Bearer "+key)
-                    .body(request(input)).retrieve().body(String.class);
+                    .body(payload).retrieve().body(String.class);
+            phase="RESPONSE_RECEIVED";diagnostics.add(QaRunner.diagnostic(phase,null));
             var root=mapper.readTree(response);var u=root.path("usage");
             if(u.isObject()) {
                 var d=u.path("input_tokens_details");Long write=d.path("cache_write_tokens").isIntegralNumber()?d.path("cache_write_tokens").asLong():null;
@@ -68,14 +73,16 @@ public final class QaPersonaClient implements QaRunner.Persona {
                 calls.add(new QaRunner.Usage("PERSONA",spec.personaModel(),PROMPT_VERSION,in,cached,write,out,"USAGE_REPORTED",usd,
                         root.path("id").asText(UUID.randomUUID().toString()),0));
             } else calls.add(unknown("USAGE_NOT_REPORTED"));
-            if(!"completed".equals(root.path("status").asText()))return new QaRunner.Generation("",calls,"Persona response incomplete");
+            phase="USAGE_PARSED";diagnostics.add(QaRunner.diagnostic(phase,null));
+            if(!"completed".equals(root.path("status").asText()))return new QaRunner.Generation("",calls,"Persona response incomplete",diagnostics);
             var text=new StringBuilder();
             for(var item:root.path("output"))if("message".equals(item.path("type").asText()))
                 for(var part:item.path("content"))if("output_text".equals(part.path("type").asText()))text.append(part.path("text").asText());
-            return new QaRunner.Generation(text.toString(),calls,null);
+            return new QaRunner.Generation(text.toString(),calls,null,diagnostics);
         } catch(RuntimeException ex) {
+            diagnostics.add(QaRunner.diagnostic(phase,ex));
             if(calls.isEmpty())calls.add(unknown(ex instanceof RestClientResponseException h?"HTTP_"+h.getStatusCode().value():"REQUEST_OR_PARSE_FAILED"));
-            return new QaRunner.Generation("",calls,"Persona call failed; no automatic retry");
+            return new QaRunner.Generation("",calls,"Persona call failed; no automatic retry",diagnostics);
         }
     }
     private QaRunner.Usage unknown(String status) {return new QaRunner.Usage("PERSONA",spec.personaModel(),PROMPT_VERSION,0,0,null,0,status,null);}
