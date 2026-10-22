@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { QA_PERSONA_MODEL, qaEstimate, qaModelLabel, qaRequest, qaStartRequest, qaStatusLabels } from "@/lib/pocketQa"
+import { qaEstimate, qaModelLabel, qaRequest, qaStartRequest, qaStatusLabels } from "@/lib/pocketQa"
 
 const usd = value => value == null ? "미확인" : `$${Number(value).toFixed(4)}`
 const field = "mt-1 h-9 w-full rounded-md border bg-background px-2 text-sm"
@@ -9,7 +9,7 @@ export default function PocketQaPanel({ sessionId }) {
   const base = `/api/worlds/pockets/${sessionId}/qa`
   const [capabilities, setCapabilities] = useState(null)
   const [unavailable, setUnavailable] = useState("")
-  const [targetModel, setTargetModel] = useState(QA_PERSONA_MODEL)
+  const [targetModel, setTargetModel] = useState("gpt-5.6-sol")
   const [turns, setTurns] = useState(20)
   const [paid, setPaid] = useState(false)
   const [budget, setBudget] = useState("")
@@ -68,7 +68,7 @@ export default function PocketQaPanel({ sessionId }) {
     <h3 className="text-sm font-semibold">자동 기억 테스트</h3>
     <p className="mt-1 text-xs leading-5 text-muted-foreground">별도 QA 포켓과 합성 인물로 대화·기억 기능을 검사합니다.</p>
     {unavailable ? <p className="mt-3 text-xs text-muted-foreground">{unavailable}</p> : !capabilities ? <p className="mt-3 text-xs text-muted-foreground">실행 환경 확인 중…</p> : <>
-      <p className="mt-3 rounded bg-muted/40 px-2 py-2 text-xs">테스트용 봇: <strong>GPT-5.6 Luna · 고정</strong></p>
+      <p className="mt-3 rounded bg-muted/40 px-2 py-2 text-xs">테스트 상대·내부 판단: <strong>GPT-5.6 Luna · 고정</strong></p>
       <div className="mt-3 grid grid-cols-1 gap-3">
         <label className="text-xs">테스트 대상 모델
           <select className={field} value={targetModel} onChange={event => change(setTargetModel, event.target.value)} disabled={busy}>

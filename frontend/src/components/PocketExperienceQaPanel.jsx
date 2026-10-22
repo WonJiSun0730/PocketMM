@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { QA_PERSONA_MODEL, qaEstimate, qaModelLabel, qaRequest, qaStartRequest, qaStatusLabels } from "@/lib/pocketQa"
+import { qaEstimate, qaModelLabel, qaRequest, qaStartRequest, qaStatusLabels } from "@/lib/pocketQa"
 
 const usd = value => value == null ? "미확인" : `$${Number(value).toFixed(4)}`
 const field = "mt-1 h-9 w-full rounded-md border bg-background px-2 text-sm"
@@ -9,7 +9,7 @@ export default function PocketExperienceQaPanel({ sessionId }) {
   const base = `/api/worlds/pockets/${sessionId}/experience-qa`
   const [capabilities, setCapabilities] = useState(null)
   const [unavailable, setUnavailable] = useState("")
-  const [targetModel, setTargetModel] = useState(QA_PERSONA_MODEL)
+  const [targetModel, setTargetModel] = useState("gpt-5.6-sol")
   const [turns, setTurns] = useState(20)
   const [paid, setPaid] = useState(false)
   const [budget, setBudget] = useState("")
@@ -99,7 +99,7 @@ export default function PocketExperienceQaPanel({ sessionId }) {
         <p>기존 메시지 {capabilities.snapshot.messages}개 · 기억 {capabilities.snapshot.memories}개</p>
         <p className="text-muted-foreground">복사 후 설정 일치 검사 · 서비스 응답 지침 유지 · 하드캡 보호용 역할별 출력 상한 적용</p>
       </div>
-      <p className="mt-3 rounded bg-muted/40 px-2 py-2 text-xs">플레이어 대역: <strong>GPT-5.6 Luna · 고정</strong></p>
+      <p className="mt-3 rounded bg-muted/40 px-2 py-2 text-xs">플레이어 대역·내부 판단: <strong>GPT-5.6 Luna · 고정</strong></p>
       <div className="mt-3 grid grid-cols-1 gap-3">
         <label className="text-xs">테스트 대상 모델
           <select className={field} value={targetModel} onChange={event => change(setTargetModel, event.target.value)} disabled={busy}>

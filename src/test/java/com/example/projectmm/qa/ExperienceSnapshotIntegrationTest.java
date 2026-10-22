@@ -54,9 +54,16 @@ class ExperienceSnapshotIntegrationTest {
         });
     }
     @Test void copiesFullPocketAndMemoryWithoutReadingCredentialsOrChangingSource() throws Exception {
-        var fixture=fixture();var exporter=new PocketExperienceSnapshotService(sessions,jdbc,new MockEnvironment().withProperty("openai.api-key","configured-not-exported"));
+        var fixture=fixture();var exporter=new PocketExperienceSnapshotService(sessions,jdbc,new MockEnvironment()
+                .withProperty("openai.api-key","configured-not-exported")
+                .withProperty("openai.memory-model","gpt-5.6-sol")
+                .withProperty("openai.time-model","gpt-5.6-sol")
+                .withProperty("openai.compression-model","gpt-5.6-sol"));
         var before=PocketExperienceSnapshot.digest(PocketExperienceSnapshot.readTables(jdbc,fixture.session()));
         var snapshot=tx.execute(status->exporter.capture(fixture.session(),fixture.login()));
+        assertThat(snapshot.extractorModel()).isEqualTo("gpt-5.6-luna");
+        assertThat(snapshot.timeModel()).isEqualTo("gpt-5.6-luna");
+        assertThat(snapshot.compressorModel()).isEqualTo("gpt-5.6-luna");
         String json=new ObjectMapper().writeValueAsString(snapshot);
         assertThat(json).contains("셜록 홈즈","존 왓슨","아이린","붉은 봉인","의뢰인이 아홉 시에 온다").doesNotContain("private-password-hash","private.example","configured-not-exported","Secret Real Name");
         assertThat(snapshot.digest()).isEqualTo(before);

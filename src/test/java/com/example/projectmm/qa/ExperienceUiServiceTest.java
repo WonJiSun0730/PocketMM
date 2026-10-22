@@ -9,15 +9,6 @@ import java.math.BigDecimal;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 class ExperienceUiServiceTest {
-    @Test void costlyModelsAreRejectedBeforeWorkerLaunch() throws Exception {
-        var worker = new Worker(); var service = service(worker);
-        assertThat(ExperienceQaUiService.TARGET_MODELS).containsExactly("gpt-5.6-luna");
-        for (String model : List.of("gpt-5.6-sol", "gpt-5.6-terra"))
-            assertThatThrownBy(() -> service.start(1,"dev",new ExperienceQaUiService.Start(
-                    UUID.randomUUID().toString(),model,100,false,BigDecimal.ZERO,false,DIGEST)))
-                    .hasMessageContaining("Luna");
-        assertThat(worker.launches).isZero();
-    }
     static final String DIGEST=PocketExperienceSnapshot.digest(List.of());
     @TempDir Path dir;
     static class Worker implements ExperienceQaUiService.Worker {
@@ -32,7 +23,7 @@ class ExperienceUiServiceTest {
         when(snapshots.capture(1L,"dev")).thenReturn(new PocketExperienceSnapshot(1,"2026-10-16T00:00:00Z",DIGEST,"NONE","gpt-5.6-luna",null,null,null,false,List.of(),List.of("mock-only")));
         return new ExperienceQaUiService(dir,null,dir.resolve("maven").toString(),"","",worker,new ObjectMapper(),snapshots,null,"");
     }
-    ExperienceQaUiService.Start start(String digest){return new ExperienceQaUiService.Start(UUID.randomUUID().toString(),"gpt-5.6-luna",3,false,BigDecimal.ZERO,false,digest);}
+    ExperienceQaUiService.Start start(String digest){return new ExperienceQaUiService.Start(UUID.randomUUID().toString(),"gpt-5.6-sol",3,false,BigDecimal.ZERO,false,digest);}
     @Test void stalePocketIsRejectedBeforeAnyWorkerAndSameRequestIsIdempotent() throws Exception {
         var worker=new Worker();var service=service(worker);
         assertThatThrownBy(()->service.start(1,"dev",start("stale"))).hasMessageContaining("409");assertThat(worker.launches).isZero();

@@ -138,6 +138,38 @@ class SceneContinuityRequestTest {
                 .isEqualTo(SceneContinuityRequest.parts(context(), evidence("BOOTSTRAP")).stable());
     }
 
+    @Test void solTargetUsesLunaForReviewButStillSolForFiction() {
+        var requests = new ArrayList<JsonNode>();
+        var tracker = new AiUsageTracker();
+        var gemini = new GeminiDialogueGateway("never-sent","fixture",json);
+        var openai = new OpenAiDialogueGateway("never-sent","gpt-5.6-sol",json,gemini,tracker);
+        ReflectionTestUtils.setField(openai,"restClient",client(requests,true));
+        var sol = context().withAiSelection("OPENAI","gpt-5.6-sol");
+        openai.generateWorldRoomTurn(sol,"continue");
+        openai.reviewWorldRoomContinuity(sol,evidence("REVIEW"));
+        assertThat(requests.get(0).path("model").asText()).isEqualTo("gpt-5.6-sol");
+        assertThat(requests.get(1).path("model").asText()).isEqualTo("gpt-5.6-luna");
+        assertThat(tracker.calls(sol.sessionId())).extracting(c -> c.usage().model())
+                .containsExactly("gpt-5.6-sol","gpt-5.6-luna");
+    }
+
+    @Test void internalStateJudgmentsUseLunaAndSelectedFictionModelRemainsFlexible() {
+        var gemini=mock(GeminiDialogueGateway.class);var openai=mock(OpenAiDialogueGateway.class);
+        var router=new PocketDialogueGatewayRouter(gemini,openai);
+        var sol=context().withAiSelection("OPENAI","gpt-5.6-sol");
+        router.initializeWorldRoomScene(sol,true,"opening");
+        router.setupWorldRoomScene(sol,"setup");
+        router.analyzeEditedWorldRoomState(sol,"edited");
+        verify(openai).initializeWorldRoomScene(argThat(c->c.aiModel().equals("gpt-5.6-luna")),eq(true),eq("opening"));
+        verify(openai).setupWorldRoomScene(argThat(c->c.aiModel().equals("gpt-5.6-luna")),eq("setup"));
+        verify(openai).analyzeEditedWorldRoomState(argThat(c->c.aiModel().equals("gpt-5.6-luna")),eq("edited"));
+        for(String model:List.of("gpt-5.6-luna","gpt-5.6-terra","gpt-5.6-sol")) {
+            router.generateWorldRoomTurn(sol.withAiSelection("OPENAI",model),"continue");
+            verify(openai).generateWorldRoomTurn(argThat(c->c.aiModel().equals(model)),eq("continue"));
+        }
+        verifyNoInteractions(gemini);
+    }
+
     @Test void runtimeChangesStayAfterBoundaryAndAuthoredEditsInvalidatePrefix() {
         var c = context();
         var cast = c.roomCast().stream().map(x -> new WorldRoomCharacterContext(x.characterId(),
