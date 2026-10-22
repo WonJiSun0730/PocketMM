@@ -13,7 +13,7 @@ import java.util.*;
 /** Development-only bridge to the existing isolated test-classpath worker. */
 public final class ExperienceQaUiService {
     public static final String PERSONA_MODEL="gpt-5.6-luna";
-    public static final List<String> TARGET_MODELS=List.of("gpt-5.6-luna","gpt-5.6-terra","gpt-5.6-sol");
+    public static final List<String> TARGET_MODELS=List.of("gpt-5.6-luna");
     public record Start(String requestId,String targetModel,int turns,boolean paid,BigDecimal budgetUsd,boolean acknowledgeCost,String snapshotDigest) {}
     public record Estimate(BigDecimal lowUsd,BigDecimal highUsd,BigDecimal serviceLowUsd,BigDecimal serviceHighUsd) {}
     public record Capabilities(String personaModel,List<String> targetModels,boolean paidAvailable,String paidUnavailableReason,
@@ -110,7 +110,7 @@ public final class ExperienceQaUiService {
     public synchronized View start(long pocketId,String owner,Start request) throws IOException {
         if(request==null||request.requestId()==null||!request.requestId().matches("[0-9a-fA-F-]{36}")
                 ||!TARGET_MODELS.contains(request.targetModel())||request.turns()<1||request.turns()>1000)
-            throw bad("대상 모델과 1~1,000턴을 지정해 주세요.");
+            throw bad("비용 보호를 위해 대상 모델은 Luna만 사용할 수 있어요. 1~1,000턴을 지정해 주세요.");
         try {UUID.fromString(request.requestId());}catch(IllegalArgumentException e){throw bad("올바른 실행 요청 ID가 필요해요.");}
         if(request.paid()&&(!request.acknowledgeCost()||request.budgetUsd()==null||request.budgetUsd().signum()<=0))
             throw bad("실제 API 호출에는 양수인 최대 비용과 비용 발생 동의가 필요해요.");
@@ -156,6 +156,8 @@ public final class ExperienceQaUiService {
                     "진행 기록을 읽지 못했지만 중단 요청은 전달했어요. 비용은 원본 기록을 확인해 주세요.",List.of(),mapper.createObjectNode());
         }
         if(Set.of("COMPLETED","STOPPED").contains(current.status()))throw new ResponseStatusException(HttpStatus.CONFLICT,"이미 종료된 테스트예요.");
+        if(command.equals("RESUME")&&!TARGET_MODELS.contains(meta.targetModel()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"기존 고비용 테스트는 재개할 수 없어요. Luna로 새 실행을 시작해 주세요.");
         if(command.equals("RESUME")&&Set.of("REVIEW_REQUIRED","BUDGET_STOP","FAILED").contains(current.status()))
             throw new ResponseStatusException(HttpStatus.CONFLICT,"비용 또는 실패 원인을 확인한 뒤 실행기로 복구해야 해요.");
         atomic(path(id).resolve("control"),command);

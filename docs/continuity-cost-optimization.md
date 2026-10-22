@@ -1,5 +1,13 @@
 # 연속성 검사 비용 최적화 (2026-10-22)
 
+## 후속 사용자 결정: Luna로 비용 제한
+
+사용자 요청에 따라 신규 QA 대상 모델을 Luna로 제한했다. 일반 QA/체험 QA 모두 capabilities에서 Luna만 제공하고 서버도 Sol/Terra 실행 및 재개를 거부한다. 플레이어 대역은 기존 Luna를 유지한다. 연속성 검사 기본값과 직접 생성되는 QA 게이트웨이 기본값도 Luna다. 따라서 신규 UI QA는 소설 생성·플레이어·검사 모두 Luna를 사용한다. 기존 실행의 기록/설정은 재작성하지 않는다. 이미 진행 중인 Sol 실행은 중지하고 Luna로 새 실행을 만들어야 한다. 유료 API 실행은 하지 않았다.
+
+후속 무료 검증: SceneContinuityRequestTest, QaUiServiceTest, ExperienceUiServiceTest, ExperienceBudgetTest 총 28개 통과(실패/오류/건너뜀 0). 신규 고비용 모델 요청이 worker 실행 전에 거부되고 생성된 QA 설정의 대상/플레이어가 Luna이며 기본 검사 요청도 Luna인지 확인했다. 기존 캐시 경계 및 승인 검사는 유지한다.
+
+아래 기본 검사 모델 유지 및 후보 미전환 설명은 최초 구현 당시 기록이다. 현재 기본값은 위 사용자 결정이 우선한다. 실서비스 Pocket의 소설 모델 선택은 별도 기존 설정이며, QA의 모델 제한은 신규 QA 복사본에 적용된다. 명시적인 openai.continuity-model 설정은 여전히 기본값을 덮어쓸 수 있다.
+
 ## 기준 상태와 보존
 
 원본 `C:\SpringWork\projectmm`은 main, HEAD `a8dd3bc5a72d60952ea6c3506176baa9a4b5af49`였다. 추적 파일 변경은 없었다. 미추적 `.mvn/jvm.config`, data/, log/, jansi DLL, 개인 QA 모델 한도 및 가격 백업 파일은 수정하거나 삭제하지 않았다. 원본 쓰기 권한이 부여되지 않아 이 작업 공간의 work/PocketMM에 추적 파일과 Git 이력을 복사하고 `perf/continuity-cost-optimization` 브랜치를 만들었다. 개인 설정, API 키, DB, 로그를 개발 복사본에 복사하지 않았다.

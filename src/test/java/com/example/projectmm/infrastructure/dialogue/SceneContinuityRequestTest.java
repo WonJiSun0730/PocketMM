@@ -68,6 +68,7 @@ class SceneContinuityRequestTest {
         assertThat(AiUsageTracker.withPurpose(7L,"SCENE_CONTINUITY",
                 ()->openai.reviewWorldRoomContinuity(context(),evidence("REVIEW")))).isEqualTo(approved);
         assertThat(gr).hasSize(1);assertThat(or).hasSize(1);
+        assertThat(or.getFirst().path("model").asText()).isEqualTo("gpt-5.6-luna");
         String g=gr.getFirst().path("contents").path(0).path("parts").path(0).path("text").asText();
         String o=or.getFirst().path("input").path(1).path("content").path(0).path("text").asText()
                 + or.getFirst().path("input").path(2).path("content").asText();

@@ -28,9 +28,9 @@ public class OpenAiDialogueGateway implements DialogueGateway {
     private final GeminiDialogueGateway promptBuilder;
     private final AiUsageTracker usageTracker;
 
-    // Empty until a paid quality comparison authorizes a dedicated review model.
-    @Value("${openai.continuity-model:}")
-    private String continuityModel = "";
+    // Cost-first default also applies to the manually constructed offline/QA gateway.
+    @Value("${openai.continuity-model:gpt-5.6-luna}")
+    private String continuityModel = "gpt-5.6-luna";
 
     public OpenAiDialogueGateway(
             @Value("${openai.api-key:}") String apiKey,
