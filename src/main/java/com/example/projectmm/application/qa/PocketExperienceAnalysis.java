@@ -35,6 +35,17 @@ public final class PocketExperienceAnalysis {
         var quote=Pattern.compile("[\"“「『](.*?)[\"”」』]",Pattern.DOTALL);
         for(var t:state.path("turns")) {
             int number=t.path("number").asInt();String reply=t.path("outcome").path("reply").asText();int characters=reply.codePointCount(0,reply.length()),dialogue=0;
+            String diagnostics=t.path("outcome").path("diagnosticsJson").asText("");
+            if(!diagnostics.isBlank()) {
+                try {
+                    for(var issue:M.readTree(diagnostics).path("continuityQa").path("findings"))
+                        findings.add(new Finding(number,"CONTINUITY_"+issue.path("type").asText(),
+                                issue.path("mode").asText()+": "+issue.path("message").asText()+
+                                        " / "+issue.path("review").path("conflicts"),"OBSERVED_ERROR"));
+                } catch(RuntimeException invalidDiagnostics) {
+                    findings.add(new Finding(number,"CONTINUITY_DIAGNOSTICS_INVALID","검사 관찰 기록 JSON을 읽을 수 없음","OBSERVED_ERROR"));
+                }
+            }
             var matcher=quote.matcher(reply);while(matcher.find())dialogue+=matcher.group(1).codePointCount(0,matcher.group(1).length());
             long in=0,out=0,cached=0;boolean known=true;int targetCalls=0;
             for(var c:calls.getOrDefault(number,List.of()))if(c.path("role").asText().equals("TARGET")) {

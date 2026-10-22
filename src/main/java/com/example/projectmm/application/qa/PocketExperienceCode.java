@@ -4,7 +4,7 @@ public final class PocketExperienceCode {
     public static Map<String,String> hashes() {
         var result=new TreeMap<String,String>();
         for(String name:List.of("application.chat.WorldRoomDialogueService","application.chat.WorldRoomSessionService",
-                "application.dialogue.WorldRoomContextBuilder","application.dialogue.SceneContinuityService","application.dialogue.SceneContinuityPrompt","infrastructure.dialogue.SceneContinuityRequest","domain.dialogue.SceneFacts","infrastructure.dialogue.WorldRoomNarrativeStyle",
+                "application.dialogue.WorldRoomContextBuilder","application.dialogue.SceneContinuityService","application.dialogue.SceneContinuityObservation","application.dialogue.SceneContinuityPrompt","infrastructure.dialogue.SceneContinuityRequest","domain.dialogue.SceneFacts","infrastructure.dialogue.WorldRoomNarrativeStyle",
                 "application.time.HybridTimeInterpreter","application.time.AiTimeInterpreter","application.time.RuleBasedTimeInterpreter","infrastructure.time.GeminiTimeParser","application.memory.MemoryRecallService","application.memory.MemoryRetrievalRanker","application.memory.MemoryCompressionService",
                 "application.memory.PocketMemoryService","application.memory.PocketMemoryWriter",
                 "application.memory.MemoryDecayPolicy","application.memory.MemoryTierPolicy","application.memory.MemoryLifecycleService",

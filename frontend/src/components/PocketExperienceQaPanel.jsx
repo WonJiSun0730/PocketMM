@@ -100,6 +100,7 @@ export default function PocketExperienceQaPanel({ sessionId }) {
         <p className="text-muted-foreground">복사 후 설정 일치 검사 · 서비스 응답 지침 유지 · 하드캡 보호용 역할별 출력 상한 적용</p>
       </div>
       <p className="mt-3 rounded bg-muted/40 px-2 py-2 text-xs">플레이어 대역·내부 판단: <strong>GPT-5.6 Luna · 고정</strong></p>
+      <p className="mt-1 text-xs text-muted-foreground">검사 오류는 기록하고 다음 턴으로 진행합니다. 대상 원문을 유지하며 예산·과금·통신 문제는 중단합니다.</p>
       <div className="mt-3 grid grid-cols-1 gap-3">
         <label className="text-xs">테스트 대상 모델
           <select className={field} value={targetModel} onChange={event => change(setTargetModel, event.target.value)} disabled={busy}>
@@ -177,7 +178,7 @@ export default function PocketExperienceQaPanel({ sessionId }) {
               <p className="text-muted-foreground">{analysis.comparison.explanation}</p>
             </>}
             <p className="text-muted-foreground">{analysis.verdict}</p>
-            <details><summary className="cursor-pointer">짧음·반복·응답 상태 검토 후보 {analysis.findings.length}건</summary>
+            <details><summary className="cursor-pointer">연속성 검사 오류·짧음·반복·응답 상태 검토 {analysis.findings.length}건</summary>
               {analysis.findings.map((finding, i) => <p key={i} className="mt-1">{finding.turn ? `${finding.turn}턴` : "전체"} · {finding.type}: {finding.evidence}</p>)}
             </details>
           </div>}
