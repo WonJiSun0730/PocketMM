@@ -1,10 +1,12 @@
 import {readPocketChatStream} from "@/lib/pocketChatStream"
+import {createPocketChatTiming} from "@/lib/pocketChatTiming"
+import PocketChatTimingPanel, {MeasuredPocketReply} from "@/components/PocketChatTimingPanel"
 import PocketExperienceQaPanel from "@/components/PocketExperienceQaPanel";
 import PocketQaPanel from "@/components/PocketQaPanel";
 import AiCallUsage from "../components/AiCallUsage";
 import PromptTokenUsage from "../components/PromptTokenUsage";
 import {enterSendsMessage,chatInputEnvironment} from "@/lib/chatInput"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
 import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, Menu, Pencil, RefreshCw, Send, Trash2, Wrench, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -67,6 +69,25 @@ export default function PocketPage({ pocket, onBack }) {
   const [systems, setSystems] = useState([])
   const [input, setInput] = useState("")
   const [messageSending, setSending] = useState(false)
+  const chatTiming = useMemo(() => createPocketChatTiming({sessionId:session.id,storage:{
+    getItem: key => window.localStorage.getItem(key),
+    setItem: (key,value) => window.localStorage.setItem(key,value),
+  }}),[session.id])
+  const timingRecords = useSyncExternalStore(chatTiming.subscribe,chatTiming.getSnapshot)
+  const timingSample = timingRecords[0]
+  useEffect(() => {
+    if (!messageSending && timingSample?.status === "FINALIZED") chatTiming.ready(timingSample.id)
+  },[chatTiming,messageSending,timingSample])
+  useEffect(() => {
+    if (!timingSample?.id) return
+    const id=timingSample.id
+    const visibilityChanged=()=>{
+      if(document.visibilityState !== "visible") chatTiming.displayUnavailable(id)
+    }
+    visibilityChanged()
+    document.addEventListener("visibilitychange",visibilityChanged)
+    return ()=>document.removeEventListener("visibilitychange",visibilityChanged)
+  },[chatTiming,timingSample?.id])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [editing, setEditing] = useState(null)
@@ -159,7 +180,7 @@ export default function PocketPage({ pocket, onBack }) {
         base, sessionId: session.id,
         metadata: { worldId: world.id, worldName: world.name, roomId: room.id, roomTitle: room.title },
       })
-      downloadPocketTestData(data)
+      downloadPocketTestData({...data,browserChatTiming:chatTiming.export()})
       setMobileToolsOpen(false)
     } catch (cause) {
       setError(cause.message ?? "테스트 데이터 내보내기에 실패했어요.")
@@ -337,6 +358,7 @@ export default function PocketPage({ pocket, onBack }) {
       await continueScene()
       return
     }
+    const timingId=chatTiming.begin()
     setSending(true)
     setError("")
     setReplyPreview(null)
@@ -349,6 +371,7 @@ export default function PocketPage({ pocket, onBack }) {
     try {
       if (!await progress.resume()) throw new Error("먼저 부재 활동을 확인해 주세요.")
       submitted = true
+      chatTiming.sent(timingId)
       const response = await fetch(`${base}/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -357,10 +380,12 @@ export default function PocketPage({ pocket, onBack }) {
       })
       await readPocketChatStream(response, event => {
         if (event.type === "preview") {
+          chatTiming.received(timingId)
           preview = event.reply
           setReplyPreview(event.reply)
         }
         if (event.type === "complete") {
+          chatTiming.complete(timingId,event.reply)
           setReplyPreview(event.reply)
           if (preview && preview !== event.reply) setReplyNotice("장면 확인 후 답변을 수정했어요.")
         }
@@ -371,6 +396,7 @@ export default function PocketPage({ pocket, onBack }) {
       await refreshMemoryInspector()
       await refreshAiUsage()
     } catch (e) {
+      chatTiming.failed(timingId)
       setReplyPreview(null)
       setMessages(current => current.filter(item => item.id !== pending.id))
       if (!submitted) setInput(message)
@@ -623,6 +649,7 @@ export default function PocketPage({ pocket, onBack }) {
         {devOpen && <div className="border-t px-4 py-3 sm:px-6">
           <PocketQaPanel sessionId={session.id} />
           <PocketExperienceQaPanel sessionId={session.id} />
+          <PocketChatTimingPanel timing={chatTiming} records={timingRecords} />
           <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
             <span>SESSION #{session.id}</span>
             <span>시뮬레이션 시각 {session.simulatedAt ?? "-"}</span>
@@ -749,12 +776,13 @@ export default function PocketPage({ pocket, onBack }) {
               {editing === item.id ? <div className="space-y-2">
                 <Textarea autoFocus value={editText} onChange={e => setEditText(e.target.value)} className="min-h-32 resize-y text-base leading-7" />
                 <div className="flex justify-end gap-2"><Button size="sm" variant="ghost" onClick={() => setEditing(null)}><X className="mr-1 size-3.5"/>취소</Button><Button size="sm" onClick={() => editMessage(item)}>저장</Button></div>
-              </div> : isAbsence ? <PocketAbsenceLog sessionId={session.id} reportId={item.absenceReportId} allowGenerate={!messages.slice(index+1).some(m => m.absenceReportId == null)} isDeveloper={isDeveloper} fallback={item.content ?? item.message} disabled={sending} /> : <TypedPocketReply key={`${item.id}:${item.selectedVariantNo ?? 1}:${item.content ?? item.message}`}
+              </div> : isAbsence ? <PocketAbsenceLog sessionId={session.id} reportId={item.absenceReportId} allowGenerate={!messages.slice(index+1).some(m => m.absenceReportId == null)} isDeveloper={isDeveloper} fallback={item.content ?? item.message} disabled={sending} /> : <MeasuredPocketReply timing={chatTiming} sampleId={timingSample?.id}
+                eligible={isCharacter && isLatest && !replyPreview && chatTiming.canMeasureFinal(item.content ?? item.message)}><TypedPocketReply key={`${item.id}:${item.selectedVariantNo ?? 1}:${item.content ?? item.message}`}
                 text={item.content ?? item.message}
                 animate={isCharacter && !isAbsence && typingTarget===`${item.id}:${item.selectedVariantNo ?? 1}`}
                 onProgress={followTyping}>
                 {messageSceneState && <SceneStateMessage state={messageSceneState} />}
-              </TypedPocketReply>}
+              </TypedPocketReply></MeasuredPocketReply>}
               {editing !== item.id && <div className="mt-4 flex min-h-7 flex-wrap items-center gap-1 text-xs text-muted-foreground opacity-40 transition-opacity group-hover:opacity-100">
                 {!isAbsence && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { setEditing(item.id); setEditText(item.content ?? item.message ?? "") }} disabled={sending}><Pencil className="mr-1 size-3"/>수정</Button>}
                 {isCharacter && !isAbsence && isLatest && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => reroll(item)} disabled={sending}><RefreshCw className="mr-1 size-3"/>리롤</Button>}
@@ -772,7 +800,7 @@ export default function PocketPage({ pocket, onBack }) {
           })}
 
           {replyPreview && <article className="border-b border-border/70 py-7 sm:py-9" aria-live="polite">
-            <RpText text={replyPreview} />
+            <MeasuredPocketReply timing={chatTiming} sampleId={timingSample?.id} autoScroll><RpText text={replyPreview} /></MeasuredPocketReply>
             <p className="mt-4 text-xs text-muted-foreground">장면과 기억을 확인하고 있어요. 확인 후 내용이 수정될 수 있어요.</p>
           </article>}
           {replyNotice && <p role="status" className="py-2 text-xs text-muted-foreground">{replyNotice}</p>}
@@ -828,6 +856,7 @@ export default function PocketPage({ pocket, onBack }) {
         {devOpen && <div className="border-t px-4 py-3 sm:px-6">
           <PocketQaPanel sessionId={session.id} />
           <PocketExperienceQaPanel sessionId={session.id} />
+          <PocketChatTimingPanel timing={chatTiming} records={timingRecords} />
           <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
             <span>SESSION #{session.id}</span>
             <span>시뮬레이션 시각 {session.simulatedAt ?? "-"}</span>
