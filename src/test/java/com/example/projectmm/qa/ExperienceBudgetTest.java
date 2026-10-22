@@ -30,6 +30,34 @@ class ExperienceBudgetTest {
  byte[] body(){return "{\"model\":\"gpt-5.6-sol\",\"reasoning\":{\"effort\":\"none\"},\"input\":[{\"role\":\"user\",\"content\":\"장면을 이어간다\"}],\"text\":{\"format\":{\"name\":\"pocket_turn\"}}}".getBytes(java.nio.charset.StandardCharsets.UTF_8);}
  MockClientHttpResponse response(long in,long cache,long out) {return new MockClientHttpResponse(("{\"status\":\"completed\",\"usage\":{\"input_tokens\":"+in+",\"input_tokens_details\":{\"cached_tokens\":"+cache+",\"cache_write_tokens\":0},\"output_tokens\":"+out+"}}").getBytes(),HttpStatus.OK);}
  JsonNode budget() throws java.io.IOException{return m.readTree(Files.readString(dir.resolve("budget.json")));}
+ @Test void preflightFailureAfterPaidAuxiliaryWorkIsNotAnUnknownTargetCharge() throws Exception {
+  transport(BigDecimal.TEN,1000);var fail=new AtomicBoolean();var generationSent=new AtomicInteger();
+  var t=new ExperienceTransport(spec(BigDecimal.TEN),dir,(p,model,j,e)->{
+   if(fail.get())throw new org.springframework.web.client.ResourceAccessException("count unavailable");return 1000;
+  });
+  var before=t.ids();
+  var auxiliary=(tools.jackson.databind.node.ObjectNode)m.readTree(body());auxiliary.put("model","gpt-5.6-luna");
+  t.intercept(req(),m.writeValueAsBytes(auxiliary),(r,b)->response(1000,0,100)).close();
+  fail.set(true);
+  assertThatThrownBy(()->t.intercept(req(),body(),(r,b)->{generationSent.incrementAndGet();return response(1000,0,100);}))
+    .hasMessageContaining("입력 토큰 계수 실패");
+  var failed=t.outcomeSince(before,new QaRunner.Outcome("",List.of(),null,null,null,null,List.of(),"failure"));
+  assertThat(failed.calls()).hasSize(2);
+  assertThat(failed.calls().getFirst().usd()).isEqualByComparingTo("0.006");
+  assertThat(failed.calls().getLast().status()).isEqualTo("BUDGET_BLOCKED");
+  assertThat(failed.calls().getLast().usd()).isZero();assertThat(generationSent.get()).isZero();
+  var sends=new AtomicInteger();
+  QaRunner.Target target=new QaRunner.Target(){
+   public QaRunner.Outcome send(String id,String input){sends.incrementAndGet();return failed;}
+   public Optional<QaRunner.Outcome> recover(String id){return Optional.empty();}
+  };
+  var runner=new QaRunner(dir.resolve("runner"),input->new QaRunner.Generation("input",List.of(
+    new QaRunner.Usage("PERSONA","gpt-5.6-luna","PLAYER_SIMULATION",0,0,0L,0,"completed",BigDecimal.ZERO)),null),target);
+  runner.create(spec(BigDecimal.TEN),new QaScenarios(List.of()));
+  var state=runner.step();assertThat(state.status).isEqualTo("BUDGET_STOP");assertThat(state.unknownCost()).isFalse();
+  assertThat(state.knownUsd()).isEqualByComparingTo("0.006");assertThat(state.turns).isEmpty();
+  assertThat(state.reason).contains("입력 토큰 계수 실패");runner.step();assertThat(sends.get()).isEqualTo(1);
+ }
  @Test void rejectedReviewResponseIsSavedWithLedgerAndWithoutAuthHeaders() throws Exception {
   var t=transport(BigDecimal.TEN,1000);
   String review="{\"approved\":false,\"turn\":null,\"changes\":[],\"conflicts\":[\"Custody conflict\"]}";

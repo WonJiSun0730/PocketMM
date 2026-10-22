@@ -150,6 +150,12 @@ public final class QaRunner {
         if(outcome.error()!=null)s.failedOutcome=outcome;
         s.addCalls(outcome.calls(),number);
         s.diagnostics.add(diagnostic("TARGET_USAGE_CHECKPOINT",null));save(s);
+        boolean blockedBeforeSend=outcome.calls().stream().anyMatch(c->c.status().equals("BUDGET_BLOCKED"));
+        if(blockedBeforeSend&&outcome.error()!=null) {
+            if(s.unknownCost()) {review(s,"A request was blocked before sending, but an earlier charge still needs reconciliation");return;}
+            s.status="BUDGET_STOP";s.reason=outcome.error()==null?"Request blocked before sending":outcome.error();
+            s.heldUsd=BigDecimal.ZERO;save(s);return;
+        }
         if(s.spec.paid()&&outcome.calls().stream().noneMatch(c->c.role().equals("TARGET"))) {
             uncertain(s,"TARGET",s.spec.targetModel(),"Paid target returned no usage record");return;
         }
@@ -157,7 +163,8 @@ public final class QaRunner {
         s.turns.add(new Turn(number,id,s.pendingInput,outcome,latency,scenario.evaluate(number,outcome.reply(),outcome.memories())));
         s.pendingInput=null;s.stage="READY";s.heldUsd=BigDecimal.ZERO;
         if(s.unknownCost()) {review(s,"Usage incomplete; known subtotal is not total cost");return;}
-        if(s.knownUsd().compareTo(s.spec.budgetUsd())>0) {s.status="BUDGET_STOP";s.reason="Actual call exceeded configured reservation/budget";}
+        if(blockedBeforeSend) {s.status="BUDGET_STOP";s.reason="A subsequent auxiliary request was blocked before sending; the committed turn is preserved";}
+        else if(s.knownUsd().compareTo(s.spec.budgetUsd())>0) {s.status="BUDGET_STOP";s.reason="Actual call exceeded configured reservation/budget";}
         else s.status=s.turns.size()==s.spec.turns()?"COMPLETED":"RUNNING";
         save(s);
     }

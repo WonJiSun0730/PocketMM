@@ -20,6 +20,7 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
     private final QaSpec spec;private final Path directory;private final ObjectMapper mapper=new ObjectMapper();
     private final Map<String,Long> maxima;private BigDecimal spent=BigDecimal.ZERO;private boolean uncertain;
     boolean budgetBlocked;
+    private String blockedReason,requestRole="AUXILIARY",requestModel="unknown";
     interface InputCounter {long count(String provider,String model,tools.jackson.databind.JsonNode request,boolean embedding);}
     private final InputCounter counter;
     private final tools.jackson.databind.JsonNode policy;
@@ -42,7 +43,7 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
         }
         finally {Files.deleteIfExists(temp);}
     }
-    private void block(String reason) throws IOException {budgetBlocked=true;budgetEvent("BLOCKED",reason);throw new IllegalStateException(reason);}
+    private void block(String reason) throws IOException {budgetBlocked=true;blockedReason=reason;budgetEvent("BLOCKED",reason);throw new IllegalStateException(reason);}
 
     private final LinkedHashMap<String,Receipt> calls=new LinkedHashMap<>();
     ExperienceTransport(QaSpec spec,Path directory) throws IOException {
@@ -65,6 +66,13 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
     }
     synchronized List<QaRunner.Usage> since(Set<String> before){return calls.values().stream().filter(c->!before.contains(c.callId())).map(Receipt::usage).toList();}
     synchronized Set<String> ids(){return Set.copyOf(calls.keySet());}
+    synchronized QaRunner.Outcome outcomeSince(Set<String> before,QaRunner.Outcome outcome) {
+        var receipts=new ArrayList<>(since(before));
+        if(budgetBlocked)receipts.add(new QaRunner.Usage(requestRole,requestModel,"NOT_SENT",0,0,0L,0,"BUDGET_BLOCKED",BigDecimal.ZERO));
+        return new QaRunner.Outcome(outcome.reply(),outcome.memories(),outcome.evaluationJson(),outcome.diagnosticsJson(),
+                outcome.memoryBeforeJson(),outcome.memoryAfterJson(),receipts,
+                budgetBlocked&&outcome.error()!=null?"요청 전송 전 차단: "+blockedReason:outcome.error());
+    }
     synchronized void begin(QaRunner.State state){if(state.unknownCost())uncertain=true;}
     private void record(Receipt receipt) throws IOException {
         // No auth headers, URL query keys or exception text are written.
@@ -87,7 +95,6 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
         if(budgetBlocked)throw new IllegalStateException("Budget policy already blocked this run; no further HTTP requests permitted");
         if(uncertain){budgetEvent("REVIEW_REQUIRED","Unknown prior charge; automatic retry prohibited");throw new IllegalStateException("Unknown prior charge; automatic retry prohibited");}
         var json=mapper.readTree(body);boolean gemini=request.getURI().getHost().equals("generativelanguage.googleapis.com");
-        if(gemini)block("OpenAI QA에서 Gemini 요청을 전송 전에 차단했습니다. 새 실행을 만드세요.");
         boolean embedding=request.getURI().getPath().equals("/v1/embeddings");
         String model=gemini?request.getURI().getPath().replaceFirst(".*/models/","").replaceFirst(":.*",""):json.path("model").asText();
         String provider=gemini?"GEMINI":"OPENAI";
@@ -95,6 +102,8 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
         String purpose=scope==null?"ROLEPLAY":(String)org.springframework.test.util.ReflectionTestUtils.getField(scope,"purpose");
         if(ExperiencePersonaClient.personaCall.get())purpose="PLAYER_SIMULATION";
         String role=ExperiencePersonaClient.personaCall.get()?"PERSONA":!"SCENE_CONTINUITY".equals(purpose)&&model.equals(spec.targetModel())&&!gemini&&json.path("text").path("format").path("name").asText().equals("pocket_turn")?"TARGET":"AUXILIARY";
+        requestRole=role;requestModel=model;
+        if(gemini)block("OpenAI QA에서 Gemini 요청을 전송 전에 차단했습니다. 새 실행을 만드세요.");
         var rate=spec.prices().get(model);Long maximum=maxima.get(model);
         if(rate==null||maximum==null||maximum<(embedding?0:1))throw new IllegalStateException("Verified model price and maximum output reservation required");
         budget.clear();budget.put("model",model);budget.put("role",role);budget.put("purpose",purpose);

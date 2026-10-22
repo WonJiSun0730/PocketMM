@@ -51,9 +51,7 @@ class ExperienceExecutionTest {
         QaRunner.Target target=new QaRunner.Target() {
             public QaRunner.Outcome send(String id,String input) {
                 var before=transport.ids();var outcome=pipeline.send(id,input);
-                var calls=spec.paid()?transport.since(before):outcome.calls();
-                if(transport.budgetBlocked&&calls.isEmpty())calls=List.of(new QaRunner.Usage("TARGET",spec.targetModel(),"NOT_SENT",0,0,0L,0,"BUDGET_BLOCKED",java.math.BigDecimal.ZERO));
-                return new QaRunner.Outcome(outcome.reply(),outcome.memories(),outcome.evaluationJson(),outcome.diagnosticsJson(),outcome.memoryBeforeJson(),outcome.memoryAfterJson(),calls,outcome.error());
+                return spec.paid()?transport.outcomeSince(before,outcome):outcome;
             }
             public Optional<QaRunner.Outcome> recover(String id) {
                 return pipeline.recover(id).map(o->new QaRunner.Outcome(o.reply(),o.memories(),o.evaluationJson(),o.diagnosticsJson(),o.memoryBeforeJson(),o.memoryAfterJson(),
@@ -67,7 +65,7 @@ class ExperienceExecutionTest {
         for(int i=0;i<spec.turns();i++) {
             var state=runner.step();
             if(transport.budgetBlocked&&!state.unknownCost()) {
-                state.status="BUDGET_STOP";state.reason="하드캡 정책에 따라 다음 호출 전 중단했습니다. 예산 상세의 입력 계수·출력 상한·최대 예약액·잔액·중단 사유를 확인하세요.";
+                state.status="BUDGET_STOP";if(state.reason==null)state.reason="하드캡 정책에 따라 다음 호출 전 중단했습니다. 예산 상세의 입력 계수·출력 상한·최대 예약액·잔액·중단 사유를 확인하세요.";
                 var temp=Files.createTempFile(path,"experience-state-",".tmp");Files.writeString(temp,mapper.writerWithDefaultPrettyPrinter().writeValueAsString(state));
                 try { QaAtomicFiles.replace(temp,path.resolve("run.json")); }
                 finally { Files.deleteIfExists(temp); }
