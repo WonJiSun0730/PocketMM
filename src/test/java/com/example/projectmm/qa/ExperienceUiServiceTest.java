@@ -16,14 +16,17 @@ class ExperienceUiServiceTest {
         var turns=state.putArray("turns");
         var first=turns.addObject();first.put("number",1);
         first.putObject("outcome").put("reply","reply").put("diagnosticsJson",
-                "{\"chatTiming\":{\"source\":\"QA_SERVER\",\"bodyReadyMs\":100,\"reviewCompleteMs\":200,\"processingCompleteMs\":300}}");
+                "{\"chatTiming\":{\"source\":\"QA_SERVER\",\"bodyReadyMs\":100,\"reviewCompleteMs\":200,\"processingCompleteMs\":300,\"preGenerationMs\":60,\"targetDispatchMs\":80,\"stages\":{\"TIME_INTERPRETATION\":{\"durationMs\":20,\"count\":1,\"failedCount\":0}}}}");
         turns.addObject().put("number",2).putObject("outcome").put("reply","old reply");
         Files.writeString(dir.resolve("target/pocket-qa-experience").resolve(run.id()).resolve("run.json"),mapper.writeValueAsString(state));
         String csv=new String(service.download(1,"dev",run.id(),"metrics"),java.nio.charset.StandardCharsets.UTF_8);
         var rows=csv.lines().toList();
-        assertThat(rows.getFirst()).endsWith("qa_body_ready_ms,qa_review_complete_ms,qa_processing_complete_ms");
-        assertThat(rows.get(1)).endsWith(",100,200,300");
-        assertThat(rows.get(2)).endsWith(",,,");
+        assertThat(rows.getFirst()).contains("qa_body_ready_ms,qa_review_complete_ms,qa_processing_complete_ms,qa_pre_generation_ms,qa_target_dispatch_ms","qa_stage_time_interpretation_ms");
+        assertThat(Arrays.asList(rows.get(1).split(",",-1)).subList(11,14)).containsExactly("100","200","300");
+        assertThat(Arrays.asList(rows.get(1).split(",",-1)).subList(14,16)).containsExactly("60","80");
+        int stageColumn=Arrays.asList(rows.getFirst().split(",")).indexOf("qa_stage_time_interpretation_ms");
+        assertThat(rows.get(1).split(",",-1)[stageColumn]).isEqualTo("20");
+        assertThat(Arrays.asList(rows.get(2).split(",",-1)).subList(11,14)).containsExactly("","","");
         String json=new String(service.download(1,"dev",run.id(),"json"),java.nio.charset.StandardCharsets.UTF_8);
         assertThat(json).contains("bodyReadyMs","processingCompleteMs","QA_SERVER");
     }

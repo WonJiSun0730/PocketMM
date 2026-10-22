@@ -40,10 +40,11 @@ public class SceneContinuityService {
     }
 
     private Outcome generateChecked(WorldRoomDialogueContext context, String modelInput, String userInput, long beforeId) {
-        List<SceneFacts.Fact> before = prepare(context, beforeId);
+        List<SceneFacts.Fact> before = DialogueTiming.stage("SCENE_FACTS_PREPARE",()->prepare(context, beforeId));
         String beforeJson = JSON.writeValueAsString(before);
         var enriched = context.withSceneFacts(beforeJson);
-        var candidate = gateway.generateWorldRoomTurn(enriched, modelInput);
+        DialogueTiming.generationStarting();
+        var candidate = DialogueTiming.stage("TARGET_GENERATION",()->gateway.generateWorldRoomTurn(enriched, modelInput));
         requireTurn(candidate, enriched);
         DialogueTiming.bodyReady();
         DialoguePreview.generated(candidate.reply());

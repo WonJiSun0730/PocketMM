@@ -123,7 +123,7 @@ public final class PocketExperienceAnalysis {
         timingSummary.put("explanation","QA 대상 요청 시작 기준 서버 단계 시간 · 브라우저 수신/화면 표시 실측 아님 · 기존 기록 미측정");
         var byTurn=new HashMap<Integer,JsonNode>();
         for(var t:state.path("turns"))byTurn.put(t.path("number").asInt(),readTiming(t.path("outcome")));
-        for(String field:List.of("bodyReadyMs","reviewCompleteMs","processingCompleteMs")) {
+        for(String field:List.of("preGenerationMs","targetDispatchMs","bodyReadyMs","reviewCompleteMs","processingCompleteMs")) {
             var values=new ArrayList<Long>();
             for(var detail:node.path("turns")) {
                 var value=byTurn.getOrDefault(detail.path("turn").asInt(),M.createObjectNode()).path(field);
@@ -132,6 +132,21 @@ public final class PocketExperienceAnalysis {
                 else target.putNull(field);
             }
             timingSummary.set(field,M.valueToTree(distribution(values)));
+        }
+        var stageSummary=timingSummary.putObject("stages");
+        for(String stage:com.example.projectmm.application.dialogue.DialogueTiming.STAGES) {
+            var values=new ArrayList<Long>();int failures=0,calls=0;
+            for(var detail:node.path("turns")) {
+                var record=byTurn.getOrDefault(detail.path("turn").asInt(),M.createObjectNode()).path("stages").path(stage);
+                var target=(tools.jackson.databind.node.ObjectNode)detail;
+                var stages=target.has("preparationStages")?(tools.jackson.databind.node.ObjectNode)target.path("preparationStages"):target.putObject("preparationStages");
+                if(record.path("durationMs").isNumber()&&record.path("durationMs").asLong()>=0) {
+                    stages.set(stage,record);values.add(record.path("durationMs").asLong());
+                    failures+=record.path("failedCount").asInt();calls+=record.path("count").asInt();
+                }
+            }
+            var summary=(tools.jackson.databind.node.ObjectNode)M.valueToTree(distribution(values));
+            summary.put("calls",calls);summary.put("failedCalls",failures);stageSummary.set(stage,summary);
         }
         node.set("failedAttemptTiming",readTiming(state.path("failedOutcome")));
         return node;
@@ -146,10 +161,15 @@ public final class PocketExperienceAnalysis {
     private static String timingMarkdown(JsonNode state) {
         var timing=fullAnalysis(state,M.createObjectNode()).path("chatTiming");
         var text=new StringBuilder("\n\n## QA 단계별 시간 (서버 기준)\n\n브라우저 도착·표시 시간이 아닙니다. QA 대상 요청 시작 기준이며 기존 기록은 미측정입니다.\n\n| 구간 | 최소 초 | 최대 초 | 평균 초 | 표본 |\n| --- | --- | --- | --- | --- |\n");
-        for(var entry:Map.of("bodyReadyMs","본문 준비","reviewCompleteMs","검사 완료","processingCompleteMs","저장·기억 포함 완료").entrySet()) {
+        for(var entry:Map.of("preGenerationMs","생성 경로 진입 전","targetDispatchMs","HTTP 호출 직전","bodyReadyMs","본문 준비","reviewCompleteMs","검사 완료","processingCompleteMs","저장·기억 포함 완료").entrySet()) {
             var stat=timing.path(entry.getKey());text.append("| ").append(entry.getValue()).append(" | ");
             if(stat.path("count").asInt()==0)text.append("미측정 | 미측정 | 미측정 | 0 |\n");
             else text.append(stat.path("min").asDouble()/1000).append(" | ").append(stat.path("max").asDouble()/1000).append(" | ").append(stat.path("average").asDouble()/1000).append(" | ").append(stat.path("count").asInt()).append(" |\n");
+        }
+        text.append("\n### 생성 전 병목 작업별 소요\n\n기억 조회와 토큰 계수는 상위 구간에 포함됩니다. 작업들을 중복 합산하지 마세요. HTTP 호출 직전 대기는 QA 사전 계수를 포함합니다.\n\n| 작업 | 평균 초 | 최소 초 | 최대 초 | 표본 턴 | 실행 횟수 |\n| --- | --- | --- | --- | --- | --- |\n");
+        for(String stage:com.example.projectmm.application.dialogue.DialogueTiming.STAGES) {
+            var stat=timing.path("stages").path(stage);
+            if(stat.path("count").asInt()>0)text.append("| ").append(stage).append(" | ").append(stat.path("average").asDouble()/1000).append(" | ").append(stat.path("min").asDouble()/1000).append(" | ").append(stat.path("max").asDouble()/1000).append(" | ").append(stat.path("count").asInt()).append(" | ").append(stat.path("calls").asInt()).append(" |\n");
         }
         return text.toString();
     }

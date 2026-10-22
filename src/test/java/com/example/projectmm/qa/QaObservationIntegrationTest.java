@@ -82,6 +82,12 @@ class QaObservationIntegrationTest {
                 var timing=json.readTree(turn.outcome().diagnosticsJson()).path("chatTiming");
                 assertThat(timing.path("source").asText()).isEqualTo("QA_SERVER");
                 assertThat(timing.path("bodyReadyMs").isNumber()).isTrue();
+                assertThat(timing.path("preGenerationMs").isNumber()).isTrue();
+                assertThat(timing.path("bodyReadyMs").asLong()).isGreaterThanOrEqualTo(timing.path("preGenerationMs").asLong());
+                for(String stage:List.of("SESSION_LOCK","INITIAL_SCENE_SETUP","TIME_INTERPRETATION","CONTEXT_BUILD","CONTEXT_MEMORY_RECALL","SCENE_FACTS_PREPARE","TARGET_GENERATION"))
+                    assertThat(timing.path("stages").path(stage).path("durationMs").isNumber()).as(stage).isTrue();
+                assertThat(timing.path("stages").path("STATE_SNAPSHOT").path("count").asInt()).isEqualTo(2);
+                assertThat(timing.path("stages").has("TARGET_TOKEN_COUNT")).isFalse();
                 assertThat(timing.path("reviewCompleteMs").asLong()).isGreaterThanOrEqualTo(timing.path("bodyReadyMs").asLong());
                 assertThat(timing.path("processingCompleteMs").isNumber()).isTrue();
                 assertThat(timing.path("processingCompleteMs").asLong()).isGreaterThanOrEqualTo(timing.path("reviewCompleteMs").asLong());

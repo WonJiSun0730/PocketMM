@@ -139,7 +139,7 @@ public class WorldRoomContextBuilder {
                         ? ""
                         : recentMessages.getLast().getContent());
 
-        var recalledMemories = activeCast.stream()
+        var recalledMemories = DialogueTiming.stage("CONTEXT_MEMORY_RECALL",()->activeCast.stream()
                 .map(character -> new WorldRoomDialogueContext.CharacterMemories(
                         character.characterId(),
                         character.characterName(),
@@ -161,7 +161,7 @@ public class WorldRoomContextBuilder {
                                 .toList()
                 ))
                 .filter(group -> !group.memories().isEmpty())
-                .toList();
+                .toList());
 
         return new WorldRoomDialogueContext(
                 session.getId(),

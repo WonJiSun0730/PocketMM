@@ -133,7 +133,11 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
         // Count both in settlement; never change the service thinking settings.
         long thoughtBound=0;
         long input;
-        try {input=counter.count(provider,model,modified,embedding);if(input<0)throw new IllegalStateException();}
+        final String countedProvider=provider,countedModel=model;
+        try {input=role.equals("TARGET")
+                ? com.example.projectmm.application.dialogue.DialogueTiming.stage("TARGET_TOKEN_COUNT",()->counter.count(countedProvider,countedModel,modified,embedding))
+                : counter.count(provider,model,modified,embedding);
+            if(input<0)throw new IllegalStateException();}
         catch(RuntimeException e){block("입력 토큰 계수 실패("+e.getClass().getSimpleName()+"): 최대 비용을 확인할 수 없어 전송하지 않았습니다.");return null;}
         long maxOutput=Math.addExact(output,thoughtBound);
         boolean large=rate.largeContextThreshold()>0&&input>rate.largeContextThreshold();
@@ -166,6 +170,7 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
         budget.put("callId",id);
         record(new Receipt(id,Instant.now().toString(),"REQUEST_STARTED",role,provider,model,purpose,0,0,null,0,"UNKNOWN",null,null));
         try {
+            if(role.equals("TARGET"))com.example.projectmm.application.dialogue.DialogueTiming.targetDispatching();
             var response=execution.execute(request,body);byte[] bytes=response.getBody().readAllBytes();var root=mapper.readTree(bytes);
             // Keep the review result, not HTTP/auth headers, for offline rejection diagnosis.
             // A receipt failure must not hide already-incurred provider usage.

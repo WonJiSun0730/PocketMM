@@ -1,6 +1,7 @@
 package com.example.projectmm.application.chat;
 
 import com.example.projectmm.application.dialogue.DialogueGateway;
+import com.example.projectmm.application.dialogue.DialogueTiming;
 import com.example.projectmm.application.dialogue.WorldRoomContextBuilder;
 import com.example.projectmm.application.memory.PocketUserSpeechCommitted;
 import com.example.projectmm.application.time.TimeInterpreter;
@@ -80,23 +81,23 @@ public class WorldRoomDialogueService {
     @Transactional
     public WorldRoomTurn chat(Long sessionId, String userMessage) {
         return com.example.projectmm.infrastructure.dialogue.AiUsageTracker.withScope(sessionId, "ROLEPLAY", () -> {
-        var session = sessionService.lockForDialogue(sessionId);
+        var session = DialogueTiming.stage("SESSION_LOCK",()->sessionService.lockForDialogue(sessionId));
 
-        initializeSceneIfNeeded(session, userMessage);
-        var userSourceMessage = messages.save(new WorldRoomMessage(
+        DialogueTiming.stage("INITIAL_SCENE_SETUP",()->{initializeSceneIfNeeded(session, userMessage);return null;});
+        var userSourceMessage = DialogueTiming.stage("USER_MESSAGE_SAVE",()->messages.save(new WorldRoomMessage(
                 session,
                 ChatRole.USER,
                 userMessage,
                 now()
-        ));
+        )));
 
         var beforeTime = session.getSimulatedAt();
-        var beforePlayerState = capturePlayerState(sessionId);
-        String sceneSetup = applySceneInstruction(session, userMessage, null);
-        boolean explicitTimeChanged = sceneSetupHasTime(sceneSetup) || applyExplicitTimeChange(session, userMessage);
-        var context = contextBuilder.buildSession(sessionId);
-        var beforeCast = sessionService.captureCastState(sessionId);
-        var beforeSystems = sessionService.captureSystemState(sessionId);
+        var beforePlayerState = DialogueTiming.stage("PLAYER_STATE_SNAPSHOT",()->capturePlayerState(sessionId));
+        String sceneSetup = DialogueTiming.stage("SCENE_INSTRUCTION",()->applySceneInstruction(session, userMessage, null));
+        boolean explicitTimeChanged = DialogueTiming.stage("TIME_INTERPRETATION",()->sceneSetupHasTime(sceneSetup) || applyExplicitTimeChange(session, userMessage));
+        var context = DialogueTiming.stage("CONTEXT_BUILD",()->contextBuilder.buildSession(sessionId));
+        var beforeCast = DialogueTiming.stage("STATE_SNAPSHOT",()->sessionService.captureCastState(sessionId));
+        var beforeSystems = DialogueTiming.stage("STATE_SNAPSHOT",()->sessionService.captureSystemState(sessionId));
         var measured = com.example.projectmm.infrastructure.dialogue.AiUsageTracker.capture(sessionId, () -> continuity.generate(context, userMessage, userMessage, userSourceMessage.getId()));
         var checked = measured.value();
         var generated = checked.turn();

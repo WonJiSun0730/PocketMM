@@ -13,6 +13,21 @@ import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 
 class ExperienceBehaviorTest {
+    @Test void preparationStageSummaryCountsMeasuredTurnsNotNestedInvocations() {
+        var state=mapper.createObjectNode();var turns=state.putArray("turns");
+        for(int i=1;i<=3;i++) {
+            var t=turns.addObject();t.put("number",i);var outcome=t.putObject("outcome");outcome.put("reply","reply");
+            if(i<3)outcome.put("diagnosticsJson","{\"chatTiming\":{\"source\":\"QA_SERVER\",\"preGenerationMs\":50,\"stages\":{\"CONTEXT_BUILD\":{\"durationMs\":"+(i*10)+",\"count\":2,\"failedCount\":0},\"CONTEXT_MEMORY_RECALL\":{\"durationMs\":0,\"count\":1,\"failedCount\":0}}}}");
+        }
+        var a=PocketExperienceAnalysis.fullAnalysis(state,mapper.createObjectNode());
+        var stage=a.path("chatTiming").path("stages").path("CONTEXT_BUILD");
+        assertThat(stage.path("count").asInt()).isEqualTo(2);
+        assertThat(stage.path("calls").asInt()).isEqualTo(4);
+        assertThat(stage.path("average").asDouble()).isEqualTo(15);
+        assertThat(a.path("turns").get(2).path("preparationStages").size()).isZero();
+        assertThat(a.path("chatTiming").path("stages").path("CONTEXT_MEMORY_RECALL").path("count").asInt()).isEqualTo(2);
+        assertThat(a.path("turns").get(2).path("preGenerationMs").isNull()).isTrue();
+    }
     @TempDir Path dir;final ObjectMapper mapper=new ObjectMapper();
     QaSpec spec(){var m=QaSpec.mock("experience-transport",3);var rate=new QaSpec.Rate(BigDecimal.ONE,BigDecimal.ONE,BigDecimal.ONE,BigDecimal.ONE,0,BigDecimal.ONE,BigDecimal.ONE,"MOCK RATE","2026-10-16");return new QaSpec(m.runId(),3,true,m.runId(),m.persona(),"gpt-5.6-luna","gpt-5.6-sol","gpt-5.6-luna",BigDecimal.TEN,new BigDecimal("0.01"),Map.of("gpt-5.6-luna",rate,"gpt-5.6-sol",rate),6,true);}
     ExperienceTransport transport() throws Exception {Files.writeString(dir.resolve("manifest.json"),"{\"maximumOutputTokens\":{\"gpt-5.6-sol\":128000}}");var manifest=(tools.jackson.databind.node.ObjectNode)mapper.readTree(Files.readString(dir.resolve("manifest.json")));manifest.set("budgetPolicy",mapper.valueToTree(ExperienceBudgetPolicy.create(List.of())));Files.writeString(dir.resolve("manifest.json"),mapper.writeValueAsString(manifest));return new ExperienceTransport(spec(),dir,(p,m,j,e)->100);}

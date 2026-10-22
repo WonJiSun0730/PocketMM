@@ -39,8 +39,13 @@ class ExperienceBudgetTest {
   var auxiliary=(tools.jackson.databind.node.ObjectNode)m.readTree(body());auxiliary.put("model","gpt-5.6-luna");
   t.intercept(req(),m.writeValueAsBytes(auxiliary),(r,b)->response(1000,0,100)).close();
   fail.set(true);
-  assertThatThrownBy(()->t.intercept(req(),body(),(r,b)->{generationSent.incrementAndGet();return response(1000,0,100);}))
-    .hasMessageContaining("입력 토큰 계수 실패");
+  var timing=new com.example.projectmm.application.dialogue.DialogueTiming();
+  timing.measure(()->{
+   assertThatThrownBy(()->t.intercept(req(),body(),(r,b)->{generationSent.incrementAndGet();return response(1000,0,100);}))
+     .hasMessageContaining("입력 토큰 계수 실패");return null;
+  });
+  assertThat(timing.snapshot().stages().get("TARGET_TOKEN_COUNT").failedCount()).isEqualTo(1);
+  assertThat(timing.snapshot().targetDispatchMs()).isNull();
   var failed=t.outcomeSince(before,new QaRunner.Outcome("",List.of(),null,null,null,null,List.of(),"failure"));
   assertThat(failed.calls()).hasSize(2);
   assertThat(failed.calls().getFirst().usd()).isEqualByComparingTo("0.006");
@@ -57,6 +62,21 @@ class ExperienceBudgetTest {
   var state=runner.step();assertThat(state.status).isEqualTo("BUDGET_STOP");assertThat(state.unknownCost()).isFalse();
   assertThat(state.knownUsd()).isEqualByComparingTo("0.006");assertThat(state.turns).isEmpty();
   assertThat(state.reason).contains("입력 토큰 계수 실패");runner.step();assertThat(sends.get()).isEqualTo(1);
+ }
+ @Test void targetCountingAndDispatchAreMeasuredWithoutAnotherHttpRequest() throws Exception {
+  transport(BigDecimal.TEN,1000);
+  var clock=new java.util.concurrent.atomic.AtomicLong();var sends=new AtomicInteger();
+  var t=new ExperienceTransport(spec(BigDecimal.TEN),dir,(p,model,j,e)->{clock.set(5_000_000);return 1000;});
+  var timing=new com.example.projectmm.application.dialogue.DialogueTiming(clock::get);
+  timing.measure(()->{
+   try {
+    t.intercept(req(),body(),(r,b)->{sends.incrementAndGet();clock.set(8_000_000);return response(1000,0,100);}).close();
+   } catch(java.io.IOException e){throw new java.io.UncheckedIOException(e);}
+   return null;
+  });
+  assertThat(timing.snapshot().stages().get("TARGET_TOKEN_COUNT").durationMs()).isEqualTo(5);
+  assertThat(timing.snapshot().targetDispatchMs()).isEqualTo(5);
+  assertThat(sends.get()).isEqualTo(1);
  }
  @Test void rejectedReviewResponseIsSavedWithLedgerAndWithoutAuthHeaders() throws Exception {
   var t=transport(BigDecimal.TEN,1000);
