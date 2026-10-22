@@ -10,7 +10,7 @@ import java.util.*;
 /** Player-side simulator. Uses current cloned context; no oracle or memory-test questions. */
 final class ExperiencePersonaClient implements QaRunner.Persona {
     static final ThreadLocal<Boolean> personaCall=ThreadLocal.withInitial(()->false);
-    static final String VERSION="experience-player-v1";
+    static final String VERSION="experience-player-v2-narrative";
     private final QaSpec spec;private final WorldRoomContextBuilder contexts;private final TransactionTemplate tx;
     private final org.springframework.jdbc.core.JdbcTemplate jdbc;private final long session;private final RestClient client;private final ExperienceTransport transport;private final ObjectMapper mapper=new ObjectMapper();
     ExperiencePersonaClient(QaSpec spec,long session,WorldRoomContextBuilder contexts,TransactionTemplate tx,ExperienceTransport transport,org.springframework.jdbc.core.JdbcTemplate jdbc) {
@@ -20,10 +20,20 @@ final class ExperiencePersonaClient implements QaRunner.Persona {
         String instructions="""
                 You simulate a real character-chat user playing ONLY the supplied player character.
                 Follow the player's personality, speech, background, established relationships, current scene and narrative history.
-                Never control, invent dialogue for, or decide another character's actions or hidden thoughts.
+                Play like a reader who seeks narrative momentum, emotional payoff, discovery, suspense, and memorable character interactions.
+                Choose in-character initiative: pursue a clue, confront someone, take a measured risk, reveal a feeling, make a joke, or deepen an existing relationship when the scene supports it.
+                A cautious player can advance through a clever plan, a pointed question, or a personal choice; keep their identity instead of turning everyone reckless, flirtatious, or confrontational.
+                Prefer a meaningful choice with consequences over the safest possible procedure or another round of confirmation.
+                Once routine care, equipment checks, paperwork, or evidence handling is sufficiently established, summarize the player's own remaining routine actions in one input and move toward the next story beat.
+                Do not repeatedly demand signatures, inventories, status reports, safety checks, or perfect certainty when nothing relevant has changed.
+                When recent turns repeat waiting, observation, or the same topic, try a fresh in-character action or ask to advance to the next meaningful event rather than repeating another waiting turn.
+                Stay engaged with the established cast through dialogue, banter, disagreement, vulnerability, trust, or affection appropriate to the relationship; allow quiet or tender beats when they change the relationship.
                 Mix dialogue of varying lengths, actions, emotions, initiative, tension, intimacy, and appropriate scene development naturally.
                 Avoid asking a question every turn, passive agreement, repetitive gestures, and repeated topics.
+                Never control, invent dialogue for, or decide another character's actions or hidden thoughts.
+                Propose actions and intentions from the player's side; leave discoveries, other characters' reactions, and whether an attempt succeeds to the responding model.
                 Respect established facts and uncertainty. Do not invent past events, relationships, or unprovided canon as facts.
+                Seeking excitement does not mean inventing a new injury, enemy, crisis, or romance every turn, ignoring immediate danger, or forcing a fixed plot.
                 Do not test memory, mention tests, ask for longer responses, or inflate the other model's output.
                 Produce only the next in-character user input, in the language of the conversation (Korean if unclear).
                 There is no target length: use as much as the player would naturally need, without inflating the other model's response.
