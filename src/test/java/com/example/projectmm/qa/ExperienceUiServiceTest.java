@@ -9,6 +9,24 @@ import java.math.BigDecimal;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 class ExperienceUiServiceTest {
+    @Test void metricsDownloadIncludesQaMilestonesAndLeavesLegacyValuesBlank() throws Exception {
+        var service=service(new Worker());var run=service.start(1,"dev",start(DIGEST));
+        var mapper=new ObjectMapper();var state=mapper.createObjectNode();state.put("status","COMPLETED");
+        state.putArray("calls");
+        var turns=state.putArray("turns");
+        var first=turns.addObject();first.put("number",1);
+        first.putObject("outcome").put("reply","reply").put("diagnosticsJson",
+                "{\"chatTiming\":{\"source\":\"QA_SERVER\",\"bodyReadyMs\":100,\"reviewCompleteMs\":200,\"processingCompleteMs\":300}}");
+        turns.addObject().put("number",2).putObject("outcome").put("reply","old reply");
+        Files.writeString(dir.resolve("target/pocket-qa-experience").resolve(run.id()).resolve("run.json"),mapper.writeValueAsString(state));
+        String csv=new String(service.download(1,"dev",run.id(),"metrics"),java.nio.charset.StandardCharsets.UTF_8);
+        var rows=csv.lines().toList();
+        assertThat(rows.getFirst()).endsWith("qa_body_ready_ms,qa_review_complete_ms,qa_processing_complete_ms");
+        assertThat(rows.get(1)).endsWith(",100,200,300");
+        assertThat(rows.get(2)).endsWith(",,,");
+        String json=new String(service.download(1,"dev",run.id(),"json"),java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(json).contains("bodyReadyMs","processingCompleteMs","QA_SERVER");
+    }
     @Test void livePendingCallSettlesFromLatestLedgerAndDeadWorkerRemainsUnknown() throws Exception {
         var alive=new boolean[]{true};
         var worker=new Worker(){@Override public boolean alive(long pid,String at){return alive[0];}};

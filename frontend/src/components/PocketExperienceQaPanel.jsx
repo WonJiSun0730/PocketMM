@@ -167,6 +167,15 @@ export default function PocketExperienceQaPanel({ sessionId }) {
             <p>캐시 적중률: {(analysis.cacheHitRate * 100).toFixed(1)}%</p>
             <p>응답 글자 수: 최소 {analysis.replyCharacters.min} · 중앙 {analysis.replyCharacters.median} · 평균 {analysis.replyCharacters.average.toFixed(1)} · 최대 {analysis.replyCharacters.max}</p>
             <p>저장·기억 처리 포함 왕복 시간: 최소 {(analysis.latencyMillis.min / 1000).toFixed(1)}초 · 중앙 {(analysis.latencyMillis.median / 1000).toFixed(1)}초 · 평균 {(analysis.latencyMillis.average / 1000).toFixed(1)}초 · 최대 {(analysis.latencyMillis.max / 1000).toFixed(1)}초</p>
+            <div className="rounded border p-2">
+              <p className="font-semibold">QA 본문 준비·후속 처리 시간</p>
+              {[["bodyReadyMs","본문 준비 (조기 전달 가능)"],["reviewCompleteMs","연속성 검사 완료"],["processingCompleteMs","저장·기억 포함 처리 완료"]].map(([field,label])=>{
+                const stat=analysis.chatTiming?.[field]
+                return <p key={field}>{label}: {stat?.count > 0 ? `최소 ${(stat.min/1000).toFixed(2)}초 · 최대 ${(stat.max/1000).toFixed(2)}초 · 평균 ${(stat.average/1000).toFixed(2)}초 · ${stat.count}턴` : "미측정 · 업데이트 후 새 실행부터 기록"}</p>
+              })}
+              <p className="text-muted-foreground">QA 대상 요청 시작 기준 서버 단계 시간입니다. 실제 브라우저 수신·표시 시간과는 다릅니다.</p>
+              {analysis.failedAttemptTiming?.source === "QA_SERVER" && <p className="text-muted-foreground">중단 요청 (평균 제외): 본문 준비 {analysis.failedAttemptTiming.bodyReadyMs != null ? `${(analysis.failedAttemptTiming.bodyReadyMs/1000).toFixed(2)}초` : "미측정"} · 검사 완료 {analysis.failedAttemptTiming.reviewCompleteMs != null ? `${(analysis.failedAttemptTiming.reviewCompleteMs/1000).toFixed(2)}초` : "미측정"} · 기억 포함 완료 {analysis.failedAttemptTiming.processingCompleteMs != null ? `${(analysis.failedAttemptTiming.processingCompleteMs/1000).toFixed(2)}초` : "미측정"}</p>}
+            </div>
             {analysis.generationMillis?.count > 0 && <p>모델 호출 시간: 최소 {(analysis.generationMillis.min / 1000).toFixed(1)}초 · 중앙 {(analysis.generationMillis.median / 1000).toFixed(1)}초 · 최대 {(analysis.generationMillis.max / 1000).toFixed(1)}초</p>}
             <p>출력 토큰: 최소 {analysis.outputTokens.min} · 중앙 {analysis.outputTokens.median} · 최대 {analysis.outputTokens.max}</p>
             <p>응답 분포: {Object.entries(analysis.replyCharacters.buckets).map(([range, count]) => `${range}자 ${count}회`).join(" / ")}</p>
@@ -192,6 +201,7 @@ export default function PocketExperienceQaPanel({ sessionId }) {
               const metric = analysis?.turns?.find(row => row.turn === turn.number)
               return <article key={turn.number} className="rounded border p-2 text-xs leading-5">
                 <p className="font-semibold">{turn.number}턴 · {(turn.latencyMillis / 1000).toFixed(1)}초</p>
+                <p className="text-muted-foreground">QA 서버 기준 · 본문 준비 {metric?.bodyReadyMs != null ? `${(metric.bodyReadyMs/1000).toFixed(2)}초` : "미측정"} · 검사 완료 {metric?.reviewCompleteMs != null ? `${(metric.reviewCompleteMs/1000).toFixed(2)}초` : "미측정"} · 기억 포함 완료 {metric?.processingCompleteMs != null ? `${(metric.processingCompleteMs/1000).toFixed(2)}초` : "미측정"}</p>
                 {metric && <p className="text-muted-foreground">입력 {metric.inputTokens} / 출력 {metric.outputTokens}토큰{metric.generationMillis >= 0 && ` · 모델 ${(metric.generationMillis / 1000).toFixed(1)}초`} · 본문 {metric.replyCharacters}자 · 대사 약 {metric.dialogueCharacters} / 나레이션 약 {metric.narrationCharacters}자</p>}
                 <p className="mt-1 whitespace-pre-wrap break-words"><strong>플레이어 AI</strong>{"\n"}{turn.input}</p>
                 <p className="mt-2 whitespace-pre-wrap break-words"><strong>캐릭터</strong>{"\n"}{turn.outcome.reply}</p>

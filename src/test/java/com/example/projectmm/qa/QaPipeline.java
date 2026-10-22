@@ -34,6 +34,7 @@ public final class QaPipeline implements QaRunner.Target {
         if(url==null||!url.startsWith("jdbc:h2:")||!url.contains("pocket-qa"))throw new IllegalStateException("Only isolated pocket-qa H2 database permitted");
         jdbc.execute("CREATE TABLE IF NOT EXISTS qa_turn_receipts(request_id VARCHAR(120) PRIMARY KEY, session_id BIGINT NOT NULL, input_hash VARCHAR(64) NOT NULL, reply_message_id BIGINT, result_json LONGTEXT)");
         jdbc.execute("ALTER TABLE qa_turn_receipts ADD COLUMN IF NOT EXISTS continuity_json LONGTEXT");
+        jdbc.execute("ALTER TABLE qa_turn_receipts ADD COLUMN IF NOT EXISTS timing_json LONGTEXT");
     }
     @Override public QaRunner.Outcome send(String requestId,String input) {
         var hashes=jdbc.queryForList("SELECT input_hash FROM qa_turn_receipts WHERE request_id=?",requestId);
@@ -42,15 +43,18 @@ public final class QaPipeline implements QaRunner.Target {
         var previous=recover(requestId);
         if(previous.isPresent())return previous.get();
         var before=usage.calls(sessionId);
+        var timing=new com.example.projectmm.application.dialogue.DialogueTiming();
         try {
-            Long replyId=SceneContinuityObservation.observe(()->transactions.execute(status->{
+            Long replyId=timing.measure(()->SceneContinuityObservation.observe(()->transactions.execute(status->{
                 jdbc.update("INSERT INTO qa_turn_receipts(request_id,session_id,input_hash) VALUES(?,?,?)",requestId,sessionId,hash(input));
                 dialogue.chat(sessionId,input);
                 long reply=messages.findTop50BySessionIdOrderByIdDesc(sessionId).stream().filter(m->m.getRole()==ChatRole.CHARACTER).findFirst().orElseThrow().getId();
-                jdbc.update("UPDATE qa_turn_receipts SET reply_message_id=?,continuity_json=? WHERE request_id=?",reply,
-                        mapper.writeValueAsString(SceneContinuityObservation.current()),requestId);
+                jdbc.update("UPDATE qa_turn_receipts SET reply_message_id=?,continuity_json=?,timing_json=? WHERE request_id=?",reply,
+                        mapper.writeValueAsString(SceneContinuityObservation.current()),mapper.writeValueAsString(timing.snapshot()),requestId);
                 return reply;
-            }));
+            })));
+            timing.processingComplete();
+            jdbc.update("UPDATE qa_turn_receipts SET timing_json=? WHERE request_id=?",mapper.writeValueAsString(timing.snapshot()),requestId);
             // AFTER_COMMIT extraction has completed before execute returns; reuse durable variant evidence.
             var result=withObservation(transactions.execute(status->snapshot(callsSince(before,usage.calls(sessionId),spec,"TARGET"),replyId)),requestId);
             jdbc.update("UPDATE qa_turn_receipts SET result_json=? WHERE request_id=? AND session_id=?",mapper.writeValueAsString(result),requestId,sessionId);
@@ -58,7 +62,9 @@ public final class QaPipeline implements QaRunner.Target {
         } catch(RuntimeException ex) {
             var partial=new ArrayList<>(callsSince(before,usage.calls(sessionId),spec,"TARGET"));
             partial.add(new QaRunner.Usage("TARGET",spec.targetModel(),"UNCERTAIN_FAILURE",0,0,null,0,"UNKNOWN",null));
-            String details=mapper.writeValueAsString(failureDetails(ex));
+            var failure=new LinkedHashMap<String,Object>(failureDetails(ex));
+            failure.put("chatTiming",timing.snapshot());
+            String details=mapper.writeValueAsString(failure);
             return new QaRunner.Outcome("",List.of(),null,details,null,null,partial,
                     "Target failed; inspect failedOutcome.diagnosticsJson. Usage may be incomplete. No automatic retry.");
         }
@@ -103,6 +109,8 @@ public final class QaPipeline implements QaRunner.Target {
         var root=diagnostics.isObject()?(tools.jackson.databind.node.ObjectNode)diagnostics:mapper.createObjectNode();
         root.set("continuityQa",mapper.valueToTree(Map.of("policy","OBSERVE_ONLY",
                 "findings",saved==null?mapper.createArrayNode():mapper.readTree(saved))));
+        String timing=jdbc.queryForObject("SELECT timing_json FROM qa_turn_receipts WHERE request_id=?",String.class,requestId);
+        if(timing!=null)root.set("chatTiming",mapper.readTree(timing));
         return new QaRunner.Outcome(outcome.reply(),outcome.memories(),outcome.evaluationJson(),mapper.writeValueAsString(root),
                 outcome.memoryBeforeJson(),outcome.memoryAfterJson(),outcome.calls(),outcome.error());
     }

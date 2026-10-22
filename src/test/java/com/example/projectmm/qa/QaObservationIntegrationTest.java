@@ -78,10 +78,28 @@ class QaObservationIntegrationTest {
             assertThat(java.nio.file.Files.readString(dir.resolve("turns.csv")).lines()).hasSize(101);
             var again=pipeline.send("observe-100:1",state.turns.getFirst().input());
             assertThat(again.diagnosticsJson()).contains("REJECTED","unresolved conflict");
+            for(var turn:state.turns) {
+                var timing=json.readTree(turn.outcome().diagnosticsJson()).path("chatTiming");
+                assertThat(timing.path("source").asText()).isEqualTo("QA_SERVER");
+                assertThat(timing.path("bodyReadyMs").isNumber()).isTrue();
+                assertThat(timing.path("reviewCompleteMs").asLong()).isGreaterThanOrEqualTo(timing.path("bodyReadyMs").asLong());
+                assertThat(timing.path("processingCompleteMs").isNumber()).isTrue();
+                assertThat(timing.path("processingCompleteMs").asLong()).isGreaterThanOrEqualTo(timing.path("reviewCompleteMs").asLong());
+            }
+            var timedAnalysis=com.example.projectmm.application.qa.PocketExperienceAnalysis.fullAnalysis(json.valueToTree(state),json.createObjectNode());
+            assertThat(timedAnalysis.path("chatTiming").path("bodyReadyMs").path("count").asInt()).isEqualTo(100);
             assertThat(generated.get()).isEqualTo(100);
             // Simulate a crash after commit but before the JSON receipt was finalized.
             jdbc.update("UPDATE qa_turn_receipts SET result_json=NULL WHERE request_id=?","observe-100:1");
             assertThat(pipeline.recover("observe-100:1").orElseThrow().diagnosticsJson()).contains("unresolved conflict");
+            var recovered=json.readTree(pipeline.recover("observe-100:1").orElseThrow().diagnosticsJson()).path("chatTiming");
+            assertThat(recovered.path("processingCompleteMs").isNumber()).isTrue();
+            jdbc.update("UPDATE qa_turn_receipts SET timing_json=? WHERE request_id=?",
+                    "{\"source\":\"QA_SERVER\",\"bodyReadyMs\":5,\"reviewCompleteMs\":8,\"processingCompleteMs\":null}","observe-100:1");
+            var partial=json.readTree(pipeline.recover("observe-100:1").orElseThrow().diagnosticsJson()).path("chatTiming");
+            assertThat(partial.path("bodyReadyMs").asLong()).isEqualTo(5);
+            assertThat(partial.path("processingCompleteMs").isNull()).isTrue();
+            assertThat(generated.get()).isEqualTo(100);
             var facts=jdbc.queryForList("SELECT after_scene_facts_json FROM world_room_message_variants WHERE after_scene_facts_json IS NOT NULL ORDER BY id",String.class);
             assertThat(facts).noneMatch(f->f.contains("REVIEWER_POISON"));
             assertThat(facts.getLast()).contains("trusted","original narrator");

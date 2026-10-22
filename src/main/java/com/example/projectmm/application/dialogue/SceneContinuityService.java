@@ -34,11 +34,18 @@ public class SceneContinuityService {
     }
 
     public Outcome generate(WorldRoomDialogueContext context, String modelInput, String userInput, long beforeId) {
+        var result=generateChecked(context,modelInput,userInput,beforeId);
+        DialogueTiming.reviewed();
+        return result;
+    }
+
+    private Outcome generateChecked(WorldRoomDialogueContext context, String modelInput, String userInput, long beforeId) {
         List<SceneFacts.Fact> before = prepare(context, beforeId);
         String beforeJson = JSON.writeValueAsString(before);
         var enriched = context.withSceneFacts(beforeJson);
         var candidate = gateway.generateWorldRoomTurn(enriched, modelInput);
         requireTurn(candidate, enriched);
+        DialogueTiming.bodyReady();
         DialoguePreview.generated(candidate.reply());
         if(SceneContinuityObservation.enabled())return observeCandidate(enriched,before,beforeJson,userInput,candidate);
         var reviewed = review(enriched, "REVIEW", before, userInput, candidate, List.of());

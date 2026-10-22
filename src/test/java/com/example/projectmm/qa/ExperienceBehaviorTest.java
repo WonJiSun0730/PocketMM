@@ -61,6 +61,22 @@ class ExperienceBehaviorTest {
         assertThat(analysis.path("findings").valueStream().map(f->f.path("type").asText()).toList()).contains("RELATIVE_SHORT_BIAS");
         assertThat(state.path("status").asText()).isEqualTo("COMPLETED");
     }
+    @Test void qaMilestoneAnalysisKeepsOldAndFailedAttemptsOutOfCompletedAverages() {
+        var state=mapper.createObjectNode();var turns=state.putArray("turns");
+        for(int i=1;i<=3;i++) {
+            var t=turns.addObject();t.put("number",i);var outcome=t.putObject("outcome");outcome.put("reply","reply");
+            if(i<3)outcome.put("diagnosticsJson","{\"chatTiming\":{\"source\":\"QA_SERVER\",\"bodyReadyMs\":"+(i*10)+",\"reviewCompleteMs\":30,\"processingCompleteMs\":40}}");
+        }
+        state.putObject("failedOutcome").put("diagnosticsJson","{\"chatTiming\":{\"source\":\"QA_SERVER\",\"bodyReadyMs\":999,\"reviewCompleteMs\":null,\"processingCompleteMs\":null}}");
+        var a=PocketExperienceAnalysis.fullAnalysis(state,mapper.createObjectNode());
+        var body=a.path("chatTiming").path("bodyReadyMs");
+        assertThat(body.path("count").asInt()).isEqualTo(2);
+        assertThat(body.path("min").asLong()).isEqualTo(10);
+        assertThat(body.path("max").asLong()).isEqualTo(20);
+        assertThat(body.path("average").asDouble()).isEqualTo(15);
+        assertThat(a.path("turns").get(2).path("bodyReadyMs").isNull()).isTrue();
+        assertThat(a.path("failedAttemptTiming").path("bodyReadyMs").asLong()).isEqualTo(999);
+    }
     @Test void zeroGenerationMaximumCannotAuthorizeAnUnboundedPaidRequest() throws Exception {
         Files.writeString(dir.resolve("manifest.json"),"{\"maximumOutputTokens\":{\"gpt-5.6-sol\":0}}");
         var transport=new ExperienceTransport(spec(),dir);var request=new MockClientHttpRequest(HttpMethod.POST,URI.create("https://api.openai.com/v1/responses"));
