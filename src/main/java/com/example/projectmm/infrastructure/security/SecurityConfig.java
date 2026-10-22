@@ -68,7 +68,8 @@ public class SecurityConfig {
                                  .requestMatchers(
                                         "/api/auth/me",
                                         "/api/characters/**",
-                                        "/api/worlds/**"
+                                        "/api/worlds/**",
+                                        "/api/published-worlds/**"
                                 )
                                 .authenticated()
                                 .requestMatchers("/api/**")

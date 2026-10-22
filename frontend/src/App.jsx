@@ -10,10 +10,12 @@ import PocketsPage from "@/pages/PocketsPage"
 import PlayerProfilesPage from "@/pages/PlayerProfilesPage"
 import SignupPage from "@/pages/SignupPage"
 import WorldPage from "@/pages/WorldPage"
+import PublishedWorldsPage from "@/pages/PublishedWorldsPage"
 
-const routePaths = { home: "/", characters: "/characters", world: "/worlds", pockets: "/pockets", playerProfiles: "/pockets/profiles" }
+const routePaths = { home: "/", characters: "/characters", world: "/worlds", deployments: "/deployments", pockets: "/pockets", playerProfiles: "/pockets/profiles" }
 
 function pageFromPath(pathname) {
+  if (pathname.startsWith("/deployments")) return "deployments"
   if (pathname.startsWith("/pockets/profiles")) return "playerProfiles"
   if (pathname.startsWith("/pockets")) return "pockets"
   if (pathname.startsWith("/worlds")) return "world"
@@ -64,6 +66,7 @@ export default function App() {
   function openChat(character) { setSelectedWorldChat(null); setSelectedCharacter(character); setPage("chat") }
   function openWorldChat(world, character) { setSelectedWorldChat(world); setSelectedCharacter(character); setPage("worldChat") }
   function openPocket(pocket) { setSelectedPocket(pocket); setPage("pocket") }
+  function openPublishedWorld(id) { window.history.pushState({}, "", `/deployments?world=${id}`); setPage("deployments") }
   function openCharacters() { setSelectedCharacter(null); navigate("characters") }
   function openEdit(character) { setSelectedCharacter(character); setPage("edit") }
   function finishEdit(character) { setSelectedCharacter(character); setPage("characters") }
@@ -79,8 +82,9 @@ export default function App() {
     return <LoginPage onAuthenticated={refreshMember} onOpenSignup={() => setPage("signup")} />
   }
 
-  if (page === "home") return <HomePage onOpenCharacters={openCharacters} onOpenWorld={() => navigate("world")} onOpenPockets={() => navigate("pockets")} />
-  if (page === "world") return <WorldPage onBack={() => navigate("home")} onOpenWorldChat={openWorldChat} onOpenPocket={openPocket} />
+  if (page === "home") return <HomePage onOpenCharacters={openCharacters} onOpenWorld={() => navigate("world")} onOpenPockets={() => navigate("pockets")} onOpenDeployments={() => navigate("deployments")} />
+  if (page === "deployments") return <PublishedWorldsPage onNavigate={navigate} onOpenPocket={openPocket} />
+  if (page === "world") return <WorldPage onBack={() => navigate("home")} onOpenWorldChat={openWorldChat} onOpenPocket={openPocket} onOpenPublished={openPublishedWorld} />
   if (page === "pocket" && selectedPocket) return <PocketPage pocket={selectedPocket} onBack={() => navigate("pockets")} />
   if (page === "pockets") return <PocketsPage onBack={() => navigate("home")} onOpenPocket={openPocket} onManageProfiles={() => navigate("playerProfiles")} />
   if (page === "playerProfiles") return <PlayerProfilesPage onBack={() => navigate("pockets")} />

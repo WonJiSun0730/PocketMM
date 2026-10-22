@@ -8,6 +8,7 @@ import {
   Sparkles,
   Sun,
   Users,
+  Upload,
 } from "lucide-react"
 
 import PocketIcon from "@/components/PocketIcon"
@@ -28,11 +29,12 @@ const navItems = [
   { id: "home", label: "NOW", icon: Home },
   { id: "characters", label: "캐릭터", icon: Users },
   { id: "timeline", label: "세계", icon: Clock3 },
+  { id: "deployments", label: "배포", icon: Upload },
   { id: "pockets", label: "포켓", icon: PocketIcon },
   { id: "settings", label: "설정", icon: Settings },
 ]
 
-export default function HomePage({ onOpenCharacters, onOpenWorld, onOpenPockets }) {
+export default function HomePage({ onOpenCharacters, onOpenWorld, onOpenPockets, onOpenDeployments }) {
   const [dark, setDark] = useState(() =>
     document.documentElement.classList.contains("dark")
   )
@@ -42,6 +44,7 @@ export default function HomePage({ onOpenCharacters, onOpenWorld, onOpenPockets 
   }, [dark])
 
   function selectNav(id) {
+    if (id === "deployments") onOpenDeployments()
     if (id === "characters") {
       onOpenCharacters()
     }
@@ -146,7 +149,7 @@ export default function HomePage({ onOpenCharacters, onOpenWorld, onOpenPockets 
       </aside>
 
       <nav className="bottom-nav" aria-label="Mobile navigation">
-        {navItems.slice(0, 4).map(({ id, label, icon: Icon }) => (
+        {navItems.filter(item => item.id !== "settings").map(({ id, label, icon: Icon }) => (
           <button
             className={id === "home" ? "bottom-nav-item active" : "bottom-nav-item"}
             key={id}

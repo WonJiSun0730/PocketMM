@@ -27,6 +27,23 @@ public class World {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(name = "cover_image_url", length = 2048)
+    private String coverImageUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String hashtags;
+
+    @Column(name = "published_at")
+    private java.time.LocalDateTime publishedAt;
+
+    public void updateHashtags(String hashtags) { this.hashtags = hashtags; }
+
+    public void publish() {
+        if (publishedAt == null) publishedAt = java.time.LocalDateTime.now();
+    }
+
+    public void unpublish() { publishedAt = null; }
+
     @Lob
     @Column(name = "play_guide", columnDefinition = "TEXT")
     private String playGuide;
@@ -39,6 +56,10 @@ public class World {
 
     public void updatePlayGuide(String playGuide) {
         this.playGuide = playGuide;
+    }
+
+    public void updateCoverImageUrl(String coverImageUrl) {
+        this.coverImageUrl = coverImageUrl;
     }
 
     public void updateMetadata(String name, String description) {
