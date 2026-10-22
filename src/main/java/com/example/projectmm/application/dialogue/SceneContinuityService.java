@@ -39,6 +39,7 @@ public class SceneContinuityService {
         var enriched = context.withSceneFacts(beforeJson);
         var candidate = gateway.generateWorldRoomTurn(enriched, modelInput);
         requireTurn(candidate, enriched);
+        DialoguePreview.generated(candidate.reply());
         if(SceneContinuityObservation.enabled())return observeCandidate(enriched,before,beforeJson,userInput,candidate);
         var reviewed = review(enriched, "REVIEW", before, userInput, candidate, List.of());
         requireReview(reviewed);

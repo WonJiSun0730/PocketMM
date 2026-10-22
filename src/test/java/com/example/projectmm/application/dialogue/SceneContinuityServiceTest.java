@@ -46,6 +46,35 @@ class SceneContinuityServiceTest {
         verify(gateway,times(2)).reviewWorldRoomContinuity(any(),anyString());
         verifyNoInteractionsExceptReads();
     }
+    @Test void previewArrivesBeforeReviewButDoesNotApproveOrReplaceFinalTurn() {
+        var order = new ArrayList<String>();
+        var candidate = turn("provisional");
+        var repaired = turn("approved repair");
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(candidate);
+        when(gateway.reviewWorldRoomContinuity(any(),anyString())).thenAnswer(call -> {
+            assertThat(order).contains("preview:provisional");
+            order.add("review");
+            var mode=json.readTree((String)call.getArgument(1)).path("mode").asText();
+            return result(mode.equals("REVIEW") ? repaired : null,List.of());
+        });
+        var outcome=DialoguePreview.deliver(reply -> order.add("preview:"+reply),
+                () -> service.generate(context(),"continue","",Long.MAX_VALUE));
+        assertThat(outcome.turn()).isEqualTo(repaired);
+        assertThat(order).containsExactly("preview:provisional","review","review");
+    }
+    @Test void rejectedPreviewCannotEscapeAsApprovedAndScopeIsAlwaysCleared() {
+        var previews=new ArrayList<String>();
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(turn("untrusted"));
+        when(gateway.reviewWorldRoomContinuity(any(),anyString())).thenReturn("{}");
+        assertThatThrownBy(() -> DialoguePreview.deliver(previews::add,
+                () -> service.generate(context(),"continue","",Long.MAX_VALUE)))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(previews).containsExactly("untrusted");
+        assertThatThrownBy(() -> service.generate(context(),"continue","",Long.MAX_VALUE))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(previews).containsExactly("untrusted");
+        verifyNoInteractionsExceptReads();
+    }
     private void verifyNoInteractionsExceptReads() {
         verify(messages,never()).save(any());
         verify(variants,never()).save(any());

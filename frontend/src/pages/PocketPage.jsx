@@ -1,3 +1,4 @@
+import {readPocketChatStream} from "@/lib/pocketChatStream"
 import PocketExperienceQaPanel from "@/components/PocketExperienceQaPanel";
 import PocketQaPanel from "@/components/PocketQaPanel";
 import AiCallUsage from "../components/AiCallUsage";
@@ -58,6 +59,8 @@ export default function PocketPage({ pocket, onBack }) {
   const [pickerMode, setPickerMode] = useState(false)
   const [changingPlayerProfile, setChangingPlayerProfile] = useState(false)
   const [messages, setMessages] = useState([])
+  const [replyPreview, setReplyPreview] = useState(null)
+  const [replyNotice, setReplyNotice] = useState("")
   const [typingTarget,setTypingTarget] = useState(null)
   const [cast, setCast] = useState([])
   const [worldCharacters, setWorldCharacters] = useState([])
@@ -336,25 +339,45 @@ export default function PocketPage({ pocket, onBack }) {
     }
     setSending(true)
     setError("")
+    setReplyPreview(null)
+    setReplyNotice("")
     setInput("")
     const pending = { id: `pending-${Date.now()}`, role: "USER", content: message }
     setMessages(current => [...current, pending])
+    let preview = ""
+    let submitted = false
     try {
       if (!await progress.resume()) throw new Error("먼저 부재 활동을 확인해 주세요.")
-      const response = await fetch(`${base}/chat`, {
+      submitted = true
+      const response = await fetch(`${base}/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ message }),
       })
-      if (!response.ok) throw new Error("대화를 이어가지 못했어요.")
-      await refresh({animateReply:true})
+      await readPocketChatStream(response, event => {
+        if (event.type === "preview") {
+          preview = event.reply
+          setReplyPreview(event.reply)
+        }
+        if (event.type === "complete") {
+          setReplyPreview(event.reply)
+          if (preview && preview !== event.reply) setReplyNotice("장면 확인 후 답변을 수정했어요.")
+        }
+      })
+      await refresh({animateReply:false})
+      setReplyPreview(null)
       refreshPlayerState()
       await refreshMemoryInspector()
       await refreshAiUsage()
     } catch (e) {
+      setReplyPreview(null)
       setMessages(current => current.filter(item => item.id !== pending.id))
-      setInput(message)
+      if (!submitted) setInput(message)
+      // A lost response may follow a successful commit. Never resend automatically.
+      if (submitted) {
+        try { await refresh({animateReply:false}); refreshPlayerState() } catch { /* Preserve the failure notice. */ }
+      }
       setError(e.message)
     } finally {
       setSending(false)
@@ -748,7 +771,12 @@ export default function PocketPage({ pocket, onBack }) {
             </article>
           })}
 
-          {sending && <div className="border-b border-border/70 py-7 sm:py-9">
+          {replyPreview && <article className="border-b border-border/70 py-7 sm:py-9" aria-live="polite">
+            <RpText text={replyPreview} />
+            <p className="mt-4 text-xs text-muted-foreground">장면과 기억을 확인하고 있어요. 확인 후 내용이 수정될 수 있어요.</p>
+          </article>}
+          {replyNotice && <p role="status" className="py-2 text-xs text-muted-foreground">{replyNotice}</p>}
+          {sending && !replyPreview && <div className="border-b border-border/70 py-7 sm:py-9">
             <p className="animate-pulse text-sm italic text-muted-foreground">{progress.busy ? "부재 활동을 확인하는 중…" : "장면을 이어가는 중..."}</p>
           </div>}
           <div ref={bottomRef} />
