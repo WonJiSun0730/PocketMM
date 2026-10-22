@@ -28,6 +28,10 @@ public class OpenAiDialogueGateway implements DialogueGateway {
     private final GeminiDialogueGateway promptBuilder;
     private final AiUsageTracker usageTracker;
 
+    // Empty until a paid quality comparison authorizes a dedicated review model.
+    @Value("${openai.continuity-model:}")
+    private String continuityModel = "";
+
     public OpenAiDialogueGateway(
             @Value("${openai.api-key:}") String apiKey,
             @Value("${openai.model:gpt-5.6-luna}") String defaultModel,
@@ -211,12 +215,20 @@ public class OpenAiDialogueGateway implements DialogueGateway {
     public String reviewWorldRoomContinuity(WorldRoomDialogueContext context, String evidenceJson) {
         if (apiKey == null || apiKey.isBlank()) throw new IllegalStateException("OPENAI_API_KEY is not configured");
         String model = context.aiModel() == null || context.aiModel().isBlank() ? defaultModel : context.aiModel().trim();
+        if (continuityModel != null && !continuityModel.isBlank()) model = continuityModel.trim();
         String instructions = com.example.projectmm.application.dialogue.SceneContinuityPrompt.REVIEW;
-        String evidence = SceneContinuityRequest.evidence(context, evidenceJson);
+        var parts = SceneContinuityRequest.parts(context, evidenceJson);
         var schema = SceneContinuityRequest.schema();
-        var input = List.<Map<String,Object>>of(Map.of("role","user","content",evidence));
-        var estimate = PromptTokenBreakdown.estimate(instructions,input,objectMapper.writeValueAsString(schema));
-        var request = Map.<String,Object>of("model",model,"instructions",instructions,"input",input,
+        // Authored reference remains user data; only the review policy has developer priority.
+        var input = List.<Map<String,Object>>of(
+                Map.of("role","developer","content",instructions),
+                Map.of("role","user","content",List.of(Map.of("type","input_text","text",parts.stable(),
+                        "prompt_cache_breakpoint",Map.of("mode","explicit")))),
+                Map.of("role","user","content",parts.dynamic()));
+        var estimate = PromptTokenBreakdown.estimate(instructions + "\n" + parts.stable(),
+                List.of(Map.of("role","user","content",parts.dynamic())),objectMapper.writeValueAsString(schema));
+        var request = Map.<String,Object>of("model",model,"input",input,
+                "prompt_cache_options",Map.of("mode","explicit"),
                 "reasoning",Map.of("effort","none"),"store",false,
                 "text",Map.of("format",Map.of("type","json_schema","name","scene_continuity_review",
                         "strict",true,"schema",schema)));

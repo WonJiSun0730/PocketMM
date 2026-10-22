@@ -52,6 +52,8 @@ public final class SceneFacts {
                 if (old == null) throw invalid("Cannot retire an unknown fact");
                 facts.remove(c.key());
             } else {
+                // A repeated mention is not a new event; keep the original provenance.
+                if (old != null && old.value().equals(c.value()) && old.certainty() == c.certainty()) continue;
                 facts.put(c.key(), new Fact(c.key(), c.kind(), c.value(), c.certainty(), c.source(), c.evidence()));
             }
         }

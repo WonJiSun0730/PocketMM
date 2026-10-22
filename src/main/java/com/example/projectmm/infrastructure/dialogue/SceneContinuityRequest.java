@@ -10,6 +10,16 @@ final class SceneContinuityRequest {
     private static final ObjectMapper JSON = new ObjectMapper();
     private SceneContinuityRequest() {}
 
+    record Parts(String stable, String dynamic) {}
+
+    static Parts parts(WorldRoomDialogueContext context, String evidenceJson) {
+        var combined = JSON.readTree(evidence(context, evidenceJson));
+        var dynamic = (tools.jackson.databind.node.ObjectNode) combined;
+        var stable = dynamic.remove("stableReference");
+        return new Parts(JSON.writeValueAsString(Map.of("stableReference", stable)),
+                JSON.writeValueAsString(dynamic));
+    }
+
     static String evidence(WorldRoomDialogueContext context, String evidenceJson) {
         var data = JSON.readTree(evidenceJson);
         if (!data.isObject()) throw new IllegalArgumentException("Continuity evidence must be an object");
@@ -24,11 +34,31 @@ final class SceneContinuityRequest {
         reference.put("userNote", context.userNote());
         reference.put("pocketPlayGuide", context.pocketPlayGuide());
         reference.put("noControlPlayer", context.noControlPlayer());
-        reference.put("simulatedAt", context.simulatedAt());
-        reference.put("roomCast", context.roomCast());
-        reference.put("sessionSystems", context.sessionSystems());
-        reference.put("playerState", context.playerState());
-        reference.put("recalledMemories", context.recalledMemories());
+        reference.put("roomCast", context.roomCast().stream()
+                .sorted(Comparator.comparing(WorldRoomCharacterContext::characterId))
+                .map(c -> {
+                    var profile = new LinkedHashMap<String, Object>();
+                    profile.put("characterId", c.characterId()); profile.put("characterName", c.characterName());
+                    profile.put("profile", c.profile()); return profile;
+                }).toList());
+        reference.put("sessionSystems", context.sessionSystems().stream()
+                .sorted(Comparator.comparing(WorldRoomSystemContext::systemId))
+                .map(s -> {
+                    var definition = new LinkedHashMap<String, Object>();
+                    definition.put("systemId", s.systemId()); definition.put("name", s.name());
+                    definition.put("minValue", s.minValue()); definition.put("maxValue", s.maxValue());
+                    definition.put("changeCondition", s.changeCondition()); definition.put("states", s.states());
+                    return definition;
+                }).toList());
+        var dynamicReference = new LinkedHashMap<String, Object>();
+        dynamicReference.put("simulatedAt", context.simulatedAt());
+        dynamicReference.put("roomCastState", context.roomCast().stream().map(c -> Map.of(
+                "characterId", c.characterId(), "energy", c.energy(), "mood", c.mood(),
+                "active", c.active(), "departed", c.departed())).toList());
+        dynamicReference.put("systemValues", context.sessionSystems().stream().map(s -> Map.of(
+                "systemId", s.systemId(), "currentValue", s.currentValue())).toList());
+        dynamicReference.put("playerState", context.playerState());
+        dynamicReference.put("recalledMemories", context.recalledMemories());
         // Preserve authored profiles/lore and relevant knowledge. Facts already occur in data.facts.
         // Historical bootstrap must not see later recent dialogue outside its chronological batch.
         var recent = new ArrayList<DialogueMessageContext>();
@@ -37,10 +67,13 @@ final class SceneContinuityRequest {
             if (!recent.isEmpty() && recent.getLast().role() == ChatRole.USER
                     && recent.getLast().content().trim().equals(user.trim())) recent.removeLast();
         }
-        reference.put("recentMessages", recent);
+        dynamicReference.put("recentMessages", recent);
         if (bootstrap) root.put("userInput", ""); // USER passages already occur in history with their roles.
-        root.set("reference", JSON.valueToTree(reference));
-        return JSON.writeValueAsString(root);
+        root.set("reference", JSON.valueToTree(dynamicReference));
+        var ordered = new LinkedHashMap<String, Object>();
+        ordered.put("stableReference", reference);
+        root.properties().forEach(e -> ordered.put(e.getKey(), e.getValue()));
+        return JSON.writeValueAsString(ordered);
     }
 
     static Map<String, Object> schema() {

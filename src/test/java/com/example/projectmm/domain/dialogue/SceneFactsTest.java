@@ -6,6 +6,18 @@ import static org.assertj.core.api.Assertions.*;
 import static com.example.projectmm.domain.dialogue.SceneFacts.*;
 
 class SceneFactsTest {
+    @Test void repeatedMentionPreservesOriginalEvidenceAndEmptyDeltaPreservesEveryFact() {
+        var fact = observed("letter.read", Kind.COMPLETION, "read");
+        var before = List.of(fact);
+        var repeat = new Change(fact.key(), fact.kind(), fact.value(), fact.certainty(),
+                Source.USER, "read", "read", Reason.EVENT);
+        assertThat(SceneFacts.apply(before, List.of(repeat), "already read", "", "")).containsExactly(fact);
+        assertThat(SceneFacts.apply(before, List.of(), "", "", "")).containsExactly(fact);
+        var forged = new Change(fact.key(), fact.kind(), fact.value(), fact.certainty(),
+                Source.USER, "invented", "read", Reason.EVENT);
+        assertThatThrownBy(() -> SceneFacts.apply(before, List.of(forged), "read", "", ""))
+                .hasMessageContaining("evidence");
+    }
     private Fact observed(String key, Kind kind, String value) {
         return new Fact(key, kind, value, Certainty.OBSERVED, Source.REPLY, "established");
     }
