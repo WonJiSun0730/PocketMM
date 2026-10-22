@@ -55,8 +55,31 @@ public final class QaPipeline implements QaRunner.Target {
         } catch(RuntimeException ex) {
             var partial=new ArrayList<>(callsSince(before,usage.calls(sessionId),spec,"TARGET"));
             partial.add(new QaRunner.Usage("TARGET",spec.targetModel(),"UNCERTAIN_FAILURE",0,0,null,0,"UNKNOWN",null));
-            return new QaRunner.Outcome("",List.of(),null,null,null,null,partial,"Target failed; usage may be incomplete. No automatic retry.");
+            String details=mapper.writeValueAsString(failureDetails(ex));
+            return new QaRunner.Outcome("",List.of(),null,details,null,null,partial,
+                    "Target failed; inspect failedOutcome.diagnosticsJson. Usage may be incomplete. No automatic retry.");
         }
+    }
+    // Do not persist arbitrary provider exception messages: they may contain credentials or prompts.
+    static Map<String,Object> failureDetails(Throwable error) {
+        var chain=new ArrayList<Map<String,Object>>();
+        var seen=Collections.newSetFromMap(new IdentityHashMap<Throwable,Boolean>());
+        for(Throwable e=error;e!=null&&chain.size()<16&&seen.add(e);e=e.getCause()) {
+            var item=new LinkedHashMap<String,Object>();
+            item.put("exceptionType",e.getClass().getName());
+            item.put("frames",Arrays.stream(e.getStackTrace())
+                    .filter(f->f.getClassName().startsWith("com.example.projectmm."))
+                    .limit(8).map(StackTraceElement::toString).toList());
+            String message=e.getMessage();
+            boolean localValidation=Arrays.stream(e.getStackTrace()).findFirst()
+                    .map(f->f.getClassName().equals("com.example.projectmm.domain.dialogue.SceneFacts")
+                            ||f.getClassName().equals("com.example.projectmm.application.dialogue.SceneContinuityService"))
+                    .orElse(false);
+            if(localValidation&&message!=null&&message.length()<=200)
+                item.put("validationReason",message);
+            chain.add(item);
+        }
+        return Map.of("phase","TARGET_LOCAL_FAILURE","causes",chain);
     }
     @Override public Optional<QaRunner.Outcome> recover(String requestId) {
         var rows=jdbc.queryForList("SELECT session_id,reply_message_id,result_json FROM qa_turn_receipts WHERE request_id=?",requestId);

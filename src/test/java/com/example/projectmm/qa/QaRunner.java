@@ -46,6 +46,7 @@ public final class QaRunner {
         public Map<String,BigDecimal> reconciledCosts=new HashMap<>();
         public List<String> audit=new ArrayList<>();
         public List<Diagnostic> diagnostics=new ArrayList<>();
+        public Outcome failedOutcome;
         public BigDecimal heldUsd=BigDecimal.ZERO;
         public State() {}
         public BigDecimal cost(Usage c) {return c.usd()==null?reconciledCosts.get(c.callId()):c.usd();}
@@ -146,6 +147,7 @@ public final class QaRunner {
     }
     private void finish(State s,QaScenarios scenario,String id,int number,Outcome outcome,long latency) throws IOException {
         s.diagnostics.add(diagnostic("TARGET_RESPONSE_RECEIVED",null));
+        if(outcome.error()!=null)s.failedOutcome=outcome;
         s.addCalls(outcome.calls(),number);
         s.diagnostics.add(diagnostic("TARGET_USAGE_CHECKPOINT",null));save(s);
         if(s.spec.paid()&&outcome.calls().stream().noneMatch(c->c.role().equals("TARGET"))) {
