@@ -158,6 +158,20 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
         record(new Receipt(id,Instant.now().toString(),"REQUEST_STARTED",role,provider,model,purpose,0,0,null,0,"UNKNOWN",null,null));
         try {
             var response=execution.execute(request,body);byte[] bytes=response.getBody().readAllBytes();var root=mapper.readTree(bytes);
+            // Keep the review result, not HTTP/auth headers, for offline rejection diagnosis.
+            // A receipt failure must not hide already-incurred provider usage.
+            if("SCENE_CONTINUITY".equals(purpose)) {
+                try {
+                    var reviews=directory.resolve("review-responses");Files.createDirectories(reviews);
+                    var texts=new ArrayList<String>();
+                    for(var outputItem:root.path("output"))for(var part:outputItem.path("content"))
+                        if("output_text".equals(part.path("type").asText()))texts.add(part.path("text").asText());
+                    Files.writeString(reviews.resolve(id+".json"),mapper.writeValueAsString(Map.of(
+                            "callId",id,"status",root.path("status").asText("UNKNOWN"),"outputTexts",texts)),StandardOpenOption.CREATE_NEW);
+                } catch(IOException receiptFailure) {
+                    System.err.println("QA review receipt unavailable: "+receiptFailure.getClass().getName());
+                }
+            }
             var u=root.path(gemini?"usageMetadata":"usage");var d=u.path("input_tokens_details");
             long in=u.path(gemini?"promptTokenCount":embedding?"prompt_tokens":"input_tokens").asLong(-1),cache=embedding?0:(gemini?u.path("cachedContentTokenCount"):d.path("cached_tokens")).asLong(gemini?0:-1);
             Long write=gemini||embedding?Long.valueOf(0):d.path("cache_write_tokens").isIntegralNumber()?Long.valueOf(d.path("cache_write_tokens").asLong()):null;

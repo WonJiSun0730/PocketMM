@@ -30,6 +30,22 @@ class ExperienceBudgetTest {
  byte[] body(){return "{\"model\":\"gpt-5.6-sol\",\"reasoning\":{\"effort\":\"none\"},\"input\":[{\"role\":\"user\",\"content\":\"장면을 이어간다\"}],\"text\":{\"format\":{\"name\":\"pocket_turn\"}}}".getBytes(java.nio.charset.StandardCharsets.UTF_8);}
  MockClientHttpResponse response(long in,long cache,long out) {return new MockClientHttpResponse(("{\"status\":\"completed\",\"usage\":{\"input_tokens\":"+in+",\"input_tokens_details\":{\"cached_tokens\":"+cache+",\"cache_write_tokens\":0},\"output_tokens\":"+out+"}}").getBytes(),HttpStatus.OK);}
  JsonNode budget() throws java.io.IOException{return m.readTree(Files.readString(dir.resolve("budget.json")));}
+ @Test void rejectedReviewResponseIsSavedWithLedgerAndWithoutAuthHeaders() throws Exception {
+  var t=transport(BigDecimal.TEN,1000);
+  String review="{\"approved\":false,\"turn\":null,\"changes\":[],\"conflicts\":[\"Custody conflict\"]}";
+  var root=(tools.jackson.databind.node.ObjectNode)m.readTree(response(1000,0,10).getBody());
+  root.set("output",m.valueToTree(List.of(Map.of("type","message","content",List.of(Map.of("type","output_text","text",review))))));
+  var request=req();request.getHeaders().setBearerAuth("SECRET_HEADER");
+  com.example.projectmm.infrastructure.dialogue.AiUsageTracker.withPurpose(1L,"SCENE_CONTINUITY",()->{
+   try{return t.intercept(request,body(),(r,b)->new MockClientHttpResponse(m.writeValueAsBytes(root),HttpStatus.OK));}
+   catch(java.io.IOException e){throw new java.io.UncheckedIOException(e);}
+  }).close();
+  var calls=t.since(Set.of());assertThat(calls).hasSize(1);
+  var saved=Files.readString(dir.resolve("review-responses").resolve(calls.getFirst().callId()+".json"));
+  assertThat(m.readTree(saved).path("outputTexts").get(0).asText()).isEqualTo(review);
+  assertThat(saved).doesNotContain("SECRET_HEADER","Authorization");
+  assertThat(budget().path("reservedUsd").decimalValue()).isZero();
+ }
  @Test void postResponseLocalSaveFailurePreservesKnownReceiptAndNeverResendsHttp() throws Exception {
   var t=transport(new BigDecimal("4"),1000);var sent=new AtomicInteger();
   assertThatThrownBy(()->t.intercept(req(),body(),(r,b)->{

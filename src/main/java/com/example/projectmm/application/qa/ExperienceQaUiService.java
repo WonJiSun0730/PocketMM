@@ -176,6 +176,8 @@ public final class ExperienceQaUiService {
                 for(var receipt:ledger(path(id))) {
                     String call=receipt.path("callId").asText();if(!call.matches("[0-9a-f-]{36}"))throw new IOException("Invalid request identifier");
                     files.add(path(id).resolve("requests").resolve(call+".json"));
+                    Path review=path(id).resolve("review-responses").resolve(call+".json");
+                    if(Files.isRegularFile(review))files.add(review);
                 }
                 for(Path entry:files) {
                     checkFile(entry);if(!entry.toRealPath().startsWith(path(id).toRealPath()))throw bad("요청 기록 경로가 올바르지 않아요.");

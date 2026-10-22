@@ -21,6 +21,15 @@ public class SceneContinuityService {
     public record Review(boolean approved, WorldRoomTurn turn, List<SceneFacts.Change> changes, List<String> conflicts) {}
     public record Outcome(WorldRoomTurn turn, WorldRoomDialogueContext context, String before, String after) {}
 
+    public static final class ReviewRejectedException extends IllegalStateException {
+        private final Review review;
+        public ReviewRejectedException(Review review) {
+            super("Scene continuity review did not approve the response");
+            this.review=review;
+        }
+        public Review review() {return review;}
+    }
+
     public Outcome generate(WorldRoomDialogueContext context, String modelInput, String userInput, long beforeId) {
         List<SceneFacts.Fact> before = prepare(context, beforeId);
         String beforeJson = JSON.writeValueAsString(before);
@@ -104,7 +113,7 @@ public class SceneContinuityService {
     private void requireReview(Review review) {
         if (review == null || !review.approved() || review.changes() == null || review.conflicts() == null
                 || !review.conflicts().isEmpty())
-            throw new IllegalStateException("Scene continuity review did not approve the response");
+            throw new ReviewRejectedException(review);
     }
 
     private void requireTurn(WorldRoomTurn turn, WorldRoomDialogueContext context) {

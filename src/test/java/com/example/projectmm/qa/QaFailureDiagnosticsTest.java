@@ -9,6 +9,13 @@ import static org.assertj.core.api.Assertions.*;
 
 class QaFailureDiagnosticsTest {
     @TempDir Path dir;
+    @Test void preservesExactReviewDecisionAndConflicts() {
+        var review=new com.example.projectmm.application.dialogue.SceneContinuityService.Review(
+                false,null,List.of(),List.of("Envelope custody changed without a transfer."));
+        var rejected=new com.example.projectmm.application.dialogue.SceneContinuityService.ReviewRejectedException(review);
+        String saved=new ObjectMapper().writeValueAsString(QaPipeline.failureDetails(rejected));
+        assertThat(saved).contains("continuityReview","Envelope custody changed without a transfer.","\"approved\":false");
+    }
     @Test void keepsLocalValidationReasonWithoutProviderMessageSecrets() {
         var local=new IllegalStateException("Scene continuity: Fact predecessor does not match");
         local.setStackTrace(new StackTraceElement[]{new StackTraceElement(

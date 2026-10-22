@@ -67,6 +67,8 @@ public final class QaPipeline implements QaRunner.Target {
         for(Throwable e=error;e!=null&&chain.size()<16&&seen.add(e);e=e.getCause()) {
             var item=new LinkedHashMap<String,Object>();
             item.put("exceptionType",e.getClass().getName());
+            if(e instanceof com.example.projectmm.application.dialogue.SceneContinuityService.ReviewRejectedException rejected)
+                item.put("continuityReview",rejected.review());
             item.put("frames",Arrays.stream(e.getStackTrace())
                     .filter(f->f.getClassName().startsWith("com.example.projectmm."))
                     .limit(8).map(StackTraceElement::toString).toList());
