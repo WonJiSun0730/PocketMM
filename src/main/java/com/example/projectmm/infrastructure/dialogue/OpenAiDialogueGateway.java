@@ -159,14 +159,72 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                 ))
         );
 
-        String response = usageTracker.accountRequest(context.sessionId(),"OPENAI",model, () -> restClient.post()
+        String response = postResponse(context, model, request);
+
+        return parseResponse(response, context, model, tokenEstimate);
+    }
+
+    private String postResponse(WorldRoomDialogueContext context, String model, Map<String,Object> request) {
+        return usageTracker.accountRequest(context.sessionId(),"OPENAI",model, () -> restClient.post()
                 .uri("/v1/responses")
                 .headers(headers -> headers.setBearerAuth(apiKey))
                 .body(request)
                 .retrieve()
                 .body(String.class));
+    }
 
-        return parseResponse(response, context, model, tokenEstimate);
+    private String readPayload(String response, WorldRoomDialogueContext context, String model,
+                               PromptTokenBreakdown breakdown) {
+        JsonNode root = objectMapper.readTree(response);
+        JsonNode usage = root.path("usage");
+        if (usage.isObject()) usageTracker.record(
+                context.sessionId(),
+                "OPENAI",
+                model,
+                usage.path("input_tokens").asLong(0),
+                usage.path("input_tokens_details").path("cached_tokens").asLong(0),
+                usage.path("input_tokens_details").path("cache_write_tokens").isIntegralNumber()
+                        ? usage.path("input_tokens_details").path("cache_write_tokens").asLong() : null,
+                usage.path("output_tokens").asLong(0),
+                usage.path("total_tokens").asLong(0), breakdown
+        );
+        else usageTracker.recordUnavailable(context.sessionId(),"OPENAI",model,"USAGE_NOT_REPORTED");
+        String payload = null;
+        for (JsonNode item : root.path("output")) {
+            if (!"message".equals(item.path("type").asText())) continue;
+            for (JsonNode part : item.path("content")) {
+                if ("output_text".equals(part.path("type").asText())) {
+                    payload = part.path("text").asText();
+                    break;
+                }
+            }
+            if (payload != null) break;
+        }
+        if (payload == null || payload.isBlank()) {
+            throw new IllegalStateException("OpenAI response has no output_text");
+        }
+
+        return payload;
+    }
+
+    @Override
+    public String reviewWorldRoomContinuity(WorldRoomDialogueContext context, String evidenceJson) {
+        if (apiKey == null || apiKey.isBlank()) throw new IllegalStateException("OPENAI_API_KEY is not configured");
+        String model = context.aiModel() == null || context.aiModel().isBlank() ? defaultModel : context.aiModel().trim();
+        String instructions = com.example.projectmm.application.dialogue.SceneContinuityPrompt.REVIEW;
+        String evidence = SceneContinuityRequest.evidence(context, evidenceJson);
+        var schema = SceneContinuityRequest.schema();
+        var input = List.<Map<String,Object>>of(Map.of("role","user","content",evidence));
+        var estimate = PromptTokenBreakdown.estimate(instructions,input,objectMapper.writeValueAsString(schema));
+        var request = Map.<String,Object>of("model",model,"instructions",instructions,"input",input,
+                "reasoning",Map.of("effort","none"),"store",false,
+                "text",Map.of("format",Map.of("type","json_schema","name","scene_continuity_review",
+                        "strict",true,"schema",schema)));
+        String response = postResponse(context,model,request);
+        String payload = readPayload(response,context,model,estimate);
+        var status = objectMapper.readTree(response).path("status").asText("completed");
+        if (!status.equals("completed")) throw new IllegalStateException("OpenAI continuity review incomplete");
+        return payload;
     }
 
     private WorldRoomTurn parseResponse(String response, WorldRoomDialogueContext context, String model) {
@@ -176,34 +234,7 @@ public class OpenAiDialogueGateway implements DialogueGateway {
     private WorldRoomTurn parseResponse(String response, WorldRoomDialogueContext context, String model,
                                        PromptTokenBreakdown breakdown) {
         try {
-            JsonNode root = objectMapper.readTree(response);
-            JsonNode usage = root.path("usage");
-            if (usage.isObject()) usageTracker.record(
-                    context.sessionId(),
-                    "OPENAI",
-                    model,
-                    usage.path("input_tokens").asLong(0),
-                    usage.path("input_tokens_details").path("cached_tokens").asLong(0),
-                    usage.path("input_tokens_details").path("cache_write_tokens").isIntegralNumber()
-                            ? usage.path("input_tokens_details").path("cache_write_tokens").asLong() : null,
-                    usage.path("output_tokens").asLong(0),
-                    usage.path("total_tokens").asLong(0), breakdown
-            );
-            else usageTracker.recordUnavailable(context.sessionId(),"OPENAI",model,"USAGE_NOT_REPORTED");
-            String payload = null;
-            for (JsonNode item : root.path("output")) {
-                if (!"message".equals(item.path("type").asText())) continue;
-                for (JsonNode part : item.path("content")) {
-                    if ("output_text".equals(part.path("type").asText())) {
-                        payload = part.path("text").asText();
-                        break;
-                    }
-                }
-                if (payload != null) break;
-            }
-            if (payload == null || payload.isBlank()) {
-                throw new IllegalStateException("OpenAI response has no output_text");
-            }
+            String payload = readPayload(response, context, model, breakdown);
 
             JsonNode turn = objectMapper.readTree(payload);
             String reply = turn.path("reply").asText();

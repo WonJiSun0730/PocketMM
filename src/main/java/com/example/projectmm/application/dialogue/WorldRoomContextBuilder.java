@@ -123,9 +123,9 @@ public class WorldRoomContextBuilder {
                 .toList();
 
         long exclusiveEnd = beforeMessageId == null ? Long.MAX_VALUE : beforeMessageId;
-        var turnStarts = messages.findBySessionIdAndRoleAndIdLessThanOrderByIdDesc(
-                sessionId, ChatRole.USER, exclusiveEnd, org.springframework.data.domain.PageRequest.of(0, 7));
-        long firstId = turnStarts.isEmpty() ? 0L : turnStarts.getLast().getId();
+        var turnEnds = messages.findBySessionIdAndRoleAndIdLessThanOrderByIdDesc(
+                sessionId, ChatRole.CHARACTER, exclusiveEnd, org.springframework.data.domain.PageRequest.of(0, 7));
+        long firstId = turnEnds.size() > 6 ? turnEnds.get(6).getId() + 1 : 0L;
         var availableMessages = messages.findBySessionIdAndIdGreaterThanEqualAndIdLessThanOrderByIdAsc(
                 sessionId, firstId, exclusiveEnd);
 

@@ -21,8 +21,11 @@ public class PocketDialogueGatewayRouter implements DialogueGateway {
 
     @Override
     public String reviewWorldRoomContinuity(WorldRoomDialogueContext context, String evidenceJson) {
-        return AiUsageTracker.withPurpose(context.sessionId(), "SCENE_CONTINUITY",
-                () -> DialogueGateway.super.reviewWorldRoomContinuity(context, evidenceJson));
+        var selected = resolveSelection(context);
+        return AiUsageTracker.withPurpose(selected.sessionId(), "SCENE_CONTINUITY",
+                () -> "OPENAI".equalsIgnoreCase(selected.aiProvider())
+                        ? openAi.reviewWorldRoomContinuity(selected,evidenceJson)
+                        : gemini.reviewWorldRoomContinuity(selected,evidenceJson));
     }
 
     @Override
@@ -55,12 +58,17 @@ public class PocketDialogueGatewayRouter implements DialogueGateway {
             throw new IllegalStateException("Legacy dialogue cannot serve an OpenAI Pocket; Gemini call blocked");
     }
 
-    @Override
-    public WorldRoomTurn generateWorldRoomTurn(WorldRoomDialogueContext context, String userMessage) {
+    private WorldRoomDialogueContext resolveSelection(WorldRoomDialogueContext context) {
         if (sessions != null && context.sessionId() != null) {
             var session=sessions.findById(context.sessionId()).orElseThrow();
             context=context.withAiSelection(session.getAiProvider(),session.getAiModel());
         }
+        return context;
+    }
+
+    @Override
+    public WorldRoomTurn generateWorldRoomTurn(WorldRoomDialogueContext context, String userMessage) {
+        context = resolveSelection(context);
         String provider = context.aiProvider() == null ? "GEMINI" : context.aiProvider();
         return "OPENAI".equalsIgnoreCase(provider)
                 ? openAi.generateWorldRoomTurn(context, userMessage)

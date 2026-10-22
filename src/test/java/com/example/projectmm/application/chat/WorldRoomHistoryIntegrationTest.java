@@ -186,4 +186,29 @@ class WorldRoomHistoryIntegrationTest {
         assertOrder(owner,second,first);
     }
 
+
+    @Test void automaticResponsesUseSixTurnWindowAndPreserveAllStoredHistory() {
+        var owner = listOwner("auto-history");
+        var session = listPocket(owner,1889);
+        var at = session.getSimulatedAt();
+        messages.save(new WorldRoomMessage(session,ChatRole.USER,"old user input",at));
+        var stored = new java.util.ArrayList<WorldRoomMessage>();
+        for(int i=1;i<=30;i++) stored.add(messages.save(new WorldRoomMessage(
+                session,ChatRole.CHARACTER,"auto-"+i,at.plusSeconds(i))));
+        messages.flush();
+        var context = contextBuilder.buildSession(session.getId());
+        assertThat(context.recentMessages()).extracting(com.example.projectmm.domain.dialogue.DialogueMessageContext::content)
+                .containsExactly("auto-25","auto-26","auto-27","auto-28","auto-29","auto-30");
+        var before = contextBuilder.buildSessionBeforeMessage(session.getId(),stored.get(27).getId());
+        assertThat(before.recentMessages()).extracting(com.example.projectmm.domain.dialogue.DialogueMessageContext::content)
+                .containsExactly("auto-22","auto-23","auto-24","auto-25","auto-26","auto-27");
+        messages.save(new WorldRoomMessage(session,ChatRole.USER,"new pending input",at.plusSeconds(31)));
+        messages.flush();
+        var pending = contextBuilder.buildSession(session.getId());
+        assertThat(pending.recentMessages()).extracting(com.example.projectmm.domain.dialogue.DialogueMessageContext::content)
+                .containsExactly("auto-25","auto-26","auto-27","auto-28","auto-29","auto-30","new pending input");
+        assertThat(messages.count()).isEqualTo(32);
+        assertThat(dialogueService.history(session.getId(),null)).hasSize(15);
+    }
+
 }
