@@ -94,7 +94,7 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
         Object scope=((ThreadLocal<?>)org.springframework.test.util.ReflectionTestUtils.getField(com.example.projectmm.infrastructure.dialogue.AiUsageTracker.class,"scope")).get();
         String purpose=scope==null?"ROLEPLAY":(String)org.springframework.test.util.ReflectionTestUtils.getField(scope,"purpose");
         if(ExperiencePersonaClient.personaCall.get())purpose="PLAYER_SIMULATION";
-        String role=ExperiencePersonaClient.personaCall.get()?"PERSONA":model.equals(spec.targetModel())&&!gemini&&json.path("text").path("format").path("name").asText().equals("pocket_turn")?"TARGET":"AUXILIARY";
+        String role=ExperiencePersonaClient.personaCall.get()?"PERSONA":!"SCENE_CONTINUITY".equals(purpose)&&model.equals(spec.targetModel())&&!gemini&&json.path("text").path("format").path("name").asText().equals("pocket_turn")?"TARGET":"AUXILIARY";
         var rate=spec.prices().get(model);Long maximum=maxima.get(model);
         if(rate==null||maximum==null||maximum<(embedding?0:1))throw new IllegalStateException("Verified model price and maximum output reservation required");
         budget.clear();budget.put("model",model);budget.put("role",role);budget.put("purpose",purpose);

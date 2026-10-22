@@ -39,6 +39,11 @@ import static org.mockito.Mockito.when;
         WorldRoomDialogueService.class
 })
 class WorldRoomDeleteIntegrationTest {
+    @org.junit.jupiter.api.BeforeEach
+    void approveContinuityForExistingScenario() {
+        com.example.projectmm.application.dialogue.SceneContinuityTestSupport.approveUnchanged(gateway);
+    }
+
 
     @Autowired WorldRoomService roomService;
     @Autowired WorldRoomSessionService sessionService;

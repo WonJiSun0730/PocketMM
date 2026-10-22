@@ -8,6 +8,10 @@ import com.example.projectmm.domain.dialogue.WorldRoomTurn;
 
 public interface DialogueGateway {
 
+    default String reviewWorldRoomContinuity(WorldRoomDialogueContext context, String evidenceJson) {
+        return generateWorldRoomTurn(context, SceneContinuityPrompt.REVIEW + "\n" + evidenceJson).reply();
+    }
+
     default String setupWorldRoomScene(WorldRoomDialogueContext context, String userMessage) {
         return generateWorldRoomTurn(context, """
                 [OUT-OF-CHARACTER STATE INSTRUCTION ANALYSIS — DO NOT CONTINUE THE STORY]

@@ -120,6 +120,11 @@ public class ExperienceEnvironment {
             return new PocketDialogueGatewayRouter(builder,target);
         }
         return new DialogueGateway() {
+            public String reviewWorldRoomContinuity(WorldRoomDialogueContext c, String evidence) {
+                var request=mapper.readTree(evidence); var result=mapper.createObjectNode();
+                result.put("approved",true);result.set("turn",request.path("candidate"));result.putArray("changes");result.putArray("conflicts");
+                return mapper.writeValueAsString(result);
+            }
             public String generate(DialogueContext context,String message) {throw new UnsupportedOperationException("QA only world-room");}
             public WorldRoomTurn generateWorldRoomTurn(WorldRoomDialogueContext c,String message) {
                 usage.record(c.sessionId(),"MOCK",spec.targetModel(),0,0,0L,0,0);

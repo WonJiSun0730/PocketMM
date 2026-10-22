@@ -20,6 +20,12 @@ public class PocketDialogueGatewayRouter implements DialogueGateway {
     private final OpenAiDialogueGateway openAi;
 
     @Override
+    public String reviewWorldRoomContinuity(WorldRoomDialogueContext context, String evidenceJson) {
+        return AiUsageTracker.withPurpose(context.sessionId(), "SCENE_CONTINUITY",
+                () -> DialogueGateway.super.reviewWorldRoomContinuity(context, evidenceJson));
+    }
+
+    @Override
     public String initializeWorldRoomScene(WorldRoomDialogueContext context, boolean timeUnset, String opening) {
         return AiUsageTracker.withPurpose(context.sessionId(),"INITIAL_SCENE",
                 () -> DialogueGateway.super.initializeWorldRoomScene(context,timeUnset,opening));

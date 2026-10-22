@@ -375,6 +375,10 @@ public final class ExperienceQaUiService {
         var rates=prices();var info=info(snapshot);long input=info.estimatedInputTokens();var policy=budgetPolicy(snapshot);long output=((Number)policy.get("expectedTargetOutputTokens")).longValue();long safe=((Number)policy.get("safeExpectedTargetOutputTokens")).longValue();
         var serviceLow=estimateRate(rates.path(target),input,Math.max(100,output/2),false);
         var serviceHigh=estimateRate(rates.path(target),input*2,safe,true);
+        // Every turn has one review; repaired prose has one verification. Legacy backfill is extra.
+        serviceLow=serviceLow.add(estimateRate(rates.path(target),input+output+4000,output+1500,false));
+        serviceHigh=serviceHigh.add(estimateRate(rates.path(target),input*2+safe+8000,safe+6000,true).multiply(BigDecimal.valueOf(2)));
+
         if(snapshot.memoryEnabled()&&!snapshot.extractorProvider().equals("NONE")) {
             serviceLow=serviceLow.add(estimateRate(rates.path(snapshot.extractorModel()),1500,200,false));
             serviceHigh=serviceHigh.add(estimateRate(rates.path(snapshot.extractorModel()),4000,2048,true));

@@ -12,7 +12,7 @@ public record DialogueEvaluationEvidence(String operation, String userInput, Str
         var snapshot = new WorldRoomDialogueContext(c.sessionId(), c.roomId(), c.roomTitle(), c.visibility(),
                 c.simulatedAt(), c.world(), c.playerProfile(), c.introTitle(), c.introContent(), limited,
                 c.roomCast(), c.activeCast(), c.sessionSystems(), c.playerState(), c.recalledMemories(),
-                c.userNote(), c.pocketPlayGuide(), c.noControlPlayer(), c.aiProvider(), c.aiModel());
+                c.userNote(), c.pocketPlayGuide(), c.noControlPlayer(), c.aiProvider(), c.aiModel(), c.sceneFactsJson());
         return new ObjectMapper().writeValueAsString(new DialogueEvaluationEvidence(operation, input, modelInput, reply, effectiveModel, snapshot));
     }
 }
