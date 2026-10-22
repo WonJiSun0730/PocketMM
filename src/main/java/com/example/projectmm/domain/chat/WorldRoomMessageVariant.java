@@ -55,6 +55,17 @@ public class WorldRoomMessageVariant {
     @Column(columnDefinition = "LONGTEXT")
     private String testDiagnosticsJson;
 
+    @Column(columnDefinition = "LONGTEXT")
+    private String beforeSceneFactsJson;
+
+    @Column(columnDefinition = "LONGTEXT")
+    private String afterSceneFactsJson;
+
+    public void captureSceneFactsWorldline(String before, String after) {
+        this.beforeSceneFactsJson = before;
+        this.afterSceneFactsJson = after;
+    }
+
     public void captureTestDiagnostics(String json) { this.testDiagnosticsJson = json; }
 
     @Column(columnDefinition = "LONGTEXT")

@@ -11,6 +11,14 @@ public interface WorldRoomMessageRepository extends JpaRepository<WorldRoomMessa
     @org.springframework.data.jpa.repository.Query("select m.session.room.world.id as worldId, count(m) as turns from WorldRoomMessage m where m.session.room.world.id in :worldIds and m.role = com.example.projectmm.domain.chat.ChatRole.CHARACTER and m.absenceReportId is null group by m.session.room.world.id")
     List<WorldTurnCount> countTurnsByWorldIds(@org.springframework.data.repository.query.Param("worldIds") List<Long> worldIds);
 
+    @org.springframework.data.jpa.repository.Query("select m from WorldRoomMessage m where m.session.id = :sessionId "
+            + "and m.id > :afterId and m.id < :beforeId order by m.id asc")
+    List<WorldRoomMessage> sceneHistoryAfter(
+            @org.springframework.data.repository.query.Param("sessionId") Long sessionId,
+            @org.springframework.data.repository.query.Param("afterId") long afterId,
+            @org.springframework.data.repository.query.Param("beforeId") long beforeId,
+            org.springframework.data.domain.Pageable page);
+
     java.util.Optional<WorldRoomMessage> findTopBySessionIdOrderByIdDesc(Long sessionId);
 
     List<WorldRoomMessage> findTop50BySessionIdOrderByCreatedAtDescIdDesc(Long sessionId);

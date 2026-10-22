@@ -24,6 +24,11 @@ import static org.mockito.Mockito.*;
 @DataJpaTest
 @Import({WorldRoomSessionService.class, WorldRoomContextBuilder.class, WorldRoomDialogueService.class, DialogueIssueService.class})
 class DialogueIssueIntegrationTest {
+    @org.junit.jupiter.api.BeforeEach
+    void approveContinuityForExistingScenario() {
+        com.example.projectmm.application.dialogue.SceneContinuityTestSupport.approveUnchanged(gateway);
+    }
+
     @Autowired WorldRoomSessionService sessions;
     @Autowired WorldRoomDialogueService dialogue;
     @Autowired DialogueIssueService reports;

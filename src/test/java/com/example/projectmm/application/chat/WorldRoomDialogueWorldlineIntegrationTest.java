@@ -44,6 +44,11 @@ import static org.mockito.Mockito.*;
         WorldRoomDialogueService.class
 })
 class WorldRoomDialogueWorldlineIntegrationTest {
+    @org.junit.jupiter.api.BeforeEach
+    void approveContinuityForExistingScenario() {
+        com.example.projectmm.application.dialogue.SceneContinuityTestSupport.approveUnchanged(gateway);
+    }
+
 
     @Autowired WorldRoomSessionService sessionService;
     @Autowired WorldRoomPlayerStateService playerStateService;
@@ -659,4 +664,76 @@ class WorldRoomDialogueWorldlineIntegrationTest {
                 .singleElement()
                 .satisfies(state -> assertThat(state.getCurrentValue()).isEqualTo(30));
     }
+
+    @Test
+    void sceneFactsFollowRerollSelectionDeletionAndEditedProse() {
+        var session = automaticProgressionSession("facts-worldline");
+        var mapper = new tools.jackson.databind.ObjectMapper();
+        when(gateway.reviewWorldRoomContinuity(any(), anyString())).thenAnswer(call -> {
+            var request = mapper.readTree((String) call.getArgument(1));
+            boolean history = request.path("mode").asText().equals("BOOTSTRAP");
+            String text = history ? request.path("history").toString() : request.path("candidate").path("reply").asText();
+            String holder = text.contains("nurse") ? "nurse" : text.contains("Holmes") ? "Holmes" : text.contains("Eleanor") ? "Eleanor" : null;
+            String old = null;
+            for (var fact : request.path("facts")) if (fact.path("key").asText().equals("receipt.custodian")) old = fact.path("value").asText();
+            var changes = new java.util.ArrayList<com.example.projectmm.domain.dialogue.SceneFacts.Change>();
+            if (holder != null && !holder.equals(old)) {
+                String evidence = holder;
+                changes.add(new com.example.projectmm.domain.dialogue.SceneFacts.Change(
+                        "receipt.custodian", com.example.projectmm.domain.dialogue.SceneFacts.Kind.POSSESSION, holder,
+                        com.example.projectmm.domain.dialogue.SceneFacts.Certainty.OBSERVED,
+                        history ? com.example.projectmm.domain.dialogue.SceneFacts.Source.HISTORY : com.example.projectmm.domain.dialogue.SceneFacts.Source.REPLY,
+                        evidence, old, old == null ? com.example.projectmm.domain.dialogue.SceneFacts.Reason.NEW : com.example.projectmm.domain.dialogue.SceneFacts.Reason.EVENT));
+            }
+            return mapper.writeValueAsString(new com.example.projectmm.application.dialogue.SceneContinuityService.Review(true,null,changes,List.of()));
+        });
+        when(gateway.generateWorldRoomTurn(any(), anyString())).thenReturn(
+                new WorldRoomTurn("The receipt is with Eleanor.", WorldRoomCastChange.none()));
+        dialogueService.continueScene(session.getId());
+        var first = messages.findTopBySessionIdOrderByIdDesc(session.getId()).orElseThrow();
+        when(gateway.generateWorldRoomTurn(any(), anyString())).thenReturn(
+                new WorldRoomTurn("She hands the receipt to Holmes.", WorldRoomCastChange.none()));
+        dialogueService.continueScene(session.getId());
+        var second = messages.findTopBySessionIdOrderByIdDesc(session.getId()).orElseThrow();
+        when(gateway.generateWorldRoomTurn(any(), anyString())).thenReturn(
+                new WorldRoomTurn("She hands the receipt to the nurse.", WorldRoomCastChange.none()));
+        dialogueService.reroll(session.getId(), second.getId());
+        assertThat(variants.findByMessageIdAndVariantNo(second.getId(),2).orElseThrow().getAfterSceneFactsJson()).contains("nurse");
+        dialogueService.selectVariant(session.getId(),second.getId(),1);
+        when(gateway.generateWorldRoomTurn(any(), anyString())).thenReturn(new WorldRoomTurn("A quiet moment.",WorldRoomCastChange.none()));
+        clearInvocations(gateway);
+        dialogueService.continueScene(session.getId());
+        verify(gateway).generateWorldRoomTurn(argThat(c -> c.sceneFactsJson().contains("Holmes") && !c.sceneFactsJson().contains("nurse")),anyString());
+        dialogueService.deleteMessageAndFollowing(session.getId(),second.getId());
+        clearInvocations(gateway);
+        dialogueService.continueScene(session.getId());
+        verify(gateway).generateWorldRoomTurn(argThat(c -> c.sceneFactsJson().contains("Eleanor") && !c.sceneFactsJson().contains("Holmes")),anyString());
+        var latest = messages.findTopBySessionIdOrderByIdDesc(session.getId()).orElseThrow();
+        dialogueService.editMessage(session.getId(), latest.getId(), "The receipt is with the nurse.");
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(variants.findByMessageIdAndVariantNo(latest.getId(),1).orElseThrow().getAfterSceneFactsJson()).isNull();
+        clearInvocations(gateway);
+        dialogueService.continueScene(session.getId());
+        verify(gateway).generateWorldRoomTurn(argThat(c -> c.sceneFactsJson().contains("nurse")),anyString());
+        assertThat(variants.findByMessageIdAndVariantNo(first.getId(),1).orElseThrow().getAfterSceneFactsJson()).contains("Eleanor");
+    }
+
+    @Test
+    void rejectedContinuityCannotApplyStateOrPersistGeneratedMessage() {
+        var session = automaticProgressionSession("facts-rejection");
+        when(gateway.generateWorldRoomTurn(any(), anyString())).thenReturn(
+                new WorldRoomTurn("Unexplained teleport.",WorldRoomCastChange.none(),List.of(),3600,"Elsewhere"));
+        when(gateway.reviewWorldRoomContinuity(any(),anyString())).thenReturn(
+                "{\"approved\":false,\"turn\":null,\"changes\":[],\"conflicts\":[\"location changed without event\"]}");
+        long beforeMessages=messages.count(), beforeVariants=variants.count();
+        var beforeTime=session.getSimulatedAt();
+        assertThatThrownBy(() -> dialogueService.continueScene(session.getId()))
+                .hasMessageContaining("did not approve");
+        assertThat(messages.count()).isEqualTo(beforeMessages);
+        assertThat(variants.count()).isEqualTo(beforeVariants);
+        assertThat(session.getSimulatedAt()).isEqualTo(beforeTime);
+        assertThat(playerStateService.current(session.getId(),session.getMember().getLoginId()).getLocation()).isNotEqualTo("Elsewhere");
+    }
+
 }

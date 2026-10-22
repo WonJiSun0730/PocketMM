@@ -36,6 +36,11 @@ import static org.mockito.Mockito.when;
         WorldRoomDialogueService.class
 })
 class WorldRoomActiveCastIntegrationTest {
+    @org.junit.jupiter.api.BeforeEach
+    void approveContinuityForExistingScenario() {
+        com.example.projectmm.application.dialogue.SceneContinuityTestSupport.approveUnchanged(gateway);
+    }
+
 
     @Autowired WorldRoomSessionService sessionService;
     @Autowired WorldRoomDialogueService dialogueService;

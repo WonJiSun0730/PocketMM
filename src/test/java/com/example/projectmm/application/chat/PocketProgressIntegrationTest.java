@@ -34,6 +34,11 @@ import static org.mockito.ArgumentMatchers.*;
 @Import({PocketProgressService.class, WorldRoomSessionService.class, WorldRoomDialogueService.class,
         WorldRoomContextBuilder.class, CatchUpSimulationService.class, WorldRoomService.class})
 class PocketProgressIntegrationTest {
+    @org.junit.jupiter.api.BeforeEach
+    void approveContinuityForExistingScenario() {
+        com.example.projectmm.application.dialogue.SceneContinuityTestSupport.approveUnchanged(gateway);
+    }
+
     @Autowired PocketProgressService progress;
     @Autowired WorldRoomService roomService;
     @Autowired WorldRoomSessionService sessionService;

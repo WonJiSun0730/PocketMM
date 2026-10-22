@@ -25,7 +25,8 @@ public record WorldRoomDialogueContext(
         String pocketPlayGuide,
         boolean noControlPlayer,
         String aiProvider,
-        String aiModel
+        String aiModel,
+        String sceneFactsJson
 ) {
     public WorldRoomDialogueContext(
             Long roomId,
@@ -90,10 +91,28 @@ public record WorldRoomDialogueContext(
         );
     }
 
+    public WorldRoomDialogueContext(Long sessionId, Long roomId, String roomTitle,
+            WorldConversation.Visibility visibility, LocalDateTime simulatedAt, DialogueWorldContext world,
+            DialoguePlayerProfile playerProfile, String introTitle, String introContent,
+            List<DialogueMessageContext> recentMessages, List<WorldRoomCharacterContext> roomCast,
+            List<WorldRoomCharacterContext> activeCast, List<WorldRoomSystemContext> sessionSystems,
+            WorldRoomPlayerStateContext playerState, List<CharacterMemories> recalledMemories,
+            String userNote, String pocketPlayGuide, boolean noControlPlayer, String aiProvider, String aiModel) {
+        this(sessionId, roomId, roomTitle, visibility, simulatedAt, world, playerProfile, introTitle,
+                introContent, recentMessages, roomCast, activeCast, sessionSystems, playerState,
+                recalledMemories, userNote, pocketPlayGuide, noControlPlayer, aiProvider, aiModel, null);
+    }
+
+    public WorldRoomDialogueContext withSceneFacts(String json) {
+        return new WorldRoomDialogueContext(sessionId,roomId,roomTitle,visibility,simulatedAt,world,playerProfile,
+                introTitle,introContent,recentMessages,roomCast,activeCast,sessionSystems,playerState,recalledMemories,
+                userNote,pocketPlayGuide,noControlPlayer,aiProvider,aiModel,json);
+    }
+
     public WorldRoomDialogueContext withAiSelection(String provider,String model) {
         return new WorldRoomDialogueContext(sessionId,roomId,roomTitle,visibility,simulatedAt,world,playerProfile,
                 introTitle,introContent,recentMessages,roomCast,activeCast,sessionSystems,playerState,recalledMemories,
-                userNote,pocketPlayGuide,noControlPlayer,provider,model);
+                userNote,pocketPlayGuide,noControlPlayer,provider,model,sceneFactsJson);
     }
     public record CharacterMemories(
             Long characterId,
