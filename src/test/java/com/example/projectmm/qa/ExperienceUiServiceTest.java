@@ -9,6 +9,25 @@ import java.math.BigDecimal;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 class ExperienceUiServiceTest {
+    @Test void livePendingCallSettlesFromLatestLedgerAndDeadWorkerRemainsUnknown() throws Exception {
+        var alive=new boolean[]{true};
+        var worker=new Worker(){@Override public boolean alive(long pid,String at){return alive[0];}};
+        var service=service(worker);var run=service.start(1,"dev",start(DIGEST));
+        var path=dir.resolve("target/pocket-qa-experience").resolve(run.id());
+        Files.writeString(path.resolve("run.json"),"{\"status\":\"RUNNING\",\"stage\":\"TARGET_IN_FLIGHT\",\"turns\":[],\"calls\":[{\"callId\":\"call\",\"turn\":1,\"phase\":\"REQUEST_STARTED\",\"role\":\"TARGET\",\"status\":\"UNKNOWN\",\"usd\":null}]}");
+        String started="{\"callId\":\"call\",\"phase\":\"REQUEST_STARTED\",\"role\":\"TARGET\",\"status\":\"UNKNOWN\",\"usd\":null}\n";
+        Files.writeString(path.resolve("ledger.jsonl"),started);
+        assertThat(service.current(1,"dev",run.id()).pendingCalls()).isEqualTo(1);
+        assertThat(service.analysis(1,"dev",run.id()).path("findings").toString()).doesNotContain("CALL_STATUS");
+        alive[0]=false;
+        assertThat(service.current(1,"dev",run.id()).pendingCalls()).isZero();
+        assertThat(service.current(1,"dev",run.id()).unknownCalls()).isEqualTo(1);
+        assertThat(service.analysis(1,"dev",run.id()).path("findings").toString()).contains("CALL_STATUS");
+        Files.writeString(path.resolve("ledger.jsonl"),started+"{\"callId\":\"call\",\"phase\":\"RESPONSE_RECEIVED\",\"role\":\"TARGET\",\"status\":\"completed\",\"usd\":0.02}\n");
+        var settled=service.current(1,"dev",run.id());
+        assertThat(settled.unknownCalls()).isZero();assertThat(settled.pendingCalls()).isZero();
+        assertThat(settled.knownUsd()).isEqualByComparingTo("0.02");
+    }
     static final String DIGEST=PocketExperienceSnapshot.digest(List.of());
     @TempDir Path dir;
     static class Worker implements ExperienceQaUiService.Worker {

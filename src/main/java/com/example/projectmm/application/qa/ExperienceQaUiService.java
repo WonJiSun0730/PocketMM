@@ -29,7 +29,7 @@ public final class ExperienceQaUiService {
     }
     public record TurnView(int number,String input,String reply,long latencyMillis,List<String> memories,JsonNode recalledMemories) {}
     public record View(String id,String status,String personaModel,String targetModel,int completed,int total,boolean paid,
-                       BigDecimal budgetUsd,BigDecimal knownUsd,int unknownCalls,boolean workerAlive,String reason,List<TurnView> recentTurns,JsonNode budget) {}
+                       BigDecimal budgetUsd,BigDecimal knownUsd,int unknownCalls,int pendingCalls,boolean workerAlive,String reason,List<TurnView> recentTurns,JsonNode budget) {}
     public interface Worker {
         long launch(List<String> command,Path directory,Map<String,String> environment,Path log) throws IOException;
         boolean alive(long pid,String createdAt);
@@ -152,7 +152,7 @@ public final class ExperienceQaUiService {
             if(!command.equals("STOP"))throw failure;
             atomic(path(id).resolve("control"),"STOP");
             boolean alive=meta.pid()>0&&worker.alive(meta.pid(),meta.createdAt());
-            return new View(meta.id(),alive?"STOPPING":"STOPPED",PERSONA_MODEL,meta.targetModel(),0,meta.turns(),meta.paid(),meta.budgetUsd(),null,1,alive,
+            return new View(meta.id(),alive?"STOPPING":"STOPPED",PERSONA_MODEL,meta.targetModel(),0,meta.turns(),meta.paid(),meta.budgetUsd(),null,1,0,alive,
                     "진행 기록을 읽지 못했지만 중단 요청은 전달했어요. 비용은 원본 기록을 확인해 주세요.",List.of(),mapper.createObjectNode());
         }
         if(Set.of("COMPLETED","STOPPED").contains(current.status()))throw new ResponseStatusException(HttpStatus.CONFLICT,"이미 종료된 테스트예요.");
@@ -221,11 +221,17 @@ public final class ExperienceQaUiService {
     }
     private JsonNode stateWithLedger(Path directory) throws IOException {
         Path file=directory.resolve("run.json");checkFile(file);var state=mapper.readTree(Files.readString(file));
-        var ids=new HashSet<String>();for(var call:state.path("calls"))ids.add(call.path("callId").asText());
         var calls=(tools.jackson.databind.node.ArrayNode)state.path("calls");
-        for(var entry:ledger(directory))if(!ids.contains(entry.path("callId").asText())) {
-            var call=(tools.jackson.databind.node.ObjectNode)entry.deepCopy();call.put("turn",state.path("turns").size()+1);calls.add(call);
+        var positions=new HashMap<String,Integer>();for(int i=0;i<calls.size();i++)positions.put(calls.get(i).path("callId").asText(),i);
+        for(var entry:ledger(directory)) {
+            Integer position=positions.get(entry.path("callId").asText());
+            var call=(tools.jackson.databind.node.ObjectNode)entry.deepCopy();
+            call.put("turn",position==null?state.path("turns").size()+1:calls.get(position).path("turn").asInt());
+            if(position==null)calls.add(call);else calls.set(position,call);
         }
+        Path metaFile=directory.resolve("ui-owner.json");checkFile(metaFile);
+        var meta=mapper.readValue(Files.readString(metaFile),Meta.class);
+        ((tools.jackson.databind.node.ObjectNode)state).put("workerAlive",meta.pid()>0&&worker.alive(meta.pid(),meta.createdAt()));
         return state;
     }
     public JsonNode analysis(long pocketId,String owner,String id) throws IOException {
@@ -286,7 +292,7 @@ public final class ExperienceQaUiService {
     }
     private View view(Meta meta) throws IOException {
         Path file=path(meta.id()).resolve("run.json");boolean alive=meta.pid()>0&&worker.alive(meta.pid(),meta.createdAt());
-        if(!Files.isRegularFile(file))return new View(meta.id(),alive?"STARTING":"FAILED",PERSONA_MODEL,meta.targetModel(),0,meta.turns(),meta.paid(),meta.budgetUsd(),BigDecimal.ZERO,0,alive,
+        if(!Files.isRegularFile(file))return new View(meta.id(),alive?"STARTING":"FAILED",PERSONA_MODEL,meta.targetModel(),0,meta.turns(),meta.paid(),meta.budgetUsd(),BigDecimal.ZERO,0,0,alive,
                 alive?"격리된 테스트 환경을 준비하고 있어요.":"실행기가 시작되지 않았어요. 서버의 worker.log를 확인해 주세요.",List.of(),budgetView(meta));
         checkFile(file);var state=stateWithLedger(path(meta.id()));
         String status=state.path("status").asText("FAILED");
@@ -296,10 +302,11 @@ public final class ExperienceQaUiService {
         if(alive&&control.equals("STOP")&&!Set.of("COMPLETED","STOPPED").contains(status))status="STOPPING";
         else if(alive&&control.equals("PAUSE")&&status.equals("RUNNING"))status="PAUSING";
         else if(alive&&control.equals("RESUME")&&status.equals("PAUSED"))status="STARTING";
-        BigDecimal known=BigDecimal.ZERO;int unknown=0;
+        BigDecimal known=BigDecimal.ZERO;int unknown=0,pending=0;
         for(var c:state.path("calls")) {
             var amount=c.path("usd");if(amount.isNull()||amount.isMissingNode())amount=state.path("reconciledCosts").path(c.path("callId").asText());
-            if(amount.isNull()||amount.isMissingNode())unknown++;else known=known.add(new BigDecimal(amount.asText()));
+            if(amount.isNull()||amount.isMissingNode()) {unknown++;if(PocketExperienceAnalysis.isPending(state,c))pending++;}
+            else known=known.add(new BigDecimal(amount.asText()));
         }
         var turns=state.path("turns");var recent=new ArrayList<TurnView>();
         for(int i=Math.max(0,turns.size()-10);i<turns.size();i++) {
@@ -308,7 +315,7 @@ public final class ExperienceQaUiService {
             try {recalled=mapper.readTree(o.path("evaluationJson").asText("{}")).path("context").path("recalledMemories");}catch(RuntimeException ignored) { /* Missing evidence stays missing. */ }
             recent.add(new TurnView(t.path("number").asInt(),t.path("input").asText(),o.path("reply").asText(),t.path("latencyMillis").asLong(),memories,recalled));
         }
-        return new View(meta.id(),status,PERSONA_MODEL,meta.targetModel(),turns.size(),meta.turns(),meta.paid(),meta.budgetUsd(),known,unknown,alive,
+        return new View(meta.id(),status,PERSONA_MODEL,meta.targetModel(),turns.size(),meta.turns(),meta.paid(),meta.budgetUsd(),known,unknown,pending,alive,
                 state.path("reason").isNull()?null:state.path("reason").asText(null),recent,budgetView(meta));
     }
     private JsonNode budgetView(Meta meta) throws IOException {

@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { qaEstimate, qaModelLabel, qaRequest, qaStartRequest, qaStatusLabels } from "@/lib/pocketQa"
+import { qaEstimate, qaModelLabel, qaRequest, qaStartRequest, qaStatusLabels, qaCostStatus, qaUsd as usd } from "@/lib/pocketQa"
 
-const usd = value => value == null ? "미확인" : `$${Number(value).toFixed(4)}`
 const field = "mt-1 h-9 w-full rounded-md border bg-background px-2 text-sm"
 
 export default function PocketExperienceQaPanel({ sessionId }) {
@@ -35,7 +34,7 @@ export default function PocketExperienceQaPanel({ sessionId }) {
       .then(([a, log]) => { if (active) { setAnalysis({ runId: selected.id, value: a }); setConversation(log.turns); setConversationTotal(log.total) } })
       .catch(cause => { if (active) setError(cause.message) })
     return () => { active = false }
-  }, [base, selected?.id, selected?.completed, selected?.status, selected?.knownUsd, selected?.unknownCalls, offset, refresh])
+  }, [base, selected?.id, selected?.completed, selected?.status, selected?.knownUsd, selected?.unknownCalls, selected?.pendingCalls, offset, refresh])
   const estimate = qaEstimate(capabilities, targetModel, turns)
   useEffect(() => {
     let active = true, loading = false, capLoaded = false
@@ -140,10 +139,11 @@ export default function PocketExperienceQaPanel({ sessionId }) {
         {selected && <div className="mt-3 space-y-3">
           <div className="flex flex-wrap justify-between gap-2 text-xs"><strong role="status">{qaStatusLabels[selected.status] ?? selected.status}</strong><span>{selected.completed} / {selected.total}턴</span></div>
           <progress className="h-2 w-full" max={selected.total} value={selected.completed} aria-label="테스트 진행률" />
-          <p className="text-xs">{selected.paid ? "테스트 운영 비용 소계" : "무료 모의 비용"}: <strong>{usd(selected.knownUsd)}</strong>{selected.paid && ` / 최대 ${usd(selected.budgetUsd)}`}{selected.unknownCalls > 0 && ` · 비용 미확인 ${selected.unknownCalls}건`}</p>
+          <p className="text-xs">{selected.paid ? "테스트 운영 비용 소계" : "무료 모의 비용"}: <strong>{usd(selected.knownUsd)}</strong>{selected.paid && ` / 최대 ${usd(selected.budgetUsd)}`}{selected.unknownCalls > 0 && ` · ${qaCostStatus(selected.unknownCalls, selected.pendingCalls)}`}</p>
           {selected.paid && selected.budget && <div className="rounded border p-2 text-xs leading-5" aria-label="예산 예약 및 정산">
             <p>확인된 실제 지출액: {usd(selected.budget.actualUsd)} · 예약 중: {usd(selected.budget.reservedUsd)}</p>
             <p>사용 가능 잔액: {usd(selected.budget.remainingUsd)}</p>
+            <p className="text-muted-foreground">지출에는 진행 중인 턴의 호출도 포함됩니다. 사용 가능 잔액은 지출과 예약액을 뺀 금액입니다.</p>
             <p>최근 계획 호출: {selected.budget.role ?? "계수 대기"} {selected.budget.model ?? ""}</p>
             <p>해당 호출 예상: {usd(selected.budget.expectedUsd)} · 안전 여유: {usd(selected.budget.safetyMarginUsd)}</p>
             <p>안전 여유 포함 예상: {usd(selected.budget.safeExpectedUsd)} · 최대 예약액: {usd(selected.budget.nextMaximumUsd)}</p>
@@ -163,7 +163,7 @@ export default function PocketExperienceQaPanel({ sessionId }) {
           </div>}
           {analysis?.replyCharacters && <div className="space-y-2 rounded border p-2 text-xs leading-5">
             <p>실서비스 확인 비용: <strong>{usd(analysis.serviceUsd)}</strong> · 플레이어 AI: {usd(analysis.playerUsd)}</p>
-            <p>테스트 운영 확인 비용: <strong>{usd(analysis.operatingUsd)}</strong>{analysis.unknownCalls > 0 && ` · 미확인 ${analysis.unknownCalls}건 포함 제외한 소계`}</p>
+            <p>테스트 운영 확인 비용: <strong>{usd(analysis.operatingUsd)}</strong>{analysis.unknownCalls > 0 && ` · ${qaCostStatus(analysis.unknownCalls, analysis.pendingCalls)} 금액을 제외한 소계`}</p>
             <p>캐시 적중률: {(analysis.cacheHitRate * 100).toFixed(1)}%</p>
             <p>응답 글자 수: 최소 {analysis.replyCharacters.min} · 중앙 {analysis.replyCharacters.median} · 평균 {analysis.replyCharacters.average.toFixed(1)} · 최대 {analysis.replyCharacters.max}</p>
             <p>저장·기억 처리 포함 왕복 시간: 최소 {(analysis.latencyMillis.min / 1000).toFixed(1)}초 · 중앙 {(analysis.latencyMillis.median / 1000).toFixed(1)}초 · 평균 {(analysis.latencyMillis.average / 1000).toFixed(1)}초 · 최대 {(analysis.latencyMillis.max / 1000).toFixed(1)}초</p>
