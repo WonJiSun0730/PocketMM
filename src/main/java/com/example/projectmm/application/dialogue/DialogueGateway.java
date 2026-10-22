@@ -9,7 +9,7 @@ import com.example.projectmm.domain.dialogue.WorldRoomTurn;
 public interface DialogueGateway {
 
     default String reviewWorldRoomContinuity(WorldRoomDialogueContext context, String evidenceJson) {
-        return generateWorldRoomTurn(context, SceneContinuityPrompt.REVIEW + "\n" + evidenceJson).reply();
+        throw new UnsupportedOperationException("Dedicated scene continuity review is not supported by this gateway");
     }
 
     default String setupWorldRoomScene(WorldRoomDialogueContext context, String userMessage) {

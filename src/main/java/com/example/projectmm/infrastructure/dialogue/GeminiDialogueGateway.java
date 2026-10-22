@@ -200,12 +200,43 @@ public class GeminiDialogueGateway implements DialogueGateway {
         );
 
         String response = callGeminiWithRetry(request);
-        var root = objectMapper.readTree(response);
-        var usage = root.path("usageMetadata");
+        recordWorldRoomUsage(response,context);
+        return parseWorldRoomResponse(response, context);
+    }
+
+    @Override
+    public String reviewWorldRoomContinuity(WorldRoomDialogueContext context, String evidenceJson) {
+        String evidence = SceneContinuityRequest.evidence(context, evidenceJson);
+        String instructions = com.example.projectmm.application.dialogue.SceneContinuityPrompt.REVIEW
+                + "\nReview JSON schema:\n" + objectMapper.writeValueAsString(SceneContinuityRequest.schema());
+        var request = Map.<String,Object>of(
+                "systemInstruction", Map.of("parts",List.of(Map.of("text",instructions))),
+                "contents",List.of(Map.of("role","user","parts",List.of(Map.of("text",evidence)))),
+                "generationConfig",Map.of("responseMimeType","application/json"));
+        String response = callGeminiWithRetry(request);
+        recordWorldRoomUsage(response,context);
+        return readWorldRoomPayload(response);
+    }
+
+    private void recordWorldRoomUsage(String response, WorldRoomDialogueContext context) {
+        var usage = objectMapper.readTree(response).path("usageMetadata");
         if (usage.isObject()) usageTracker.record(context.sessionId(),"GEMINI",model,
                 usage.path("promptTokenCount").asLong(0),usage.path("cachedContentTokenCount").asLong(0),
-                usage.path("candidatesTokenCount").asLong(0)+usage.path("thoughtsTokenCount").asLong(0),usage.path("totalTokenCount").asLong(0));
-        return parseWorldRoomResponse(response, context);
+                usage.path("candidatesTokenCount").asLong(0)+usage.path("thoughtsTokenCount").asLong(0),
+                usage.path("totalTokenCount").asLong(0));
+    }
+
+    private String readWorldRoomPayload(String response) {
+        JsonNode candidate = objectMapper.readTree(response).path("candidates").path(0);
+        if (!"STOP".equals(candidate.path("finishReason").asText()))
+            throw new IllegalArgumentException("Incomplete world room dialogue response");
+        StringBuilder body = new StringBuilder();
+        for (JsonNode part : candidate.path("content").path("parts"))
+            if (!part.path("thought").asBoolean(false)) body.append(part.path("text").asText(""));
+        String payload = body.toString().strip();
+        if (payload.startsWith("```json\n") && payload.endsWith("```"))
+            payload = payload.substring(8,payload.length()-3).strip();
+        return payload;
     }
 
     WorldRoomTurn parseWorldRoomResponse(
@@ -213,22 +244,7 @@ public class GeminiDialogueGateway implements DialogueGateway {
             WorldRoomDialogueContext context
     ) {
         try {
-            JsonNode candidate = objectMapper.readTree(response).path("candidates").path(0);
-            if (!"STOP".equals(candidate.path("finishReason").asText())) {
-                throw new IllegalArgumentException("Incomplete world room dialogue response");
-            }
-
-            StringBuilder body = new StringBuilder();
-            for (JsonNode part : candidate.path("content").path("parts")) {
-                if (!part.path("thought").asBoolean(false)) {
-                    body.append(part.path("text").asText(""));
-                }
-            }
-
-            String payload = body.toString().strip();
-            if (payload.startsWith("```json\n") && payload.endsWith("```")) {
-                payload = payload.substring(8, payload.length() - 3).strip();
-            }
+            String payload = readWorldRoomPayload(response);
 
             JsonNode turn;
             try {

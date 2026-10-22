@@ -31,7 +31,8 @@ public final class SceneContinuityPrompt {
             alone does not erase identity, custody, identifiers or unfinished delivery.
             Maintain at most 96 short active facts; never discard an unresolved fact to fit.
             Each change needs a verbatim nonempty evidence quote from its specified source:
-            USER = userInput; REPLY = the FINAL approved turn.reply; HISTORY = history passages.
+            USER = userInput (or USER-role history in BOOTSTRAP);
+            REPLY = the FINAL approved turn.reply; HISTORY = history passages.
             Never use a rejected candidate as evidence for approved facts.
             A changed existing key needs its exact previousValue and reason EVENT or
             USER_DIRECTION; NEW is only for a previously absent key. USER_DIRECTION requires
@@ -45,8 +46,8 @@ public final class SceneContinuityPrompt {
             If already consistent, return turn=null to approve the unchanged candidate without copying it.
             For mode VERIFY, return turn=null and do not correct:
             report any remaining conflicts. An unresolved ambiguity should stay uncertain.
-            Return the normal response envelope, with the following JSON serialized as a STRING
-            in its reply. Outer cast/system/state/time metadata must be empty/zero.
+            Return the following review JSON object directly, using the supplied schema.
+            Do not wrap it in a roleplay response envelope or serialize it as a string.
             {
               "approved":true, "turn": null,
               "changes": [{
