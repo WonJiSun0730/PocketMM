@@ -9,6 +9,7 @@ public record WorldLoreResponse(
         List<WorldLoreItem> entries,
         int totalCharacters,
         int maxTotalCharacters,
-        int maxEntries
+        int maxEntries,
+        int worldTotalCharacters
 ) {
 }

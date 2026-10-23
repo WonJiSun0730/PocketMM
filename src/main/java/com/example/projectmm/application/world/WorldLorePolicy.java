@@ -9,6 +9,16 @@ import java.util.List;
 @Component
 public class WorldLorePolicy {
 
+    public static final int MAX_TOTAL_CHARACTERS = 10_000;
+
+    public void validateWorldTotal(int otherCharacters, List<WorldLoreItem> entries) {
+        long total = (long) otherCharacters + entries.stream()
+                .mapToLong(entry -> length(entry.title()) + length(entry.content())).sum();
+        if (total > MAX_TOTAL_CHARACTERS) {
+            throw new IllegalArgumentException("세계 설정은 모든 항목 합계 10,000자까지 저장할 수 있어요.");
+        }
+    }
+
     public List<WorldLoreItem> normalizeAndValidate(WorldLoreCategory category, List<WorldLoreItem> entries) {
         if (entries == null || entries.isEmpty()) {
             return List.of();
@@ -29,10 +39,10 @@ public class WorldLorePolicy {
                 .mapToInt(entry -> length(entry.title()) + length(entry.content()))
                 .sum();
 
-        if (totalCharacters > category.getMaxTotalCharacters()) {
+        if (totalCharacters > MAX_TOTAL_CHARACTERS) {
             throw new IllegalArgumentException(
                     category + " lore entries must not exceed "
-                            + category.getMaxTotalCharacters()
+                            + MAX_TOTAL_CHARACTERS
                             + " characters in total."
             );
         }

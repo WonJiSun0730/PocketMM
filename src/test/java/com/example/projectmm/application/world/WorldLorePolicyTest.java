@@ -3,49 +3,36 @@ package com.example.projectmm.application.world;
 import com.example.projectmm.api.world.WorldLoreItem;
 import com.example.projectmm.domain.world.WorldLoreCategory;
 import org.junit.jupiter.api.Test;
-
 import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
 
 class WorldLorePolicyTest {
-
     private final WorldLorePolicy policy = new WorldLorePolicy();
 
-    @Test
-    void limitsAreSharedAcrossSlotsInsteadOfAppliedPerSlot() {
-        var entries = List.of(new WorldLoreItem(null, "a".repeat(1200)), new WorldLoreItem(null, "b".repeat(800)));
-
-        assertThat(policy.normalizeAndValidate(
-                WorldLoreCategory.ERA_REGION_BACKGROUND,
-                entries
-        )).hasSize(2);
-
-        assertThatThrownBy(() -> policy.normalizeAndValidate(
-                WorldLoreCategory.ERA_REGION_BACKGROUND,
-                List.of(new WorldLoreItem(null, "a".repeat(1200)), new WorldLoreItem(null, "b".repeat(801)))
-        )).isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("2000 characters in total");
+    @Test void oneCategoryCanUseTheWholeBudgetIncludingTitles() {
+        var entries = policy.normalizeAndValidate(WorldLoreCategory.SOCIETY_CULTURE,
+                List.of(new WorldLoreItem("제목", "a".repeat(9998))));
+        policy.validateWorldTotal(0, entries);
+        assertThatThrownBy(() -> policy.validateWorldTotal(1, entries))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("10,000");
     }
 
-    @Test
-    void societyCultureAllowsAtMostTenSlotsSharingFiveHundredCharacters() {
-        assertThatThrownBy(() -> policy.normalizeAndValidate(
-                WorldLoreCategory.SOCIETY_CULTURE,
+    @Test void categoriesShareOneBudget() {
+        var entries = policy.normalizeAndValidate(WorldLoreCategory.HISTORY,
+                List.of(new WorldLoreItem(null, "a".repeat(4000))));
+        policy.validateWorldTotal(6000, entries);
+        assertThatThrownBy(() -> policy.validateWorldTotal(6001, entries))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test void slotLimitsAndNormalizationRemain() {
+        assertThat(policy.normalizeAndValidate(WorldLoreCategory.HISTORY,
+                List.of(new WorldLoreItem("  제목  ", " 내용 "), new WorldLoreItem("", " "))))
+                .containsExactly(new WorldLoreItem("제목", "내용"));
+        assertThatThrownBy(() -> policy.normalizeAndValidate(WorldLoreCategory.SOCIETY_CULTURE,
                 java.util.stream.IntStream.range(0, 11)
-                        .mapToObj(i -> new WorldLoreItem(null, "x"))
-                        .toList()
-        )).isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("10");
-    }
-
-    @Test
-    void historyAllowsAtMostTenSlotsSharingOneThousandCharacters() {
-        assertThatThrownBy(() -> policy.normalizeAndValidate(
-                WorldLoreCategory.HISTORY,
-                List.of(new WorldLoreItem(null, "a".repeat(600)), new WorldLoreItem(null, "b".repeat(401)))
-        )).isInstanceOf(IllegalArgumentException.class)
-          .hasMessageContaining("1000 characters in total");
+                        .mapToObj(i -> new WorldLoreItem(null, "x")).toList()))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("10");
+        assertThat(policy.normalizeAndValidate(WorldLoreCategory.HISTORY, null)).isEmpty();
     }
 }

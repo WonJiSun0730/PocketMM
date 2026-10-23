@@ -1,12 +1,12 @@
 package com.example.projectmm.domain.world;
 
 public enum WorldLoreCategory {
-    ERA_REGION_BACKGROUND(2000, 20),
-    SOCIETY_CULTURE(500, 10),
-    RACE_ORGANIZATION(1500, 10),
-    WORLD_RULE(1000, 15),
-    TERMINOLOGY(500, 20),
-    HISTORY(1000, 10);
+    ERA_REGION_BACKGROUND(10000, 20),
+    SOCIETY_CULTURE(10000, 10),
+    RACE_ORGANIZATION(10000, 10),
+    WORLD_RULE(10000, 15),
+    TERMINOLOGY(10000, 20),
+    HISTORY(10000, 10);
 
     private final int maxTotalCharacters;
     private final int maxEntries;

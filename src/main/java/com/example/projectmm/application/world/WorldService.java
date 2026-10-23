@@ -92,10 +92,10 @@ public class WorldService {
                 .stream()
                 .map(entry -> new WorldLoreItem(entry.getTitle(), entry.getContent()))
                 .toList();
-        return toLoreResponse(category, entries);
+        return toLoreResponse(world.getId(), category, entries);
     }
 
-    @Transactional
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
     public WorldLoreResponse replaceLore(
             Long worldId,
             WorldLoreCategory category,
@@ -103,7 +103,14 @@ public class WorldService {
             String loginId
     ) {
         World world = findOwnedWorld(worldId, loginId);
+        // Serialize category replacements so simultaneous saves share one world budget.
+        worldRepository.findForLoreUpdate(world.getId());
         List<WorldLoreItem> normalized = worldLorePolicy.normalizeAndValidate(category, entries);
+        int otherCharacters = worldLoreEntryRepository.findByWorldIdOrderByCategoryAscSortOrderAsc(world.getId())
+                .stream().filter(entry -> entry.getCategory() != category)
+                .mapToInt(entry -> (entry.getTitle() == null ? 0 : entry.getTitle().length())
+                        + (entry.getContent() == null ? 0 : entry.getContent().length())).sum();
+        worldLorePolicy.validateWorldTotal(otherCharacters, normalized);
 
         worldLoreEntryRepository.deleteByWorldIdAndCategory(world.getId(), category);
         for (int i = 0; i < normalized.size(); i++) {
@@ -112,7 +119,7 @@ public class WorldService {
             );
         }
 
-        return toLoreResponse(category, normalized);
+        return toLoreResponse(world.getId(), category, normalized);
     }
 
     private World findOwnedWorld(Long worldId, String loginId) {
@@ -130,7 +137,7 @@ public class WorldService {
         return new WorldResponse(world.getId(), world.getName(), world.getDescription(), world.getCoverImageUrl());
     }
 
-    private WorldLoreResponse toLoreResponse(WorldLoreCategory category, List<WorldLoreItem> entries) {
+    private WorldLoreResponse toLoreResponse(Long worldId, WorldLoreCategory category, List<WorldLoreItem> entries) {
         int totalCharacters = entries.stream()
                 .mapToInt(entry -> (entry.title() == null ? 0 : entry.title().length()) + entry.content().length())
                 .sum();
@@ -139,7 +146,10 @@ public class WorldService {
                 entries,
                 totalCharacters,
                 category.getMaxTotalCharacters(),
-                category.getMaxEntries()
+                category.getMaxEntries(),
+                worldLoreEntryRepository.findByWorldIdOrderByCategoryAscSortOrderAsc(worldId).stream()
+                        .mapToInt(entry -> (entry.getTitle() == null ? 0 : entry.getTitle().length())
+                                + (entry.getContent() == null ? 0 : entry.getContent().length())).sum()
         );
     }
 

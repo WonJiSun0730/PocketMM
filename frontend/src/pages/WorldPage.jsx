@@ -7,13 +7,15 @@ import "./PublishedWorldsPage.css"
 import { newWorldSystem, prepareWorldSystems } from "@/lib/worldSystemForm"
 import "./WorldPage.css"
 
+const WORLD_LORE_LIMIT = 10000
+
 const categories = [
-  { id: "ERA_REGION_BACKGROUND", label: "시대 / 지역 / 배경", maxCharacters: 2000, maxEntries: 20 },
-  { id: "SOCIETY_CULTURE", label: "사회 / 문화", maxCharacters: 500, maxEntries: 10 },
-  { id: "RACE_ORGANIZATION", label: "종족 / 조직", maxCharacters: 1500, maxEntries: 10 },
-  { id: "WORLD_RULE", label: "세계 규칙", maxCharacters: 1000, maxEntries: 15 },
-  { id: "TERMINOLOGY", label: "용어 / 고유명사", maxCharacters: 500, maxEntries: 20 },
-  { id: "HISTORY", label: "세계 사건 / 역사", maxCharacters: 1000, maxEntries: 10 },
+  { id: "ERA_REGION_BACKGROUND", label: "시대 / 지역 / 배경", maxEntries: 20 },
+  { id: "SOCIETY_CULTURE", label: "사회 / 문화", maxEntries: 10 },
+  { id: "RACE_ORGANIZATION", label: "종족 / 조직", maxEntries: 10 },
+  { id: "WORLD_RULE", label: "세계 규칙", maxEntries: 15 },
+  { id: "TERMINOLOGY", label: "용어 / 고유명사", maxEntries: 20 },
+  { id: "HISTORY", label: "세계 사건 / 역사", maxEntries: 10 },
 ]
 
 export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket, onOpenPublished }) {
@@ -22,6 +24,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket, onOpe
   const [selectedWorld, setSelectedWorld] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState(categories[0])
   const [entries, setEntries] = useState([])
+  const [otherLoreCharacters, setOtherLoreCharacters] = useState(0)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState("")
   const [draftReady, setDraftReady] = useState(false)
@@ -49,6 +52,8 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket, onOpe
     [entries]
   )
 
+  const worldTotalCharacters = otherLoreCharacters + totalCharacters
+
   useEffect(() => { loadWorlds() }, [])
 
   useEffect(() => {
@@ -69,7 +74,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket, onOpe
     }))
 
     window.clearTimeout(autosaveTimer.current)
-    if (allowLoreAutosaveRef.current && totalCharacters <= selectedCategory.maxCharacters) {
+    if (allowLoreAutosaveRef.current && worldTotalCharacters <= WORLD_LORE_LIMIT) {
       autosaveTimer.current = window.setTimeout(() => saveLore(true, worldId, categoryId, entries), 800)
     }
     return () => window.clearTimeout(autosaveTimer.current)
@@ -323,6 +328,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket, onOpe
       return
     }
     const data = await response.json()
+    setOtherLoreCharacters(Math.max(0, (data.worldTotalCharacters ?? 0) - (data.totalCharacters ?? 0)))
     const key = draftKey(worldId, category)
     const stored = localStorage.getItem(key)
     if (stored) {
@@ -415,7 +421,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket, onOpe
   }
 
   async function saveLore(silent = false, worldId = selectedWorld?.id, categoryId = selectedCategory.id, values = entries) {
-    if (!worldId || values.reduce((sum, entry) => sum + (entry.title?.length ?? 0) + (entry.content?.length ?? 0), 0) > selectedCategory.maxCharacters) return
+    if (!worldId || values.reduce((sum, entry) => sum + (entry.title?.length ?? 0) + (entry.content?.length ?? 0), 0) + otherLoreCharacters > WORLD_LORE_LIMIT) return
     const saveVersion = editVersionRef.current
     if (!silent) setMessage("")
     try {
@@ -428,8 +434,14 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket, onOpe
           body: JSON.stringify({ entries: values }),
         }
       )
-      if (!response.ok) throw new Error("세계 설정을 저장하지 못했어요.")
+      if (!response.ok) {
+        const detail = await response.json().catch(() => null)
+        throw new Error(detail?.message || "세계 설정을 저장하지 못했어요. 전체 10,000자 제한을 확인해 주세요.")
+      }
       const data = await response.json()
+      if (loadedLoreRef.current?.worldId === worldId && loadedLoreRef.current?.categoryId === categoryId) {
+        setOtherLoreCharacters(Math.max(0, data.worldTotalCharacters - data.totalCharacters))
+      }
       if (editVersionRef.current === saveVersion) {
         const savedEntries = data.entries ?? []
         if (JSON.stringify(savedEntries) === JSON.stringify(values)) {
@@ -457,7 +469,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket, onOpe
           <h1>작은 세계를 정리해요</h1>
           <p>필요한 설정만 짧은 슬롯으로 나눠 두면, 관련 장면에서 꺼내 쓸 수 있어요.</p>
         </div>
-        <button className="world-save" disabled={!selectedWorld || savingSystems || (!systemMode && totalCharacters > selectedCategory.maxCharacters)} onClick={() => systemMode ? saveSystems() : saveLore(false)} type="button">
+        <button className="world-save" disabled={!selectedWorld || savingSystems || (!systemMode && worldTotalCharacters > WORLD_LORE_LIMIT)} onClick={() => systemMode ? saveSystems() : saveLore(false)} type="button">
           <Save size={16} /> {systemMode && savingSystems ? "저장 중..." : "저장"}
         </button>
       </header>
@@ -545,7 +557,7 @@ export default function WorldPage({ onBack, onOpenWorldChat, onOpenPocket, onOpe
               ) : (<>
               <div className="world-limit-row">
                 <span>{entries.length} / {selectedCategory.maxEntries} 슬롯</span>
-                <span className={totalCharacters > selectedCategory.maxCharacters ? "over" : ""}>{totalCharacters.toLocaleString()} / {selectedCategory.maxCharacters.toLocaleString()}자</span>
+                <span className={worldTotalCharacters > WORLD_LORE_LIMIT ? "over" : ""}>현재 항목 {totalCharacters.toLocaleString()}자 · 전체 {worldTotalCharacters.toLocaleString()} / 10,000자</span>
               </div>
               <div className="lore-entry-list">
                 {entries.map((entry, index) => (

@@ -58,7 +58,7 @@ class WorldServiceTest {
     }
 
     @Test
-    void loreSlotsPersistInOrderAndShareCategoryCharacterLimit() {
+    void loreSlotsPersistInOrderAndShareWorldCharacterLimit() {
         Member owner = saveMember("worldowner3", "worldowner3@pocketmm.test");
         var world = worldService.create(
                 new WorldCreateRequest("QWL", null),
@@ -74,7 +74,7 @@ class WorldServiceTest {
 
         assertThat(saved.entries()).extracting(WorldLoreItem::content).containsExactly("a".repeat(1200), "b".repeat(800));
         assertThat(saved.totalCharacters()).isEqualTo(2000);
-        assertThat(saved.maxTotalCharacters()).isEqualTo(2000);
+        assertThat(saved.maxTotalCharacters()).isEqualTo(10000);
         assertThat(saved.maxEntries()).isEqualTo(20);
 
         assertThat(worldLoreEntryRepository
@@ -85,6 +85,13 @@ class WorldServiceTest {
                 .extracting("content")
                 .containsExactly("a".repeat(1200), "b".repeat(800));
 
+        var history = worldService.replaceLore(world.id(), WorldLoreCategory.HISTORY,
+                List.of(new WorldLoreItem(null, "h".repeat(8000))), owner.getLoginId());
+        assertThat(history.worldTotalCharacters()).isEqualTo(10000);
+        // Replacing a category must exclude its previous contents from the budget.
+        assertThat(worldService.replaceLore(world.id(), WorldLoreCategory.ERA_REGION_BACKGROUND,
+                saved.entries(), owner.getLoginId()).worldTotalCharacters()).isEqualTo(10000);
+
         assertThatThrownBy(() -> worldService.replaceLore(
                 world.id(),
                 WorldLoreCategory.ERA_REGION_BACKGROUND,
@@ -92,7 +99,7 @@ class WorldServiceTest {
                 owner.getLoginId()
         ))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("2000 characters in total");
+                .hasMessageContaining("10,000");
     }
 
     @Test
