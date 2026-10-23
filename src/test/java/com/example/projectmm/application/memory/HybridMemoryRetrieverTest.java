@@ -10,8 +10,35 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
 
 class HybridMemoryRetrieverTest {
+
+    @Test void noSemanticCandidatesKeepRankingWithoutAnyEmbeddingCall() {
+        var provider=mock(MemoryEmbeddingProvider.class);
+        var documents=mock(CachedMemoryEmbeddingService.class);
+        var ranker=new MemoryRetrievalRanker();
+        var items=List.of(memory(1L,"potato",50,null),memory(2L,"other",90,null));
+        var result=new HybridMemoryRetriever(provider,documents,ranker).retrieve("potato",items,2);
+        assertThat(result).isEqualTo(ranker.rank("potato",items,items.size()).stream().limit(2).toList());
+        verifyNoInteractions(provider,documents);
+    }
+
+    @Test void identicalQueryVectorCanBeSharedWithoutSharingCharacterCandidatesOrResults() {
+        var provider=mock(MemoryEmbeddingProvider.class);when(provider.embed("query")).thenReturn(List.of(1.0,0.0));
+        var documents=mock(CachedMemoryEmbeddingService.class);
+        var semantic=semantic(SemanticMemory.Type.PREFERENCE,"likes");
+        when(documents.embeddingFor(1L,semantic)).thenReturn(List.of(1.0,0.0));
+        when(documents.embeddingFor(2L,semantic)).thenReturn(List.of(0.5,0.5));
+        var retriever=new HybridMemoryRetriever(provider,documents,new MemoryRetrievalRanker());
+        MemoryQueryEmbeddingScope.within(()->{
+            assertThat(retriever.retrieve("query",List.of(memory(1L,"first",90,semantic)),1)).extracting(EffectiveMemory::memoryId).containsExactly(1L);
+            assertThat(retriever.retrieve("query",List.of(memory(2L,"second",90,semantic)),1)).extracting(EffectiveMemory::memoryId).containsExactly(2L);
+            return null;
+        });
+        verify(provider,times(1)).embed("query");verify(documents).embeddingFor(1L,semantic);verify(documents).embeddingFor(2L,semantic);
+    }
 
     @Test
     void semanticSimilarityCanOutrankStrongerMemory() {
