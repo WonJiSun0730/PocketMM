@@ -40,13 +40,11 @@
   font-size: 11px;
 }
 
-.logo-placeholder {
+.pocketmm-brand-logo {
   width: 40px;
   height: 40px;
   flex: 0 0 40px;
-  border: 1px dashed var(--border);
-  border-radius: 10px;
-  background: var(--secondary);
+  object-fit: contain;
 }
 
 .desktop-nav {
@@ -395,7 +393,7 @@
     justify-content: space-between;
   }
 
-  .mobile-header .logo-placeholder {
+  .mobile-header .pocketmm-brand-logo {
     width: 34px;
     height: 34px;
     flex-basis: 34px;

@@ -60,7 +60,7 @@ export default function HomePage({ onOpenCharacters, onOpenWorld, onOpenPockets,
     <div className="now-shell">
       <aside className="now-sidebar">
         <div className="brand-block">
-          <div className="logo-placeholder" aria-label="PocketMM logo placeholder" />
+          <img className="pocketmm-brand-logo" src="/pocketmm-logo.png" alt="PocketMM 로고" />
           <div>
             <strong>PocketMM</strong>
             <span>Living character world</span>
@@ -94,7 +94,7 @@ export default function HomePage({ onOpenCharacters, onOpenWorld, onOpenPockets,
       <main className="now-main">
         <header className="mobile-header">
           <div className="brand-block">
-            <div className="logo-placeholder" aria-label="PocketMM logo placeholder" />
+            <img className="pocketmm-brand-logo" src="/pocketmm-logo.png" alt="PocketMM 로고" />
             <strong>PocketMM</strong>
           </div>
           <button

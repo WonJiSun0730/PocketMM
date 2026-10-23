@@ -102,7 +102,7 @@ export default function LoginPage({ onAuthenticated, onOpenSignup }) {
 
 export function AuthFrame({ title, description, children }) {
   return <main className="auth-shell"><section className="auth-card">
-    <header className="auth-brand"><div className="auth-logo-placeholder" /><span>PocketMM</span></header>
+    <header className="auth-brand"><img className="auth-logo" src="/pocketmm-logo.png" alt="PocketMM 로고" /><span>PocketMM</span></header>
     <div className="auth-heading"><h1>{title}</h1><p>{description}</p></div>
     {children}
   </section></main>
