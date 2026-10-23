@@ -67,13 +67,6 @@ export default function PocketPage({ pocket, onBack }) {
   const [changingPlayerProfile, setChangingPlayerProfile] = useState(false)
   const [messages, setMessages] = useState([])
   const [chatFailures,setChatFailures]=useState([])
-  useEffect(()=>{
-    let active=true
-    fetch(`${base}/chat/failures`,{credentials:"include"}).then(r=>r.ok?r.json():[]).then(rows=>{
-      if(active && Array.isArray(rows))setChatFailures(current=>mergeChatFailures(current,rows,session.id))
-    }).catch(()=>{})
-    return ()=>{active=false}
-  },[base,session.id])
   const [replyPreview, setReplyPreview] = useState(null)
   const [streamFinished,setStreamFinished]=useState(false)
   const typingDrain=useRef(null)
@@ -114,6 +107,16 @@ export default function PocketPage({ pocket, onBack }) {
   const [issueNotice, setIssueNotice] = useState("")
   const [exportingTestData, setExportingTestData] = useState(false)
   const [isDeveloper, setIsDeveloper] = useState(false)
+  const [isAdministrator, setIsAdministrator] = useState(false)
+  useEffect(()=>{
+    if(!isAdministrator)return
+    let active=true
+    fetch(`${base}/chat/failures`,{credentials:"include"}).then(r=>r.ok?r.json():[]).then(rows=>{
+      if(active && Array.isArray(rows))setChatFailures(current=>mergeChatFailures(current,rows,session.id))
+    }).catch(()=>{})
+    return ()=>{active=false}
+  },[base,session.id,isAdministrator])
+
   const [devOpen, setDevOpen] = useState(false)
   const [mobileToolsOpen,setMobileToolsOpen] = useState(false)
   const mobileToolsRef = useRef(null)
@@ -295,8 +298,8 @@ export default function PocketPage({ pocket, onBack }) {
     let active = true
     fetch("/api/auth/me", { credentials: "include" })
       .then(response => response.ok ? response.json() : null)
-      .then(member => { if (active) setIsDeveloper(member?.role === "DEVELOPER") })
-      .catch(() => { if (active) setIsDeveloper(false) })
+      .then(member => { if (active) {setIsDeveloper(member?.role === "DEVELOPER");setIsAdministrator(["ADMIN","DEVELOPER"].includes(member?.role))} })
+      .catch(() => { if (active) {setIsDeveloper(false);setIsAdministrator(false)} })
     return () => { active = false }
   }, [])
   // Scene rendering must keep receiving runtime state even when the legacy editor is hidden.
@@ -416,7 +419,7 @@ export default function PocketPage({ pocket, onBack }) {
         body: JSON.stringify({ message }),
       })
       await readPocketChatStream(response, event => {
-        if(event.type === "review_warning" && event.reviewFailure) {
+        if(isAdministrator && event.type === "review_warning" && event.reviewFailure) {
           setChatFailures(current=>mergeChatFailures(current,[{...event.reviewFailure,diagnosticsSaved:event.diagnosticsSaved!==false}],session.id))
         }
         if (event.type === "delta") {
@@ -443,7 +446,7 @@ export default function PocketPage({ pocket, onBack }) {
       await refreshMemoryInspector()
       await refreshAiUsage()
     } catch (e) {
-      if(e.reviewFailure)setChatFailures(current=>mergeChatFailures(current,[e.reviewFailure],session.id))
+      if(isAdministrator && e.reviewFailure)setChatFailures(current=>mergeChatFailures(current,[e.reviewFailure],session.id))
       chatTiming.failed(timingId)
       setReplyPreview(null)
       setMessages(current => current.filter(item => item.id !== pending.id))
@@ -591,7 +594,6 @@ export default function PocketPage({ pocket, onBack }) {
     return <main className="min-h-svh bg-background text-foreground">
       <p className="mx-auto max-w-2xl px-4 pt-6 text-sm text-muted-foreground">{room.title} · 유저 프로필 선택</p>
       {error && <p role="alert" className="mx-auto max-w-2xl px-4 py-2 text-destructive">{error}</p>}
-      <ChatFailurePanel records={chatFailures.filter(row=>String(row.sessionId)===String(session.id))} error={error}/>
       <PlayerProfilePicker
         current={selectedPlayerProfile}
         busy={changingPlayerProfile}
@@ -651,7 +653,6 @@ export default function PocketPage({ pocket, onBack }) {
       </section>
 
       {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}
-      <ChatFailurePanel records={chatFailures.filter(row=>String(row.sessionId)===String(session.id))} error={error}/>
 
       <dialog ref={mobileToolsRef} className="pocket-mobile-tools" aria-label="포켓 메뉴"
         onCancel={event=>{event.preventDefault();setMobileToolsOpen(false)}}>
@@ -690,7 +691,7 @@ export default function PocketPage({ pocket, onBack }) {
       </div>
 
       <div>
-      {isDeveloper && <section className="shrink-0 border-b bg-muted/20">
+      {isAdministrator && <section className="shrink-0 border-b bg-muted/20">
         <button type="button" onClick={() => setDevOpen(open => !open)}
           className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-muted-foreground sm:px-6">
           <Wrench className="size-3.5" />
@@ -698,6 +699,8 @@ export default function PocketPage({ pocket, onBack }) {
           <ChevronDown className={`ml-auto size-3.5 transition-transform ${devOpen ? "rotate-180" : ""}`} />
         </button>
         {devOpen && <div className="border-t px-4 py-3 sm:px-6">
+          <ChatFailurePanel records={chatFailures.filter(row=>String(row.sessionId)===String(session.id))}/>
+          {isDeveloper && <>
           <PocketQaPanel sessionId={session.id} />
           <PocketExperienceQaPanel sessionId={session.id} />
           <PocketChatTimingPanel timing={chatTiming} records={timingRecords} />
@@ -793,6 +796,7 @@ export default function PocketPage({ pocket, onBack }) {
                 </div>)}
               </div>}
           </div>
+          </>}
         </div>}
       </section>}
 
@@ -892,7 +896,7 @@ export default function PocketPage({ pocket, onBack }) {
       </div>
 
       <div>
-      {isDeveloper && <section className="shrink-0 border-b bg-muted/20">
+      {isAdministrator && <section className="shrink-0 border-b bg-muted/20">
         <button type="button" onClick={() => setDevOpen(open => !open)}
           className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-muted-foreground sm:px-6">
           <Wrench className="size-3.5" />
@@ -900,6 +904,8 @@ export default function PocketPage({ pocket, onBack }) {
           <ChevronDown className={`ml-auto size-3.5 transition-transform ${devOpen ? "rotate-180" : ""}`} />
         </button>
         {devOpen && <div className="border-t px-4 py-3 sm:px-6">
+          <ChatFailurePanel records={chatFailures.filter(row=>String(row.sessionId)===String(session.id))}/>
+          {isDeveloper && <>
           <PocketQaPanel sessionId={session.id} />
           <PocketExperienceQaPanel sessionId={session.id} />
           <PocketChatTimingPanel timing={chatTiming} records={timingRecords} />
@@ -995,6 +1001,7 @@ export default function PocketPage({ pocket, onBack }) {
                 </div>)}
               </div>}
           </div>
+          </>}
         </div>}
       </section>}
 

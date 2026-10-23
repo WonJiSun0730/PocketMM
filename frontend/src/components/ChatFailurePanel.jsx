@@ -1,10 +1,11 @@
 const modeLabel={REVIEW:"답변 검사",VERIFY:"수정본 재검사",BOOTSTRAP:"이전 대화 보강 검사",UNKNOWN:"검사"}
-export default function ChatFailurePanel({records,error}) {
+export default function ChatFailurePanel({records}) {
   if(!records.length)return null
-  return <section className="shrink-0 border-b px-4 py-2 text-sm" aria-label="장면 검사 검토 기록">
-    <p className="font-medium">장면 검사 검토 기록</p>
+  return <details className="mb-3 rounded-lg border bg-background p-3 text-xs" aria-label="장면 검사 검토 기록">
+    <summary className="cursor-pointer font-medium">장면 검사 검토 기록 · 최근 {Math.min(records.length,10)}건</summary>
+    <div className="mt-2 max-h-80 overflow-y-auto overscroll-contain break-words pr-1">
     <p className="text-xs text-muted-foreground">검사기의 판단이며 실제 오류로 확정된 것은 아닙니다. 자동 재생성하지 않습니다.</p>
-    {records.map(row=><details key={row.requestId} open={Boolean(error?.includes(row.requestId))} className="mt-2">
+    {records.slice(0,10).map(row=><details key={row.requestId} className="mt-2">
       <summary className="cursor-pointer">{new Date(row.createdAt).toLocaleString("ko-KR")} · {modeLabel[row.mode]??"검사"} · {row.requestId}</summary>
       <ul className="my-2 list-disc pl-5">{(row.reasons??[]).map((text,i)=><li key={i}>{text}</li>)}</ul>
       <p className="font-medium">검사기가 보고한 구체적 충돌</p>
@@ -14,5 +15,6 @@ export default function ChatFailurePanel({records,error}) {
       {row.truncated && <p className="text-muted-foreground">긴 진단 내용 일부가 생략됐습니다.</p>}
       {row.diagnosticsSaved===false && <p className="text-destructive">기록 저장에 실패해 현재 화면에서만 확인할 수 있습니다.</p>}
     </details>)}
-  </section>
+    </div>
+  </details>
 }

@@ -24,6 +24,8 @@ class PocketChatStreamControllerTest {
 
     void owned(long worldId) {
         when(auth.getName()).thenReturn("owner");
+        when(auth.isAuthenticated()).thenReturn(true);
+        doReturn(java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_DEVELOPER"))).when(auth).getAuthorities();
         var session=mock(WorldRoomSession.class,RETURNS_DEEP_STUBS);
         when(session.getRoom().getWorld().getId()).thenReturn(worldId);
         when(sessions.ownedSession(2L,3L,"owner")).thenReturn(session);
@@ -115,6 +117,42 @@ class PocketChatStreamControllerTest {
         assertThat(body.indexOf("review_warning")).isLessThan(body.indexOf("complete"));
         assertThat(SceneContinuityObservation.enabled()).isFalse();
         verify(dialogue,times(1)).chat(3L,"hello");
+    }
+
+    @Test void ordinaryOwnerCannotReadReviewHistory() {
+        owned(1L);doReturn(java.util.List.of()).when(auth).getAuthorities();
+        assertThatThrownBy(()->controller.failures(1L,2L,3L,auth,new MockHttpServletResponse()))
+                .isInstanceOfSatisfying(ResponseStatusException.class,e->assertThat(e.getStatusCode().value()).isEqualTo(403));
+        verifyNoInteractions(failures);
+    }
+    @Test void ordinaryOwnerCompletesChatWithoutReceivingReviewDetails() throws Exception {
+        owned(1L);doReturn(java.util.List.of()).when(auth).getAuthorities();
+        when(dialogue.chat(3L,"hello")).thenAnswer(call->{
+            SceneContinuityObservation.record("REVIEW","REJECTED","private diagnostic",
+                    new SceneContinuityService.Review(false,null,java.util.List.of(),java.util.List.of("private conflict")));
+            return new WorldRoomTurn("reply",WorldRoomCastChange.none());
+        });
+        var response=new MockHttpServletResponse();controller.chat(1L,2L,3L,new WorldRoomChatRequest("hello"),auth,response);
+        assertThat(response.getContentAsString()).contains("complete","reply").doesNotContain("review_warning","reviewFailure","private conflict","private diagnostic");
+        verify(failures).save(any());
+    }
+    @Test void ordinaryOwnerFailureDoesNotLeakStoredReviewEvidence() throws Exception {
+        owned(1L);doReturn(java.util.List.of()).when(auth).getAuthorities();
+        when(dialogue.chat(3L,"hello")).thenThrow(new SceneContinuityService.ReviewRejectedException(
+                new SceneContinuityService.Review(false,null,java.util.List.of(),java.util.List.of("private conflict")),"REVIEW"));
+        var response=new MockHttpServletResponse();controller.chat(1L,2L,3L,new WorldRoomChatRequest("hello"),auth,response);
+        assertThat(response.getContentAsString()).contains("failed").doesNotContain("reviewFailure","private conflict");
+        verify(failures).save(any());
+    }
+
+    @Test void administratorCanReadOwnedHistoryButNotAnotherWorld() throws Exception {
+        owned(1L);
+        doReturn(java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"))).when(auth).getAuthorities();
+        when(failures.latest(3L)).thenReturn(java.util.List.of());
+        assertThat(controller.failures(1L,2L,3L,auth,new MockHttpServletResponse())).isEmpty();
+        assertThatThrownBy(()->controller.failures(99L,2L,3L,auth,new MockHttpServletResponse()))
+                .isInstanceOfSatisfying(ResponseStatusException.class,e->assertThat(e.getStatusCode().value()).isEqualTo(404));
+        verify(failures,times(1)).latest(3L);
     }
 
 }

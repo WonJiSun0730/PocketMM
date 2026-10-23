@@ -66,7 +66,8 @@ public class PocketChatStreamController {
                     boolean saved=false;
                     try {failures.save(evidence);saved=true;}
                     catch(IOException|RuntimeException saveFailure) {LOG.warn("Continuity advisory save failed session={}",sessionId);}
-                    emit.accept(Map.of("type","review_warning","reviewFailure",evidence,"diagnosticsSaved",saved));
+                    if(administrator(authentication))
+                        emit.accept(Map.of("type","review_warning","reviewFailure",evidence,"diagnosticsSaved",saved));
                 }
                 return result;
             });
@@ -88,7 +89,7 @@ public class PocketChatStreamController {
             var event=new java.util.LinkedHashMap<String,Object>();
             event.put("type","failed");event.put("code",detail.code());event.put("phase",detail.phase());event.put("requestId",requestId);
             event.put("message",com.example.projectmm.application.dialogue.DialogueFailure.message(detail,requestId));
-            if(evidence!=null){event.put("reviewFailure",evidence);event.put("diagnosticsSaved",saved);}
+            if(evidence!=null && administrator(authentication)){event.put("reviewFailure",evidence);event.put("diagnosticsSaved",saved);}
             emit.accept(event);
         }
     }
@@ -97,9 +98,15 @@ public class PocketChatStreamController {
     public java.util.List<com.example.projectmm.application.dialogue.ChatFailureStore.Evidence> failures(
             @PathVariable Long worldId,@PathVariable Long roomId,@PathVariable Long sessionId,
             Authentication authentication,HttpServletResponse response) throws IOException {
+        if(!administrator(authentication))throw new ResponseStatusException(HttpStatus.FORBIDDEN,"관리자만 검토 기록을 조회할 수 있어요.");
         var session=sessions.ownedSession(roomId,sessionId,authentication.getName());
         if(!worldId.equals(session.getRoom().getWorld().getId()))throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         response.setHeader("Cache-Control","no-store");
         return failures.latest(sessionId);
     }
+    private static boolean administrator(Authentication authentication) {
+        return authentication!=null && authentication.isAuthenticated()
+                && authentication.getAuthorities().stream().anyMatch(a->java.util.Set.of("ROLE_ADMIN","ROLE_DEVELOPER").contains(a.getAuthority()));
+    }
+
 }
