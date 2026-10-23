@@ -45,6 +45,14 @@ test("turning off before dispatch avoids a paid request",async()=>{
   assert.equal(calls,0)
   manager.toggle();await tick();assert.equal(calls,1)
 })
+test("partial results and safe failure reasons are preserved without retries",async()=>{
+  const manager=createReplySuggestions(async()=>({status:"PARTIAL",suggestions:["one","two"],message:"partial"}))
+  manager.setScene({key:"1"});manager.toggle();await tick()
+  assert.equal(manager.getSnapshot().status,"PARTIAL");assert.equal(manager.getSnapshot().suggestions.length,2)
+  const failed=createReplySuggestions(async()=>({status:"FAILED",suggestions:[],errorCode:"HTTP_400",message:"request rejected"}))
+  failed.setScene({key:"1"});failed.toggle();await tick()
+  assert.match(failed.getSnapshot().error,/HTTP_400/)
+})
 test("asterisk wraps selection and keeps cursor/selection inside, including emoji",()=>{
   assert.deepEqual(wrapAction("가나다",1,2),{value:"가*나*다",start:2,end:3})
   assert.deepEqual(wrapAction("가나다",1),{value:"가**나다",start:2,end:2})

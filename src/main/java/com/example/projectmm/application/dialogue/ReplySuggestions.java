@@ -22,35 +22,60 @@ public final class ReplySuggestions {
     public record Payload(List<Draft> suggestions) {}
     public static Map<String,Object> schema() {
         var draft=Map.of("type","object","additionalProperties",false,
-                "properties",Map.of("action",Map.of("type","string","maxLength",80),
-                        "speech",Map.of("type","string","maxLength",120)),
+                "properties",Map.of("action",Map.of("type","string"),
+                        "speech",Map.of("type","string")),
                 "required",List.of("action","speech"));
         return Map.of("type","object","additionalProperties",false,"properties",
-                Map.of("suggestions",Map.of("type","array","minItems",3,"maxItems",3,"items",draft)),
+                Map.of("suggestions",Map.of("type","array","items",draft)),
                 "required",List.of("suggestions"));
     }
+    public static final class Failure extends IllegalStateException {
+        private final String code;
+        private final String payload;
+        public Failure(String code,String message,String payload,Throwable cause) {
+            super(message,cause);this.code=code;this.payload=payload;
+        }
+        public String code(){return code;}
+        public String payload(){return payload;}
+    }
     public static List<String> parse(String payload) {
-        var parsed=new ObjectMapper().readValue(payload,Payload.class);
-        if(parsed==null || parsed.suggestions()==null || parsed.suggestions().size()!=3)
-            throw new IllegalStateException("Expected three reply suggestions");
+        Payload parsed;
+        try {
+            String text=payload==null?"":payload.strip();
+            if(text.startsWith("```"))text=text.replaceFirst("^```(?:json)?\\s*","").replaceFirst("\\s*```$","");
+            parsed=new ObjectMapper().readValue(text,Payload.class);
+        } catch(RuntimeException invalid) {
+            throw new Failure("INVALID_JSON","추천 응답 형식을 읽지 못했어요.",payload,invalid);
+        }
+        if(parsed==null || parsed.suggestions()==null)
+            throw new Failure("MISSING_DRAFTS","추천 목록이 응답에 없어요.",payload,null);
         var result=new ArrayList<String>();
         for(var draft:parsed.suggestions()) {
-            if(draft==null)throw new IllegalStateException("Missing suggestion");
+            if(draft==null)continue;
             String action=part(draft.action(),80),speech=part(draft.speech(),120);
-            if(action.isBlank() && speech.isBlank())throw new IllegalStateException("Empty suggestion");
+            if(action.isBlank() && speech.isBlank())continue;
             String text=(action.isBlank()?"":"*"+action+"*")+(action.isBlank()||speech.isBlank()?"":" ")+speech;
-            if(result.contains(text))throw new IllegalStateException("Duplicate suggestion");
-            result.add(text);
+            if(!result.contains(text))result.add(text);
+            if(result.size()==3)break;
         }
+        if(result.isEmpty())throw new Failure("EMPTY_DRAFTS","사용할 수 있는 추천 문장이 없어요.",payload,null);
         return List.copyOf(result);
     }
     private static String part(String text,int max) {
-        if(text==null || text.length()>max || text.contains("\n") || text.contains("\r") || text.contains("*"))
-            throw new IllegalStateException("Invalid suggestion length or format");
-        text=text.trim();
-        // At most one sentence per part; terminal punctuation and closing quotes are allowed.
-        if(text.matches("(?s).*[.!?。！？][^.!?。！？\\\"'’”]*[\\p{L}\\p{N}].*"))
-            throw new IllegalStateException("Suggestion contains multiple sentences");
+        if(text==null)return "";
+        text=text.replace("*","").replaceAll("[\\r\\n\\t]+"," ").strip();
+        while(!text.isEmpty() && "\"'‘’“”".indexOf(text.charAt(0))>=0)text=text.substring(1).strip();
+        while(!text.isEmpty() && "\"'‘’“”".indexOf(text.charAt(text.length()-1))>=0)text=text.substring(0,text.length()-1).strip();
+        for(int i=0;i<text.length();i++) {
+            char c=text.charAt(i);
+            if(".!?。！？".indexOf(c)<0)continue;
+            if(c=='.' && i>0 && i+1<text.length() && Character.isDigit(text.charAt(i-1)) && Character.isDigit(text.charAt(i+1)))continue;
+            int end=i+1;
+            while(end<text.length() && ".!?。！？".indexOf(text.charAt(end))>=0)end++;
+            text=text.substring(0,end);break;
+        }
+        int count=text.codePointCount(0,text.length());
+        if(count>max)text=text.substring(0,text.offsetByCodePoints(0,max-1))+"…";
         return text;
     }
 }

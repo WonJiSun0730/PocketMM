@@ -47,4 +47,25 @@ class ReplySuggestionStoreTest {
         var next=new ReplySuggestionScene.Snapshot(1L,"b".repeat(64),"next passage");
         assertThat(store.getOrCreate(next,()->List.of("seven","eight","nine")).suggestions()).containsExactly("seven","eight","nine");
     }
+    @Test void oldFailureIsExplainedWithoutChargingAgain() throws Exception {
+        var folder=directory.resolve("1");java.nio.file.Files.createDirectories(folder);
+        java.nio.file.Files.writeString(folder.resolve(scene.key()+".json"),
+                "{\"sceneKey\":\""+scene.key()+"\",\"status\":\"FAILED\",\"suggestions\":[]}");
+        var result=new ReplySuggestionStore(directory.toString()).getOrCreate(scene,()->{throw new AssertionError("paid retry");});
+        assertThat(result.errorCode()).isEqualTo("LEGACY_FAILURE");
+    }
+    @Test void generatedPayloadSurvivesParserFailureButGenericExceptionMessagesAreNotSaved() throws Exception {
+        var store=new ReplySuggestionStore(directory.toString());
+        var result=store.getOrCreate(scene,()->{throw new ReplySuggestions.Failure("INVALID_JSON","invalid draft","generated drafts",null);});
+        assertThat(result.errorCode()).isEqualTo("INVALID_JSON");
+        assertThat(java.nio.file.Files.readString(directory.resolve("1").resolve(scene.key()+".failure.json"))).contains("generated drafts");
+        var other=new ReplySuggestionScene.Snapshot(2L,scene.key(),"private prompt");
+        store.getOrCreate(other,()->{throw new IllegalStateException("SECRET provider message");});
+        assertThat(java.nio.file.Files.readString(directory.resolve("2").resolve(scene.key()+".failure.json")))
+                .doesNotContain("SECRET","private prompt");
+    }
+    @Test void keepsPartialSuggestionsInsteadOfReportingTotalFailure() throws Exception {
+        var result=new ReplySuggestionStore(directory.toString()).getOrCreate(scene,()->List.of("first","second"));
+        assertThat(result.status()).isEqualTo("PARTIAL");assertThat(result.suggestions()).hasSize(2);
+    }
 }

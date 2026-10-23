@@ -45,13 +45,37 @@ class OpenAiReplySuggestionsTest {
         });
         assertThat(usage.latest(1L)).isNull();verifyNoInteractions(builder);
     }
-    @Test void rejectsTooManySentencesDuplicatesAndOversizedDraftsWithoutRepairCall() {
-        for(var drafts:List.of(
-                List.of(new ReplySuggestions.Draft("","첫 문장. 두 번째 문장."),new ReplySuggestions.Draft("","둘"),new ReplySuggestions.Draft("","셋")),
-                List.of(new ReplySuggestions.Draft("","같음"),new ReplySuggestions.Draft("","같음"),new ReplySuggestions.Draft("","셋")),
-                List.of(new ReplySuggestions.Draft("가".repeat(81),""),new ReplySuggestions.Draft("","둘"),new ReplySuggestions.Draft("","셋")))) {
-            assertThatThrownBy(()->ReplySuggestions.parse(json.writeValueAsString(new ReplySuggestions.Payload(drafts))))
-                    .isInstanceOf(IllegalStateException.class);
-        }
+    @Test void normalizesFormattingAndLengthWithoutDiscardingPaidDrafts() {
+        var drafts=List.of(new ReplySuggestions.Draft("*고개를 끄덕인다.*\n잠시 기다린다.","첫 문장. 두 번째 문장."),
+                new ReplySuggestions.Draft("가".repeat(81),"둘"),new ReplySuggestions.Draft("","셋"));
+        var result=ReplySuggestions.parse(json.writeValueAsString(new ReplySuggestions.Payload(drafts)));
+        assertThat(result).hasSize(3);
+        assertThat(result.getFirst()).isEqualTo("*고개를 끄덕인다.* 첫 문장.");
+        assertThat(result.get(1)).contains("…").doesNotContain("가".repeat(81));
+    }
+    @Test void duplicateOrEmptyDraftDoesNotDiscardOtherAvailableChoices() {
+        var drafts=List.of(new ReplySuggestions.Draft("","같음"),new ReplySuggestions.Draft("","같음"),new ReplySuggestions.Draft("","셋"));
+        assertThat(ReplySuggestions.parse(json.writeValueAsString(new ReplySuggestions.Payload(drafts)))).containsExactly("같음","셋");
+        assertThatThrownBy(()->ReplySuggestions.parse("invalid JSON"))
+                .isInstanceOfSatisfying(ReplySuggestions.Failure.class,failure->{
+                    assertThat(failure.code()).isEqualTo("INVALID_JSON");assertThat(failure.payload()).isEqualTo("invalid JSON");
+                });
+    }
+    @Test void providerRejectionKeepsSafeCodeAndParameterWithoutProviderMessageOrRetry() {
+        var usage=new AiUsageTracker();var gateway=new OpenAiDialogueGateway("offline-key","gpt-5.6-sol",json,mock(GeminiDialogueGateway.class),usage);
+        var calls=new AtomicInteger();
+        var client=RestClient.builder().baseUrl("https://api.openai.com").requestInterceptor((request,body,execution)->{
+            calls.incrementAndGet();
+            String error="{\"error\":{\"code\":\"unsupported_parameter\",\"param\":\"text.format.schema\",\"message\":\"SECRET provider data\"}}";
+            return new MockClientHttpResponse(error.getBytes(StandardCharsets.UTF_8),HttpStatus.BAD_REQUEST);
+        }).build();
+        ReflectionTestUtils.setField(gateway,"restClient",client);
+        assertThatThrownBy(()->gateway.suggestPlayerReplies(1L,"private scene evidence"))
+                .isInstanceOfSatisfying(ReplySuggestions.Failure.class,failure->{
+                    assertThat(failure.code()).isEqualTo("HTTP_400");
+                    assertThat(failure.getMessage()).contains("unsupported_parameter","text.format.schema").doesNotContain("SECRET","private scene evidence");
+                });
+        assertThat(calls.get()).isEqualTo(1);
+        assertThat(usage.calls(1L)).singleElement().satisfies(call->assertThat(call.status()).isEqualTo("REQUEST_FAILED"));
     }
 }

@@ -17,10 +17,10 @@ export function createReplySuggestions(load) {
         if(!state.enabled || scene?.key!==current.key){cache.delete(current.key);return {status:"IDLE",suggestions:[]}}
         return load(current.source)
       }).then(result=>{
-        if(result.status==="READY" && (!Array.isArray(result.suggestions) || result.suggestions.length!==3))throw new Error("추천 응답을 확인하지 못했어요.")
+        if(["READY","PARTIAL"].includes(result.status) && (!Array.isArray(result.suggestions) || result.suggestions.length<1 || result.suggestions.length>3))throw new Error("추천 응답을 확인하지 못했어요.")
         entry.status=result.status
         entry.suggestions=result.suggestions??[]
-        entry.error=result.status==="FAILED"?"추천을 만들지 못했어요. 같은 지문에서는 자동 재시도하지 않습니다.":""
+        entry.error=result.status==="FAILED"?`${result.message??"추천을 만들지 못했어요."} [${result.errorCode??"UNKNOWN"}]`:result.message??""
       }).catch(()=>{
         entry.status="FAILED"
         entry.error="추천을 불러오지 못했어요. 같은 지문에서는 자동 재시도하지 않습니다."

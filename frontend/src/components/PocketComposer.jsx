@@ -20,7 +20,7 @@ export default function PocketComposer({value,onChange,onKeyDown,onSend,disabled
       {recommendations.status==="LOADING" && <p className="flex items-center gap-2 text-xs text-muted-foreground"><LoaderCircle className="size-3 animate-spin"/>추천 문장 3개를 만드는 중…</p>}
       {recommendations.status==="PENDING" && <p className="text-xs text-muted-foreground">다른 요청에서 추천을 생성 중이거나 이전 생성이 중단됐어요. 추가 호출하지 않습니다.</p>}
       {recommendations.error && <p className="text-xs text-muted-foreground">{recommendations.error}</p>}
-      {recommendations.status==="READY" && <div className="grid gap-1.5">
+      {["READY","PARTIAL"].includes(recommendations.status) && <div className="grid gap-1.5">
         {recommendations.suggestions.map((text,index)=><button key={index} type="button" disabled={disabled}
           title="입력창에 넣기" onClick={()=>{onChange(text);focus(text.length)}}
           className="rounded-md border bg-background px-3 py-2 text-left text-sm leading-6 hover:bg-muted disabled:opacity-50">{text}</button>)}
@@ -36,7 +36,7 @@ export default function PocketComposer({value,onChange,onKeyDown,onSend,disabled
         title="켜면 새 지문마다 Luna로 추천 3개를 만들어요">
         <NotebookPen className="size-5"/>
       </Button>
-      <Textarea ref={input} value={value} onChange={event=>onChange(event.target.value)} onKeyDown={onKeyDown} enterKeyHint="enter"
+      <Textarea ref={input} id="pocket-chat-input" name="message" autoComplete="off" value={value} onChange={event=>onChange(event.target.value)} onKeyDown={onKeyDown} enterKeyHint="enter"
         placeholder="행동이나 대사를 입력해 주세요." aria-label="행동이나 대사" disabled={disabled} rows={1}
         className="max-h-36 min-h-11 min-w-0 resize-none text-base"/>
       <Button type="button" size="icon" className="size-11 shrink-0" disabled={disabled}

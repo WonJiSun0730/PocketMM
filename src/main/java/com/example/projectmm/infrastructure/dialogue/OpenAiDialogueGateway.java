@@ -190,13 +190,29 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                 .body(request)
                 .exchange((httpRequest,response) -> {
                     if(!response.getStatusCode().is2xxSuccessful())
-                        throw new IllegalStateException("OpenAI request rejected: HTTP "+response.getStatusCode().value());
+                        throw requestRejected(response.getStatusCode().value(),response.getBody().readNBytes(8192));
                     var contentType=response.getHeaders().getContentType();
                     if(contentType!=null && contentType.isCompatibleWith(org.springframework.http.MediaType.TEXT_EVENT_STREAM))
                         return OpenAiResponseStream.read(response.getBody(),com.example.projectmm.application.dialogue.DialogueTokens::publish);
                     return new String(response.getBody().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
                 }));
     }
+
+    private static final class RequestRejected extends IllegalStateException {
+        final int status;final String code;final String parameter;
+        RequestRejected(int status,String code,String parameter) {
+            super("OpenAI request rejected: HTTP "+status);this.status=status;this.code=code;this.parameter=parameter;
+        }
+    }
+    private RequestRejected requestRejected(int status,byte[] body) {
+        String code="",parameter="";
+        try {
+            var error=objectMapper.readTree(new String(body,java.nio.charset.StandardCharsets.UTF_8)).path("error");
+            code=safeErrorField(error.path("code").asText(""));parameter=safeErrorField(error.path("param").asText(""));
+        } catch(RuntimeException invalidErrorBody) { /* HTTP status is sufficient; do not expose body. */ }
+        return new RequestRejected(status,code,parameter);
+    }
+    private static String safeErrorField(String value) {return value.matches("[a-zA-Z0-9_.\\[\\]-]{1,100}")?value:"";}
 
     private String readPayload(String response, WorldRoomDialogueContext context, String model,
                                PromptTokenBreakdown breakdown) {
@@ -237,7 +253,8 @@ public class OpenAiDialogueGateway implements DialogueGateway {
     }
 
     public List<String> suggestPlayerReplies(Long sessionId,String evidenceJson) {
-        if(apiKey==null || apiKey.isBlank())throw new IllegalStateException("OPENAI_API_KEY is not configured");
+        if(apiKey==null || apiKey.isBlank())throw new com.example.projectmm.application.dialogue.ReplySuggestions.Failure(
+                "CONFIGURATION","OpenAI API 키 설정을 확인해 주세요.",null,null);
         var schema=com.example.projectmm.application.dialogue.ReplySuggestions.schema();
         String model=com.example.projectmm.application.dialogue.ReplySuggestions.MODEL;
         var input=List.<Map<String,Object>>of(
@@ -247,11 +264,27 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                 "reasoning",Map.of("effort","none"),"max_output_tokens",800,
                 "text",Map.of("format",Map.of("type","json_schema","name","player_reply_suggestions","strict",true,"schema",schema)));
         return AiUsageTracker.withPurpose(sessionId,"REPLY_SUGGESTION",()->{
-            String response=postResponse(sessionId,model,request);
-            String payload=readPayload(response,sessionId,model,null);
-            if(!objectMapper.readTree(response).path("status").asText("completed").equals("completed"))
-                throw new IllegalStateException("Reply suggestions incomplete; no retry");
-            return com.example.projectmm.application.dialogue.ReplySuggestions.parse(payload);
+            try {
+                String response=postResponse(sessionId,model,request);
+                var root=objectMapper.readTree(response);
+                String payload;
+                try {payload=readPayload(response,sessionId,model,null);}
+                catch(IllegalStateException missingText) {
+                    boolean refused=false;
+                    for(var output:root.path("output"))for(var content:output.path("content"))
+                        if("refusal".equals(content.path("type").asText()))refused=true;
+                    throw new com.example.projectmm.application.dialogue.ReplySuggestions.Failure(
+                            refused?"MODEL_REFUSAL":"NO_OUTPUT",refused?"모델이 추천 생성을 거절했어요.":"모델 응답에 추천 본문이 없어요.",null,missingText);
+                }
+                if(!root.path("status").asText("completed").equals("completed"))
+                    throw new com.example.projectmm.application.dialogue.ReplySuggestions.Failure("INCOMPLETE",
+                            "모델이 추천 응답을 끝내지 못했어요. 추가 호출하지 않습니다.",payload,null);
+                return com.example.projectmm.application.dialogue.ReplySuggestions.parse(payload);
+            } catch(RequestRejected rejected) {
+                throw new com.example.projectmm.application.dialogue.ReplySuggestions.Failure("HTTP_"+rejected.status,
+                        "추천 요청이 거절됐어요. HTTP "+rejected.status+" "+rejected.code+" "+rejected.parameter,null,rejected);
+            }
+
         });
     }
 
