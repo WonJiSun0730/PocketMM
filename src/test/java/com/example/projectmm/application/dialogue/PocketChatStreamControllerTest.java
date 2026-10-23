@@ -31,6 +31,8 @@ class PocketChatStreamControllerTest {
         owned(1L);
         var response=new MockHttpServletResponse();
         when(dialogue.chat(3L,"hello")).thenAnswer(call->{
+            DialogueTokens.generate(()->{DialogueTokens.publish("미확정");return null;});
+            assertThat(response.getContentAsString()).contains("delta").doesNotContain("preview","complete");
             DialoguePreview.generated("미확정 본문");
             assertThat(response.isCommitted()).isTrue();
             assertThat(response.getContentAsString()).contains("미확정 본문").doesNotContain("complete");

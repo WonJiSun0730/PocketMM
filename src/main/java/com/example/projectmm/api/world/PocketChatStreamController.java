@@ -43,9 +43,11 @@ public class PocketChatStreamController {
         };
         emit.accept(Map.of("type", "started"));
         try {
-            var turn = DialoguePreview.deliver(
+            var turn = com.example.projectmm.application.dialogue.DialogueTokens.deliver(
+                    reply -> emit.accept(Map.of("type", "delta", "reply", reply)),
+                    () -> DialoguePreview.deliver(
                     reply -> emit.accept(Map.of("type", "preview", "reply", reply)),
-                    () -> dialogue.chat(sessionId, request.message()));
+                    () -> dialogue.chat(sessionId, request.message())));
             // The proxied service has returned: transaction and AFTER_COMMIT listeners finished.
             emit.accept(Map.of("type", "complete", "reply", turn.reply()));
         } catch (RuntimeException failure) {

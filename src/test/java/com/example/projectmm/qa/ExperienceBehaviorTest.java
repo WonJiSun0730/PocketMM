@@ -80,10 +80,13 @@ class ExperienceBehaviorTest {
         var state=mapper.createObjectNode();var turns=state.putArray("turns");
         for(int i=1;i<=3;i++) {
             var t=turns.addObject();t.put("number",i);var outcome=t.putObject("outcome");outcome.put("reply","reply");
-            if(i<3)outcome.put("diagnosticsJson","{\"chatTiming\":{\"source\":\"QA_SERVER\",\"bodyReadyMs\":"+(i*10)+",\"reviewCompleteMs\":30,\"processingCompleteMs\":40}}");
+            if(i<3)outcome.put("diagnosticsJson","{\"chatTiming\":{\"source\":\"QA_SERVER\",\"firstTokenMs\":5,\"bodyReadyMs\":"+(i*10)+",\"reviewCompleteMs\":30,\"processingCompleteMs\":40}}");
         }
         state.putObject("failedOutcome").put("diagnosticsJson","{\"chatTiming\":{\"source\":\"QA_SERVER\",\"bodyReadyMs\":999,\"reviewCompleteMs\":null,\"processingCompleteMs\":null}}");
         var a=PocketExperienceAnalysis.fullAnalysis(state,mapper.createObjectNode());
+        assertThat(a.path("chatTiming").path("firstTokenMs").path("count").asInt()).isEqualTo(2);
+        assertThat(a.path("chatTiming").path("firstTokenMs").path("average").asDouble()).isEqualTo(5);
+        assertThat(a.path("turns").get(2).path("firstTokenMs").isNull()).isTrue();
         var body=a.path("chatTiming").path("bodyReadyMs");
         assertThat(body.path("count").asInt()).isEqualTo(2);
         assertThat(body.path("min").asLong()).isEqualTo(10);

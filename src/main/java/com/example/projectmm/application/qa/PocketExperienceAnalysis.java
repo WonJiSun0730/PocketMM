@@ -123,7 +123,7 @@ public final class PocketExperienceAnalysis {
         timingSummary.put("explanation","QA 대상 요청 시작 기준 서버 단계 시간 · 브라우저 수신/화면 표시 실측 아님 · 기존 기록 미측정");
         var byTurn=new HashMap<Integer,JsonNode>();
         for(var t:state.path("turns"))byTurn.put(t.path("number").asInt(),readTiming(t.path("outcome")));
-        for(String field:List.of("preGenerationMs","targetDispatchMs","bodyReadyMs","reviewCompleteMs","processingCompleteMs")) {
+        for(String field:List.of("firstTokenMs","preGenerationMs","targetDispatchMs","bodyReadyMs","reviewCompleteMs","processingCompleteMs")) {
             var values=new ArrayList<Long>();
             for(var detail:node.path("turns")) {
                 var value=byTurn.getOrDefault(detail.path("turn").asInt(),M.createObjectNode()).path(field);
@@ -161,7 +161,7 @@ public final class PocketExperienceAnalysis {
     private static String timingMarkdown(JsonNode state) {
         var timing=fullAnalysis(state,M.createObjectNode()).path("chatTiming");
         var text=new StringBuilder("\n\n## QA 단계별 시간 (서버 기준)\n\n브라우저 도착·표시 시간이 아닙니다. QA 대상 요청 시작 기준이며 기존 기록은 미측정입니다.\n\n| 구간 | 최소 초 | 최대 초 | 평균 초 | 표본 |\n| --- | --- | --- | --- | --- |\n");
-        for(var entry:Map.of("preGenerationMs","생성 경로 진입 전","targetDispatchMs","HTTP 호출 직전","bodyReadyMs","본문 준비","reviewCompleteMs","검사 완료","processingCompleteMs","저장·기억 포함 완료").entrySet()) {
+        for(var entry:Map.of("firstTokenMs","첫 본문 조각 준비","preGenerationMs","생성 경로 진입 전","targetDispatchMs","HTTP 호출 직전","bodyReadyMs","본문 준비","reviewCompleteMs","검사 완료","processingCompleteMs","저장·기억 포함 완료").entrySet()) {
             var stat=timing.path(entry.getKey());text.append("| ").append(entry.getValue()).append(" | ");
             if(stat.path("count").asInt()==0)text.append("미측정 | 미측정 | 미측정 | 0 |\n");
             else text.append(stat.path("min").asDouble()/1000).append(" | ").append(stat.path("max").asDouble()/1000).append(" | ").append(stat.path("average").asDouble()/1000).append(" | ").append(stat.path("count").asInt()).append(" |\n");

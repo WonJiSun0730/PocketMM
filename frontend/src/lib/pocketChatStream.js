@@ -11,7 +11,7 @@ export async function readPocketChatStream(response, onEvent) {
     if (terminal) throw new Error("대화 응답 순서가 올바르지 않아요.")
     if (event.type === "failed") throw new Error(event.message)
     if (event.type === "complete") terminal = true
-    if (!["started", "preview", "complete"].includes(event.type)) throw new Error("알 수 없는 대화 응답입니다.")
+    if (!["started", "delta", "preview", "complete"].includes(event.type)) throw new Error("알 수 없는 대화 응답입니다.")
     onEvent(event)
   }
   try {

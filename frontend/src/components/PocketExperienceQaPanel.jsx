@@ -174,11 +174,12 @@ export default function PocketExperienceQaPanel({ sessionId }) {
                 const stat=analysis.chatTiming?.[field]
                 return <p key={field}>{label}: {stat?.count > 0 ? `최소 ${qaTimingSeconds(stat.min)} · 최대 ${qaTimingSeconds(stat.max)} · 평균 ${qaTimingSeconds(stat.average)} · ${stat.count}턴` : "미측정"}</p>
               })}
-              {[["bodyReadyMs","본문 준비 (조기 전달 가능)"],["reviewCompleteMs","연속성 검사 완료"],["processingCompleteMs","저장·기억 포함 처리 완료"]].map(([field,label])=>{
+              {[["firstTokenMs","첫 본문 조각 준비"],["bodyReadyMs","전체 본문 준비"],["reviewCompleteMs","연속성 검사 완료"],["processingCompleteMs","저장·기억 포함 처리 완료"]].map(([field,label])=>{
                 const stat=analysis.chatTiming?.[field]
                 return <p key={field}>{label}: {stat?.count > 0 ? `최소 ${(stat.min/1000).toFixed(2)}초 · 최대 ${(stat.max/1000).toFixed(2)}초 · 평균 ${(stat.average/1000).toFixed(2)}초 · ${stat.count}턴` : "미측정 · 업데이트 후 새 실행부터 기록"}</p>
               })}
               <p className="text-muted-foreground">QA 대상 요청 시작 기준 서버 단계 시간입니다. 실제 브라우저 수신·표시 시간과는 다릅니다.</p>
+              {analysis.failedAttemptTiming?.firstTokenMs != null && <p>중단 요청 첫 본문 조각: {qaTimingSeconds(analysis.failedAttemptTiming.firstTokenMs)} · 완료 평균에서 제외</p>}
               <details><summary className="cursor-pointer">생성 전 병목 상세 · 평균 소요 시간순</summary>
                 <p className="text-muted-foreground">아래 값은 각 작업 소요 시간입니다. 기억 조회·토큰 계수는 상위 작업에 포함되므로 표 전체를 합산하지 마세요. 0초는 실제 측정, 미측정은 기록 없음입니다.</p>
                 {qaPreparationRows(analysis.chatTiming?.stages).length ? qaPreparationRows(analysis.chatTiming?.stages).map(row=><p key={row.key}>{row.label}: 평균 {qaTimingSeconds(row.stats.average)} · 최소 {qaTimingSeconds(row.stats.min)} · 최대 {qaTimingSeconds(row.stats.max)} · {row.stats.count}턴 / {row.stats.calls}회{row.stats.failedCalls > 0 && ` · 실패 ${row.stats.failedCalls}회`}</p>) : <p>미측정 · 업데이트 후 새 실행부터 기록</p>}

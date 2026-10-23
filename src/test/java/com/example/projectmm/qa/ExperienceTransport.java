@@ -171,7 +171,17 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
         record(new Receipt(id,Instant.now().toString(),"REQUEST_STARTED",role,provider,model,purpose,0,0,null,0,"UNKNOWN",null,null));
         try {
             if(role.equals("TARGET"))com.example.projectmm.application.dialogue.DialogueTiming.targetDispatching();
-            var response=execution.execute(request,body);byte[] bytes=response.getBody().readAllBytes();var root=mapper.readTree(bytes);
+            var response=execution.execute(request,body);
+            boolean streamed=modified.path("stream").asBoolean(false)&&response.getStatusCode().is2xxSuccessful()
+                    &&response.getHeaders().getContentType()!=null
+                    &&response.getHeaders().getContentType().isCompatibleWith(MediaType.TEXT_EVENT_STREAM);
+            byte[] bytes;
+            try {
+                bytes=streamed?com.example.projectmm.infrastructure.dialogue.OpenAiResponseStream.read(response.getBody(),
+                        com.example.projectmm.application.dialogue.DialogueTokens::publish).getBytes(java.nio.charset.StandardCharsets.UTF_8)
+                        :response.getBody().readAllBytes();
+            } catch(IOException|RuntimeException failure) {response.close();throw failure;}
+            var root=mapper.readTree(bytes);
             // Keep the review result, not HTTP/auth headers, for offline rejection diagnosis.
             // A receipt failure must not hide already-incurred provider usage.
             if("SCENE_CONTINUITY".equals(purpose)) {
@@ -204,7 +214,11 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
             return new ClientHttpResponse() {
                 public HttpStatusCode getStatusCode() throws IOException{return response.getStatusCode();}
                 public String getStatusText() throws IOException{return response.getStatusText();}
-                public HttpHeaders getHeaders(){return response.getHeaders();}
+                public HttpHeaders getHeaders(){
+                    if(!streamed)return response.getHeaders();
+                    var headers=new HttpHeaders();headers.putAll(response.getHeaders());
+                    headers.setContentType(MediaType.APPLICATION_JSON);headers.setContentLength(safeBytes.length);return headers;
+                }
                 public InputStream getBody(){return new ByteArrayInputStream(safeBytes);}
                 public void close(){response.close();}
             };

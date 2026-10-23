@@ -1,7 +1,7 @@
 const LIMIT = 100
 const validMs = value => Number.isFinite(value) && value >= 0
 const keyFor = sessionId => `pocket-chat-timing:v1:${sessionId}`
-export const timingFields = ["sentMs", "receivedMs", "displayMs", "completeMs", "readyMs", "endedMs"]
+export const timingFields = ["firstTokenMs", "sentMs", "receivedMs", "displayMs", "completeMs", "readyMs", "endedMs"]
 
 export function timingStats(records, field) {
   const values = records.filter(row => row.status === "COMPLETE" && validMs(row[field])).map(row => row[field])
@@ -52,6 +52,9 @@ export function createPocketChatTiming({ sessionId, storage, now = () => perform
       return id
     },
     sent(id) { if (active?.id === id) update(id,{sentMs:elapsed()}) },
+    firstToken(id) {
+      if (active?.id === id && records[0]?.firstTokenMs == null) update(id,{firstTokenMs:elapsed()})
+    },
     received(id) {
       if (active?.id === id && records[0]?.receivedMs == null) update(id,{receivedMs:elapsed()})
     },
@@ -62,7 +65,7 @@ export function createPocketChatTiming({ sessionId, storage, now = () => perform
     displayed(id) {
       const row = records.find(row => row.id === id)
       if (active?.id === id && row && row.displayMs == null && !row.displayUnavailable
-          && row.receivedMs != null) update(id,{displayMs:elapsed()})
+          && (row.firstTokenMs != null || row.receivedMs != null)) update(id,{displayMs:elapsed()})
     },
     complete(id,reply) {
       if (active?.id !== id) return

@@ -9,6 +9,14 @@ function response(text, width=1) {
     controller.close()
   }}))
 }
+
+test("token snapshots arrive before whole-body and committed completion",async()=>{
+  const events=[]
+  await readPocketChatStream(response('{"type":"started"}\n{"type":"delta","reply":"안"}\n{"type":"delta","reply":"안녕"}\n{"type":"preview","reply":"안녕"}\n{"type":"complete","reply":"안녕"}\n'),e=>events.push(e))
+  assert.deepEqual(events.map(e=>e.type),["started","delta","delta","preview","complete"])
+  assert.equal(events[2].reply,"안녕")
+  await assert.rejects(readPocketChatStream(response('{"type":"delta","reply":"부분"}\n'),()=>{}),/자동 재시도/)
+})
 test("decodes Korean across byte boundaries and preserves preview/final order",async()=>{
   const events=[]
   await readPocketChatStream(response('{"type":"started"}\n{"type":"preview","reply":"미확정 본문"}\n{"type":"complete","reply":"수정된 본문"}\n'), e=>events.push(e))

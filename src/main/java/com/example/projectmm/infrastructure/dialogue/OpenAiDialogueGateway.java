@@ -143,6 +143,13 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                 "required", List.of("reply", "enterCharacterIds", "leaveCharacterIds", "systemChanges", "elapsedSeconds", "locationChange", "addedConditions", "removedConditions", "addedInventory", "removedInventory")
         );
 
+        // Structured outputs follow schema property order: prose must precede metadata.
+        var orderedProperties = new java.util.LinkedHashMap<String,Object>();
+        var originalProperties = (Map<String,Object>) schema.get("properties");
+        for(String name:List.of("reply","enterCharacterIds","leaveCharacterIds","systemChanges","elapsedSeconds","locationChange","addedConditions","removedConditions","addedInventory","removedInventory"))
+            orderedProperties.put(name,originalProperties.get(name));
+        schema = new java.util.LinkedHashMap<>(schema);
+        schema.put("properties",orderedProperties);
         var tokenEstimate = PromptTokenBreakdown.estimate(instructions + "\n" + promptParts.dynamic(), input, objectMapper.writeValueAsString(schema));
         input.add(0, Map.of("role", "developer", "content", promptParts.dynamic()));
         input.add(0, Map.of("role", "developer", "content", List.of(Map.of(
@@ -163,6 +170,10 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                 ))
         );
 
+        if(com.example.projectmm.application.dialogue.DialogueTokens.enabled()) {
+            request=new java.util.LinkedHashMap<>(request);
+            request.put("stream",true);
+        }
         String response = postResponse(context, model, request);
 
         return parseResponse(response, context, model, tokenEstimate);
@@ -173,8 +184,14 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                 .uri("/v1/responses")
                 .headers(headers -> headers.setBearerAuth(apiKey))
                 .body(request)
-                .retrieve()
-                .body(String.class));
+                .exchange((httpRequest,response) -> {
+                    if(!response.getStatusCode().is2xxSuccessful())
+                        throw new IllegalStateException("OpenAI request rejected: HTTP "+response.getStatusCode().value());
+                    var contentType=response.getHeaders().getContentType();
+                    if(contentType!=null && contentType.isCompatibleWith(org.springframework.http.MediaType.TEXT_EVENT_STREAM))
+                        return OpenAiResponseStream.read(response.getBody(),com.example.projectmm.application.dialogue.DialogueTokens::publish);
+                    return new String(response.getBody().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
+                }));
     }
 
     private String readPayload(String response, WorldRoomDialogueContext context, String model,
@@ -248,6 +265,8 @@ public class OpenAiDialogueGateway implements DialogueGateway {
         try {
             String payload = readPayload(response, context, model, breakdown);
 
+            if(!objectMapper.readTree(response).path("status").asText("completed").equals("completed"))
+                throw new IllegalStateException("OpenAI target response incomplete; no retry");
             JsonNode turn = objectMapper.readTree(payload);
             String reply = turn.path("reply").asText();
             if (reply.isBlank()) throw new IllegalStateException("OpenAI Pocket reply is blank");

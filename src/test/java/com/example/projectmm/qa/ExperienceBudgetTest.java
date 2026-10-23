@@ -4,6 +4,7 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.http.client.*;
 import org.springframework.http.*;
+import org.springframework.http.MediaType;
 import tools.jackson.databind.*;
 import java.nio.file.*;
 import java.net.URI;
@@ -30,6 +31,44 @@ class ExperienceBudgetTest {
  byte[] body(){return "{\"model\":\"gpt-5.6-sol\",\"reasoning\":{\"effort\":\"none\"},\"input\":[{\"role\":\"user\",\"content\":\"장면을 이어간다\"}],\"text\":{\"format\":{\"name\":\"pocket_turn\"}}}".getBytes(java.nio.charset.StandardCharsets.UTF_8);}
  MockClientHttpResponse response(long in,long cache,long out) {return new MockClientHttpResponse(("{\"status\":\"completed\",\"usage\":{\"input_tokens\":"+in+",\"input_tokens_details\":{\"cached_tokens\":"+cache+",\"cache_write_tokens\":0},\"output_tokens\":"+out+"}}").getBytes(),HttpStatus.OK);}
  JsonNode budget() throws java.io.IOException{return m.readTree(Files.readString(dir.resolve("budget.json")));}
+ @Test void streamedTargetPublishesBeforeTerminalAndSettlesOnceWithOriginalBudgetGuard() throws Exception {
+  var t=transport(BigDecimal.TEN,1000);var previews=new ArrayList<String>();var timing=new com.example.projectmm.application.dialogue.DialogueTiming();
+  var request=(tools.jackson.databind.node.ObjectNode)m.readTree(body());request.put("stream",true);
+  var delta="data: "+m.writeValueAsString(Map.of("type","response.output_text.delta","delta","{\"reply\":\"hello\"}"))+"\n\n";
+  var terminal="data: "+m.writeValueAsString(Map.of("type","response.completed","response",m.readTree(response(1000,0,100).getBody())))+"\n\n";
+  var sent=new AtomicInteger();
+  timing.measure(()->com.example.projectmm.application.dialogue.DialogueTokens.deliver(previews::add,()->
+   com.example.projectmm.application.dialogue.DialogueTokens.generate(()->{
+    try(var result=t.intercept(req(),m.writeValueAsBytes(request),(r,b)->{
+     sent.incrementAndGet();var bytes=(delta+terminal).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+     var input=new java.io.ByteArrayInputStream(bytes){
+      @Override public synchronized int available(){return 0;}
+            @Override public synchronized int read(byte[] b,int off,int len){
+       if(pos>=delta.getBytes(java.nio.charset.StandardCharsets.UTF_8).length)assertThat(previews).containsExactly("hello");
+       return super.read(b,off,Math.min(1,len));
+      }
+     };
+     var resultResponse=new MockClientHttpResponse(input,HttpStatus.OK);resultResponse.getHeaders().setContentType(MediaType.TEXT_EVENT_STREAM);return resultResponse;
+    })) {
+     assertThat(result.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
+     assertThat(m.readTree(result.getBody()).path("status").asText()).isEqualTo("completed");
+    }catch(java.io.IOException failure){throw new java.io.UncheckedIOException(failure);}return null;
+   })));
+  assertThat(sent).hasValue(1);assertThat(timing.snapshot().firstTokenMs()).isNotNull();
+  assertThat(t.since(Set.of())).singleElement().satisfies(call->assertThat(call.usd()).isEqualByComparingTo("0.006"));
+  assertThat(budget().path("reservedUsd").decimalValue()).isEqualByComparingTo(BigDecimal.ZERO);
+ }
+ @Test void disconnectedStreamKeepsReservationAndBlocksAnotherPaidSend() throws Exception {
+  var t=transport(BigDecimal.TEN,1000);var request=(tools.jackson.databind.node.ObjectNode)m.readTree(body());request.put("stream",true);
+  var sends=new AtomicInteger();
+  assertThatThrownBy(()->t.intercept(req(),m.writeValueAsBytes(request),(r,b)->{
+   sends.incrementAndGet();var response=new MockClientHttpResponse("data: {\"type\":\"response.created\"}\n\n".getBytes(),HttpStatus.OK);
+   response.getHeaders().setContentType(MediaType.TEXT_EVENT_STREAM);return response;
+  }));
+  assertThat(budget().path("uncertain").asBoolean()).isTrue();assertThat(budget().path("reservedUsd").decimalValue()).isPositive();
+  assertThatThrownBy(()->t.intercept(req(),body(),(r,b)->{sends.incrementAndGet();return response(1000,0,100);}));
+  assertThat(sends).hasValue(1);assertThat(t.since(Set.of()).getFirst().usd()).isNull();
+ }
  @Test void preflightFailureAfterPaidAuxiliaryWorkIsNotAnUnknownTargetCharge() throws Exception {
   transport(BigDecimal.TEN,1000);var fail=new AtomicBoolean();var generationSent=new AtomicInteger();
   var t=new ExperienceTransport(spec(BigDecimal.TEN),dir,(p,model,j,e)->{

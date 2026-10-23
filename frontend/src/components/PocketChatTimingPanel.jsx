@@ -14,7 +14,7 @@ export function MeasuredPocketReply({timing, sampleId, eligible=true, autoScroll
 const statusLabel = {RUNNING:"처리 중",FINALIZED:"서버 완료 · 화면 갱신 중",COMPLETE:"완료",FAILED:"실패 · 확인 필요",INTERRUPTED:"기록 중단 · 완료 여부 미확인"}
 export default function PocketChatTimingPanel({timing,records}) {
   const latest = records[0]
-  const fields = [["receivedMs","본문 수신"],["displayMs","화면 표시 추정"],["completeMs","검사·기억 처리 완료"],["readyMs","다음 입력 준비"]]
+  const fields = [["firstTokenMs","첫 본문 조각 수신"],["receivedMs","전체 본문 수신"],["displayMs","첫 화면 표시 추정"],["completeMs","검사·기억 처리 완료"],["readyMs","다음 입력 준비"]]
   function download() {
     const url = URL.createObjectURL(new Blob([JSON.stringify(timing.export(),null,2)],{type:"application/json"}))
     const link = document.createElement("a")

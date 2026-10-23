@@ -379,6 +379,10 @@ export default function PocketPage({ pocket, onBack }) {
         body: JSON.stringify({ message }),
       })
       await readPocketChatStream(response, event => {
+        if (event.type === "delta") {
+          chatTiming.firstToken(timingId)
+          setReplyPreview(event.reply)
+        }
         if (event.type === "preview") {
           chatTiming.received(timingId)
           preview = event.reply
@@ -801,7 +805,7 @@ export default function PocketPage({ pocket, onBack }) {
 
           {replyPreview && <article className="border-b border-border/70 py-7 sm:py-9" aria-live="polite">
             <MeasuredPocketReply timing={chatTiming} sampleId={timingSample?.id} autoScroll><RpText text={replyPreview} /></MeasuredPocketReply>
-            <p className="mt-4 text-xs text-muted-foreground">장면과 기억을 확인하고 있어요. 확인 후 내용이 수정될 수 있어요.</p>
+            <p className="mt-4 text-xs text-muted-foreground">답변을 작성하고 확인하고 있어요. 완료 전에는 내용이 수정될 수 있어요.</p>
           </article>}
           {replyNotice && <p role="status" className="py-2 text-xs text-muted-foreground">{replyNotice}</p>}
           {sending && !replyPreview && <div className="border-b border-border/70 py-7 sm:py-9">

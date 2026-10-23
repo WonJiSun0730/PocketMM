@@ -8,6 +8,21 @@ function fixture(storage = new Map(),sessionId=55) {
     now:()=>clock,makeId:()=>`${sessionId}-${++id}`,wallTime:()=>"2026-10-22T09:00:00Z"})
   return {timing,storage,at:value=>{clock=value}}
 }
+
+test("first token and paint are separate from whole-body arrival and legacy samples stay unmeasured",()=>{
+  const f=fixture();const id=f.timing.begin()
+  f.at(100);f.timing.firstToken(id)
+  f.at(120);f.timing.firstToken(id);f.timing.displayed(id)
+  f.at(1000);f.timing.received(id)
+  f.at(2000);f.timing.complete(id,"reply");f.timing.ready(id)
+  const row=f.timing.getSnapshot()[0]
+  assert.equal(row.firstTokenMs,100);assert.equal(row.displayMs,120);assert.equal(row.receivedMs,1000)
+  const restored=fixture(f.storage).timing.getSnapshot()[0]
+  assert.equal(restored.firstTokenMs,100)
+  const next=f.timing.begin();f.at(2500);f.timing.received(next);f.timing.ready(next)
+  assert.equal(f.timing.getSnapshot()[0].firstTokenMs,undefined)
+  assert.equal(timingStats(f.timing.getSnapshot(),"firstTokenMs").count,1)
+})
 test("records click-to-delivery, paint, completion and input-ready separately",()=>{
   const {timing,at}=fixture()
   at(100);const id=timing.begin()

@@ -44,7 +44,7 @@ public class SceneContinuityService {
         String beforeJson = JSON.writeValueAsString(before);
         var enriched = context.withSceneFacts(beforeJson);
         DialogueTiming.generationStarting();
-        var candidate = DialogueTiming.stage("TARGET_GENERATION",()->gateway.generateWorldRoomTurn(enriched, modelInput));
+        var candidate = DialogueTiming.stage("TARGET_GENERATION",()->DialogueTokens.generate(()->gateway.generateWorldRoomTurn(enriched, modelInput)));
         requireTurn(candidate, enriched);
         DialogueTiming.bodyReady();
         DialoguePreview.generated(candidate.reply());
