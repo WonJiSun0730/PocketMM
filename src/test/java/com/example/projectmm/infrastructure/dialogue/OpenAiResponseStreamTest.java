@@ -13,7 +13,7 @@ class OpenAiResponseStreamTest {
     static String frame(Object event) {return "data: "+JSON.writeValueAsString(event)+"\n\n";}
     static String delta(String text) {return frame(Map.of("type","response.output_text.delta","output_index",1,"content_index",0,"delta",text));}
     @Test void deliversDecodedKoreanBeforeTerminalBytesAreReadAndNeverLeaksMetadata() throws Exception {
-        var first=delta("{\"reply\":\"안녕");var observed=new AtomicBoolean();
+        var first=delta("{\"elapsedSeconds\":1,\"metadata\":{\"reply\":\"hidden\"},\"reply\":\"안녕");var observed=new AtomicBoolean();
         var bytes=(first+delta("\\n\\\"친구\\\" \\uD83D")+delta("\\uDE00\",\"systemChanges\":[{\"delta\":999}]}")
                 +frame(Map.of("type","response.completed","response",Map.of("status","completed","usage",Map.of("output_tokens",10))))).getBytes(StandardCharsets.UTF_8);
         var input=new ByteArrayInputStream(bytes) {
@@ -42,7 +42,10 @@ class OpenAiResponseStreamTest {
         }
     }
     @Test void unknownPropertyOrderAndPartialEscapeRemainSafe() {
-        assertThat(OpenAiResponseStream.replyPrefix("{\"elapsedSeconds\":1,\"reply\":\"text\"}")).isEmpty();
+        assertThat(OpenAiResponseStream.replyPrefix("{\"elapsedSeconds\":1,\"reply\":\"text")).isEqualTo("text");
+        assertThat(OpenAiResponseStream.replyPrefix("{\"metadata\":{\"reply\":\"secret\"},\"reply\":\"visible")).isEqualTo("visible");
+        assertThat(OpenAiResponseStream.replyPrefix("{\"metadata\":{\"reply\":\"secret\"}")).isEmpty();
+        assertThat(OpenAiResponseStream.replyPrefix("{\"label\":\"reply\\\": \\\"secret\",\"reply\":\"visible")).isEqualTo("visible");
         assertThat(OpenAiResponseStream.replyPrefix("{\"reply\":\"hello\\")).isEqualTo("hello");
         assertThat(OpenAiResponseStream.replyPrefix("{\"reply\":\"hello\\u12")).isEqualTo("hello");
     }

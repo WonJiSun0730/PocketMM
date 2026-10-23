@@ -38,11 +38,43 @@ public final class OpenAiResponseStream {
         return terminal;
     }
 
-    // The ordered schema puts reply first. Unknown order safely falls back to the final preview.
+    // Only a root reply property is visible. Metadata order must not suppress partial delivery.
     static String replyPrefix(String json) {
-        var prefix=java.util.regex.Pattern.compile("^\\s*\\{\\s*\"reply\"\\s*:\\s*\"").matcher(json);
-        if(!prefix.find())return "";
-        var result=new StringBuilder();int i=prefix.end();
+        int depth=0;
+        for(int i=0;i<json.length();i++) {
+            char c=json.charAt(i);
+            if(c=='{' || c=='[')depth++;
+            else if(c=='}' || c==']')depth--;
+            else if(c=='"') {
+                int end=stringEnd(json,i+1);
+                if(end<0)return "";
+                int colon=skipWhitespace(json,end+1);
+                if(depth==1 && colon<json.length() && json.charAt(colon)==':'
+                        && JSON.readTree(json.substring(i,end+1)).asText().equals("reply")) {
+                    int value=skipWhitespace(json,colon+1);
+                    return value<json.length() && json.charAt(value)=='"'?decodePrefix(json,value+1):"";
+                }
+                i=end;
+            }
+        }
+        return "";
+    }
+    private static int skipWhitespace(String text,int start) {
+        while(start<text.length() && Character.isWhitespace(text.charAt(start)))start++;
+        return start;
+    }
+    private static int stringEnd(String text,int start) {
+        boolean escaped=false;
+        for(int i=start;i<text.length();i++) {
+            char c=text.charAt(i);
+            if(escaped)escaped=false;
+            else if(c=='\\')escaped=true;
+            else if(c=='"')return i;
+        }
+        return -1;
+    }
+    private static String decodePrefix(String json,int i) {
+        var result=new StringBuilder();
         while(i<json.length()) {
             char c=json.charAt(i++);
             if(c=='"')break;

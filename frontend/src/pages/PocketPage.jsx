@@ -22,6 +22,7 @@ import PocketProgressPanel from "@/components/PocketProgressPanel"
 import RpText from "@/components/RpText"
 import PocketAbsenceLog from "@/components/PocketAbsenceLog"
 import TypedPocketReply from "@/components/TypedPocketReply"
+import StreamingPocketReply from "@/components/StreamingPocketReply"
 import PocketActivityScene from "@/components/PocketActivityScene"
 import { resolvePocketSceneModels } from "@/lib/pocketCharacterModels"
 import "./PocketPage.css"
@@ -62,6 +63,9 @@ export default function PocketPage({ pocket, onBack }) {
   const [changingPlayerProfile, setChangingPlayerProfile] = useState(false)
   const [messages, setMessages] = useState([])
   const [replyPreview, setReplyPreview] = useState(null)
+  const [streamFinished,setStreamFinished]=useState(false)
+  const typingDrain=useRef(null)
+  useEffect(()=>()=>{typingDrain.current?.resolve();typingDrain.current=null},[session.id])
   const [replyNotice, setReplyNotice] = useState("")
   const [typingTarget,setTypingTarget] = useState(null)
   const [cast, setCast] = useState([])
@@ -359,6 +363,8 @@ export default function PocketPage({ pocket, onBack }) {
       return
     }
     const timingId=chatTiming.begin()
+    const typingDone=new Promise(resolve=>{typingDrain.current={id:timingId,resolve}})
+    setStreamFinished(false)
     setSending(true)
     setError("")
     setReplyPreview(null)
@@ -367,6 +373,7 @@ export default function PocketPage({ pocket, onBack }) {
     const pending = { id: `pending-${Date.now()}`, role: "USER", content: message }
     setMessages(current => [...current, pending])
     let preview = ""
+    let finalReply = ""
     let submitted = false
     try {
       if (!await progress.resume()) throw new Error("먼저 부재 활동을 확인해 주세요.")
@@ -390,10 +397,13 @@ export default function PocketPage({ pocket, onBack }) {
         }
         if (event.type === "complete") {
           chatTiming.complete(timingId,event.reply)
+          finalReply=event.reply
+          setStreamFinished(true)
           setReplyPreview(event.reply)
           if (preview && preview !== event.reply) setReplyNotice("장면 확인 후 답변을 수정했어요.")
         }
       })
+      if(finalReply)await typingDone
       await refresh({animateReply:false})
       setReplyPreview(null)
       refreshPlayerState()
@@ -410,6 +420,7 @@ export default function PocketPage({ pocket, onBack }) {
       }
       setError(e.message)
     } finally {
+      if(typingDrain.current?.id===timingId)typingDrain.current=null
       setSending(false)
     }
   }
@@ -804,7 +815,10 @@ export default function PocketPage({ pocket, onBack }) {
           })}
 
           {replyPreview && <article className="border-b border-border/70 py-7 sm:py-9" aria-live="polite">
-            <MeasuredPocketReply timing={chatTiming} sampleId={timingSample?.id} autoScroll><RpText text={replyPreview} /></MeasuredPocketReply>
+            <MeasuredPocketReply timing={chatTiming} sampleId={timingSample?.id} autoScroll>
+              <StreamingPocketReply key={timingSample?.id} text={replyPreview} finished={streamFinished} onProgress={followTyping}
+                onSettled={()=>{if(typingDrain.current?.id===timingSample?.id)typingDrain.current.resolve()}}/>
+            </MeasuredPocketReply>
             <p className="mt-4 text-xs text-muted-foreground">답변을 작성하고 확인하고 있어요. 완료 전에는 내용이 수정될 수 있어요.</p>
           </article>}
           {replyNotice && <p role="status" className="py-2 text-xs text-muted-foreground">{replyNotice}</p>}
