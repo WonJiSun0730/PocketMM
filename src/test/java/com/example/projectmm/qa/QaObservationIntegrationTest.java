@@ -72,7 +72,8 @@ class QaObservationIntegrationTest {
             assertThat(state.turns).hasSize(100);assertThat(generated.get()).isEqualTo(100);assertThat(reviews.get()).isEqualTo(100);
             for(var turn:state.turns)assertThat(turn.outcome().reply()).isEqualTo("Original target reply "+turn.number());
             var analysis=com.example.projectmm.application.qa.PocketExperienceAnalysis.analyze(json.valueToTree(state));
-            assertThat(analysis.findings().stream().filter(f->f.type().startsWith("CONTINUITY_"))).hasSize(80);
+            assertThat(analysis.findings().stream().filter(f->f.type().startsWith("CONTINUITY_"))).hasSize(120);
+            assertThat(analysis.findings().stream().filter(f->f.type().startsWith("CONTINUITY_")).map(f->f.turn()).distinct()).hasSize(80);
             QaReports.write(dir,state);
             assertThat(java.nio.file.Files.readString(dir.resolve("report.md"))).contains("연속성 검사 관찰","unresolved conflict");
             assertThat(java.nio.file.Files.readString(dir.resolve("turns.csv")).lines()).hasSize(101);

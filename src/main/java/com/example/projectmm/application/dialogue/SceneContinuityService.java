@@ -2,21 +2,37 @@ package com.example.projectmm.application.dialogue;
 
 import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.dialogue.*;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.*;
 
-/** Production approval gate; explicitly scoped QA observes errors while preserving target output. */
+/** Advisory continuity review; never replaces or rejects the generated conversation. */
 @Service
-@RequiredArgsConstructor
 public class SceneContinuityService {
     private final DialogueGateway gateway;
     private final WorldRoomMessageRepository messages;
     private final WorldRoomMessageVariantRepository variants;
     private static final ObjectMapper JSON = new ObjectMapper();
+    private final ChatFailureStore failureStore;
+
+    public SceneContinuityService(DialogueGateway gateway,WorldRoomMessageRepository messages,
+                                  WorldRoomMessageVariantRepository variants) {
+        this(gateway,messages,variants,(ChatFailureStore)null);
+    }
+    @Autowired
+    public SceneContinuityService(DialogueGateway gateway,WorldRoomMessageRepository messages,
+                                  WorldRoomMessageVariantRepository variants,
+                                  org.springframework.beans.factory.ObjectProvider<ChatFailureStore> failureStore) {
+        this(gateway,messages,variants,failureStore.getIfAvailable());
+    }
+    public SceneContinuityService(DialogueGateway gateway,WorldRoomMessageRepository messages,
+                                  WorldRoomMessageVariantRepository variants,ChatFailureStore failureStore) {
+        this.gateway=gateway;this.messages=messages;this.variants=variants;this.failureStore=failureStore;
+    }
+
 
     public record Review(boolean approved, WorldRoomTurn turn, List<SceneFacts.Change> changes, List<String> conflicts) {}
     public record Outcome(WorldRoomTurn turn, WorldRoomDialogueContext context, String before, String after) {}
@@ -46,6 +62,18 @@ public class SceneContinuityService {
     }
 
     public Outcome generate(WorldRoomDialogueContext context, String modelInput, String userInput, long beforeId) {
+        if(!SceneContinuityObservation.enabled())return SceneContinuityObservation.observe(()->{
+            var outcome=generate(context,modelInput,userInput,beforeId);
+            if(failureStore!=null)for(var finding:SceneContinuityObservation.current()) {
+                var evidence=ChatFailureStore.evidence(new ReviewRejectedException(finding.review(),finding.mode()),
+                        UUID.randomUUID().toString(),context.sessionId(),"ADVISORY",outcome.turn().reply());
+                try {failureStore.save(evidence);}
+                catch(java.io.IOException|RuntimeException failedSave) {
+                    org.slf4j.LoggerFactory.getLogger(SceneContinuityService.class).warn("Continuity advisory save failed session={}",context.sessionId());
+                }
+            }
+            return outcome;
+        });
         var result=generateChecked(context,modelInput,userInput,beforeId);
         DialogueTiming.reviewed();
         return result;
@@ -60,50 +88,47 @@ public class SceneContinuityService {
         requireTurn(candidate, enriched);
         DialogueTiming.bodyReady();
         DialoguePreview.generated(candidate.reply());
-        if(SceneContinuityObservation.enabled())return observeCandidate(enriched,before,beforeJson,userInput,candidate);
-        var reviewed = review(enriched, "REVIEW", before, userInput, candidate, List.of());
-        requireReview(reviewed,"REVIEW",candidate);
-        if (reviewed.turn() == null) reviewed = new Review(true, candidate, reviewed.changes(), reviewed.conflicts());
-        requireTurn(reviewed.turn(), enriched);
-        // A repaired response must pass a second independent check; no unbounded repair loop.
-        if (!candidate.equals(reviewed.turn())) {
-            var verified = review(enriched, "VERIFY", before, userInput, reviewed.turn(), List.of());
-            requireReview(verified,"VERIFY",reviewed.turn());
-            if (verified.turn() == null) verified = new Review(true, reviewed.turn(), verified.changes(), verified.conflicts());
-            if (!reviewed.turn().equals(verified.turn()))
-                throw new IllegalStateException("Scene continuity verification changed the response again");
-            reviewed = verified;
-        }
-        var after = SceneFacts.apply(before, reviewed.changes(), userInput, reviewed.turn().reply(), "");
-        return new Outcome(reviewed.turn(), enriched, beforeJson, JSON.writeValueAsString(after));
+        return observeCandidate(enriched,before,beforeJson,userInput,candidate);
     }
 
     private Outcome observeCandidate(WorldRoomDialogueContext context,List<SceneFacts.Fact> before,
                                      String beforeJson,String user,WorldRoomTurn candidate) {
-        Review reviewed;
+        var reviewed=advisoryReview(context,"REVIEW",before,user,candidate,List.of());
+        var after=applyAdvisory(before,reviewed,user,candidate.reply(),"","REVIEW");
+        return new Outcome(candidate,context,beforeJson,JSON.writeValueAsString(after));
+    }
+
+    private Review advisoryReview(WorldRoomDialogueContext context,String mode,List<SceneFacts.Fact> facts,
+                                  String user,WorldRoomTurn candidate,List<Evidence> history) {
         try {
-            reviewed=review(context,"REVIEW",before,user,candidate,List.of());
-            requireReview(reviewed,"REVIEW",candidate);
-        } catch(ReviewRejectedException rejected) {
-            SceneContinuityObservation.record("REVIEW","REJECTED",rejected.getMessage(),rejected.review());
-            return new Outcome(candidate,context,beforeJson,beforeJson);
+            var result=review(context,mode,facts,user,candidate,history);
+            if(result==null || !result.approved() || result.changes()==null || result.conflicts()==null || !result.conflicts().isEmpty())
+                SceneContinuityObservation.record(mode,"REJECTED","Advisory finding; conversation continues",result);
+            else if(result.turn()!=null && !result.turn().equals(candidate))
+                SceneContinuityObservation.record(mode,"REPAIR_PROPOSED","Original conversation preserved",result);
+            return result;
         } catch(ReviewFormatException malformed) {
-            SceneContinuityObservation.record("REVIEW","INVALID_JSON",malformed.getMessage(),null);
-            return new Outcome(candidate,context,beforeJson,beforeJson);
+            SceneContinuityObservation.record(mode,"INVALID_JSON",malformed.getMessage(),null);
+            return null;
         }
-        if(reviewed.turn()!=null&&!candidate.equals(reviewed.turn())) {
-            SceneContinuityObservation.record("REVIEW","REPAIR_PROPOSED",
-                    "QA keeps the target's original output; proposed repair and its fact changes were not applied",reviewed);
-            return new Outcome(candidate,context,beforeJson,beforeJson);
+    }
+
+    private List<SceneFacts.Fact> applyAdvisory(List<SceneFacts.Fact> before,Review review,
+                                              String user,String reply,String history,String mode) {
+        if(review==null || review.changes()==null)return before;
+        var after=before;
+        // Approval is advisory. Validate each delta against the actual committed text,
+        // preserving valid changes even if a different delta or the verdict is wrong.
+        var touched=new HashSet<String>();
+        for(var change:review.changes()) {
+            try {
+                if(change==null || !touched.add(change.key()))throw new IllegalStateException("Repeated or missing fact change");
+                after=SceneFacts.apply(after,List.of(change),user,reply,history);
+            } catch(IllegalStateException invalid) {
+                SceneContinuityObservation.record(mode,"INVALID_FACTS",invalid.getMessage(),review);
+            }
         }
-        try {
-            var after=SceneFacts.apply(before,reviewed.changes(),user,candidate.reply(),"");
-            return new Outcome(candidate,context,beforeJson,JSON.writeValueAsString(after));
-        } catch(IllegalStateException invalidFacts) {
-            // Pure local validation only; provider/transport/budget exceptions never enter this catch.
-            SceneContinuityObservation.record("REVIEW","INVALID_FACTS",invalidFacts.getMessage(),reviewed);
-            return new Outcome(candidate,context,beforeJson,beforeJson);
-        }
+        return after;
     }
 
     private List<SceneFacts.Fact> prepare(WorldRoomDialogueContext context, long beforeId) {
@@ -126,28 +151,9 @@ public class SceneContinuityService {
                     .map(WorldRoomMessage::getContent).collect(java.util.stream.Collectors.joining("\n"));
             String historyEvidence = batch.stream().map(WorldRoomMessage::getContent)
                     .collect(java.util.stream.Collectors.joining("\n"));
-            if(SceneContinuityObservation.enabled()) {
-                Review boot=null;
-                try {
-                    boot=review(context.withSceneFacts(JSON.writeValueAsString(facts)),"BOOTSTRAP",facts,userEvidence,null,history);
-                    requireReview(boot,"BOOTSTRAP",null);
-                    if(boot.turn()!=null)SceneContinuityObservation.record("BOOTSTRAP","REPAIR_PROPOSED","Bootstrap must not generate a turn",boot);
-                    else {
-                        try {facts=SceneFacts.apply(facts,boot.changes(),userEvidence,"",historyEvidence);}
-                        catch(IllegalStateException invalidFacts) {SceneContinuityObservation.record("BOOTSTRAP","INVALID_FACTS",invalidFacts.getMessage(),boot);}
-                    }
-                } catch(ReviewRejectedException rejected) {
-                    SceneContinuityObservation.record("BOOTSTRAP","REJECTED",rejected.getMessage(),rejected.review());
-                } catch(ReviewFormatException malformed) {
-                    SceneContinuityObservation.record("BOOTSTRAP","INVALID_JSON",malformed.getMessage(),null);
-                }
-            } else {
-                var boot = review(context.withSceneFacts(JSON.writeValueAsString(facts)),
-                        "BOOTSTRAP", facts, userEvidence, null, history);
-                requireReview(boot,"BOOTSTRAP",null);
-                if (boot.turn() != null) throw new IllegalStateException("Scene bootstrap must not generate a turn");
-                facts = SceneFacts.apply(facts, boot.changes(), userEvidence, "", historyEvidence);
-            }
+            var boot=advisoryReview(context.withSceneFacts(JSON.writeValueAsString(facts)),
+                    "BOOTSTRAP",facts,userEvidence,null,history);
+            facts=applyAdvisory(facts,boot,userEvidence,"",historyEvidence,"BOOTSTRAP");
             afterId = batch.getLast().getId();
         }
         return facts;
@@ -178,12 +184,6 @@ public class SceneContinuityService {
         var facts = Arrays.asList(JSON.readValue(json, SceneFacts.Fact[].class));
         // Validate persisted data as well, without mutating it.
         return SceneFacts.apply(facts, List.of(), "", "", "");
-    }
-
-    private void requireReview(Review review,String mode,WorldRoomTurn candidate) {
-        if (review == null || !review.approved() || review.changes() == null || review.conflicts() == null
-                || !review.conflicts().isEmpty())
-            throw new ReviewRejectedException(review,mode,candidate);
     }
 
     private void requireTurn(WorldRoomTurn turn, WorldRoomDialogueContext context) {

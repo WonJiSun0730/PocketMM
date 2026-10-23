@@ -396,6 +396,9 @@ export default function PocketPage({ pocket, onBack }) {
         body: JSON.stringify({ message }),
       })
       await readPocketChatStream(response, event => {
+        if(event.type === "review_warning" && event.reviewFailure) {
+          setChatFailures(current=>mergeChatFailures(current,[{...event.reviewFailure,diagnosticsSaved:event.diagnosticsSaved!==false}],session.id))
+        }
         if (event.type === "delta") {
           chatTiming.firstToken(timingId)
           setReplyPreview(event.reply)

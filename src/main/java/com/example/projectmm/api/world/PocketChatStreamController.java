@@ -48,11 +48,28 @@ public class PocketChatStreamController {
         var timing=new com.example.projectmm.application.dialogue.DialogueTiming("POCKET_SERVER");
         String[] candidate={""};
         try {
-            var turn = timing.measure(()->com.example.projectmm.application.dialogue.DialogueTokens.deliver(
-                    reply -> emit.accept(Map.of("type", "delta", "reply", reply)),
-                    () -> DialoguePreview.deliver(
-                    reply -> {candidate[0]=reply;emit.accept(Map.of("type", "preview", "reply", reply));},
-                    () -> dialogue.chat(sessionId, request.message()))));
+            var turn = com.example.projectmm.application.dialogue.SceneContinuityObservation.observe(() -> {
+                var result = timing.measure(()->com.example.projectmm.application.dialogue.DialogueTokens.deliver(
+                        reply -> emit.accept(Map.of("type", "delta", "reply", reply)),
+                        () -> DialoguePreview.deliver(
+                        reply -> {candidate[0]=reply;emit.accept(Map.of("type", "preview", "reply", reply));},
+                        () -> dialogue.chat(sessionId, request.message()))));
+                for(var finding:com.example.projectmm.application.dialogue.SceneContinuityObservation.current()) {
+                    var evidence=com.example.projectmm.application.dialogue.ChatFailureStore.evidence(
+                            new com.example.projectmm.application.dialogue.SceneContinuityService.ReviewRejectedException(
+                                    finding.review(),finding.mode()),java.util.UUID.randomUUID().toString(),sessionId,"ADVISORY",candidate[0]);
+                    var reasons=new java.util.ArrayList<>(evidence.reasons());
+                    reasons.add(finding.type()+": "+finding.message());
+                    evidence=new com.example.projectmm.application.dialogue.ChatFailureStore.Evidence(
+                            evidence.requestId(),evidence.sessionId(),evidence.createdAt(),evidence.phase(),evidence.mode(),
+                            evidence.approved(),java.util.List.copyOf(reasons),evidence.conflicts(),evidence.candidate(),evidence.truncated());
+                    boolean saved=false;
+                    try {failures.save(evidence);saved=true;}
+                    catch(IOException|RuntimeException saveFailure) {LOG.warn("Continuity advisory save failed session={}",sessionId);}
+                    emit.accept(Map.of("type","review_warning","reviewFailure",evidence,"diagnosticsSaved",saved));
+                }
+                return result;
+            });
             // The proxied service has returned: transaction and AFTER_COMMIT listeners finished.
             emit.accept(Map.of("type", "complete", "reply", turn.reply()));
         } catch (RuntimeException failure) {

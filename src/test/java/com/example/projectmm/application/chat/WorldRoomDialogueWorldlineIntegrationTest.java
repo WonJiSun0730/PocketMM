@@ -744,7 +744,7 @@ class WorldRoomDialogueWorldlineIntegrationTest {
     }
 
     @Test
-    void rejectedContinuityCannotApplyStateOrPersistGeneratedMessage() {
+    void advisoryRejectionPersistsGeneratedMessageAndItsState() {
         var session = automaticProgressionSession("facts-rejection");
         when(gateway.generateWorldRoomTurn(any(), anyString())).thenReturn(
                 new WorldRoomTurn("Unexplained teleport.",WorldRoomCastChange.none(),List.of(),3600,"Elsewhere"));
@@ -752,12 +752,11 @@ class WorldRoomDialogueWorldlineIntegrationTest {
                 "{\"approved\":false,\"turn\":null,\"changes\":[],\"conflicts\":[\"location changed without event\"]}");
         long beforeMessages=messages.count(), beforeVariants=variants.count();
         var beforeTime=session.getSimulatedAt();
-        assertThatThrownBy(() -> dialogueService.continueScene(session.getId()))
-                .hasMessageContaining("did not approve");
-        assertThat(messages.count()).isEqualTo(beforeMessages);
-        assertThat(variants.count()).isEqualTo(beforeVariants);
-        assertThat(session.getSimulatedAt()).isEqualTo(beforeTime);
-        assertThat(playerStateService.current(session.getId(),session.getMember().getLoginId()).getLocation()).isNotEqualTo("Elsewhere");
+        dialogueService.continueScene(session.getId());
+        assertThat(messages.count()).isGreaterThan(beforeMessages);
+        assertThat(variants.count()).isGreaterThan(beforeVariants);
+        assertThat(session.getSimulatedAt()).isEqualTo(beforeTime.plusSeconds(3600));
+        assertThat(playerStateService.current(session.getId(),session.getMember().getLoginId()).getLocation()).isEqualTo("Elsewhere");
     }
 
 }

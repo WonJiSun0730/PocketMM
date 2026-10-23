@@ -99,4 +99,22 @@ class PocketChatStreamControllerTest {
         assertThat(response.getContentAsString()).contains("Conflict","\"diagnosticsSaved\":false","BOOTSTRAP").doesNotContain("SECRET");
         verify(dialogue,times(1)).chat(3L,"hello");
     }
+    @Test void advisoryWarningIsSavedAndSentBeforeSuccessfulCompletionEvenIfDiskFails() throws Exception {
+        owned(1L);
+        when(dialogue.chat(3L,"hello")).thenAnswer(call->{
+            DialoguePreview.generated("original");
+            SceneContinuityObservation.record("REVIEW","REJECTED","Advisory finding; conversation continues",
+                    new SceneContinuityService.Review(false,null,java.util.List.of(),java.util.List.of("boarding ambiguous")));
+            return new WorldRoomTurn("original",WorldRoomCastChange.none());
+        });
+        doThrow(new java.io.IOException("disk unavailable")).when(failures).save(any());
+        var response=new MockHttpServletResponse();
+        controller.chat(1L,2L,3L,new WorldRoomChatRequest("hello"),auth,response);
+        var body=response.getContentAsString();
+        assertThat(body).contains("review_warning","boarding ambiguous","complete","ADVISORY").doesNotContain("\"type\":\"failed\"");
+        assertThat(body.indexOf("review_warning")).isLessThan(body.indexOf("complete"));
+        assertThat(SceneContinuityObservation.enabled()).isFalse();
+        verify(dialogue,times(1)).chat(3L,"hello");
+    }
+
 }

@@ -52,3 +52,11 @@ test("rejection evidence reaches the page even if diagnostic persistence fails",
     assert.deepEqual(error.reviewFailure.conflicts,["character absent"]);return true
   })
 })
+
+test("advisory findings do not cancel the committed response",async()=>{
+  const events=[]
+  const frames=[{type:"preview",reply:"original"},{type:"review_warning",reviewFailure:{phase:"ADVISORY",conflicts:["ambiguous"]}}, {type:"complete",reply:"original"}]
+  await readPocketChatStream(response(frames.map(frame=>JSON.stringify(frame)).join("\n")+"\n"),event=>events.push(event))
+  assert.deepEqual(events.map(event=>event.type),["preview","review_warning","complete"])
+  assert.equal(events.at(-1).reply,"original")
+})

@@ -16,7 +16,7 @@ export async function readPocketChatStream(response, onEvent) {
       throw failure
     }
     if (event.type === "complete") terminal = true
-    if (!["started", "delta", "preview", "complete"].includes(event.type)) throw new Error("알 수 없는 대화 응답입니다.")
+    if (!["started", "delta", "preview", "complete", "review_warning"].includes(event.type)) throw new Error("알 수 없는 대화 응답입니다.")
     onEvent(event)
   }
   try {

@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class SceneContinuityObservationTest {
-    @Test void qaRecordsRejectedOrMalformedReviewsAndKeepsOriginalWhileProductionStillBlocks() {
+    @Test void qaAndProductionKeepOriginalWhenReviewIsRejectedOrMalformed() {
         var f=new SceneContinuityServiceTest();f.emptyHistory();
         var candidate=f.turn("original target output");
         when(f.gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(candidate);
@@ -22,8 +22,7 @@ class SceneContinuityObservationTest {
                 return null;
             });
             assertThat(SceneContinuityObservation.enabled()).isFalse();
-            assertThatThrownBy(()->f.service.generate(f.context(),"continue","",Long.MAX_VALUE))
-                    .isInstanceOf(IllegalStateException.class);
+            assertThat(f.service.generate(f.context(),"continue","",Long.MAX_VALUE).turn()).isEqualTo(candidate);
         }
     }
     @Test void bootstrapFormatErrorIsRecordedAndDoesNotPreventCurrentTurn() {
