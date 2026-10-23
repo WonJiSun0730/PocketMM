@@ -1,3 +1,5 @@
+import PocketComposer from "@/components/PocketComposer"
+import {createReplySuggestions} from "@/lib/replySuggestions"
 import ChatFailurePanel from "@/components/ChatFailurePanel"
 import {mergeChatFailures} from "@/lib/chatFailures"
 import {readPocketChatStream} from "@/lib/pocketChatStream"
@@ -9,7 +11,7 @@ import AiCallUsage from "../components/AiCallUsage";
 import PromptTokenUsage from "../components/PromptTokenUsage";
 import {enterSendsMessage,chatInputEnvironment} from "@/lib/chatInput"
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, Menu, Pencil, RefreshCw, Send, Trash2, Wrench, X } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, Menu, Pencil, RefreshCw, Trash2, Wrench, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -153,6 +155,24 @@ export default function PocketPage({ pocket, onBack }) {
     refreshPlayerState()
   }, messageSending)
   const sending = messageSending || progress.busy
+  const replySuggestions=useMemo(()=>createReplySuggestions(async source=>{
+    const response=await fetch(`${base}/reply-suggestions`,{method:"POST",credentials:"include",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(source)})
+    if(!response.ok)throw new Error("Recommendation unavailable")
+    return response.json()
+  }),[base])
+  const recommendationState=useSyncExternalStore(replySuggestions.subscribe,replySuggestions.getSnapshot)
+  const latestSuggestionSource=messages.at(-1)
+  const suggestionSourceKey=latestSuggestionSource
+    ?JSON.stringify([latestSuggestionSource.id,latestSuggestionSource.selectedVariantNo??1,latestSuggestionSource.content])
+    :"intro"
+  useEffect(()=>{
+    const ready=!loading && !sending && (!latestSuggestionSource || latestSuggestionSource.role==="CHARACTER")
+    replySuggestions.setScene(ready?{key:suggestionSourceKey,source:latestSuggestionSource?{
+      messageId:latestSuggestionSource.id,variantNo:latestSuggestionSource.selectedVariantNo??1,content:latestSuggestionSource.content,
+    }:{messageId:null,variantNo:null,content:null}}:null)
+  },[replySuggestions,loading,sending,suggestionSourceKey,latestSuggestionSource])
+
 
   async function refreshMemoryInspector() {
     if (!isDeveloper) return
@@ -845,16 +865,8 @@ export default function PocketPage({ pocket, onBack }) {
         </div>
       </ScrollArea>
 
-      <div className="shrink-0 border-t bg-card p-3 sm:p-4">
-        <div className="mx-auto flex max-w-3xl items-end gap-2">
-          <Textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} enterKeyHint="enter"
-            placeholder="행동이나 대사를 입력해 주세요." disabled={loading || sending} rows={1}
-            className="max-h-36 min-h-11 resize-none text-base" />
-          <Button type="button" size="icon" className="size-11 shrink-0" disabled={loading || sending}
-            onClick={sendMessage} aria-label="메시지 보내기"><Send className="size-4" /></Button>
-        </div>
-        <p className="mx-auto mt-2 max-w-3xl text-center text-xs text-muted-foreground">PC: Enter 전송 · Shift + Enter 줄바꿈 / 모바일: Enter 줄바꿈 · 버튼으로 전송</p>
-      </div>
+      <PocketComposer value={input} onChange={setInput} onKeyDown={handleKeyDown} onSend={sendMessage}
+        disabled={loading || sending} recommendations={recommendationState} onToggle={replySuggestions.toggle}/>
       </section>
       <aside className="pocket-desktop-tools">
         <div className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">

@@ -180,7 +180,11 @@ public class OpenAiDialogueGateway implements DialogueGateway {
     }
 
     private String postResponse(WorldRoomDialogueContext context, String model, Map<String,Object> request) {
-        return usageTracker.accountRequest(context.sessionId(),"OPENAI",model, () -> restClient.post()
+        return postResponse(context.sessionId(),model,request);
+    }
+
+    private String postResponse(Long sessionId,String model,Map<String,Object> request) {
+        return usageTracker.accountRequest(sessionId,"OPENAI",model, () -> restClient.post()
                 .uri("/v1/responses")
                 .headers(headers -> headers.setBearerAuth(apiKey))
                 .body(request)
@@ -196,10 +200,14 @@ public class OpenAiDialogueGateway implements DialogueGateway {
 
     private String readPayload(String response, WorldRoomDialogueContext context, String model,
                                PromptTokenBreakdown breakdown) {
+        return readPayload(response,context.sessionId(),model,breakdown);
+    }
+
+    private String readPayload(String response,Long sessionId,String model,PromptTokenBreakdown breakdown) {
         JsonNode root = objectMapper.readTree(response);
         JsonNode usage = root.path("usage");
         if (usage.isObject()) usageTracker.record(
-                context.sessionId(),
+                sessionId,
                 "OPENAI",
                 model,
                 usage.path("input_tokens").asLong(0),
@@ -209,7 +217,7 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                 usage.path("output_tokens").asLong(0),
                 usage.path("total_tokens").asLong(0), breakdown
         );
-        else usageTracker.recordUnavailable(context.sessionId(),"OPENAI",model,"USAGE_NOT_REPORTED");
+        else usageTracker.recordUnavailable(sessionId,"OPENAI",model,"USAGE_NOT_REPORTED");
         String payload = null;
         for (JsonNode item : root.path("output")) {
             if (!"message".equals(item.path("type").asText())) continue;
@@ -226,6 +234,25 @@ public class OpenAiDialogueGateway implements DialogueGateway {
         }
 
         return payload;
+    }
+
+    public List<String> suggestPlayerReplies(Long sessionId,String evidenceJson) {
+        if(apiKey==null || apiKey.isBlank())throw new IllegalStateException("OPENAI_API_KEY is not configured");
+        var schema=com.example.projectmm.application.dialogue.ReplySuggestions.schema();
+        String model=com.example.projectmm.application.dialogue.ReplySuggestions.MODEL;
+        var input=List.<Map<String,Object>>of(
+                Map.of("role","developer","content",com.example.projectmm.application.dialogue.ReplySuggestions.INSTRUCTIONS),
+                Map.of("role","user","content",evidenceJson));
+        var request=Map.<String,Object>of("model",model,"input",input,"store",false,
+                "reasoning",Map.of("effort","none"),"max_output_tokens",800,
+                "text",Map.of("format",Map.of("type","json_schema","name","player_reply_suggestions","strict",true,"schema",schema)));
+        return AiUsageTracker.withPurpose(sessionId,"REPLY_SUGGESTION",()->{
+            String response=postResponse(sessionId,model,request);
+            String payload=readPayload(response,sessionId,model,null);
+            if(!objectMapper.readTree(response).path("status").asText("completed").equals("completed"))
+                throw new IllegalStateException("Reply suggestions incomplete; no retry");
+            return com.example.projectmm.application.dialogue.ReplySuggestions.parse(payload);
+        });
     }
 
     @Override
