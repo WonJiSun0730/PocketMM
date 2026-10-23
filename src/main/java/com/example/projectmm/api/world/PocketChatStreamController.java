@@ -22,6 +22,7 @@ import java.util.Map;
 public class PocketChatStreamController {
     private final WorldRoomSessionService sessions;
     private final WorldRoomDialogueService dialogue;
+    private final com.example.projectmm.application.dialogue.ChatFailureStore failures;
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final org.slf4j.Logger LOG=org.slf4j.LoggerFactory.getLogger(PocketChatStreamController.class);
 
@@ -45,11 +46,12 @@ public class PocketChatStreamController {
         emit.accept(Map.of("type", "started"));
         String requestId=java.util.UUID.randomUUID().toString();
         var timing=new com.example.projectmm.application.dialogue.DialogueTiming("POCKET_SERVER");
+        String[] candidate={""};
         try {
             var turn = timing.measure(()->com.example.projectmm.application.dialogue.DialogueTokens.deliver(
                     reply -> emit.accept(Map.of("type", "delta", "reply", reply)),
                     () -> DialoguePreview.deliver(
-                    reply -> emit.accept(Map.of("type", "preview", "reply", reply)),
+                    reply -> {candidate[0]=reply;emit.accept(Map.of("type", "preview", "reply", reply));},
                     () -> dialogue.chat(sessionId, request.message()))));
             // The proxied service has returned: transaction and AFTER_COMMIT listeners finished.
             emit.accept(Map.of("type", "complete", "reply", turn.reply()));
@@ -58,8 +60,29 @@ public class PocketChatStreamController {
             var snapshot=timing.snapshot();
             var detail=com.example.projectmm.application.dialogue.DialogueFailure.describe(failure,snapshot);
             LOG.warn("Pocket chat failed requestId={} session={} detail={} timing={}",requestId,sessionId,detail,snapshot);
-            emit.accept(Map.of("type", "failed", "code",detail.code(),"phase",detail.phase(),"requestId",requestId,
-                    "message",com.example.projectmm.application.dialogue.DialogueFailure.message(detail,requestId)));
+            var evidence=com.example.projectmm.application.dialogue.ChatFailureStore.evidence(failure,requestId,sessionId,detail.phase(),candidate[0]);
+            boolean saved=false;
+            if(evidence!=null) {
+                try {failures.save(evidence);saved=true;}
+                catch(IOException|RuntimeException persistenceFailure) {
+                    LOG.warn("Pocket failure evidence save failed requestId={} type={}",requestId,persistenceFailure.getClass().getName());
+                }
+            }
+            var event=new java.util.LinkedHashMap<String,Object>();
+            event.put("type","failed");event.put("code",detail.code());event.put("phase",detail.phase());event.put("requestId",requestId);
+            event.put("message",com.example.projectmm.application.dialogue.DialogueFailure.message(detail,requestId));
+            if(evidence!=null){event.put("reviewFailure",evidence);event.put("diagnosticsSaved",saved);}
+            emit.accept(event);
         }
+    }
+
+    @GetMapping("/chat/failures")
+    public java.util.List<com.example.projectmm.application.dialogue.ChatFailureStore.Evidence> failures(
+            @PathVariable Long worldId,@PathVariable Long roomId,@PathVariable Long sessionId,
+            Authentication authentication,HttpServletResponse response) throws IOException {
+        var session=sessions.ownedSession(roomId,sessionId,authentication.getName());
+        if(!worldId.equals(session.getRoom().getWorld().getId()))throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        response.setHeader("Cache-Control","no-store");
+        return failures.latest(sessionId);
     }
 }

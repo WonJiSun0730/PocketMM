@@ -23,11 +23,23 @@ public class SceneContinuityService {
 
     public static final class ReviewRejectedException extends IllegalStateException {
         private final Review review;
+        private final String mode;
+        private final WorldRoomTurn candidate;
         public ReviewRejectedException(Review review) {
+            this(review,"UNKNOWN");
+        }
+        public ReviewRejectedException(Review review,String mode) {
+            this(review,mode,null);
+        }
+        public ReviewRejectedException(Review review,String mode,WorldRoomTurn candidate) {
             super("Scene continuity review did not approve the response");
+            this.mode=mode;
+            this.candidate=candidate;
             this.review=review;
         }
         public Review review() {return review;}
+        public String mode() {return mode;}
+        public WorldRoomTurn candidate() {return candidate;}
     }
     private static final class ReviewFormatException extends IllegalStateException {
         ReviewFormatException(Throwable cause) {super("Invalid scene continuity review",cause);}
@@ -50,13 +62,13 @@ public class SceneContinuityService {
         DialoguePreview.generated(candidate.reply());
         if(SceneContinuityObservation.enabled())return observeCandidate(enriched,before,beforeJson,userInput,candidate);
         var reviewed = review(enriched, "REVIEW", before, userInput, candidate, List.of());
-        requireReview(reviewed);
+        requireReview(reviewed,"REVIEW",candidate);
         if (reviewed.turn() == null) reviewed = new Review(true, candidate, reviewed.changes(), reviewed.conflicts());
         requireTurn(reviewed.turn(), enriched);
         // A repaired response must pass a second independent check; no unbounded repair loop.
         if (!candidate.equals(reviewed.turn())) {
             var verified = review(enriched, "VERIFY", before, userInput, reviewed.turn(), List.of());
-            requireReview(verified);
+            requireReview(verified,"VERIFY",reviewed.turn());
             if (verified.turn() == null) verified = new Review(true, reviewed.turn(), verified.changes(), verified.conflicts());
             if (!reviewed.turn().equals(verified.turn()))
                 throw new IllegalStateException("Scene continuity verification changed the response again");
@@ -71,7 +83,7 @@ public class SceneContinuityService {
         Review reviewed;
         try {
             reviewed=review(context,"REVIEW",before,user,candidate,List.of());
-            requireReview(reviewed);
+            requireReview(reviewed,"REVIEW",candidate);
         } catch(ReviewRejectedException rejected) {
             SceneContinuityObservation.record("REVIEW","REJECTED",rejected.getMessage(),rejected.review());
             return new Outcome(candidate,context,beforeJson,beforeJson);
@@ -118,7 +130,7 @@ public class SceneContinuityService {
                 Review boot=null;
                 try {
                     boot=review(context.withSceneFacts(JSON.writeValueAsString(facts)),"BOOTSTRAP",facts,userEvidence,null,history);
-                    requireReview(boot);
+                    requireReview(boot,"BOOTSTRAP",null);
                     if(boot.turn()!=null)SceneContinuityObservation.record("BOOTSTRAP","REPAIR_PROPOSED","Bootstrap must not generate a turn",boot);
                     else {
                         try {facts=SceneFacts.apply(facts,boot.changes(),userEvidence,"",historyEvidence);}
@@ -132,7 +144,7 @@ public class SceneContinuityService {
             } else {
                 var boot = review(context.withSceneFacts(JSON.writeValueAsString(facts)),
                         "BOOTSTRAP", facts, userEvidence, null, history);
-                requireReview(boot);
+                requireReview(boot,"BOOTSTRAP",null);
                 if (boot.turn() != null) throw new IllegalStateException("Scene bootstrap must not generate a turn");
                 facts = SceneFacts.apply(facts, boot.changes(), userEvidence, "", historyEvidence);
             }
@@ -168,10 +180,10 @@ public class SceneContinuityService {
         return SceneFacts.apply(facts, List.of(), "", "", "");
     }
 
-    private void requireReview(Review review) {
+    private void requireReview(Review review,String mode,WorldRoomTurn candidate) {
         if (review == null || !review.approved() || review.changes() == null || review.conflicts() == null
                 || !review.conflicts().isEmpty())
-            throw new ReviewRejectedException(review);
+            throw new ReviewRejectedException(review,mode,candidate);
     }
 
     private void requireTurn(WorldRoomTurn turn, WorldRoomDialogueContext context) {

@@ -44,3 +44,11 @@ test("failed review and invalid frames fail explicitly without resending",async(
   await assert.rejects(readPocketChatStream(response('{"type":"failed","message":"확인 실패"}\n'),()=>{}),/확인 실패/)
   await assert.rejects(readPocketChatStream(response('not json\n'),()=>{}),SyntaxError)
 })
+test("rejection evidence reaches the page even if diagnostic persistence fails",async()=>{
+  const event={type:"failed",message:"review rejected",requestId:"id",diagnosticsSaved:false,
+    reviewFailure:{requestId:"id",sessionId:55,conflicts:["character absent"],candidate:"draft"}}
+  await assert.rejects(readPocketChatStream(response(JSON.stringify(event)+"\n"),()=>{}),error=>{
+    assert.equal(error.requestId,"id");assert.equal(error.reviewFailure.diagnosticsSaved,false)
+    assert.deepEqual(error.reviewFailure.conflicts,["character absent"]);return true
+  })
+})

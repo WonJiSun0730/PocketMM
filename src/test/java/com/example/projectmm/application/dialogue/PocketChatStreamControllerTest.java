@@ -19,7 +19,8 @@ class PocketChatStreamControllerTest {
     final WorldRoomSessionService sessions=mock(WorldRoomSessionService.class);
     final WorldRoomDialogueService dialogue=mock(WorldRoomDialogueService.class);
     final Authentication auth=mock(Authentication.class);
-    final PocketChatStreamController controller=new PocketChatStreamController(sessions,dialogue);
+    final ChatFailureStore failures=mock(ChatFailureStore.class);
+    final PocketChatStreamController controller=new PocketChatStreamController(sessions,dialogue,failures);
 
     void owned(long worldId) {
         when(auth.getName()).thenReturn("owner");
@@ -66,7 +67,7 @@ class PocketChatStreamControllerTest {
         owned(1L);
         when(dialogue.chat(3L,"hello")).thenAnswer(call->{
             DialogueTiming.generationStarting();DialogueTiming.bodyReady();DialoguePreview.generated("candidate");
-            throw new SceneContinuityService.ReviewRejectedException(new SceneContinuityService.Review(false,null,java.util.List.of(),java.util.List.of("SECRET")));
+            throw new SceneContinuityService.ReviewRejectedException(new SceneContinuityService.Review(false,null,java.util.List.of(),java.util.List.of("Character was absent")));
         });
         var response=new MockHttpServletResponse();
         controller.chat(1L,2L,3L,new WorldRoomChatRequest("hello"),auth,response);
@@ -74,7 +75,28 @@ class PocketChatStreamControllerTest {
         assertThat(json.path("code").asText()).isEqualTo("CONTINUITY_REJECTED");
         assertThat(json.path("phase").asText()).isEqualTo("CONTINUITY");
         assertThat(java.util.UUID.fromString(json.path("requestId").asText())).isNotNull();
+        assertThat(json.path("reviewFailure").path("conflicts").path(0).asText()).isEqualTo("Character was absent");
+        assertThat(json.path("reviewFailure").path("candidate").asText()).isEqualTo("candidate");
+        assertThat(json.path("diagnosticsSaved").asBoolean()).isTrue();
         assertThat(response.getContentAsString()).doesNotContain("SECRET","complete");
+        verify(dialogue,times(1)).chat(3L,"hello");
+    }
+    @Test void failureRecordsRequireOwnershipAndCorrectWorldBeforeReadingDisk() throws Exception {
+        owned(99L);
+        assertThatThrownBy(()->controller.failures(1L,2L,3L,auth,new MockHttpServletResponse())).isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(failures);
+        owned(1L);
+        when(sessions.ownedSession(2L,3L,"owner")).thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND));
+        assertThatThrownBy(()->controller.failures(1L,2L,3L,auth,new MockHttpServletResponse())).isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(failures);
+    }
+    @Test void evidenceDiskFailureStillDeliversReasonsWithoutASecondGeneration() throws Exception {
+        owned(1L);
+        when(dialogue.chat(3L,"hello")).thenThrow(new SceneContinuityService.ReviewRejectedException(
+                new SceneContinuityService.Review(false,null,java.util.List.of(),java.util.List.of("Conflict")),"BOOTSTRAP"));
+        doThrow(new java.io.IOException("SECRET disk details")).when(failures).save(any());
+        var response=new MockHttpServletResponse();controller.chat(1L,2L,3L,new WorldRoomChatRequest("hello"),auth,response);
+        assertThat(response.getContentAsString()).contains("Conflict","\"diagnosticsSaved\":false","BOOTSTRAP").doesNotContain("SECRET");
         verify(dialogue,times(1)).chat(3L,"hello");
     }
 }

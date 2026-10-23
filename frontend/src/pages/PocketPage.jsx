@@ -1,3 +1,5 @@
+import ChatFailurePanel from "@/components/ChatFailurePanel"
+import {mergeChatFailures} from "@/lib/chatFailures"
 import {readPocketChatStream} from "@/lib/pocketChatStream"
 import {createPocketChatTiming} from "@/lib/pocketChatTiming"
 import PocketChatTimingPanel, {MeasuredPocketReply} from "@/components/PocketChatTimingPanel"
@@ -62,6 +64,14 @@ export default function PocketPage({ pocket, onBack }) {
   const [pickerMode, setPickerMode] = useState(false)
   const [changingPlayerProfile, setChangingPlayerProfile] = useState(false)
   const [messages, setMessages] = useState([])
+  const [chatFailures,setChatFailures]=useState([])
+  useEffect(()=>{
+    let active=true
+    fetch(`${base}/chat/failures`,{credentials:"include"}).then(r=>r.ok?r.json():[]).then(rows=>{
+      if(active && Array.isArray(rows))setChatFailures(current=>mergeChatFailures(current,rows,session.id))
+    }).catch(()=>{})
+    return ()=>{active=false}
+  },[base,session.id])
   const [replyPreview, setReplyPreview] = useState(null)
   const [streamFinished,setStreamFinished]=useState(false)
   const typingDrain=useRef(null)
@@ -410,6 +420,7 @@ export default function PocketPage({ pocket, onBack }) {
       await refreshMemoryInspector()
       await refreshAiUsage()
     } catch (e) {
+      if(e.reviewFailure)setChatFailures(current=>mergeChatFailures(current,[e.reviewFailure],session.id))
       chatTiming.failed(timingId)
       setReplyPreview(null)
       setMessages(current => current.filter(item => item.id !== pending.id))
@@ -557,6 +568,7 @@ export default function PocketPage({ pocket, onBack }) {
     return <main className="min-h-svh bg-background text-foreground">
       <p className="mx-auto max-w-2xl px-4 pt-6 text-sm text-muted-foreground">{room.title} · 유저 프로필 선택</p>
       {error && <p role="alert" className="mx-auto max-w-2xl px-4 py-2 text-destructive">{error}</p>}
+      <ChatFailurePanel records={chatFailures.filter(row=>String(row.sessionId)===String(session.id))} error={error}/>
       <PlayerProfilePicker
         current={selectedPlayerProfile}
         busy={changingPlayerProfile}
@@ -616,6 +628,7 @@ export default function PocketPage({ pocket, onBack }) {
       </section>
 
       {error && <p role="alert" className="shrink-0 border-b px-4 py-2 text-sm text-destructive">{error}</p>}
+      <ChatFailurePanel records={chatFailures.filter(row=>String(row.sessionId)===String(session.id))} error={error}/>
 
       <dialog ref={mobileToolsRef} className="pocket-mobile-tools" aria-label="포켓 메뉴"
         onCancel={event=>{event.preventDefault();setMobileToolsOpen(false)}}>
