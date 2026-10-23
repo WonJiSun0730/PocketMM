@@ -103,7 +103,17 @@ public class WorldRoomContextBuilder {
                 ))
                 .toList();
 
-        var worldSystems = sessionSystemStates.findBySessionIdOrderBySystemSortOrderAscIdAsc(sessionId)
+        var sessionSystemRows = sessionSystemStates.findBySessionIdOrderBySystemSortOrderAscIdAsc(sessionId);
+        // Reuse only within this snapshot; later builds must observe state changes.
+        var labelsBySystem = new java.util.HashMap<Long, List<DialogueWorldSystemState>>();
+        for (var row : sessionSystemRows) {
+            labelsBySystem.computeIfAbsent(row.getSystem().getId(), id ->
+                    systemStates.findBySystemIdOrderBySortOrderAsc(id).stream()
+                            .map(label -> new DialogueWorldSystemState(
+                                    label.getMinValue(), label.getMaxValue(), label.getLabel()))
+                            .toList());
+        }
+        var worldSystems = sessionSystemRows
                 .stream()
                 .map(com.example.projectmm.domain.chat.WorldRoomSessionSystemState::getSystem)
                 .map(system -> new DialogueWorldSystem(
@@ -111,14 +121,7 @@ public class WorldRoomContextBuilder {
                         system.getChangeCondition(),
                         system.getMinValue(),
                         system.getMaxValue(),
-                        systemStates.findBySystemIdOrderBySortOrderAsc(system.getId())
-                                .stream()
-                                .map(state -> new DialogueWorldSystemState(
-                                        state.getMinValue(),
-                                        state.getMaxValue(),
-                                        state.getLabel()
-                                ))
-                                .toList()
+                        labelsBySystem.get(system.getId())
                 ))
                 .toList();
 
@@ -193,8 +196,7 @@ public class WorldRoomContextBuilder {
                         .toList(),
                 roomCast,
                 activeCast,
-                sessionSystemStates.findBySessionIdOrderBySystemSortOrderAscIdAsc(sessionId)
-                        .stream()
+                sessionSystemRows.stream()
                         .map(state -> new WorldRoomSystemContext(
                                 state.getSystem().getId(),
                                 state.getSystem().getName(),
@@ -202,14 +204,7 @@ public class WorldRoomContextBuilder {
                                 state.getSystem().getMinValue(),
                                 state.getSystem().getMaxValue(),
                                 state.getSystem().getChangeCondition(),
-                                systemStates.findBySystemIdOrderBySortOrderAsc(state.getSystem().getId())
-                                        .stream()
-                                        .map(label -> new DialogueWorldSystemState(
-                                                label.getMinValue(),
-                                                label.getMaxValue(),
-                                                label.getLabel()
-                                        ))
-                                        .toList()
+                                labelsBySystem.get(state.getSystem().getId())
                         ))
                         .toList(),
                 playerStates.findBySessionId(sessionId)

@@ -11,18 +11,30 @@ final class ExperienceInputCounter {
     private static String safe(String value) {
         return value!=null&&value.matches("[a-zA-Z0-9_.-]{1,80}")?value:"unknown";
     }
+    private static final class TextClient {
+        static final RestClient INSTANCE=createClient();
+        private static RestClient createClient() {
+            var factory=new org.springframework.http.client.JdkClientHttpRequestFactory(java.net.http.HttpClient.newBuilder()
+                    .connectTimeout(java.time.Duration.ofSeconds(15)).build());
+            factory.setReadTimeout(java.time.Duration.ofSeconds(30));
+            return RestClient.builder().requestFactory(factory).build();
+        }
+    }
+    private static final class EmbeddingTokenizer {
+        static final com.knuddels.jtokkit.api.Encoding INSTANCE=com.knuddels.jtokkit.Encodings.newDefaultEncodingRegistry()
+                .getEncoding(com.knuddels.jtokkit.api.EncodingType.CL100K_BASE);
+    }
     static long count(String provider,String model,JsonNode request,boolean embedding) {
         if(!provider.equals("OPENAI"))throw new IllegalStateException("OpenAI QA blocks other provider token counters before HTTP");
-        if(embedding && provider.equals("OPENAI")) {
+        return count(provider,model,request,embedding,embedding?null:TextClient.INSTANCE,embedding?null:ExperienceEnvironment.key());
+    }
+    static long count(String provider,String model,JsonNode request,boolean embedding,RestClient client,String key) {
+        if(!provider.equals("OPENAI"))throw new IllegalStateException("OpenAI QA blocks other provider token counters before HTTP");
+        if(embedding) {
             if(!java.util.Set.of("text-embedding-3-small","text-embedding-3-large").contains(model) || !request.path("input").isString())
                 throw new IllegalStateException("Verified embedding tokenizer unavailable; request blocked");
-            return com.knuddels.jtokkit.Encodings.newDefaultEncodingRegistry()
-                    .getEncoding(com.knuddels.jtokkit.api.EncodingType.CL100K_BASE).countTokens(request.path("input").asText());
+            return EmbeddingTokenizer.INSTANCE.countTokens(request.path("input").asText());
         }
-        var factory=new org.springframework.http.client.JdkClientHttpRequestFactory(java.net.http.HttpClient.newBuilder()
-                .connectTimeout(java.time.Duration.ofSeconds(15)).build());
-        factory.setReadTimeout(java.time.Duration.ofSeconds(30));
-        RestClient client=RestClient.builder().requestFactory(factory).build();
         String response;
         {
             // Token counting accepts input-shaping fields, not generation controls.
@@ -33,7 +45,7 @@ final class ExperienceInputCounter {
             }
             try {
                 response=client.post().uri("https://api.openai.com/v1/responses/input_tokens")
-                        .headers(h->h.setBearerAuth(ExperienceEnvironment.key())).contentType(MediaType.APPLICATION_JSON)
+                        .headers(h->h.setBearerAuth(key)).contentType(MediaType.APPLICATION_JSON)
                         .body(countRequest).retrieve().body(String.class);
             } catch(RestClientResponseException e) {
                 // Do not log the raw provider response or prompt.
