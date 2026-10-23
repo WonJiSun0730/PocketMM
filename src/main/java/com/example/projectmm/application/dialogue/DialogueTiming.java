@@ -8,6 +8,7 @@ import java.util.*;
 public final class DialogueTiming {
     private static final ThreadLocal<DialogueTiming> CURRENT = new ThreadLocal<>();
     private final LongSupplier clock;
+    private final String source;
     private final long start;
     private Long firstTokenMs, preGenerationMs, targetDispatchMs, bodyReadyMs, reviewCompleteMs, processingCompleteMs;
     public static final List<String> STAGES=List.of("SESSION_LOCK","INITIAL_SCENE_SETUP","USER_MESSAGE_SAVE",
@@ -17,8 +18,10 @@ public final class DialogueTiming {
     private final Map<String,Stage> stages=new LinkedHashMap<>();
     public record Snapshot(String source, Long bodyReadyMs, Long reviewCompleteMs, Long processingCompleteMs,
                            Long preGenerationMs, Long targetDispatchMs, Map<String,Stage> stages, Long firstTokenMs) {}
-    public DialogueTiming() { this(System::nanoTime); }
-    public DialogueTiming(LongSupplier clock) { this.clock=clock;start=clock.getAsLong(); }
+    public DialogueTiming() { this("QA_SERVER",System::nanoTime); }
+    public DialogueTiming(LongSupplier clock) { this("QA_SERVER",clock); }
+    public DialogueTiming(String source) { this(source,System::nanoTime); }
+    private DialogueTiming(String source,LongSupplier clock) { this.source=source;this.clock=clock;start=clock.getAsLong(); }
     public <T> T measure(Supplier<T> action) {
         if(CURRENT.get()!=null)throw new IllegalStateException("Nested dialogue timing");
         CURRENT.set(this);
@@ -42,6 +45,6 @@ public final class DialogueTiming {
     static void bodyReady() { var t=CURRENT.get();if(t!=null&&t.bodyReadyMs==null)t.bodyReadyMs=t.elapsed(); }
     static void reviewed() { var t=CURRENT.get();if(t!=null)t.reviewCompleteMs=t.elapsed(); }
     public void processingComplete() { processingCompleteMs=elapsed(); }
-    public Snapshot snapshot() { return new Snapshot("QA_SERVER",bodyReadyMs,reviewCompleteMs,processingCompleteMs,
+    public Snapshot snapshot() { return new Snapshot(source,bodyReadyMs,reviewCompleteMs,processingCompleteMs,
             preGenerationMs,targetDispatchMs,Collections.unmodifiableMap(new LinkedHashMap<>(stages)),firstTokenMs); }
 }

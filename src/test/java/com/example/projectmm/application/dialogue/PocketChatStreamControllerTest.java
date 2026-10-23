@@ -62,4 +62,19 @@ class PocketChatStreamControllerTest {
         assertThat(response.isCommitted()).isFalse();
         verifyNoInteractions(dialogue);
     }
+    @Test void existingRoomReviewRejectionIsReportedWithoutRegenerationOrSecretExposure() throws Exception {
+        owned(1L);
+        when(dialogue.chat(3L,"hello")).thenAnswer(call->{
+            DialogueTiming.generationStarting();DialogueTiming.bodyReady();DialoguePreview.generated("candidate");
+            throw new SceneContinuityService.ReviewRejectedException(new SceneContinuityService.Review(false,null,java.util.List.of(),java.util.List.of("SECRET")));
+        });
+        var response=new MockHttpServletResponse();
+        controller.chat(1L,2L,3L,new WorldRoomChatRequest("hello"),auth,response);
+        var json=new tools.jackson.databind.ObjectMapper().readTree(response.getContentAsString().lines().reduce((a,b)->b).orElseThrow());
+        assertThat(json.path("code").asText()).isEqualTo("CONTINUITY_REJECTED");
+        assertThat(json.path("phase").asText()).isEqualTo("CONTINUITY");
+        assertThat(java.util.UUID.fromString(json.path("requestId").asText())).isNotNull();
+        assertThat(response.getContentAsString()).doesNotContain("SECRET","complete");
+        verify(dialogue,times(1)).chat(3L,"hello");
+    }
 }

@@ -23,6 +23,7 @@ public class PocketChatStreamController {
     private final WorldRoomSessionService sessions;
     private final WorldRoomDialogueService dialogue;
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final org.slf4j.Logger LOG=org.slf4j.LoggerFactory.getLogger(PocketChatStreamController.class);
 
     @PostMapping(value = "/chat/stream", produces = "application/x-ndjson")
     public void chat(@PathVariable Long worldId, @PathVariable Long roomId,
@@ -42,18 +43,23 @@ public class PocketChatStreamController {
             writer.flush();
         };
         emit.accept(Map.of("type", "started"));
+        String requestId=java.util.UUID.randomUUID().toString();
+        var timing=new com.example.projectmm.application.dialogue.DialogueTiming("POCKET_SERVER");
         try {
-            var turn = com.example.projectmm.application.dialogue.DialogueTokens.deliver(
+            var turn = timing.measure(()->com.example.projectmm.application.dialogue.DialogueTokens.deliver(
                     reply -> emit.accept(Map.of("type", "delta", "reply", reply)),
                     () -> DialoguePreview.deliver(
                     reply -> emit.accept(Map.of("type", "preview", "reply", reply)),
-                    () -> dialogue.chat(sessionId, request.message())));
+                    () -> dialogue.chat(sessionId, request.message()))));
             // The proxied service has returned: transaction and AFTER_COMMIT listeners finished.
             emit.accept(Map.of("type", "complete", "reply", turn.reply()));
         } catch (RuntimeException failure) {
             // Do not expose provider responses or claim rollback after an AFTER_COMMIT failure.
-            emit.accept(Map.of("type", "failed", "message",
-                    "대화 처리를 완료하지 못했어요. 저장된 대화를 확인해 주세요. 자동 재시도하지 않습니다."));
+            var snapshot=timing.snapshot();
+            var detail=com.example.projectmm.application.dialogue.DialogueFailure.describe(failure,snapshot);
+            LOG.warn("Pocket chat failed requestId={} session={} detail={} timing={}",requestId,sessionId,detail,snapshot);
+            emit.accept(Map.of("type", "failed", "code",detail.code(),"phase",detail.phase(),"requestId",requestId,
+                    "message",com.example.projectmm.application.dialogue.DialogueFailure.message(detail,requestId)));
         }
     }
 }

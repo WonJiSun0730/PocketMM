@@ -634,7 +634,7 @@ export default function PocketPage({ pocket, onBack }) {
         <div className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span>현재 장면 · {cast.length ? cast.map(item => item.characterName ?? item.name).join(" · ") : "등장인물 없음"}</span>
-            {systems.map(system => <span key={system.id}>{system.name} <strong className="text-foreground">{system.currentValue}</strong></span>)}
+            {systems.map(system => <span key={system.systemId}>{system.name} <strong className="text-foreground">{system.currentValue}</strong></span>)}
           </div>
         </div>
 
@@ -844,7 +844,7 @@ export default function PocketPage({ pocket, onBack }) {
         <div className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span>현재 장면 · {cast.length ? cast.map(item => item.characterName ?? item.name).join(" · ") : "등장인물 없음"}</span>
-            {systems.map(system => <span key={system.id}>{system.name} <strong className="text-foreground">{system.currentValue}</strong></span>)}
+            {systems.map(system => <span key={system.systemId}>{system.name} <strong className="text-foreground">{system.currentValue}</strong></span>)}
           </div>
         </div>
 
