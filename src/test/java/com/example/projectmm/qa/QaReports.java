@@ -53,6 +53,14 @@ public final class QaReports {
         }
         md.append("\n서술형 회상·정정·관계·환각은 단어 일치만으로 정답 처리하지 않습니다. AI 판정기는 미사용이며 해당 항목은 미평가입니다.\n\n");
         if(state.reason!=null)md.append("중단 사유: ").append(state.reason).append("\n\n");
+        md.append("\n## 연속성 검사 관찰\n\n검사 오류는 기록 후 다음 턴으로 진행합니다. 대상 원문을 유지하며 검사 수정본과 검증되지 않은 사실 변경은 적용하지 않습니다. 실행 완료는 품질 합격을 뜻하지 않습니다.\n\n");
+        var mapper=new ObjectMapper();
+        for(var t:state.turns) {
+            if(t.outcome().diagnosticsJson()==null)continue;
+            var issues=mapper.readTree(t.outcome().diagnosticsJson()).path("continuityQa").path("findings");
+            if(issues.isArray()&&!issues.isEmpty())md.append("### ").append(t.number()).append("턴\n\n```json\n")
+                    .append(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(issues)).append("\n```\n\n");
+        }
         for(var t:state.turns) if(t.verdict()!=null)md.append("## 턴 ").append(t.number()).append(" · ").append(t.verdict().eventId())
                 .append("\n\n결과: ").append(t.verdict().result()).append("\n\n입력: ").append(t.input()).append("\n\n응답: ").append(t.outcome().reply())
                 .append("\n\n근거:\n\n").append(t.verdict().evidence()).append("\n\n");

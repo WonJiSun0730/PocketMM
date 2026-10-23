@@ -20,6 +20,7 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
     private final QaSpec spec;private final Path directory;private final ObjectMapper mapper=new ObjectMapper();
     private final Map<String,Long> maxima;private BigDecimal spent=BigDecimal.ZERO;private boolean uncertain;
     boolean budgetBlocked;
+    private String blockedReason,requestRole="AUXILIARY",requestModel="unknown";
     interface InputCounter {long count(String provider,String model,tools.jackson.databind.JsonNode request,boolean embedding);}
     private final InputCounter counter;
     private final tools.jackson.databind.JsonNode policy;
@@ -42,7 +43,7 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
         }
         finally {Files.deleteIfExists(temp);}
     }
-    private void block(String reason) throws IOException {budgetBlocked=true;budgetEvent("BLOCKED",reason);throw new IllegalStateException(reason);}
+    private void block(String reason) throws IOException {budgetBlocked=true;blockedReason=reason;budgetEvent("BLOCKED",reason);throw new IllegalStateException(reason);}
 
     private final LinkedHashMap<String,Receipt> calls=new LinkedHashMap<>();
     ExperienceTransport(QaSpec spec,Path directory) throws IOException {
@@ -65,6 +66,13 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
     }
     synchronized List<QaRunner.Usage> since(Set<String> before){return calls.values().stream().filter(c->!before.contains(c.callId())).map(Receipt::usage).toList();}
     synchronized Set<String> ids(){return Set.copyOf(calls.keySet());}
+    synchronized QaRunner.Outcome outcomeSince(Set<String> before,QaRunner.Outcome outcome) {
+        var receipts=new ArrayList<>(since(before));
+        if(budgetBlocked)receipts.add(new QaRunner.Usage(requestRole,requestModel,"NOT_SENT",0,0,0L,0,"BUDGET_BLOCKED",BigDecimal.ZERO));
+        return new QaRunner.Outcome(outcome.reply(),outcome.memories(),outcome.evaluationJson(),outcome.diagnosticsJson(),
+                outcome.memoryBeforeJson(),outcome.memoryAfterJson(),receipts,
+                budgetBlocked&&outcome.error()!=null?"요청 전송 전 차단: "+blockedReason:outcome.error());
+    }
     synchronized void begin(QaRunner.State state){if(state.unknownCost())uncertain=true;}
     private void record(Receipt receipt) throws IOException {
         // No auth headers, URL query keys or exception text are written.
@@ -87,7 +95,6 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
         if(budgetBlocked)throw new IllegalStateException("Budget policy already blocked this run; no further HTTP requests permitted");
         if(uncertain){budgetEvent("REVIEW_REQUIRED","Unknown prior charge; automatic retry prohibited");throw new IllegalStateException("Unknown prior charge; automatic retry prohibited");}
         var json=mapper.readTree(body);boolean gemini=request.getURI().getHost().equals("generativelanguage.googleapis.com");
-        if(gemini)block("OpenAI QA에서 Gemini 요청을 전송 전에 차단했습니다. 새 실행을 만드세요.");
         boolean embedding=request.getURI().getPath().equals("/v1/embeddings");
         String model=gemini?request.getURI().getPath().replaceFirst(".*/models/","").replaceFirst(":.*",""):json.path("model").asText();
         String provider=gemini?"GEMINI":"OPENAI";
@@ -95,6 +102,8 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
         String purpose=scope==null?"ROLEPLAY":(String)org.springframework.test.util.ReflectionTestUtils.getField(scope,"purpose");
         if(ExperiencePersonaClient.personaCall.get())purpose="PLAYER_SIMULATION";
         String role=ExperiencePersonaClient.personaCall.get()?"PERSONA":!"SCENE_CONTINUITY".equals(purpose)&&model.equals(spec.targetModel())&&!gemini&&json.path("text").path("format").path("name").asText().equals("pocket_turn")?"TARGET":"AUXILIARY";
+        requestRole=role;requestModel=model;
+        if(gemini)block("OpenAI QA에서 Gemini 요청을 전송 전에 차단했습니다. 새 실행을 만드세요.");
         var rate=spec.prices().get(model);Long maximum=maxima.get(model);
         if(rate==null||maximum==null||maximum<(embedding?0:1))throw new IllegalStateException("Verified model price and maximum output reservation required");
         budget.clear();budget.put("model",model);budget.put("role",role);budget.put("purpose",purpose);
@@ -124,7 +133,11 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
         // Count both in settlement; never change the service thinking settings.
         long thoughtBound=0;
         long input;
-        try {input=counter.count(provider,model,modified,embedding);if(input<0)throw new IllegalStateException();}
+        final String countedProvider=provider,countedModel=model;
+        try {input=role.equals("TARGET")
+                ? com.example.projectmm.application.dialogue.DialogueTiming.stage("TARGET_TOKEN_COUNT",()->counter.count(countedProvider,countedModel,modified,embedding))
+                : counter.count(provider,model,modified,embedding);
+            if(input<0)throw new IllegalStateException();}
         catch(RuntimeException e){block("입력 토큰 계수 실패("+e.getClass().getSimpleName()+"): 최대 비용을 확인할 수 없어 전송하지 않았습니다.");return null;}
         long maxOutput=Math.addExact(output,thoughtBound);
         boolean large=rate.largeContextThreshold()>0&&input>rate.largeContextThreshold();
@@ -157,7 +170,32 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
         budget.put("callId",id);
         record(new Receipt(id,Instant.now().toString(),"REQUEST_STARTED",role,provider,model,purpose,0,0,null,0,"UNKNOWN",null,null));
         try {
-            var response=execution.execute(request,body);byte[] bytes=response.getBody().readAllBytes();var root=mapper.readTree(bytes);
+            if(role.equals("TARGET"))com.example.projectmm.application.dialogue.DialogueTiming.targetDispatching();
+            var response=execution.execute(request,body);
+            boolean streamed=modified.path("stream").asBoolean(false)&&response.getStatusCode().is2xxSuccessful()
+                    &&response.getHeaders().getContentType()!=null
+                    &&response.getHeaders().getContentType().isCompatibleWith(MediaType.TEXT_EVENT_STREAM);
+            byte[] bytes;
+            try {
+                bytes=streamed?com.example.projectmm.infrastructure.dialogue.OpenAiResponseStream.read(response.getBody(),
+                        com.example.projectmm.application.dialogue.DialogueTokens::publish).getBytes(java.nio.charset.StandardCharsets.UTF_8)
+                        :response.getBody().readAllBytes();
+            } catch(IOException|RuntimeException failure) {response.close();throw failure;}
+            var root=mapper.readTree(bytes);
+            // Keep the review result, not HTTP/auth headers, for offline rejection diagnosis.
+            // A receipt failure must not hide already-incurred provider usage.
+            if("SCENE_CONTINUITY".equals(purpose)) {
+                try {
+                    var reviews=directory.resolve("review-responses");Files.createDirectories(reviews);
+                    var texts=new ArrayList<String>();
+                    for(var outputItem:root.path("output"))for(var part:outputItem.path("content"))
+                        if("output_text".equals(part.path("type").asText()))texts.add(part.path("text").asText());
+                    Files.writeString(reviews.resolve(id+".json"),mapper.writeValueAsString(Map.of(
+                            "callId",id,"status",root.path("status").asText("UNKNOWN"),"outputTexts",texts)),StandardOpenOption.CREATE_NEW);
+                } catch(IOException receiptFailure) {
+                    System.err.println("QA review receipt unavailable: "+receiptFailure.getClass().getName());
+                }
+            }
             var u=root.path(gemini?"usageMetadata":"usage");var d=u.path("input_tokens_details");
             long in=u.path(gemini?"promptTokenCount":embedding?"prompt_tokens":"input_tokens").asLong(-1),cache=embedding?0:(gemini?u.path("cachedContentTokenCount"):d.path("cached_tokens")).asLong(gemini?0:-1);
             Long write=gemini||embedding?Long.valueOf(0):d.path("cache_write_tokens").isIntegralNumber()?Long.valueOf(d.path("cache_write_tokens").asLong()):null;
@@ -176,7 +214,11 @@ final class ExperienceTransport implements ClientHttpRequestInterceptor {
             return new ClientHttpResponse() {
                 public HttpStatusCode getStatusCode() throws IOException{return response.getStatusCode();}
                 public String getStatusText() throws IOException{return response.getStatusText();}
-                public HttpHeaders getHeaders(){return response.getHeaders();}
+                public HttpHeaders getHeaders(){
+                    if(!streamed)return response.getHeaders();
+                    var headers=new HttpHeaders();headers.putAll(response.getHeaders());
+                    headers.setContentType(MediaType.APPLICATION_JSON);headers.setContentLength(safeBytes.length);return headers;
+                }
                 public InputStream getBody(){return new ByteArrayInputStream(safeBytes);}
                 public void close(){response.close();}
             };

@@ -1,15 +1,15 @@
 import { useEffect, useRef, useState } from "react"
+import {qaPreparationRows,qaPreparationStages,qaTimingSeconds} from "@/lib/qaPreparationTiming"
 import { Button } from "@/components/ui/button"
-import { QA_PERSONA_MODEL, qaEstimate, qaModelLabel, qaRequest, qaStartRequest, qaStatusLabels } from "@/lib/pocketQa"
+import { qaEstimate, qaModelLabel, qaRequest, qaStartRequest, qaStatusLabels, qaCostStatus, qaUsd as usd } from "@/lib/pocketQa"
 
-const usd = value => value == null ? "미확인" : `$${Number(value).toFixed(4)}`
 const field = "mt-1 h-9 w-full rounded-md border bg-background px-2 text-sm"
 
 export default function PocketExperienceQaPanel({ sessionId }) {
   const base = `/api/worlds/pockets/${sessionId}/experience-qa`
   const [capabilities, setCapabilities] = useState(null)
   const [unavailable, setUnavailable] = useState("")
-  const [targetModel, setTargetModel] = useState(QA_PERSONA_MODEL)
+  const [targetModel, setTargetModel] = useState("gpt-5.6-sol")
   const [turns, setTurns] = useState(20)
   const [paid, setPaid] = useState(false)
   const [budget, setBudget] = useState("")
@@ -35,7 +35,7 @@ export default function PocketExperienceQaPanel({ sessionId }) {
       .then(([a, log]) => { if (active) { setAnalysis({ runId: selected.id, value: a }); setConversation(log.turns); setConversationTotal(log.total) } })
       .catch(cause => { if (active) setError(cause.message) })
     return () => { active = false }
-  }, [base, selected?.id, selected?.completed, selected?.status, selected?.knownUsd, selected?.unknownCalls, offset, refresh])
+  }, [base, selected?.id, selected?.completed, selected?.status, selected?.knownUsd, selected?.unknownCalls, selected?.pendingCalls, offset, refresh])
   const estimate = qaEstimate(capabilities, targetModel, turns)
   useEffect(() => {
     let active = true, loading = false, capLoaded = false
@@ -99,7 +99,8 @@ export default function PocketExperienceQaPanel({ sessionId }) {
         <p>기존 메시지 {capabilities.snapshot.messages}개 · 기억 {capabilities.snapshot.memories}개</p>
         <p className="text-muted-foreground">복사 후 설정 일치 검사 · 서비스 응답 지침 유지 · 하드캡 보호용 역할별 출력 상한 적용</p>
       </div>
-      <p className="mt-3 rounded bg-muted/40 px-2 py-2 text-xs">플레이어 대역: <strong>GPT-5.6 Luna · 고정</strong></p>
+      <p className="mt-3 rounded bg-muted/40 px-2 py-2 text-xs">플레이어 대역·내부 판단: <strong>GPT-5.6 Luna · 고정</strong></p>
+      <p className="mt-1 text-xs text-muted-foreground">검사 오류는 기록하고 다음 턴으로 진행합니다. 대상 원문을 유지하며 예산·과금·통신 문제는 중단합니다.</p>
       <div className="mt-3 grid grid-cols-1 gap-3">
         <label className="text-xs">테스트 대상 모델
           <select className={field} value={targetModel} onChange={event => change(setTargetModel, event.target.value)} disabled={busy}>
@@ -139,10 +140,11 @@ export default function PocketExperienceQaPanel({ sessionId }) {
         {selected && <div className="mt-3 space-y-3">
           <div className="flex flex-wrap justify-between gap-2 text-xs"><strong role="status">{qaStatusLabels[selected.status] ?? selected.status}</strong><span>{selected.completed} / {selected.total}턴</span></div>
           <progress className="h-2 w-full" max={selected.total} value={selected.completed} aria-label="테스트 진행률" />
-          <p className="text-xs">{selected.paid ? "테스트 운영 비용 소계" : "무료 모의 비용"}: <strong>{usd(selected.knownUsd)}</strong>{selected.paid && ` / 최대 ${usd(selected.budgetUsd)}`}{selected.unknownCalls > 0 && ` · 비용 미확인 ${selected.unknownCalls}건`}</p>
+          <p className="text-xs">{selected.paid ? "테스트 운영 비용 소계" : "무료 모의 비용"}: <strong>{usd(selected.knownUsd)}</strong>{selected.paid && ` / 최대 ${usd(selected.budgetUsd)}`}{selected.unknownCalls > 0 && ` · ${qaCostStatus(selected.unknownCalls, selected.pendingCalls)}`}</p>
           {selected.paid && selected.budget && <div className="rounded border p-2 text-xs leading-5" aria-label="예산 예약 및 정산">
             <p>확인된 실제 지출액: {usd(selected.budget.actualUsd)} · 예약 중: {usd(selected.budget.reservedUsd)}</p>
             <p>사용 가능 잔액: {usd(selected.budget.remainingUsd)}</p>
+            <p className="text-muted-foreground">지출에는 진행 중인 턴의 호출도 포함됩니다. 사용 가능 잔액은 지출과 예약액을 뺀 금액입니다.</p>
             <p>최근 계획 호출: {selected.budget.role ?? "계수 대기"} {selected.budget.model ?? ""}</p>
             <p>해당 호출 예상: {usd(selected.budget.expectedUsd)} · 안전 여유: {usd(selected.budget.safetyMarginUsd)}</p>
             <p>안전 여유 포함 예상: {usd(selected.budget.safeExpectedUsd)} · 최대 예약액: {usd(selected.budget.nextMaximumUsd)}</p>
@@ -162,10 +164,28 @@ export default function PocketExperienceQaPanel({ sessionId }) {
           </div>}
           {analysis?.replyCharacters && <div className="space-y-2 rounded border p-2 text-xs leading-5">
             <p>실서비스 확인 비용: <strong>{usd(analysis.serviceUsd)}</strong> · 플레이어 AI: {usd(analysis.playerUsd)}</p>
-            <p>테스트 운영 확인 비용: <strong>{usd(analysis.operatingUsd)}</strong>{analysis.unknownCalls > 0 && ` · 미확인 ${analysis.unknownCalls}건 포함 제외한 소계`}</p>
+            <p>테스트 운영 확인 비용: <strong>{usd(analysis.operatingUsd)}</strong>{analysis.unknownCalls > 0 && ` · ${qaCostStatus(analysis.unknownCalls, analysis.pendingCalls)} 금액을 제외한 소계`}</p>
             <p>캐시 적중률: {(analysis.cacheHitRate * 100).toFixed(1)}%</p>
             <p>응답 글자 수: 최소 {analysis.replyCharacters.min} · 중앙 {analysis.replyCharacters.median} · 평균 {analysis.replyCharacters.average.toFixed(1)} · 최대 {analysis.replyCharacters.max}</p>
             <p>저장·기억 처리 포함 왕복 시간: 최소 {(analysis.latencyMillis.min / 1000).toFixed(1)}초 · 중앙 {(analysis.latencyMillis.median / 1000).toFixed(1)}초 · 평균 {(analysis.latencyMillis.average / 1000).toFixed(1)}초 · 최대 {(analysis.latencyMillis.max / 1000).toFixed(1)}초</p>
+            <div className="rounded border p-2">
+              <p className="font-semibold">QA 본문 준비·후속 처리 시간</p>
+              {[["preGenerationMs","생성 경로 진입 전 대기"],["targetDispatchMs","HTTP 호출 직전까지 대기 (QA 사전검증 포함)"]].map(([field,label])=>{
+                const stat=analysis.chatTiming?.[field]
+                return <p key={field}>{label}: {stat?.count > 0 ? `최소 ${qaTimingSeconds(stat.min)} · 최대 ${qaTimingSeconds(stat.max)} · 평균 ${qaTimingSeconds(stat.average)} · ${stat.count}턴` : "미측정"}</p>
+              })}
+              {[["firstTokenMs","첫 본문 조각 준비"],["bodyReadyMs","전체 본문 준비"],["reviewCompleteMs","연속성 검사 완료"],["processingCompleteMs","저장·기억 포함 처리 완료"]].map(([field,label])=>{
+                const stat=analysis.chatTiming?.[field]
+                return <p key={field}>{label}: {stat?.count > 0 ? `최소 ${(stat.min/1000).toFixed(2)}초 · 최대 ${(stat.max/1000).toFixed(2)}초 · 평균 ${(stat.average/1000).toFixed(2)}초 · ${stat.count}턴` : "미측정 · 업데이트 후 새 실행부터 기록"}</p>
+              })}
+              <p className="text-muted-foreground">QA 대상 요청 시작 기준 서버 단계 시간입니다. 실제 브라우저 수신·표시 시간과는 다릅니다.</p>
+              {analysis.failedAttemptTiming?.firstTokenMs != null && <p>중단 요청 첫 본문 조각: {qaTimingSeconds(analysis.failedAttemptTiming.firstTokenMs)} · 완료 평균에서 제외</p>}
+              <details><summary className="cursor-pointer">생성 전 병목 상세 · 평균 소요 시간순</summary>
+                <p className="text-muted-foreground">아래 값은 각 작업 소요 시간입니다. 기억 조회·토큰 계수는 상위 작업에 포함되므로 표 전체를 합산하지 마세요. 0초는 실제 측정, 미측정은 기록 없음입니다.</p>
+                {qaPreparationRows(analysis.chatTiming?.stages).length ? qaPreparationRows(analysis.chatTiming?.stages).map(row=><p key={row.key}>{row.label}: 평균 {qaTimingSeconds(row.stats.average)} · 최소 {qaTimingSeconds(row.stats.min)} · 최대 {qaTimingSeconds(row.stats.max)} · {row.stats.count}턴 / {row.stats.calls}회{row.stats.failedCalls > 0 && ` · 실패 ${row.stats.failedCalls}회`}</p>) : <p>미측정 · 업데이트 후 새 실행부터 기록</p>}
+              </details>
+              {analysis.failedAttemptTiming?.source === "QA_SERVER" && <p className="text-muted-foreground">중단 요청 (평균 제외): 본문 준비 {analysis.failedAttemptTiming.bodyReadyMs != null ? `${(analysis.failedAttemptTiming.bodyReadyMs/1000).toFixed(2)}초` : "미측정"} · 검사 완료 {analysis.failedAttemptTiming.reviewCompleteMs != null ? `${(analysis.failedAttemptTiming.reviewCompleteMs/1000).toFixed(2)}초` : "미측정"} · 기억 포함 완료 {analysis.failedAttemptTiming.processingCompleteMs != null ? `${(analysis.failedAttemptTiming.processingCompleteMs/1000).toFixed(2)}초` : "미측정"}</p>}
+            </div>
             {analysis.generationMillis?.count > 0 && <p>모델 호출 시간: 최소 {(analysis.generationMillis.min / 1000).toFixed(1)}초 · 중앙 {(analysis.generationMillis.median / 1000).toFixed(1)}초 · 최대 {(analysis.generationMillis.max / 1000).toFixed(1)}초</p>}
             <p>출력 토큰: 최소 {analysis.outputTokens.min} · 중앙 {analysis.outputTokens.median} · 최대 {analysis.outputTokens.max}</p>
             <p>응답 분포: {Object.entries(analysis.replyCharacters.buckets).map(([range, count]) => `${range}자 ${count}회`).join(" / ")}</p>
@@ -177,7 +197,7 @@ export default function PocketExperienceQaPanel({ sessionId }) {
               <p className="text-muted-foreground">{analysis.comparison.explanation}</p>
             </>}
             <p className="text-muted-foreground">{analysis.verdict}</p>
-            <details><summary className="cursor-pointer">짧음·반복·응답 상태 검토 후보 {analysis.findings.length}건</summary>
+            <details><summary className="cursor-pointer">연속성 검사 오류·짧음·반복·응답 상태 검토 {analysis.findings.length}건</summary>
               {analysis.findings.map((finding, i) => <p key={i} className="mt-1">{finding.turn ? `${finding.turn}턴` : "전체"} · {finding.type}: {finding.evidence}</p>)}
             </details>
           </div>}
@@ -191,6 +211,11 @@ export default function PocketExperienceQaPanel({ sessionId }) {
               const metric = analysis?.turns?.find(row => row.turn === turn.number)
               return <article key={turn.number} className="rounded border p-2 text-xs leading-5">
                 <p className="font-semibold">{turn.number}턴 · {(turn.latencyMillis / 1000).toFixed(1)}초</p>
+                <p className="text-muted-foreground">QA 서버 기준 · 본문 준비 {metric?.bodyReadyMs != null ? `${(metric.bodyReadyMs/1000).toFixed(2)}초` : "미측정"} · 검사 완료 {metric?.reviewCompleteMs != null ? `${(metric.reviewCompleteMs/1000).toFixed(2)}초` : "미측정"} · 기억 포함 완료 {metric?.processingCompleteMs != null ? `${(metric.processingCompleteMs/1000).toFixed(2)}초` : "미측정"}</p>
+                <details><summary className="cursor-pointer">이 턴 생성 전 병목</summary>
+                  <p>생성 경로 진입 전 {qaTimingSeconds(metric?.preGenerationMs)} · HTTP 호출 직전 {qaTimingSeconds(metric?.targetDispatchMs)}</p>
+                  {qaPreparationStages.filter(([key])=>metric?.preparationStages?.[key]).map(([key,label])=><p key={key}>{label}: {qaTimingSeconds(metric.preparationStages[key].durationMs)} · {metric.preparationStages[key].count}회</p>)}
+                </details>
                 {metric && <p className="text-muted-foreground">입력 {metric.inputTokens} / 출력 {metric.outputTokens}토큰{metric.generationMillis >= 0 && ` · 모델 ${(metric.generationMillis / 1000).toFixed(1)}초`} · 본문 {metric.replyCharacters}자 · 대사 약 {metric.dialogueCharacters} / 나레이션 약 {metric.narrationCharacters}자</p>}
                 <p className="mt-1 whitespace-pre-wrap break-words"><strong>플레이어 AI</strong>{"\n"}{turn.input}</p>
                 <p className="mt-2 whitespace-pre-wrap break-words"><strong>캐릭터</strong>{"\n"}{turn.outcome.reply}</p>

@@ -30,14 +30,29 @@ public class PocketDialogueGatewayRouter implements DialogueGateway {
 
     @Override
     public String initializeWorldRoomScene(WorldRoomDialogueContext context, boolean timeUnset, String opening) {
+        var selected = resolveSelection(context);
         return AiUsageTracker.withPurpose(context.sessionId(),"INITIAL_SCENE",
-                () -> DialogueGateway.super.initializeWorldRoomScene(context,timeUnset,opening));
+                () -> "OPENAI".equalsIgnoreCase(selected.aiProvider())
+                        ? openAi.initializeWorldRoomScene(selected.withAiSelection("OPENAI","gpt-5.6-luna"),timeUnset,opening)
+                        : DialogueGateway.super.initializeWorldRoomScene(selected,timeUnset,opening));
     }
 
     @Override
     public String setupWorldRoomScene(WorldRoomDialogueContext context, String input) {
+        var selected = resolveSelection(context);
         return AiUsageTracker.withPurpose(context.sessionId(),"SCENE_SETUP",
-                () -> DialogueGateway.super.setupWorldRoomScene(context,input));
+                () -> "OPENAI".equalsIgnoreCase(selected.aiProvider())
+                        ? openAi.setupWorldRoomScene(selected.withAiSelection("OPENAI","gpt-5.6-luna"),input)
+                        : DialogueGateway.super.setupWorldRoomScene(selected,input));
+    }
+
+    @Override
+    public WorldRoomTurn analyzeEditedWorldRoomState(WorldRoomDialogueContext context, String reply) {
+        var selected = resolveSelection(context);
+        return AiUsageTracker.withPurpose(context.sessionId(),"STATE_EXTRACTION",
+                () -> "OPENAI".equalsIgnoreCase(selected.aiProvider())
+                        ? openAi.analyzeEditedWorldRoomState(selected.withAiSelection("OPENAI","gpt-5.6-luna"),reply)
+                        : DialogueGateway.super.analyzeEditedWorldRoomState(selected,reply));
     }
 
     @Override

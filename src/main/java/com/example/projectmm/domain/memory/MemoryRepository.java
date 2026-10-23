@@ -29,6 +29,13 @@ public interface MemoryRepository
 
     List<Memory> findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(Long sessionId);
 
+    @Query("select m from Memory m where m.worldRoomSession.id = :sessionId "
+            + "and m.character.id = :characterId and m.rememberedAt <= :at "
+            + "order by m.rememberedAt desc, m.id desc")
+    List<Memory> findForWorldRoomRecall(@Param("sessionId") Long sessionId,
+                                      @Param("characterId") Long characterId,
+                                      @Param("at") java.time.LocalDateTime at);
+
     void deleteByWorldRoomSessionId(Long sessionId);
 
     List<Memory> findByWorldRoomSessionIdAndRememberedAtOrderByCharacterIdAscIdAsc(

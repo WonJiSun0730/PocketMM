@@ -2,6 +2,7 @@ package com.example.projectmm.qa;
 
 import com.example.projectmm.application.chat.WorldRoomDialogueService;
 import com.example.projectmm.application.dialogue.DialogueGateway;
+import com.example.projectmm.application.dialogue.SceneContinuityObservation;
 import com.example.projectmm.application.memory.PocketMemoryInspectorService;
 import com.example.projectmm.domain.chat.*;
 import com.example.projectmm.domain.dialogue.*;
@@ -32,6 +33,8 @@ public final class QaPipeline implements QaRunner.Target {
         String url=jdbc.execute((java.sql.Connection c)->c.getMetaData().getURL());
         if(url==null||!url.startsWith("jdbc:h2:")||!url.contains("pocket-qa"))throw new IllegalStateException("Only isolated pocket-qa H2 database permitted");
         jdbc.execute("CREATE TABLE IF NOT EXISTS qa_turn_receipts(request_id VARCHAR(120) PRIMARY KEY, session_id BIGINT NOT NULL, input_hash VARCHAR(64) NOT NULL, reply_message_id BIGINT, result_json LONGTEXT)");
+        jdbc.execute("ALTER TABLE qa_turn_receipts ADD COLUMN IF NOT EXISTS continuity_json LONGTEXT");
+        jdbc.execute("ALTER TABLE qa_turn_receipts ADD COLUMN IF NOT EXISTS timing_json LONGTEXT");
     }
     @Override public QaRunner.Outcome send(String requestId,String input) {
         var hashes=jdbc.queryForList("SELECT input_hash FROM qa_turn_receipts WHERE request_id=?",requestId);
@@ -40,23 +43,54 @@ public final class QaPipeline implements QaRunner.Target {
         var previous=recover(requestId);
         if(previous.isPresent())return previous.get();
         var before=usage.calls(sessionId);
+        var timing=new com.example.projectmm.application.dialogue.DialogueTiming();
         try {
-            Long replyId=transactions.execute(status->{
+            Long replyId=timing.measure(()->SceneContinuityObservation.observe(()->transactions.execute(status->{
                 jdbc.update("INSERT INTO qa_turn_receipts(request_id,session_id,input_hash) VALUES(?,?,?)",requestId,sessionId,hash(input));
                 dialogue.chat(sessionId,input);
                 long reply=messages.findTop50BySessionIdOrderByIdDesc(sessionId).stream().filter(m->m.getRole()==ChatRole.CHARACTER).findFirst().orElseThrow().getId();
-                jdbc.update("UPDATE qa_turn_receipts SET reply_message_id=? WHERE request_id=?",reply,requestId);
+                jdbc.update("UPDATE qa_turn_receipts SET reply_message_id=?,continuity_json=?,timing_json=? WHERE request_id=?",reply,
+                        mapper.writeValueAsString(SceneContinuityObservation.current()),mapper.writeValueAsString(timing.snapshot()),requestId);
                 return reply;
-            });
+            })));
+            timing.processingComplete();
+            jdbc.update("UPDATE qa_turn_receipts SET timing_json=? WHERE request_id=?",mapper.writeValueAsString(timing.snapshot()),requestId);
             // AFTER_COMMIT extraction has completed before execute returns; reuse durable variant evidence.
-            var result=transactions.execute(status->snapshot(callsSince(before,usage.calls(sessionId),spec,"TARGET"),replyId));
+            var result=withObservation(transactions.execute(status->snapshot(callsSince(before,usage.calls(sessionId),spec,"TARGET"),replyId)),requestId);
             jdbc.update("UPDATE qa_turn_receipts SET result_json=? WHERE request_id=? AND session_id=?",mapper.writeValueAsString(result),requestId,sessionId);
             return result;
         } catch(RuntimeException ex) {
             var partial=new ArrayList<>(callsSince(before,usage.calls(sessionId),spec,"TARGET"));
             partial.add(new QaRunner.Usage("TARGET",spec.targetModel(),"UNCERTAIN_FAILURE",0,0,null,0,"UNKNOWN",null));
-            return new QaRunner.Outcome("",List.of(),null,null,null,null,partial,"Target failed; usage may be incomplete. No automatic retry.");
+            var failure=new LinkedHashMap<String,Object>(failureDetails(ex));
+            failure.put("chatTiming",timing.snapshot());
+            String details=mapper.writeValueAsString(failure);
+            return new QaRunner.Outcome("",List.of(),null,details,null,null,partial,
+                    "Target failed; inspect failedOutcome.diagnosticsJson. Usage may be incomplete. No automatic retry.");
         }
+    }
+    // Do not persist arbitrary provider exception messages: they may contain credentials or prompts.
+    static Map<String,Object> failureDetails(Throwable error) {
+        var chain=new ArrayList<Map<String,Object>>();
+        var seen=Collections.newSetFromMap(new IdentityHashMap<Throwable,Boolean>());
+        for(Throwable e=error;e!=null&&chain.size()<16&&seen.add(e);e=e.getCause()) {
+            var item=new LinkedHashMap<String,Object>();
+            item.put("exceptionType",e.getClass().getName());
+            if(e instanceof com.example.projectmm.application.dialogue.SceneContinuityService.ReviewRejectedException rejected)
+                item.put("continuityReview",rejected.review());
+            item.put("frames",Arrays.stream(e.getStackTrace())
+                    .filter(f->f.getClassName().startsWith("com.example.projectmm."))
+                    .limit(8).map(StackTraceElement::toString).toList());
+            String message=e.getMessage();
+            boolean localValidation=Arrays.stream(e.getStackTrace()).findFirst()
+                    .map(f->f.getClassName().equals("com.example.projectmm.domain.dialogue.SceneFacts")
+                            ||f.getClassName().equals("com.example.projectmm.application.dialogue.SceneContinuityService"))
+                    .orElse(false);
+            if(localValidation&&message!=null&&message.length()<=200)
+                item.put("validationReason",message);
+            chain.add(item);
+        }
+        return Map.of("phase","TARGET_LOCAL_FAILURE","causes",chain);
     }
     @Override public Optional<QaRunner.Outcome> recover(String requestId) {
         var rows=jdbc.queryForList("SELECT session_id,reply_message_id,result_json FROM qa_turn_receipts WHERE request_id=?",requestId);
@@ -66,8 +100,19 @@ public final class QaPipeline implements QaRunner.Target {
         var json=row.get("RESULT_JSON");
         if(json!=null)return Optional.of(mapper.readValue(json.toString(),QaRunner.Outcome.class));
         // A committed chat must never be resent just because file finalization was interrupted.
-        return Optional.of(transactions.execute(status->snapshot(List.of(new QaRunner.Usage("TARGET",spec.targetModel(),
-                "RECOVERED_COMMIT",0,0,null,0,"USAGE_RECONCILIATION_REQUIRED",null)),((Number)row.get("REPLY_MESSAGE_ID")).longValue())));
+        return Optional.of(withObservation(transactions.execute(status->snapshot(List.of(new QaRunner.Usage("TARGET",spec.targetModel(),
+                "RECOVERED_COMMIT",0,0,null,0,"USAGE_RECONCILIATION_REQUIRED",null)),((Number)row.get("REPLY_MESSAGE_ID")).longValue())),requestId));
+    }
+    private QaRunner.Outcome withObservation(QaRunner.Outcome outcome,String requestId) {
+        String saved=jdbc.queryForObject("SELECT continuity_json FROM qa_turn_receipts WHERE request_id=?",String.class,requestId);
+        var diagnostics=outcome.diagnosticsJson()==null?mapper.createObjectNode():mapper.readTree(outcome.diagnosticsJson());
+        var root=diagnostics.isObject()?(tools.jackson.databind.node.ObjectNode)diagnostics:mapper.createObjectNode();
+        root.set("continuityQa",mapper.valueToTree(Map.of("policy","OBSERVE_ONLY",
+                "findings",saved==null?mapper.createArrayNode():mapper.readTree(saved))));
+        String timing=jdbc.queryForObject("SELECT timing_json FROM qa_turn_receipts WHERE request_id=?",String.class,requestId);
+        if(timing!=null)root.set("chatTiming",mapper.readTree(timing));
+        return new QaRunner.Outcome(outcome.reply(),outcome.memories(),outcome.evaluationJson(),mapper.writeValueAsString(root),
+                outcome.memoryBeforeJson(),outcome.memoryAfterJson(),outcome.calls(),outcome.error());
     }
     private QaRunner.Outcome snapshot(List<QaRunner.Usage> calls,Long replyId) {
         var reply=messages.findById(replyId).filter(m->m.getSession().getId().equals(sessionId)).orElseThrow();

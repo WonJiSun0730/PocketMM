@@ -27,6 +27,7 @@ class OpenAiPocketMemoryPersistenceTest {
     @Autowired EntityManager em;
     @Autowired PocketMemoryWriter writer;
     @Autowired PocketMemoryInspectorService inspector;
+    @Autowired com.example.projectmm.domain.memory.MemoryRepository memories;
 
     @Test void openAiCandidatesPersistInTheirPocketAndInspectorAfterReloadWithoutInventedFacts() {
         var encoder=mock(PasswordEncoder.class);
@@ -54,6 +55,10 @@ class OpenAiPocketMemoryPersistenceTest {
         assertThat(result.status()).isEqualTo("SAVED");
         assertThat(result.saved()).hasSize(1);
         long id=session.getId(); em.flush(); em.clear();
+        assertThat(memories.findForWorldRoomRecall(id,character.getId(),at)).hasSize(1);
+        assertThat(memories.findForWorldRoomRecall(id,character.getId(),at.minusSeconds(1))).isEmpty();
+        assertThat(memories.findForWorldRoomRecall(id,-1L,at)).isEmpty();
+        assertThat(memories.findForWorldRoomRecall(-1L,character.getId(),at)).isEmpty();
         var groups=inspector.latest(id);
         assertThat(groups).hasSize(1);
         assertThat(groups.getFirst().memories()).hasSize(1);

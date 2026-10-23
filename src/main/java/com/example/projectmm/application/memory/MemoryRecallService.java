@@ -194,7 +194,7 @@ public class MemoryRecallService {
 
         int recallThreshold = recallThreshold(characterId);
         var memories = memoryRepository
-                .findByWorldRoomSessionIdOrderByRememberedAtDescIdDesc(sessionId)
+                .findForWorldRoomRecall(sessionId, characterId, currentTime)
                 .stream()
                 .filter(memory -> characterId.equals(memory.getCharacter().getId()))
                 .filter(memory -> !memory.getRememberedAt().isAfter(currentTime))
@@ -204,9 +204,21 @@ public class MemoryRecallService {
                 memories.stream().map(Memory::getId).toList()
         );
 
+        var ownAccess = new java.util.HashMap<Long, MemoryAccessLevel>();
+        var ids = memories.stream().map(Memory::getId).filter(java.util.Objects::nonNull).distinct().toList();
+        for (int offset = 0; offset < ids.size(); offset += 256) {
+            memoryAccessStateRepository.findAccessEntries(ids.subList(offset, Math.min(offset + 256, ids.size())))
+                    .forEach(entry -> ownAccess.put(entry.getMemoryId(), entry.getAccessLevel()));
+        }
+        // Compression commits separately and can change access. Fall back to fresh reads afterwards.
+        boolean[] compressionAttempted = {false};
+        java.util.function.Function<Memory, MemoryAccessLevel> lookup = memory -> compressionAttempted[0]
+                ? accessLevel(memory, restrictions)
+                : MemoryProvenanceAccessPolicy.stricter(ownAccess.getOrDefault(memory.getId(), MemoryAccessLevel.EXPLICIT),
+                        restrictions.getOrDefault(memory.getId(), MemoryAccessLevel.EXPLICIT));
         List<EffectiveMemory> candidates = memories.stream()
-                .filter(memory -> accessLevel(memory, restrictions) != MemoryAccessLevel.BLOCKED)
-                .map(memory -> prepareMemory(memory, currentTime, restrictions))
+                .filter(memory -> lookup.apply(memory) != MemoryAccessLevel.BLOCKED)
+                .map(memory -> prepareMemory(memory, currentTime, lookup, () -> compressionAttempted[0] = true))
                 .filter(memory -> recallable(memory, recallThreshold))
                 .toList();
 
@@ -228,6 +240,11 @@ public class MemoryRecallService {
             Memory memory,
             LocalDateTime currentTime, java.util.Map<Long, MemoryAccessLevel> restrictions
     ) {
+        return prepareMemory(memory, currentTime, m -> accessLevel(m, restrictions), () -> {});
+    }
+
+    private EffectiveMemory prepareMemory(Memory memory, LocalDateTime currentTime,
+            java.util.function.Function<Memory, MemoryAccessLevel> lookup, Runnable invalidate) {
         MemoryDecayResult decay =
                 memoryDecayPolicy.calculate(
                         memory,
@@ -237,14 +254,14 @@ public class MemoryRecallService {
         if (decay.effectiveStrength() > 0
                 && decay.compressionRequired()) {
 
+            invalidate.run();
             memoryCompressionService.compressIfNeeded(
                     memory,
                     currentTime
             );
         }
 
-        MemoryAccessLevel accessLevel =
-                accessLevel(memory, restrictions);
+        MemoryAccessLevel accessLevel = lookup.apply(memory);
 
         int accessibleStrength =
                 applyAccessStrength(

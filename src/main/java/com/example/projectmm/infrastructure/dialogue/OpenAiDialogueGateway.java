@@ -28,6 +28,10 @@ public class OpenAiDialogueGateway implements DialogueGateway {
     private final GeminiDialogueGateway promptBuilder;
     private final AiUsageTracker usageTracker;
 
+    // Cost-first default also applies to the manually constructed offline/QA gateway.
+    @Value("${openai.continuity-model:gpt-5.6-luna}")
+    private String continuityModel = "gpt-5.6-luna";
+
     public OpenAiDialogueGateway(
             @Value("${openai.api-key:}") String apiKey,
             @Value("${openai.model:gpt-5.6-luna}") String defaultModel,
@@ -139,6 +143,13 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                 "required", List.of("reply", "enterCharacterIds", "leaveCharacterIds", "systemChanges", "elapsedSeconds", "locationChange", "addedConditions", "removedConditions", "addedInventory", "removedInventory")
         );
 
+        // Structured outputs follow schema property order: prose must precede metadata.
+        var orderedProperties = new java.util.LinkedHashMap<String,Object>();
+        var originalProperties = (Map<String,Object>) schema.get("properties");
+        for(String name:List.of("reply","enterCharacterIds","leaveCharacterIds","systemChanges","elapsedSeconds","locationChange","addedConditions","removedConditions","addedInventory","removedInventory"))
+            orderedProperties.put(name,originalProperties.get(name));
+        schema = new java.util.LinkedHashMap<>(schema);
+        schema.put("properties",orderedProperties);
         var tokenEstimate = PromptTokenBreakdown.estimate(instructions + "\n" + promptParts.dynamic(), input, objectMapper.writeValueAsString(schema));
         input.add(0, Map.of("role", "developer", "content", promptParts.dynamic()));
         input.add(0, Map.of("role", "developer", "content", List.of(Map.of(
@@ -159,26 +170,60 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                 ))
         );
 
+        if(com.example.projectmm.application.dialogue.DialogueTokens.enabled()) {
+            request=new java.util.LinkedHashMap<>(request);
+            request.put("stream",true);
+        }
         String response = postResponse(context, model, request);
 
         return parseResponse(response, context, model, tokenEstimate);
     }
 
     private String postResponse(WorldRoomDialogueContext context, String model, Map<String,Object> request) {
-        return usageTracker.accountRequest(context.sessionId(),"OPENAI",model, () -> restClient.post()
+        return postResponse(context.sessionId(),model,request);
+    }
+
+    private String postResponse(Long sessionId,String model,Map<String,Object> request) {
+        return usageTracker.accountRequest(sessionId,"OPENAI",model, () -> restClient.post()
                 .uri("/v1/responses")
                 .headers(headers -> headers.setBearerAuth(apiKey))
                 .body(request)
-                .retrieve()
-                .body(String.class));
+                .exchange((httpRequest,response) -> {
+                    if(!response.getStatusCode().is2xxSuccessful())
+                        throw requestRejected(response.getStatusCode().value(),response.getBody().readNBytes(8192));
+                    var contentType=response.getHeaders().getContentType();
+                    if(contentType!=null && contentType.isCompatibleWith(org.springframework.http.MediaType.TEXT_EVENT_STREAM))
+                        return OpenAiResponseStream.read(response.getBody(),com.example.projectmm.application.dialogue.DialogueTokens::publish);
+                    return new String(response.getBody().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8);
+                }));
     }
+
+    private static final class RequestRejected extends IllegalStateException {
+        final int status;final String code;final String parameter;
+        RequestRejected(int status,String code,String parameter) {
+            super("OpenAI request rejected: HTTP "+status);this.status=status;this.code=code;this.parameter=parameter;
+        }
+    }
+    private RequestRejected requestRejected(int status,byte[] body) {
+        String code="",parameter="";
+        try {
+            var error=objectMapper.readTree(new String(body,java.nio.charset.StandardCharsets.UTF_8)).path("error");
+            code=safeErrorField(error.path("code").asText(""));parameter=safeErrorField(error.path("param").asText(""));
+        } catch(RuntimeException invalidErrorBody) { /* HTTP status is sufficient; do not expose body. */ }
+        return new RequestRejected(status,code,parameter);
+    }
+    private static String safeErrorField(String value) {return value.matches("[a-zA-Z0-9_.\\[\\]-]{1,100}")?value:"";}
 
     private String readPayload(String response, WorldRoomDialogueContext context, String model,
                                PromptTokenBreakdown breakdown) {
+        return readPayload(response,context.sessionId(),model,breakdown);
+    }
+
+    private String readPayload(String response,Long sessionId,String model,PromptTokenBreakdown breakdown) {
         JsonNode root = objectMapper.readTree(response);
         JsonNode usage = root.path("usage");
         if (usage.isObject()) usageTracker.record(
-                context.sessionId(),
+                sessionId,
                 "OPENAI",
                 model,
                 usage.path("input_tokens").asLong(0),
@@ -188,7 +233,7 @@ public class OpenAiDialogueGateway implements DialogueGateway {
                 usage.path("output_tokens").asLong(0),
                 usage.path("total_tokens").asLong(0), breakdown
         );
-        else usageTracker.recordUnavailable(context.sessionId(),"OPENAI",model,"USAGE_NOT_REPORTED");
+        else usageTracker.recordUnavailable(sessionId,"OPENAI",model,"USAGE_NOT_REPORTED");
         String payload = null;
         for (JsonNode item : root.path("output")) {
             if (!"message".equals(item.path("type").asText())) continue;
@@ -207,16 +252,60 @@ public class OpenAiDialogueGateway implements DialogueGateway {
         return payload;
     }
 
+    public List<String> suggestPlayerReplies(Long sessionId,String evidenceJson) {
+        if(apiKey==null || apiKey.isBlank())throw new com.example.projectmm.application.dialogue.ReplySuggestions.Failure(
+                "CONFIGURATION","OpenAI API 키 설정을 확인해 주세요.",null,null);
+        var schema=com.example.projectmm.application.dialogue.ReplySuggestions.schema();
+        String model=com.example.projectmm.application.dialogue.ReplySuggestions.MODEL;
+        var input=List.<Map<String,Object>>of(
+                Map.of("role","developer","content",com.example.projectmm.application.dialogue.ReplySuggestions.INSTRUCTIONS),
+                Map.of("role","user","content",evidenceJson));
+        var request=Map.<String,Object>of("model",model,"input",input,"store",false,
+                "reasoning",Map.of("effort","none"),"max_output_tokens",800,
+                "text",Map.of("format",Map.of("type","json_schema","name","player_reply_suggestions","strict",true,"schema",schema)));
+        return AiUsageTracker.withPurpose(sessionId,"REPLY_SUGGESTION",()->{
+            try {
+                String response=postResponse(sessionId,model,request);
+                var root=objectMapper.readTree(response);
+                String payload;
+                try {payload=readPayload(response,sessionId,model,null);}
+                catch(IllegalStateException missingText) {
+                    boolean refused=false;
+                    for(var output:root.path("output"))for(var content:output.path("content"))
+                        if("refusal".equals(content.path("type").asText()))refused=true;
+                    throw new com.example.projectmm.application.dialogue.ReplySuggestions.Failure(
+                            refused?"MODEL_REFUSAL":"NO_OUTPUT",refused?"모델이 추천 생성을 거절했어요.":"모델 응답에 추천 본문이 없어요.",null,missingText);
+                }
+                if(!root.path("status").asText("completed").equals("completed"))
+                    throw new com.example.projectmm.application.dialogue.ReplySuggestions.Failure("INCOMPLETE",
+                            "모델이 추천 응답을 끝내지 못했어요. 추가 호출하지 않습니다.",payload,null);
+                return com.example.projectmm.application.dialogue.ReplySuggestions.parse(payload);
+            } catch(RequestRejected rejected) {
+                throw new com.example.projectmm.application.dialogue.ReplySuggestions.Failure("HTTP_"+rejected.status,
+                        "추천 요청이 거절됐어요. HTTP "+rejected.status+" "+rejected.code+" "+rejected.parameter,null,rejected);
+            }
+
+        });
+    }
+
     @Override
     public String reviewWorldRoomContinuity(WorldRoomDialogueContext context, String evidenceJson) {
         if (apiKey == null || apiKey.isBlank()) throw new IllegalStateException("OPENAI_API_KEY is not configured");
         String model = context.aiModel() == null || context.aiModel().isBlank() ? defaultModel : context.aiModel().trim();
+        if (continuityModel != null && !continuityModel.isBlank()) model = continuityModel.trim();
         String instructions = com.example.projectmm.application.dialogue.SceneContinuityPrompt.REVIEW;
-        String evidence = SceneContinuityRequest.evidence(context, evidenceJson);
+        var parts = SceneContinuityRequest.parts(context, evidenceJson);
         var schema = SceneContinuityRequest.schema();
-        var input = List.<Map<String,Object>>of(Map.of("role","user","content",evidence));
-        var estimate = PromptTokenBreakdown.estimate(instructions,input,objectMapper.writeValueAsString(schema));
-        var request = Map.<String,Object>of("model",model,"instructions",instructions,"input",input,
+        // Authored reference remains user data; only the review policy has developer priority.
+        var input = List.<Map<String,Object>>of(
+                Map.of("role","developer","content",instructions),
+                Map.of("role","user","content",List.of(Map.of("type","input_text","text",parts.stable(),
+                        "prompt_cache_breakpoint",Map.of("mode","explicit")))),
+                Map.of("role","user","content",parts.dynamic()));
+        var estimate = PromptTokenBreakdown.estimate(instructions + "\n" + parts.stable(),
+                List.of(Map.of("role","user","content",parts.dynamic())),objectMapper.writeValueAsString(schema));
+        var request = Map.<String,Object>of("model",model,"input",input,
+                "prompt_cache_options",Map.of("mode","explicit"),
                 "reasoning",Map.of("effort","none"),"store",false,
                 "text",Map.of("format",Map.of("type","json_schema","name","scene_continuity_review",
                         "strict",true,"schema",schema)));
@@ -236,6 +325,8 @@ public class OpenAiDialogueGateway implements DialogueGateway {
         try {
             String payload = readPayload(response, context, model, breakdown);
 
+            if(!objectMapper.readTree(response).path("status").asText("completed").equals("completed"))
+                throw new IllegalStateException("OpenAI target response incomplete; no retry");
             JsonNode turn = objectMapper.readTree(payload);
             String reply = turn.path("reply").asText();
             if (reply.isBlank()) throw new IllegalStateException("OpenAI Pocket reply is blank");

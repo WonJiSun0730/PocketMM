@@ -68,9 +68,12 @@ class SceneContinuityRequestTest {
         assertThat(AiUsageTracker.withPurpose(7L,"SCENE_CONTINUITY",
                 ()->openai.reviewWorldRoomContinuity(context(),evidence("REVIEW")))).isEqualTo(approved);
         assertThat(gr).hasSize(1);assertThat(or).hasSize(1);
+        assertThat(or.getFirst().path("model").asText()).isEqualTo("gpt-5.6-luna");
         String g=gr.getFirst().path("contents").path(0).path("parts").path(0).path("text").asText();
-        String o=or.getFirst().path("input").path(0).path("content").asText();
-        assertThat(g).isEqualTo(o).containsOnlyOnce("FACT_UNIQUE").containsOnlyOnce("CURRENT_USER_UNIQUE");
+        String o=or.getFirst().path("input").path(1).path("content").path(0).path("text").asText()
+                + or.getFirst().path("input").path(2).path("content").asText();
+        assertThat(o).containsOnlyOnce("FACT_UNIQUE").containsOnlyOnce("CURRENT_USER_UNIQUE");
+        assertThat(g).containsOnlyOnce("FACT_UNIQUE").containsOnlyOnce("CURRENT_USER_UNIQUE");
         assertThat(g).contains("RAW_IDENTITY","SOUL_PERSONALITY","VOICE_EXAMPLE","WORLD_FACT","MEMORY_EVIDENCE");
         assertThat(gr.getFirst().toString()).doesNotContain("[NARRATOR:","Fiction-writing and pacing:","Return JSON only:");
         assertThat(or.getFirst().toString()).doesNotContain("[NARRATOR:","Fiction-writing and pacing:");
@@ -108,5 +111,83 @@ class SceneContinuityRequestTest {
         when(openai.reviewWorldRoomContinuity(any(),anyString())).thenReturn(approved);
         assertThat(router.reviewWorldRoomContinuity(context(),"{}")).isEqualTo(approved);
         verify(openai).reviewWorldRoomContinuity(any(),eq("{}"));verifyNoInteractions(gemini);
+    }
+
+    @Test void dedicatedModelAndCacheBoundaryDoNotChangeFictionSelection() {
+        var requests = new ArrayList<JsonNode>();
+        var tracker = new AiUsageTracker();
+        var gemini = new GeminiDialogueGateway("never-sent","fixture",json);
+        var openai = new OpenAiDialogueGateway("never-sent","gpt-5.6-luna",json,gemini,tracker);
+        ReflectionTestUtils.setField(openai,"restClient",client(requests,true));
+        ReflectionTestUtils.setField(openai,"continuityModel","gpt-5.6-terra");
+        openai.reviewWorldRoomContinuity(context(), evidence("REVIEW"));
+        openai.generateWorldRoomTurn(context(),"continue");
+        assertThat(requests.get(0).path("model").asText()).isEqualTo("gpt-5.6-terra");
+        assertThat(requests.get(1).path("model").asText()).isEqualTo(context().aiModel());
+        assertThat(tracker.calls(context().sessionId()).getFirst().usage().model()).isEqualTo("gpt-5.6-terra");
+        var request = requests.getFirst();
+        assertThat(request.path("prompt_cache_options").path("mode").asText()).isEqualTo("explicit");
+        var stable = request.path("input").path(1).path("content").path(0);
+        assertThat(stable.path("prompt_cache_breakpoint").path("mode").asText()).isEqualTo("explicit");
+        assertThat(stable.path("text").asText()).contains("RAW_IDENTITY","WORLD_FACT")
+                .doesNotContain("FACT_UNIQUE","CURRENT_USER_UNIQUE","MEMORY_EVIDENCE","simulatedAt");
+        String dynamic = request.path("input").path(2).path("content").asText();
+        assertThat(dynamic).contains("FACT_UNIQUE","MEMORY_EVIDENCE","simulatedAt");
+        assertThat(SceneContinuityRequest.parts(context(), evidence("REVIEW")).stable())
+                .isEqualTo(SceneContinuityRequest.parts(context(), evidence("VERIFY")).stable())
+                .isEqualTo(SceneContinuityRequest.parts(context(), evidence("BOOTSTRAP")).stable());
+    }
+
+    @Test void solTargetUsesLunaForReviewButStillSolForFiction() {
+        var requests = new ArrayList<JsonNode>();
+        var tracker = new AiUsageTracker();
+        var gemini = new GeminiDialogueGateway("never-sent","fixture",json);
+        var openai = new OpenAiDialogueGateway("never-sent","gpt-5.6-sol",json,gemini,tracker);
+        ReflectionTestUtils.setField(openai,"restClient",client(requests,true));
+        var sol = context().withAiSelection("OPENAI","gpt-5.6-sol");
+        openai.generateWorldRoomTurn(sol,"continue");
+        openai.reviewWorldRoomContinuity(sol,evidence("REVIEW"));
+        assertThat(requests.get(0).path("model").asText()).isEqualTo("gpt-5.6-sol");
+        assertThat(requests.get(1).path("model").asText()).isEqualTo("gpt-5.6-luna");
+        assertThat(tracker.calls(sol.sessionId())).extracting(c -> c.usage().model())
+                .containsExactly("gpt-5.6-sol","gpt-5.6-luna");
+    }
+
+    @Test void internalStateJudgmentsUseLunaAndSelectedFictionModelRemainsFlexible() {
+        var gemini=mock(GeminiDialogueGateway.class);var openai=mock(OpenAiDialogueGateway.class);
+        var router=new PocketDialogueGatewayRouter(gemini,openai);
+        var sol=context().withAiSelection("OPENAI","gpt-5.6-sol");
+        router.initializeWorldRoomScene(sol,true,"opening");
+        router.setupWorldRoomScene(sol,"setup");
+        router.analyzeEditedWorldRoomState(sol,"edited");
+        verify(openai).initializeWorldRoomScene(argThat(c->c.aiModel().equals("gpt-5.6-luna")),eq(true),eq("opening"));
+        verify(openai).setupWorldRoomScene(argThat(c->c.aiModel().equals("gpt-5.6-luna")),eq("setup"));
+        verify(openai).analyzeEditedWorldRoomState(argThat(c->c.aiModel().equals("gpt-5.6-luna")),eq("edited"));
+        for(String model:List.of("gpt-5.6-luna","gpt-5.6-terra","gpt-5.6-sol")) {
+            router.generateWorldRoomTurn(sol.withAiSelection("OPENAI",model),"continue");
+            verify(openai).generateWorldRoomTurn(argThat(c->c.aiModel().equals(model)),eq("continue"));
+        }
+        verifyNoInteractions(gemini);
+    }
+
+    @Test void runtimeChangesStayAfterBoundaryAndAuthoredEditsInvalidatePrefix() {
+        var c = context();
+        var cast = c.roomCast().stream().map(x -> new WorldRoomCharacterContext(x.characterId(),
+                x.characterName(),x.profile(),x.energy()+1,x.mood()+1,!x.active(),!x.departed())).toList();
+        var systems = c.sessionSystems().stream().map(x -> new WorldRoomSystemContext(x.systemId(),
+                x.name(),x.currentValue()+1,x.minValue(),x.maxValue(),x.changeCondition(),x.states())).toList();
+        var next = new WorldRoomDialogueContext(c.sessionId(),c.roomId(),c.roomTitle(),c.visibility(),
+                c.simulatedAt().plusSeconds(60),c.world(),c.playerProfile(),c.introTitle(),c.introContent(),
+                List.of(),cast,c.activeCast(),systems,c.playerState(),List.of(),c.userNote(),
+                c.pocketPlayGuide(),c.noControlPlayer(),c.aiProvider(),c.aiModel(),c.sceneFactsJson());
+        var oldParts = SceneContinuityRequest.parts(c,evidence("REVIEW"));
+        var newParts = SceneContinuityRequest.parts(next,evidence("VERIFY"));
+        assertThat(newParts.stable()).isEqualTo(oldParts.stable());
+        assertThat(newParts.dynamic()).isNotEqualTo(oldParts.dynamic());
+        var edited = new WorldRoomDialogueContext(c.sessionId(),c.roomId(),c.roomTitle(),c.visibility(),
+                c.simulatedAt(),c.world(),c.playerProfile(),c.introTitle(),"EDITED_SETTING",c.recentMessages(),
+                c.roomCast(),c.activeCast(),c.sessionSystems(),c.playerState(),c.recalledMemories(),c.userNote(),
+                c.pocketPlayGuide(),c.noControlPlayer(),c.aiProvider(),c.aiModel(),c.sceneFactsJson());
+        assertThat(SceneContinuityRequest.parts(edited,evidence("REVIEW")).stable()).isNotEqualTo(oldParts.stable());
     }
 }

@@ -1,10 +1,17 @@
+import PocketComposer from "@/components/PocketComposer"
+import {createReplySuggestions} from "@/lib/replySuggestions"
+import ChatFailurePanel from "@/components/ChatFailurePanel"
+import {mergeChatFailures} from "@/lib/chatFailures"
+import {readPocketChatStream} from "@/lib/pocketChatStream"
+import {createPocketChatTiming} from "@/lib/pocketChatTiming"
+import PocketChatTimingPanel, {MeasuredPocketReply} from "@/components/PocketChatTimingPanel"
 import PocketExperienceQaPanel from "@/components/PocketExperienceQaPanel";
 import PocketQaPanel from "@/components/PocketQaPanel";
 import AiCallUsage from "../components/AiCallUsage";
 import PromptTokenUsage from "../components/PromptTokenUsage";
 import {enterSendsMessage,chatInputEnvironment} from "@/lib/chatInput"
-import { useEffect, useMemo, useRef, useState } from "react"
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, Menu, Pencil, RefreshCw, Send, Trash2, Wrench, X } from "lucide-react"
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react"
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, Menu, Pencil, RefreshCw, Trash2, Wrench, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -19,6 +26,7 @@ import PocketProgressPanel from "@/components/PocketProgressPanel"
 import RpText from "@/components/RpText"
 import PocketAbsenceLog from "@/components/PocketAbsenceLog"
 import TypedPocketReply from "@/components/TypedPocketReply"
+import StreamingPocketReply from "@/components/StreamingPocketReply"
 import PocketActivityScene from "@/components/PocketActivityScene"
 import { resolvePocketSceneModels } from "@/lib/pocketCharacterModels"
 import "./PocketPage.css"
@@ -58,12 +66,37 @@ export default function PocketPage({ pocket, onBack }) {
   const [pickerMode, setPickerMode] = useState(false)
   const [changingPlayerProfile, setChangingPlayerProfile] = useState(false)
   const [messages, setMessages] = useState([])
+  const [chatFailures,setChatFailures]=useState([])
+  const [replyPreview, setReplyPreview] = useState(null)
+  const [streamFinished,setStreamFinished]=useState(false)
+  const typingDrain=useRef(null)
+  useEffect(()=>()=>{typingDrain.current?.resolve();typingDrain.current=null},[session.id])
+  const [replyNotice, setReplyNotice] = useState("")
   const [typingTarget,setTypingTarget] = useState(null)
   const [cast, setCast] = useState([])
   const [worldCharacters, setWorldCharacters] = useState([])
   const [systems, setSystems] = useState([])
   const [input, setInput] = useState("")
   const [messageSending, setSending] = useState(false)
+  const chatTiming = useMemo(() => createPocketChatTiming({sessionId:session.id,storage:{
+    getItem: key => window.localStorage.getItem(key),
+    setItem: (key,value) => window.localStorage.setItem(key,value),
+  }}),[session.id])
+  const timingRecords = useSyncExternalStore(chatTiming.subscribe,chatTiming.getSnapshot)
+  const timingSample = timingRecords[0]
+  useEffect(() => {
+    if (!messageSending && timingSample?.status === "FINALIZED") chatTiming.ready(timingSample.id)
+  },[chatTiming,messageSending,timingSample])
+  useEffect(() => {
+    if (!timingSample?.id) return
+    const id=timingSample.id
+    const visibilityChanged=()=>{
+      if(document.visibilityState !== "visible") chatTiming.displayUnavailable(id)
+    }
+    visibilityChanged()
+    document.addEventListener("visibilitychange",visibilityChanged)
+    return ()=>document.removeEventListener("visibilitychange",visibilityChanged)
+  },[chatTiming,timingSample?.id])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [editing, setEditing] = useState(null)
@@ -74,6 +107,16 @@ export default function PocketPage({ pocket, onBack }) {
   const [issueNotice, setIssueNotice] = useState("")
   const [exportingTestData, setExportingTestData] = useState(false)
   const [isDeveloper, setIsDeveloper] = useState(false)
+  const [isAdministrator, setIsAdministrator] = useState(false)
+  useEffect(()=>{
+    if(!isAdministrator)return
+    let active=true
+    fetch(`${base}/chat/failures`,{credentials:"include"}).then(r=>r.ok?r.json():[]).then(rows=>{
+      if(active && Array.isArray(rows))setChatFailures(current=>mergeChatFailures(current,rows,session.id))
+    }).catch(()=>{})
+    return ()=>{active=false}
+  },[base,session.id,isAdministrator])
+
   const [devOpen, setDevOpen] = useState(false)
   const [mobileToolsOpen,setMobileToolsOpen] = useState(false)
   const mobileToolsRef = useRef(null)
@@ -115,6 +158,24 @@ export default function PocketPage({ pocket, onBack }) {
     refreshPlayerState()
   }, messageSending)
   const sending = messageSending || progress.busy
+  const replySuggestions=useMemo(()=>createReplySuggestions(async source=>{
+    const response=await fetch(`${base}/reply-suggestions`,{method:"POST",credentials:"include",
+      headers:{"Content-Type":"application/json"},body:JSON.stringify(source)})
+    if(!response.ok)throw new Error("Recommendation unavailable")
+    return response.json()
+  }),[base])
+  const recommendationState=useSyncExternalStore(replySuggestions.subscribe,replySuggestions.getSnapshot)
+  const latestSuggestionSource=messages.at(-1)
+  const suggestionSourceKey=latestSuggestionSource
+    ?JSON.stringify([latestSuggestionSource.id,latestSuggestionSource.selectedVariantNo??1,latestSuggestionSource.content])
+    :"intro"
+  useEffect(()=>{
+    const ready=!loading && !sending && (!latestSuggestionSource || latestSuggestionSource.role==="CHARACTER")
+    replySuggestions.setScene(ready?{key:suggestionSourceKey,source:latestSuggestionSource?{
+      messageId:latestSuggestionSource.id,variantNo:latestSuggestionSource.selectedVariantNo??1,content:latestSuggestionSource.content,
+    }:{messageId:null,variantNo:null,content:null}}:null)
+  },[replySuggestions,loading,sending,suggestionSourceKey,latestSuggestionSource])
+
 
   async function refreshMemoryInspector() {
     if (!isDeveloper) return
@@ -156,7 +217,7 @@ export default function PocketPage({ pocket, onBack }) {
         base, sessionId: session.id,
         metadata: { worldId: world.id, worldName: world.name, roomId: room.id, roomTitle: room.title },
       })
-      downloadPocketTestData(data)
+      downloadPocketTestData({...data,browserChatTiming:chatTiming.export()})
       setMobileToolsOpen(false)
     } catch (cause) {
       setError(cause.message ?? "테스트 데이터 내보내기에 실패했어요.")
@@ -237,8 +298,8 @@ export default function PocketPage({ pocket, onBack }) {
     let active = true
     fetch("/api/auth/me", { credentials: "include" })
       .then(response => response.ok ? response.json() : null)
-      .then(member => { if (active) setIsDeveloper(member?.role === "DEVELOPER") })
-      .catch(() => { if (active) setIsDeveloper(false) })
+      .then(member => { if (active) {setIsDeveloper(member?.role === "DEVELOPER");setIsAdministrator(["ADMIN","DEVELOPER"].includes(member?.role))} })
+      .catch(() => { if (active) {setIsDeveloper(false);setIsAdministrator(false)} })
     return () => { active = false }
   }, [])
   // Scene rendering must keep receiving runtime state even when the legacy editor is hidden.
@@ -334,29 +395,69 @@ export default function PocketPage({ pocket, onBack }) {
       await continueScene()
       return
     }
+    const timingId=chatTiming.begin()
+    const typingDone=new Promise(resolve=>{typingDrain.current={id:timingId,resolve}})
+    setStreamFinished(false)
     setSending(true)
     setError("")
+    setReplyPreview(null)
+    setReplyNotice("")
     setInput("")
     const pending = { id: `pending-${Date.now()}`, role: "USER", content: message }
     setMessages(current => [...current, pending])
+    let preview = ""
+    let finalReply = ""
+    let submitted = false
     try {
       if (!await progress.resume()) throw new Error("먼저 부재 활동을 확인해 주세요.")
-      const response = await fetch(`${base}/chat`, {
+      submitted = true
+      chatTiming.sent(timingId)
+      const response = await fetch(`${base}/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ message }),
       })
-      if (!response.ok) throw new Error("대화를 이어가지 못했어요.")
-      await refresh({animateReply:true})
+      await readPocketChatStream(response, event => {
+        if(isAdministrator && event.type === "review_warning" && event.reviewFailure) {
+          setChatFailures(current=>mergeChatFailures(current,[{...event.reviewFailure,diagnosticsSaved:event.diagnosticsSaved!==false}],session.id))
+        }
+        if (event.type === "delta") {
+          chatTiming.firstToken(timingId)
+          setReplyPreview(event.reply)
+        }
+        if (event.type === "preview") {
+          chatTiming.received(timingId)
+          preview = event.reply
+          setReplyPreview(event.reply)
+        }
+        if (event.type === "complete") {
+          chatTiming.complete(timingId,event.reply)
+          finalReply=event.reply
+          setStreamFinished(true)
+          setReplyPreview(event.reply)
+          if (preview && preview !== event.reply) setReplyNotice("장면 확인 후 답변을 수정했어요.")
+        }
+      })
+      if(finalReply)await typingDone
+      await refresh({animateReply:false})
+      setReplyPreview(null)
       refreshPlayerState()
       await refreshMemoryInspector()
       await refreshAiUsage()
     } catch (e) {
+      if(isAdministrator && e.reviewFailure)setChatFailures(current=>mergeChatFailures(current,[e.reviewFailure],session.id))
+      chatTiming.failed(timingId)
+      setReplyPreview(null)
       setMessages(current => current.filter(item => item.id !== pending.id))
-      setInput(message)
+      if (!submitted) setInput(message)
+      // A lost response may follow a successful commit. Never resend automatically.
+      if (submitted) {
+        try { await refresh({animateReply:false}); refreshPlayerState() } catch { /* Preserve the failure notice. */ }
+      }
       setError(e.message)
     } finally {
+      if(typingDrain.current?.id===timingId)typingDrain.current=null
       setSending(false)
     }
   }
@@ -570,7 +671,7 @@ export default function PocketPage({ pocket, onBack }) {
         <div className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span>현재 장면 · {cast.length ? cast.map(item => item.characterName ?? item.name).join(" · ") : "등장인물 없음"}</span>
-            {systems.map(system => <span key={system.id}>{system.name} <strong className="text-foreground">{system.currentValue}</strong></span>)}
+            {systems.map(system => <span key={system.systemId}>{system.name} <strong className="text-foreground">{system.currentValue}</strong></span>)}
           </div>
         </div>
 
@@ -590,7 +691,7 @@ export default function PocketPage({ pocket, onBack }) {
       </div>
 
       <div>
-      {isDeveloper && <section className="shrink-0 border-b bg-muted/20">
+      {isAdministrator && <section className="shrink-0 border-b bg-muted/20">
         <button type="button" onClick={() => setDevOpen(open => !open)}
           className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-muted-foreground sm:px-6">
           <Wrench className="size-3.5" />
@@ -598,8 +699,11 @@ export default function PocketPage({ pocket, onBack }) {
           <ChevronDown className={`ml-auto size-3.5 transition-transform ${devOpen ? "rotate-180" : ""}`} />
         </button>
         {devOpen && <div className="border-t px-4 py-3 sm:px-6">
+          <ChatFailurePanel records={chatFailures.filter(row=>String(row.sessionId)===String(session.id))}/>
+          {isDeveloper && <>
           <PocketQaPanel sessionId={session.id} />
           <PocketExperienceQaPanel sessionId={session.id} />
+          <PocketChatTimingPanel timing={chatTiming} records={timingRecords} />
           <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
             <span>SESSION #{session.id}</span>
             <span>시뮬레이션 시각 {session.simulatedAt ?? "-"}</span>
@@ -692,6 +796,7 @@ export default function PocketPage({ pocket, onBack }) {
                 </div>)}
               </div>}
           </div>
+          </>}
         </div>}
       </section>}
 
@@ -726,12 +831,13 @@ export default function PocketPage({ pocket, onBack }) {
               {editing === item.id ? <div className="space-y-2">
                 <Textarea autoFocus value={editText} onChange={e => setEditText(e.target.value)} className="min-h-32 resize-y text-base leading-7" />
                 <div className="flex justify-end gap-2"><Button size="sm" variant="ghost" onClick={() => setEditing(null)}><X className="mr-1 size-3.5"/>취소</Button><Button size="sm" onClick={() => editMessage(item)}>저장</Button></div>
-              </div> : isAbsence ? <PocketAbsenceLog sessionId={session.id} reportId={item.absenceReportId} allowGenerate={!messages.slice(index+1).some(m => m.absenceReportId == null)} isDeveloper={isDeveloper} fallback={item.content ?? item.message} disabled={sending} /> : <TypedPocketReply key={`${item.id}:${item.selectedVariantNo ?? 1}:${item.content ?? item.message}`}
+              </div> : isAbsence ? <PocketAbsenceLog sessionId={session.id} reportId={item.absenceReportId} allowGenerate={!messages.slice(index+1).some(m => m.absenceReportId == null)} isDeveloper={isDeveloper} fallback={item.content ?? item.message} disabled={sending} /> : <MeasuredPocketReply timing={chatTiming} sampleId={timingSample?.id}
+                eligible={isCharacter && isLatest && !replyPreview && chatTiming.canMeasureFinal(item.content ?? item.message)}><TypedPocketReply key={`${item.id}:${item.selectedVariantNo ?? 1}:${item.content ?? item.message}`}
                 text={item.content ?? item.message}
                 animate={isCharacter && !isAbsence && typingTarget===`${item.id}:${item.selectedVariantNo ?? 1}`}
                 onProgress={followTyping}>
                 {messageSceneState && <SceneStateMessage state={messageSceneState} />}
-              </TypedPocketReply>}
+              </TypedPocketReply></MeasuredPocketReply>}
               {editing !== item.id && <div className="mt-4 flex min-h-7 flex-wrap items-center gap-1 text-xs text-muted-foreground opacity-40 transition-opacity group-hover:opacity-100">
                 {!isAbsence && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => { setEditing(item.id); setEditText(item.content ?? item.message ?? "") }} disabled={sending}><Pencil className="mr-1 size-3"/>수정</Button>}
                 {isCharacter && !isAbsence && isLatest && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => reroll(item)} disabled={sending}><RefreshCw className="mr-1 size-3"/>리롤</Button>}
@@ -748,29 +854,29 @@ export default function PocketPage({ pocket, onBack }) {
             </article>
           })}
 
-          {sending && <div className="border-b border-border/70 py-7 sm:py-9">
+          {replyPreview && <article className="border-b border-border/70 py-7 sm:py-9" aria-live="polite">
+            <MeasuredPocketReply timing={chatTiming} sampleId={timingSample?.id} autoScroll>
+              <StreamingPocketReply key={timingSample?.id} text={replyPreview} finished={streamFinished} onProgress={followTyping}
+                onSettled={()=>{if(typingDrain.current?.id===timingSample?.id)typingDrain.current.resolve()}}/>
+            </MeasuredPocketReply>
+            <p className="mt-4 text-xs text-muted-foreground">답변을 작성하고 확인하고 있어요. 완료 전에는 내용이 수정될 수 있어요.</p>
+          </article>}
+          {replyNotice && <p role="status" className="py-2 text-xs text-muted-foreground">{replyNotice}</p>}
+          {sending && !replyPreview && <div className="border-b border-border/70 py-7 sm:py-9">
             <p className="animate-pulse text-sm italic text-muted-foreground">{progress.busy ? "부재 활동을 확인하는 중…" : "장면을 이어가는 중..."}</p>
           </div>}
           <div ref={bottomRef} />
         </div>
       </ScrollArea>
 
-      <div className="shrink-0 border-t bg-card p-3 sm:p-4">
-        <div className="mx-auto flex max-w-3xl items-end gap-2">
-          <Textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={handleKeyDown} enterKeyHint="enter"
-            placeholder="행동이나 대사를 입력해 주세요." disabled={loading || sending} rows={1}
-            className="max-h-36 min-h-11 resize-none text-base" />
-          <Button type="button" size="icon" className="size-11 shrink-0" disabled={loading || sending}
-            onClick={sendMessage} aria-label="메시지 보내기"><Send className="size-4" /></Button>
-        </div>
-        <p className="mx-auto mt-2 max-w-3xl text-center text-xs text-muted-foreground">PC: Enter 전송 · Shift + Enter 줄바꿈 / 모바일: Enter 줄바꿈 · 버튼으로 전송</p>
-      </div>
+      <PocketComposer value={input} onChange={setInput} onKeyDown={handleKeyDown} onSend={sendMessage}
+        disabled={loading || sending} recommendations={recommendationState} onToggle={replySuggestions.toggle}/>
       </section>
       <aside className="pocket-desktop-tools">
         <div className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span>현재 장면 · {cast.length ? cast.map(item => item.characterName ?? item.name).join(" · ") : "등장인물 없음"}</span>
-            {systems.map(system => <span key={system.id}>{system.name} <strong className="text-foreground">{system.currentValue}</strong></span>)}
+            {systems.map(system => <span key={system.systemId}>{system.name} <strong className="text-foreground">{system.currentValue}</strong></span>)}
           </div>
         </div>
 
@@ -790,7 +896,7 @@ export default function PocketPage({ pocket, onBack }) {
       </div>
 
       <div>
-      {isDeveloper && <section className="shrink-0 border-b bg-muted/20">
+      {isAdministrator && <section className="shrink-0 border-b bg-muted/20">
         <button type="button" onClick={() => setDevOpen(open => !open)}
           className="flex w-full items-center gap-2 px-4 py-2 text-left text-xs font-medium text-muted-foreground sm:px-6">
           <Wrench className="size-3.5" />
@@ -798,8 +904,11 @@ export default function PocketPage({ pocket, onBack }) {
           <ChevronDown className={`ml-auto size-3.5 transition-transform ${devOpen ? "rotate-180" : ""}`} />
         </button>
         {devOpen && <div className="border-t px-4 py-3 sm:px-6">
+          <ChatFailurePanel records={chatFailures.filter(row=>String(row.sessionId)===String(session.id))}/>
+          {isDeveloper && <>
           <PocketQaPanel sessionId={session.id} />
           <PocketExperienceQaPanel sessionId={session.id} />
+          <PocketChatTimingPanel timing={chatTiming} records={timingRecords} />
           <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
             <span>SESSION #{session.id}</span>
             <span>시뮬레이션 시각 {session.simulatedAt ?? "-"}</span>
@@ -892,6 +1001,7 @@ export default function PocketPage({ pocket, onBack }) {
                 </div>)}
               </div>}
           </div>
+          </>}
         </div>}
       </section>}
 

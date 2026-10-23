@@ -68,6 +68,30 @@ class WorldRoomDialogueWorldlineIntegrationTest {
     @MockitoBean TimeInterpreter timeInterpreter;
     @MockitoBean MemoryRecallService memoryRecallService;
     @Autowired jakarta.persistence.EntityManager entityManager;
+    @Autowired WorldRoomContextBuilder contextBuilder;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    WorldRoomSessionSystemStateRepository sessionSystemRows;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean
+    com.example.projectmm.domain.world.WorldSystemStateRepository systemLabels;
+
+    @Test void contextReusesSystemReadsWithoutCachingMutableSessionValues() {
+        var session = automaticProgressionSession("context-system-reads");
+        var system = systems.save(new WorldSystem(session.getRoom().getWorld(), "Tension", "Danger", 0, 100, 20, 0));
+        systemLabels.save(new com.example.projectmm.domain.world.WorldSystemState(system, 0, 100, "Alert", 0));
+        var row = sessionSystemRows.save(new WorldRoomSessionSystemState(session, system, 37));
+        clearInvocations(sessionSystemRows, systemLabels);
+        var context = contextBuilder.buildSession(session.getId());
+        verify(sessionSystemRows, times(1)).findBySessionIdOrderBySystemSortOrderAscIdAsc(session.getId());
+        verify(systemLabels, times(1)).findBySystemIdOrderBySortOrderAsc(system.getId());
+        assertThat(context.sessionSystems()).singleElement().satisfies(value -> {
+            assertThat(value.currentValue()).isEqualTo(37);
+            assertThat(value.states()).singleElement().satisfies(label -> assertThat(label.label()).isEqualTo("Alert"));
+        });
+        assertThat(context.world().systems()).singleElement().satisfies(value ->
+                assertThat(value.states()).isEqualTo(context.sessionSystems().getFirst().states()));
+        row.setCurrentValue(62);
+        assertThat(contextBuilder.buildSession(session.getId()).sessionSystems().getFirst().currentValue()).isEqualTo(62);
+    }
 
     private WorldRoomSession automaticProgressionSession(String login) {
         PasswordEncoder encoder = mock(PasswordEncoder.class);
@@ -720,7 +744,7 @@ class WorldRoomDialogueWorldlineIntegrationTest {
     }
 
     @Test
-    void rejectedContinuityCannotApplyStateOrPersistGeneratedMessage() {
+    void advisoryRejectionPersistsGeneratedMessageAndItsState() {
         var session = automaticProgressionSession("facts-rejection");
         when(gateway.generateWorldRoomTurn(any(), anyString())).thenReturn(
                 new WorldRoomTurn("Unexplained teleport.",WorldRoomCastChange.none(),List.of(),3600,"Elsewhere"));
@@ -728,12 +752,11 @@ class WorldRoomDialogueWorldlineIntegrationTest {
                 "{\"approved\":false,\"turn\":null,\"changes\":[],\"conflicts\":[\"location changed without event\"]}");
         long beforeMessages=messages.count(), beforeVariants=variants.count();
         var beforeTime=session.getSimulatedAt();
-        assertThatThrownBy(() -> dialogueService.continueScene(session.getId()))
-                .hasMessageContaining("did not approve");
-        assertThat(messages.count()).isEqualTo(beforeMessages);
-        assertThat(variants.count()).isEqualTo(beforeVariants);
-        assertThat(session.getSimulatedAt()).isEqualTo(beforeTime);
-        assertThat(playerStateService.current(session.getId(),session.getMember().getLoginId()).getLocation()).isNotEqualTo("Elsewhere");
+        dialogueService.continueScene(session.getId());
+        assertThat(messages.count()).isGreaterThan(beforeMessages);
+        assertThat(variants.count()).isGreaterThan(beforeVariants);
+        assertThat(session.getSimulatedAt()).isEqualTo(beforeTime.plusSeconds(3600));
+        assertThat(playerStateService.current(session.getId(),session.getMember().getLoginId()).getLocation()).isEqualTo("Elsewhere");
     }
 
 }

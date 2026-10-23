@@ -1,7 +1,15 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { QA_PERSONA_MODEL, qaStartRequest, qaEstimate } from "./pocketQa.js"
+import { QA_PERSONA_MODEL, qaStartRequest, qaEstimate, qaCostStatus, qaUsd } from "./pocketQa.js"
 const cap = { maxTurns: 1000, paidAvailable: true, targetModels: ["gpt-5.6-luna", "gpt-5.6-sol"], perTurnEstimates: { "gpt-5.6-sol": { lowUsd: 0.05, highUsd: 0.06 } } }
+test("pending requests are distinct from unresolved charges and tiny embedding costs stay visible", () => {
+  assert.equal(qaCostStatus(1, 1), "응답 대기 1건")
+  assert.equal(qaCostStatus(1, 0), "과금 미확인 1건")
+  assert.equal(qaCostStatus(2, 1), "응답 대기 1건 · 과금 미확인 1건")
+  assert.equal(qaUsd(0.0000007), "$0.0000007")
+  assert.equal(qaUsd(0.1939), "$0.1939")
+  assert.equal(qaUsd(null), "미확인")
+})
 test("Luna is fixed while target and turn count are configurable", () => {
   assert.equal(QA_PERSONA_MODEL, "gpt-5.6-luna")
   assert.deepEqual(qaStartRequest({ requestId: "id", targetModel: "gpt-5.6-sol", turns: "100", paid: false }, cap), { requestId: "id", targetModel: "gpt-5.6-sol", turns: 100, paid: false, budgetUsd: 0, acknowledgeCost: false })

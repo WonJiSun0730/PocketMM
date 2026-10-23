@@ -9,6 +9,49 @@ import java.math.BigDecimal;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 class ExperienceUiServiceTest {
+    @Test void metricsDownloadIncludesQaMilestonesAndLeavesLegacyValuesBlank() throws Exception {
+        var service=service(new Worker());var run=service.start(1,"dev",start(DIGEST));
+        var mapper=new ObjectMapper();var state=mapper.createObjectNode();state.put("status","COMPLETED");
+        state.putArray("calls");
+        var turns=state.putArray("turns");
+        var first=turns.addObject();first.put("number",1);
+        first.putObject("outcome").put("reply","reply").put("diagnosticsJson",
+                "{\"chatTiming\":{\"source\":\"QA_SERVER\",\"firstTokenMs\":90,\"bodyReadyMs\":100,\"reviewCompleteMs\":200,\"processingCompleteMs\":300,\"preGenerationMs\":60,\"targetDispatchMs\":80,\"stages\":{\"TIME_INTERPRETATION\":{\"durationMs\":20,\"count\":1,\"failedCount\":0}}}}");
+        turns.addObject().put("number",2).putObject("outcome").put("reply","old reply");
+        Files.writeString(dir.resolve("target/pocket-qa-experience").resolve(run.id()).resolve("run.json"),mapper.writeValueAsString(state));
+        String csv=new String(service.download(1,"dev",run.id(),"metrics"),java.nio.charset.StandardCharsets.UTF_8);
+        var rows=csv.lines().toList();
+        assertThat(rows.getFirst()).contains("qa_body_ready_ms,qa_review_complete_ms,qa_processing_complete_ms,qa_pre_generation_ms,qa_target_dispatch_ms","qa_stage_time_interpretation_ms");
+        assertThat(Arrays.asList(rows.get(1).split(",",-1)).subList(11,14)).containsExactly("100","200","300");
+        assertThat(Arrays.asList(rows.get(1).split(",",-1)).subList(14,16)).containsExactly("60","80");
+        int tokenColumn=Arrays.asList(rows.getFirst().split(",")).indexOf("qa_first_token_ms");
+        assertThat(rows.get(1).split(",",-1)[tokenColumn]).isEqualTo("90");
+        assertThat(rows.get(2).split(",",-1)[tokenColumn]).isEmpty();
+        int stageColumn=Arrays.asList(rows.getFirst().split(",")).indexOf("qa_stage_time_interpretation_ms");
+        assertThat(rows.get(1).split(",",-1)[stageColumn]).isEqualTo("20");
+        assertThat(Arrays.asList(rows.get(2).split(",",-1)).subList(11,14)).containsExactly("","","");
+        String json=new String(service.download(1,"dev",run.id(),"json"),java.nio.charset.StandardCharsets.UTF_8);
+        assertThat(json).contains("bodyReadyMs","processingCompleteMs","QA_SERVER");
+    }
+    @Test void livePendingCallSettlesFromLatestLedgerAndDeadWorkerRemainsUnknown() throws Exception {
+        var alive=new boolean[]{true};
+        var worker=new Worker(){@Override public boolean alive(long pid,String at){return alive[0];}};
+        var service=service(worker);var run=service.start(1,"dev",start(DIGEST));
+        var path=dir.resolve("target/pocket-qa-experience").resolve(run.id());
+        Files.writeString(path.resolve("run.json"),"{\"status\":\"RUNNING\",\"stage\":\"TARGET_IN_FLIGHT\",\"turns\":[],\"calls\":[{\"callId\":\"call\",\"turn\":1,\"phase\":\"REQUEST_STARTED\",\"role\":\"TARGET\",\"status\":\"UNKNOWN\",\"usd\":null}]}");
+        String started="{\"callId\":\"call\",\"phase\":\"REQUEST_STARTED\",\"role\":\"TARGET\",\"status\":\"UNKNOWN\",\"usd\":null}\n";
+        Files.writeString(path.resolve("ledger.jsonl"),started);
+        assertThat(service.current(1,"dev",run.id()).pendingCalls()).isEqualTo(1);
+        assertThat(service.analysis(1,"dev",run.id()).path("findings").toString()).doesNotContain("CALL_STATUS");
+        alive[0]=false;
+        assertThat(service.current(1,"dev",run.id()).pendingCalls()).isZero();
+        assertThat(service.current(1,"dev",run.id()).unknownCalls()).isEqualTo(1);
+        assertThat(service.analysis(1,"dev",run.id()).path("findings").toString()).contains("CALL_STATUS");
+        Files.writeString(path.resolve("ledger.jsonl"),started+"{\"callId\":\"call\",\"phase\":\"RESPONSE_RECEIVED\",\"role\":\"TARGET\",\"status\":\"completed\",\"usd\":0.02}\n");
+        var settled=service.current(1,"dev",run.id());
+        assertThat(settled.unknownCalls()).isZero();assertThat(settled.pendingCalls()).isZero();
+        assertThat(settled.knownUsd()).isEqualByComparingTo("0.02");
+    }
     static final String DIGEST=PocketExperienceSnapshot.digest(List.of());
     @TempDir Path dir;
     static class Worker implements ExperienceQaUiService.Worker {

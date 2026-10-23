@@ -49,7 +49,8 @@ public class HybridMemoryRetriever
                 );
 
         if (query == null
-                || query.isBlank()) {
+                || query.isBlank()
+                || candidates.stream().noneMatch(memory -> memory.semanticMemory() != null)) {
             return limit(
                     fallback,
                     limit
@@ -57,7 +58,7 @@ public class HybridMemoryRetriever
         }
 
         List<Double> queryEmbedding =
-                embeddingProvider.embed(query);
+                MemoryQueryEmbeddingScope.embed(embeddingProvider, query);
 
         if (queryEmbedding == null
                 || queryEmbedding.isEmpty()) {

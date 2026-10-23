@@ -30,41 +30,53 @@ class SceneContinuityServiceTest {
         when(variants.selectedSceneCheckpoints(anyLong(),anyLong(),any())).thenReturn(List.of());
         when(messages.sceneHistoryAfter(anyLong(),anyLong(),anyLong(),any())).thenReturn(List.of());
     }
-    @Test void repairsContradictionThenVerifiesAndUsesOnlyApprovedEvidence() {
-        var wrong=turn("The receipt is in Eleanor's notebook. The nurse takes it from Holmes.");
-        var fixed=turn("The receipt remains in Eleanor's notebook.");
-        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(wrong);
-        var fact=new SceneFacts.Change("receipt.custodian",SceneFacts.Kind.POSSESSION,"Eleanor",
-                SceneFacts.Certainty.OBSERVED,SceneFacts.Source.REPLY,"Eleanor's notebook",null,SceneFacts.Reason.NEW);
-        when(gateway.reviewWorldRoomContinuity(any(),anyString())).thenAnswer(call -> {
-            var request=json.readTree((String)call.getArgument(1));
-            return result(request.path("mode").asText().equals("REVIEW")?fixed:null,List.of(fact));
+    @Test void rejectedReviewKeepsOriginalAndStillAppliesSupportedUserFact() {
+        var original=turn("The empty cup rests on the table.");
+        var fact=new SceneFacts.Change("tea.status",SceneFacts.Kind.COMPLETION,"finished",
+                SceneFacts.Certainty.OBSERVED,SceneFacts.Source.USER,"I finished the tea",null,SceneFacts.Reason.NEW);
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(original);
+        when(gateway.reviewWorldRoomContinuity(any(),anyString())).thenReturn(json.writeValueAsString(
+                new SceneContinuityService.Review(false,turn("rewritten"),List.of(fact),List.of("cup conflict"))));
+        SceneContinuityObservation.observe(()->{
+            var outcome=service.generate(context(),"I finished the tea","I finished the tea",100L);
+            assertThat(outcome.turn()).isEqualTo(original);
+            assertThat(outcome.after()).contains("finished");
+            assertThat(SceneContinuityObservation.current()).hasSize(1);
+            return null;
         });
-        var outcome=service.generate(context(),"continue","",Long.MAX_VALUE);
-        assertThat(outcome.turn()).isEqualTo(fixed);
-        assertThat(outcome.after()).contains("Eleanor").doesNotContain("Holmes","nurse");
-        verify(gateway,times(2)).reviewWorldRoomContinuity(any(),anyString());
-        verifyNoInteractionsExceptReads();
+        verify(gateway,times(1)).reviewWorldRoomContinuity(any(),anyString());
     }
-    private void verifyNoInteractionsExceptReads() {
-        verify(messages,never()).save(any());
-        verify(variants,never()).save(any());
-    }
-    @Test void failedVerificationNeverReturnsOrCommitsAResponse() {
-        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(turn("wrong identity"));
-        when(gateway.reviewWorldRoomContinuity(any(),anyString()))
-                .thenReturn(result(turn("still wrong"),List.of()),
-                        json.writeValueAsString(new SceneContinuityService.Review(false,null,List.of(),List.of("identity mismatch"))));
-        assertThatThrownBy(() -> service.generate(context(),"continue","",Long.MAX_VALUE))
-                .hasMessageContaining("did not approve");
-        verifyNoInteractionsExceptReads();
-    }
-    @Test void malformedAndUnavailableReviewFailClosed() {
-        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(turn("reply"));
+    @Test void malformedReviewNeverCancelsGeneratedBodyAndPreviewScopeClears() {
+        var previews=new ArrayList<String>();
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(turn("original"));
         when(gateway.reviewWorldRoomContinuity(any(),anyString())).thenReturn("{}","not json",null);
-        for(int i=0;i<3;i++)assertThatThrownBy(() -> service.generate(context(),"continue","",Long.MAX_VALUE))
-                .isInstanceOf(IllegalStateException.class);
-        verifyNoInteractionsExceptReads();
+        for(int i=0;i<3;i++)assertThat(DialoguePreview.deliver(previews::add,
+                ()->service.generate(context(),"continue","",100L)).turn().reply()).isEqualTo("original");
+        assertThat(previews).containsExactly("original","original","original");
+        service.generate(context(),"continue","",100L);
+        assertThat(previews).hasSize(3);
+    }
+    @Test void invalidFactDoesNotDiscardOtherSupportedFactsOrRewriteOriginal() {
+        var good=new SceneFacts.Change("tea.status",SceneFacts.Kind.COMPLETION,"finished",
+                SceneFacts.Certainty.OBSERVED,SceneFacts.Source.USER,"finished",null,SceneFacts.Reason.NEW);
+        var bad=new SceneFacts.Change("bag.status",SceneFacts.Kind.POSSESSION,"carried",
+                SceneFacts.Certainty.OBSERVED,SceneFacts.Source.REPLY,"invented quote",null,SceneFacts.Reason.NEW);
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(turn("original"));
+        when(gateway.reviewWorldRoomContinuity(any(),anyString())).thenReturn(result(turn("rewrite"),List.of(bad,good)));
+        var outcome=service.generate(context(),"finished","finished",100L);
+        assertThat(outcome.turn().reply()).isEqualTo("original");
+        assertThat(outcome.after()).contains("tea.status").doesNotContain("bag.status");
+        verify(gateway,times(1)).reviewWorldRoomContinuity(any(),anyString());
+    }
+    @Test void nonStreamingProductionAlsoPersistsAdvisoryAndKeepsOriginal() throws Exception {
+        var store=mock(ChatFailureStore.class);
+        var production=new SceneContinuityService(gateway,messages,variants,store);
+        when(gateway.generateWorldRoomTurn(any(),anyString())).thenReturn(turn("original"));
+        when(gateway.reviewWorldRoomContinuity(any(),anyString())).thenReturn(json.writeValueAsString(
+                new SceneContinuityService.Review(false,null,List.of(),List.of("ambiguous"))));
+        assertThat(production.generate(context(),"continue","",100L).turn().reply()).isEqualTo("original");
+        verify(store).save(argThat(e->e.phase().equals("ADVISORY") && e.conflicts().contains("ambiguous")));
+        assertThat(SceneContinuityObservation.enabled()).isFalse();
     }
     @Test void factOutsideRecentWindowStillReachesEveryGenerationAndAiSelectionCopy() {
         var checkpoint=mock(WorldRoomMessageVariant.class);

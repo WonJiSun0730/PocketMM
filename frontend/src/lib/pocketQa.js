@@ -1,5 +1,13 @@
 export const QA_PERSONA_MODEL = "gpt-5.6-luna"
-export const qaStatusLabels = { STARTING: "실행 환경 준비 중", RUNNING: "진행 중", PAUSING: "일시정지 요청 중", PAUSED: "일시정지", STOPPING: "중단 요청 중", STOPPED: "중단됨", COMPLETED: "완료", INTERRUPTED: "연결 중단 · 재개 가능", REVIEW_REQUIRED: "QA 성공 아님 · 비용·실패 확인 필요 (자동 재시도 금지)", BUDGET_STOP: "예산으로 중단", FAILED: "실행 준비 실패" }
+export function qaUsd(value) {
+  if (value == null) return "미확인"
+  const amount = Number(value)
+  return `$${amount !== 0 && Math.abs(amount) < 0.0001 ? amount.toFixed(8).replace(/0+$/, "").replace(/\.$/, "") : amount.toFixed(4)}`
+}
+export function qaCostStatus(unknown = 0, pending = 0) {
+  return [pending > 0 ? `응답 대기 ${pending}건` : "", unknown > pending ? `과금 미확인 ${unknown - pending}건` : ""].filter(Boolean).join(" · ")
+}
+export const qaStatusLabels = { STARTING: "실행 환경 준비 중", RUNNING: "진행 중", PAUSING: "일시정지 요청 중", PAUSED: "일시정지", STOPPING: "중단 요청 중", STOPPED: "중단됨", COMPLETED: "완료", INTERRUPTED: "연결 중단 · 재개 가능", REVIEW_REQUIRED: "QA 성공 아님 · 비용·실패 확인 필요 (자동 재시도 금지)", BUDGET_STOP: "예산·호출 사전검증으로 중단", FAILED: "실행 준비 실패" }
 export function qaModelLabel(model) { return ({ "gpt-5.6-luna": "GPT-5.6 Luna", "gpt-5.6-terra": "GPT-5.6 Terra", "gpt-5.6-sol": "GPT-5.6 Sol" })[model] ?? model }
 export function qaEstimate(capabilities, model, turns) {
   const rate = capabilities?.perTurnEstimates?.[model]

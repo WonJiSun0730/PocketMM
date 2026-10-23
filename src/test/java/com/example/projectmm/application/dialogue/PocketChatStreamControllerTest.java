@@ -1,0 +1,158 @@
+package com.example.projectmm.application.dialogue;
+
+import com.example.projectmm.api.world.PocketChatStreamController;
+import com.example.projectmm.api.world.WorldRoomChatRequest;
+import com.example.projectmm.application.chat.WorldRoomDialogueService;
+import com.example.projectmm.application.chat.WorldRoomSessionService;
+import com.example.projectmm.domain.chat.WorldRoomSession;
+import com.example.projectmm.domain.dialogue.WorldRoomTurn;
+import com.example.projectmm.domain.dialogue.WorldRoomCastChange;
+import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.server.ResponseStatusException;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+class PocketChatStreamControllerTest {
+    final WorldRoomSessionService sessions=mock(WorldRoomSessionService.class);
+    final WorldRoomDialogueService dialogue=mock(WorldRoomDialogueService.class);
+    final Authentication auth=mock(Authentication.class);
+    final ChatFailureStore failures=mock(ChatFailureStore.class);
+    final PocketChatStreamController controller=new PocketChatStreamController(sessions,dialogue,failures);
+
+    void owned(long worldId) {
+        when(auth.getName()).thenReturn("owner");
+        when(auth.isAuthenticated()).thenReturn(true);
+        doReturn(java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_DEVELOPER"))).when(auth).getAuthorities();
+        var session=mock(WorldRoomSession.class,RETURNS_DEEP_STUBS);
+        when(session.getRoom().getWorld().getId()).thenReturn(worldId);
+        when(sessions.ownedSession(2L,3L,"owner")).thenReturn(session);
+    }
+    @Test void flushesProvisionalBodyBeforeServiceAndMemoryCompletion() throws Exception {
+        owned(1L);
+        var response=new MockHttpServletResponse();
+        when(dialogue.chat(3L,"hello")).thenAnswer(call->{
+            DialogueTokens.generate(()->{DialogueTokens.publish("미확정");return null;});
+            assertThat(response.getContentAsString()).contains("delta").doesNotContain("preview","complete");
+            DialoguePreview.generated("미확정 본문");
+            assertThat(response.isCommitted()).isTrue();
+            assertThat(response.getContentAsString()).contains("미확정 본문").doesNotContain("complete");
+            return new WorldRoomTurn("검증된 수정본",WorldRoomCastChange.none());
+        });
+        controller.chat(1L,2L,3L,new WorldRoomChatRequest("hello"),auth,response);
+        assertThat(response.getContentAsString()).contains("complete","검증된 수정본");
+        assertThat(response.getHeader("X-Accel-Buffering")).isEqualTo("no");
+        verify(dialogue,times(1)).chat(3L,"hello");
+    }
+    @Test void failedProcessingDoesNotSendCompleteOrExposeProviderSecrets() throws Exception {
+        owned(1L);
+        when(dialogue.chat(3L,"hello")).thenAnswer(call->{
+            DialoguePreview.generated("미확정 본문");
+            throw new IllegalStateException("SECRET provider response");
+        });
+        var response=new MockHttpServletResponse();
+        controller.chat(1L,2L,3L,new WorldRoomChatRequest("hello"),auth,response);
+        assertThat(response.getContentAsString()).contains("preview","failed").doesNotContain("complete","SECRET");
+        verify(dialogue,times(1)).chat(3L,"hello");
+    }
+    @Test void checksOwnershipAndWorldBeforeStartingOrGenerating() {
+        owned(99L);
+        var response=new MockHttpServletResponse();
+        assertThatThrownBy(()->controller.chat(1L,2L,3L,new WorldRoomChatRequest("hello"),auth,response))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(response.isCommitted()).isFalse();
+        verifyNoInteractions(dialogue);
+    }
+    @Test void existingRoomReviewRejectionIsReportedWithoutRegenerationOrSecretExposure() throws Exception {
+        owned(1L);
+        when(dialogue.chat(3L,"hello")).thenAnswer(call->{
+            DialogueTiming.generationStarting();DialogueTiming.bodyReady();DialoguePreview.generated("candidate");
+            throw new SceneContinuityService.ReviewRejectedException(new SceneContinuityService.Review(false,null,java.util.List.of(),java.util.List.of("Character was absent")));
+        });
+        var response=new MockHttpServletResponse();
+        controller.chat(1L,2L,3L,new WorldRoomChatRequest("hello"),auth,response);
+        var json=new tools.jackson.databind.ObjectMapper().readTree(response.getContentAsString().lines().reduce((a,b)->b).orElseThrow());
+        assertThat(json.path("code").asText()).isEqualTo("CONTINUITY_REJECTED");
+        assertThat(json.path("phase").asText()).isEqualTo("CONTINUITY");
+        assertThat(java.util.UUID.fromString(json.path("requestId").asText())).isNotNull();
+        assertThat(json.path("reviewFailure").path("conflicts").path(0).asText()).isEqualTo("Character was absent");
+        assertThat(json.path("reviewFailure").path("candidate").asText()).isEqualTo("candidate");
+        assertThat(json.path("diagnosticsSaved").asBoolean()).isTrue();
+        assertThat(response.getContentAsString()).doesNotContain("SECRET","complete");
+        verify(dialogue,times(1)).chat(3L,"hello");
+    }
+    @Test void failureRecordsRequireOwnershipAndCorrectWorldBeforeReadingDisk() throws Exception {
+        owned(99L);
+        assertThatThrownBy(()->controller.failures(1L,2L,3L,auth,new MockHttpServletResponse())).isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(failures);
+        owned(1L);
+        when(sessions.ownedSession(2L,3L,"owner")).thenThrow(new ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND));
+        assertThatThrownBy(()->controller.failures(1L,2L,3L,auth,new MockHttpServletResponse())).isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(failures);
+    }
+    @Test void evidenceDiskFailureStillDeliversReasonsWithoutASecondGeneration() throws Exception {
+        owned(1L);
+        when(dialogue.chat(3L,"hello")).thenThrow(new SceneContinuityService.ReviewRejectedException(
+                new SceneContinuityService.Review(false,null,java.util.List.of(),java.util.List.of("Conflict")),"BOOTSTRAP"));
+        doThrow(new java.io.IOException("SECRET disk details")).when(failures).save(any());
+        var response=new MockHttpServletResponse();controller.chat(1L,2L,3L,new WorldRoomChatRequest("hello"),auth,response);
+        assertThat(response.getContentAsString()).contains("Conflict","\"diagnosticsSaved\":false","BOOTSTRAP").doesNotContain("SECRET");
+        verify(dialogue,times(1)).chat(3L,"hello");
+    }
+    @Test void advisoryWarningIsSavedAndSentBeforeSuccessfulCompletionEvenIfDiskFails() throws Exception {
+        owned(1L);
+        when(dialogue.chat(3L,"hello")).thenAnswer(call->{
+            DialoguePreview.generated("original");
+            SceneContinuityObservation.record("REVIEW","REJECTED","Advisory finding; conversation continues",
+                    new SceneContinuityService.Review(false,null,java.util.List.of(),java.util.List.of("boarding ambiguous")));
+            return new WorldRoomTurn("original",WorldRoomCastChange.none());
+        });
+        doThrow(new java.io.IOException("disk unavailable")).when(failures).save(any());
+        var response=new MockHttpServletResponse();
+        controller.chat(1L,2L,3L,new WorldRoomChatRequest("hello"),auth,response);
+        var body=response.getContentAsString();
+        assertThat(body).contains("review_warning","boarding ambiguous","complete","ADVISORY").doesNotContain("\"type\":\"failed\"");
+        assertThat(body.indexOf("review_warning")).isLessThan(body.indexOf("complete"));
+        assertThat(SceneContinuityObservation.enabled()).isFalse();
+        verify(dialogue,times(1)).chat(3L,"hello");
+    }
+
+    @Test void ordinaryOwnerCannotReadReviewHistory() {
+        owned(1L);doReturn(java.util.List.of()).when(auth).getAuthorities();
+        assertThatThrownBy(()->controller.failures(1L,2L,3L,auth,new MockHttpServletResponse()))
+                .isInstanceOfSatisfying(ResponseStatusException.class,e->assertThat(e.getStatusCode().value()).isEqualTo(403));
+        verifyNoInteractions(failures);
+    }
+    @Test void ordinaryOwnerCompletesChatWithoutReceivingReviewDetails() throws Exception {
+        owned(1L);doReturn(java.util.List.of()).when(auth).getAuthorities();
+        when(dialogue.chat(3L,"hello")).thenAnswer(call->{
+            SceneContinuityObservation.record("REVIEW","REJECTED","private diagnostic",
+                    new SceneContinuityService.Review(false,null,java.util.List.of(),java.util.List.of("private conflict")));
+            return new WorldRoomTurn("reply",WorldRoomCastChange.none());
+        });
+        var response=new MockHttpServletResponse();controller.chat(1L,2L,3L,new WorldRoomChatRequest("hello"),auth,response);
+        assertThat(response.getContentAsString()).contains("complete","reply").doesNotContain("review_warning","reviewFailure","private conflict","private diagnostic");
+        verify(failures).save(any());
+    }
+    @Test void ordinaryOwnerFailureDoesNotLeakStoredReviewEvidence() throws Exception {
+        owned(1L);doReturn(java.util.List.of()).when(auth).getAuthorities();
+        when(dialogue.chat(3L,"hello")).thenThrow(new SceneContinuityService.ReviewRejectedException(
+                new SceneContinuityService.Review(false,null,java.util.List.of(),java.util.List.of("private conflict")),"REVIEW"));
+        var response=new MockHttpServletResponse();controller.chat(1L,2L,3L,new WorldRoomChatRequest("hello"),auth,response);
+        assertThat(response.getContentAsString()).contains("failed").doesNotContain("reviewFailure","private conflict");
+        verify(failures).save(any());
+    }
+
+    @Test void administratorCanReadOwnedHistoryButNotAnotherWorld() throws Exception {
+        owned(1L);
+        doReturn(java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"))).when(auth).getAuthorities();
+        when(failures.latest(3L)).thenReturn(java.util.List.of());
+        assertThat(controller.failures(1L,2L,3L,auth,new MockHttpServletResponse())).isEmpty();
+        assertThatThrownBy(()->controller.failures(99L,2L,3L,auth,new MockHttpServletResponse()))
+                .isInstanceOfSatisfying(ResponseStatusException.class,e->assertThat(e.getStatusCode().value()).isEqualTo(404));
+        verify(failures,times(1)).latest(3L);
+    }
+
+}

@@ -1,5 +1,5 @@
 export default function AiCallUsage({ calls = [], diagnostics }) {
-  const labels = { ROLEPLAY: '본 대화', INITIAL_SCENE: '초기 장면', SCENE_SETUP: '장면 분석', MEMORY_EXTRACTION: '기억 추출' };
+  const labels = { REPLY_SUGGESTION: '문장 추천', ROLEPLAY: '본 대화', INITIAL_SCENE: '초기 장면', SCENE_SETUP: '장면 분석', MEMORY_EXTRACTION: '기억 추출' };
   const groups = new Map();
   for (const call of calls) {
     const group = groups.get(call.purpose) || { count: 0, cost: 0, unknown: false };

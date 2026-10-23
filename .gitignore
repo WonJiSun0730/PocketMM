@@ -46,3 +46,6 @@ Thumbs.db
 
 ### Generated scene assets (persistent runtime data, not release files) ###
 /data/pocket-backgrounds/
+/data/pocket-chat-failures/
+
+/data/pocket-reply-suggestions/

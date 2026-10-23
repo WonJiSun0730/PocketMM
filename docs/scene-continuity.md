@@ -1,5 +1,12 @@
 # 장면 연속성 보호
 
+QA는 [검사 오류 관찰 정책](qa-observation-policy.md)에 따라 오류를 기록하며 계속 진행한다.
+아래 저장 차단/수정 재검증 설명은 기본 실서비스 정책이다.
+
+2026-10-22 비용 최적화 후의 검사 모델 선택, 캐시 경계 및 변경량 최소화는
+[연속성 검사 비용 최적화](continuity-cost-optimization.md)를 참조한다.
+아래 '같은 선택 모델' 설명은 기본 동작이며 OpenAI 검사 전용 설정이 있으면 검사에만 적용한다.
+
 ## 기존 구조 재사용
 
 Pocket의 WorldRoomDialogueService에서 대화, 자동 전개, reroll, regenerate의 생성 결과를 저장하기 전에 검사한다. 기존 DialogueGateway, 공급자 라우터, AiUsageTracker, 응답 버전별 스냅샷을 재사용한다. 별도 대화 저장소나 AI 클라이언트는 만들지 않는다. 레거시 1:1 ChatService와 부재 활동 생성 자체에는 적용하지 않는다. 부재 활동 뒤 Pocket 응답을 생성할 때에는 해당 활동 기록을 반영한다.
