@@ -1,6 +1,7 @@
 package com.example.projectmm.domain.chat;
 
 import jakarta.persistence.*;
+import com.example.projectmm.infrastructure.security.EncryptedTextConverter;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -25,7 +26,8 @@ public class WorldRoomMessage {
     @Column(nullable = false, length = 20)
     private ChatRole role;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String content;
 
     @Column(nullable = false)

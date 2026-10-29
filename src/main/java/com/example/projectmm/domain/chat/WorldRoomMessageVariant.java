@@ -1,6 +1,7 @@
 package com.example.projectmm.domain.chat;
 
 import jakarta.persistence.*;
+import com.example.projectmm.infrastructure.security.EncryptedTextConverter;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -30,7 +31,8 @@ public class WorldRoomMessageVariant {
     @Column(name = "variant_no", nullable = false)
     private int variantNo;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String content;
 
     @Column(nullable = false)

@@ -3,6 +3,7 @@ package com.example.projectmm.domain.chat;
 import com.example.projectmm.application.policy.ContentMode;
 import com.example.projectmm.domain.character.Character;
 import jakarta.persistence.*;
+import com.example.projectmm.infrastructure.security.EncryptedTextConverter;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -31,7 +32,8 @@ public class ChatMessage {
     @Column(nullable = false, length = 20)
     private ChatRole role;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String content;
 
     @Enumerated(EnumType.STRING)
