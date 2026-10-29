@@ -20,6 +20,7 @@ import PlayerProfilePicker from "@/components/PlayerProfilePicker"
 import PocketPlayerStatePanel from "@/components/PocketPlayerStatePanel"
 import PocketSettingsPanel from "@/components/PocketSettingsPanel"
 import DialogueIssuePanel from "@/components/DialogueIssuePanel"
+import BugReportPanel from "@/components/BugReportPanel"
 import { collectPocketTestData, downloadPocketTestData } from "@/lib/pocketTestExport"
 import usePocketProgress from "@/hooks/usePocketProgress"
 import PocketProgressPanel from "@/components/PocketProgressPanel"
@@ -105,6 +106,9 @@ export default function PocketPage({ pocket, onBack }) {
   const [issueTarget, setIssueTarget] = useState(null)
   const [issueManagerOpen, setIssueManagerOpen] = useState(false)
   const [issueNotice, setIssueNotice] = useState("")
+  const [bugReportTarget, setBugReportTarget] = useState(null)
+  const [bugReportOpen, setBugReportOpen] = useState(false)
+  const [bugInboxOpen, setBugInboxOpen] = useState(false)
   const [exportingTestData, setExportingTestData] = useState(false)
   const [isDeveloper, setIsDeveloper] = useState(false)
   const [isAdministrator, setIsAdministrator] = useState(false)
@@ -684,6 +688,10 @@ export default function PocketPage({ pocket, onBack }) {
         <div className="border-b px-4 py-3">
           <Button type="button" variant="outline" className="mb-2 w-full" disabled={sending}
             onClick={() => { setMobileToolsOpen(false); setIssueNotice(""); setIssueManagerOpen(true) }}>문제 기록 관리 / 내보내기</Button>
+          <Button type="button" variant="outline" className="mb-2 w-full" disabled={sending}
+            onClick={() => { setMobileToolsOpen(false); setBugReportTarget(null); setBugReportOpen(true) }}>버그 신고</Button>
+          {isAdministrator && <Button type="button" variant="outline" className="mb-2 w-full" disabled={sending}
+            onClick={() => { setMobileToolsOpen(false); setBugInboxOpen(true) }}>운영자 신고함</Button>}
           <Button type="button" variant="outline" className="w-full" disabled={exportingTestData || sending}
             onClick={exportTestData}>{exportingTestData ? "기록 수집 중..." : "장기 테스트 기록 내보내기 (.json)"}</Button>
           <p className="mt-2 text-xs text-muted-foreground">전체 대화·리롤 버전과 현재 AI 사용량·장면·메모리 진단을 저장합니다.</p>
@@ -864,6 +872,8 @@ export default function PocketPage({ pocket, onBack }) {
                 {isCharacter && !isAbsence && <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => loadVariants(item.id)} disabled={sending}>버전 {item.selectedVariantNo ?? 1}</Button>}
                 {isCharacter && <Button size="sm" variant="ghost" className="h-7 px-2" disabled={sending}
                   onClick={() => { setIssueNotice(""); setIssueTarget({ ...item }) }}>문제 기록</Button>}
+                {isCharacter && !isAbsence && <Button size="sm" variant="ghost" className="h-7 px-2" disabled={sending}
+                  onClick={() => { setBugReportTarget({ ...item }); setBugReportOpen(true) }}>버그 신고</Button>}
                 {variants.length > 1 && <div className="flex items-center gap-1">
                   <Button size="icon" variant="ghost" className="size-7" disabled={sending || selectedIndex <= 0 || !isLatest} onClick={() => selectVariant(item, variants[selectedIndex - 1].variantNo)}><ChevronLeft className="size-3"/></Button>
                   <span>{selectedIndex + 1} / {variants.length}</span>
@@ -893,6 +903,12 @@ export default function PocketPage({ pocket, onBack }) {
         disabled={loading || sending} recommendations={recommendationState} onToggle={replySuggestions.toggle}/>
       </section>
       <aside className="pocket-desktop-tools">
+        <div className="flex shrink-0 flex-wrap gap-2 border-b px-4 py-3">
+          <Button type="button" variant="outline" disabled={sending}
+            onClick={() => { setBugReportTarget(null); setBugReportOpen(true) }}>버그 신고</Button>
+          {isAdministrator && <Button type="button" variant="outline" disabled={sending}
+            onClick={() => setBugInboxOpen(true)}>운영자 신고함</Button>}
+        </div>
         <div className="shrink-0 border-b px-4 py-2 text-xs text-muted-foreground sm:px-6">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
             <span>현재 장면 · {cast.length ? cast.map(item => item.characterName ?? item.name).join(" · ") : "등장인물 없음"}</span>
@@ -1030,5 +1046,8 @@ export default function PocketPage({ pocket, onBack }) {
     </div>
     <DialogueIssuePanel sessionId={session.id} target={issueTarget} managerOpen={issueManagerOpen}
       onClose={result => { setIssueTarget(null); setIssueManagerOpen(false); if (result === "saved") setIssueNotice("문제 기록을 저장했어요.") }} />
+    <BugReportPanel sessionId={session.id} target={bugReportTarget} reportOpen={bugReportOpen} inboxOpen={bugInboxOpen}
+      onClose={result => { setBugReportOpen(false); setBugInboxOpen(false); setBugReportTarget(null);
+        if (result?.savedId) setIssueNotice(`버그 신고 #${result.savedId}를 운영자에게 보냈어요.`) }} />
   </main>
 }

@@ -11,7 +11,7 @@ class EncryptedColumnCoverageTest {
         for(String name:List.of("domain.chat.ChatMessage","domain.chat.WorldRoomMessage","domain.chat.WorldRoomMessageVariant",
                 "domain.chat.WorldRoomSession","domain.chat.WorldRoomPlayerState","domain.chat.PocketActivityReport",
                 "domain.memory.Memory","domain.memory.MemoryFact","domain.memory.SemanticMemory",
-                "domain.memory.ProtectedMemoryDetail","infrastructure.memory.MemoryEmbeddingEntity")) {
+                "domain.memory.ProtectedMemoryDetail","infrastructure.memory.MemoryEmbeddingEntity","domain.chat.BugReport")) {
             Class<?> type=Class.forName("com.example.projectmm."+name);
             for(var field:type.getDeclaredFields()) {
                 if(field.getAnnotation(Convert.class)==null)continue;

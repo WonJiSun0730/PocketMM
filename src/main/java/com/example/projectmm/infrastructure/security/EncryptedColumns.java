@@ -21,7 +21,8 @@ public final class EncryptedColumns {
         table("world_room_session_initial_inventory","session_id,sort_order","item_text"),
         table("world_room_player_states","id","location"),
         table("world_room_player_conditions","player_state_id,sort_order","condition_text"),
-        table("world_room_player_inventory","player_state_id,sort_order","item_text")
+        table("world_room_player_inventory","player_state_id,sort_order","item_text"),
+        table("bug_reports","id","problem,expected,evidence_json")
     );
     private EncryptedColumns() {}
 }

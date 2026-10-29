@@ -72,7 +72,7 @@ public class SecurityConfig {
                                         "/api/published-worlds/**"
                                 )
                                 .authenticated()
-                                .requestMatchers("/api/admin/private-data/**", "/api/chat/**").authenticated()
+                                .requestMatchers("/api/admin/**", "/api/chat/**").authenticated()
                                 .requestMatchers("/api/**")
                                 .permitAll()
                                 .anyRequest()
