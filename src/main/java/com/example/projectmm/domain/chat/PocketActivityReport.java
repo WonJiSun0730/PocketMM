@@ -1,5 +1,7 @@
 package com.example.projectmm.domain.chat;
 
+import com.example.projectmm.infrastructure.security.EncryptedTextConverter;
+import jakarta.persistence.Convert;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -16,8 +18,11 @@ public class PocketActivityReport {
     @Column(nullable = false) private LocalDateTime processedAt;
     private boolean capped;
     @Column(length = 300) private String pauseReason;
+    @Convert(converter = EncryptedTextConverter.class)
     @Column(nullable = false, columnDefinition = "LONGTEXT") private String activitiesJson;
+    @Convert(converter = EncryptedTextConverter.class)
     @Column(columnDefinition = "LONGTEXT") private String narrativeContextJson;
+    @Convert(converter = EncryptedTextConverter.class)
     @Column(columnDefinition = "LONGTEXT") private String narrativeText;
     @Column(length = 36) private String narrativeOperationId;
     private LocalDateTime narrativeOperationUntil;

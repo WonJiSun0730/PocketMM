@@ -1,5 +1,7 @@
 package com.example.projectmm.infrastructure.memory;
 
+import com.example.projectmm.infrastructure.security.EncryptedTextConverter;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -27,11 +29,10 @@ public class MemoryEmbeddingEntity {
     private String documentFingerprint;
 
     @Lob
-    @Column(
-            name = "embedding",
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(name = "embedding",
             nullable = false,
-            columnDefinition = "LONGTEXT"
-    )
+            columnDefinition = "LONGTEXT")
     private String embedding;
 
     public MemoryEmbeddingEntity(

@@ -152,6 +152,7 @@ export default function PocketPage({ pocket, onBack }) {
   const bottomRef = useRef(null)
   const initialScrollDoneRef = useRef(false)
   const historyAnchorIdRef = useRef(null)
+  const historyLoadingRef = useRef(false)
 
   const progress = usePocketProgress(session.id, async () => {
     await refresh()
@@ -261,7 +262,7 @@ export default function PocketPage({ pocket, onBack }) {
       setTypingTarget(reply ? `${reply.id}:${reply.selectedVariantNo ?? 1}` : null)
       setMessages(loadedMessages)
       await loadPageVariants(loadedMessages)
-      setHasOlderMessages(loadedMessages.length === 15)
+      setHasOlderMessages(loadedMessages.length === 5)
       if (castResponse.ok) setCast(await castResponse.json())
       if (systemResponse.ok) setSystems(await systemResponse.json())
       if (worldCharactersResponse.ok) setWorldCharacters(await worldCharactersResponse.json())
@@ -274,17 +275,19 @@ export default function PocketPage({ pocket, onBack }) {
   }
 
   async function loadOlderMessages() {
-    if (loadingOlder || !hasOlderMessages || messages.length === 0) return
+    if (historyLoadingRef.current || loadingOlder || !hasOlderMessages || messages.length === 0) return
+    historyLoadingRef.current = true
     setLoadingOlder(true)
     try {
       historyAnchorIdRef.current = messages[0].id
       const page = await loadMessagePage(messages[0].id)
       setMessages(current => [...page, ...current])
       await loadPageVariants(page)
-      setHasOlderMessages(page.length === 15)
+      setHasOlderMessages(page.length === 5)
     } catch (e) {
       setError(e.message)
     } finally {
+      historyLoadingRef.current = false
       setLoadingOlder(false)
     }
   }
@@ -346,15 +349,32 @@ export default function PocketPage({ pocket, onBack }) {
     const sentinel = historySentinelRef.current
     if (!viewport || !sentinel || !hasOlderMessages || loadingOlder || loading) return
 
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries[0]?.isIntersecting) loadOlderMessages()
-      },
-      { root: viewport, rootMargin: "24px 0px 0px 0px", threshold: 0 }
-    )
-
-    observer.observe(sentinel)
-    return () => observer.disconnect()
+    // A short first page must stay at five until the user asks for older history.
+    let previousTop = viewport.scrollTop
+    let touchY = null
+    const olderAtTop = () => { if (viewport.scrollTop <= 48) loadOlderMessages() }
+    const onScroll = () => {
+      const top = viewport.scrollTop
+      if (top < previousTop) olderAtTop()
+      previousTop = top
+    }
+    const onWheel = event => { if (event.deltaY < 0) olderAtTop() }
+    const onTouchStart = event => { touchY = event.touches[0]?.clientY ?? null }
+    const onTouchMove = event => {
+      const nextY = event.touches[0]?.clientY
+      if (touchY != null && nextY > touchY) olderAtTop()
+      touchY = nextY ?? null
+    }
+    viewport.addEventListener("scroll", onScroll, { passive: true })
+    viewport.addEventListener("wheel", onWheel, { passive: true })
+    viewport.addEventListener("touchstart", onTouchStart, { passive: true })
+    viewport.addEventListener("touchmove", onTouchMove, { passive: true })
+    return () => {
+      viewport.removeEventListener("scroll", onScroll)
+      viewport.removeEventListener("wheel", onWheel)
+      viewport.removeEventListener("touchstart", onTouchStart)
+      viewport.removeEventListener("touchmove", onTouchMove)
+    }
   }, [hasOlderMessages, loadingOlder, loading, messages[0]?.id])
 
   function followTyping() {
@@ -810,7 +830,7 @@ export default function PocketPage({ pocket, onBack }) {
           {!loading && hasOlderMessages && <div ref={historySentinelRef} className="flex min-h-12 items-center justify-center border-b border-border/70 py-3 text-xs text-muted-foreground">
             {loadingOlder
               ? <span className="flex items-center gap-2"><LoaderCircle className="size-4 animate-spin" />이전 대화를 불러오는 중...</span>
-              : <span>위로 스크롤하면 이전 대화를 불러옵니다.</span>}
+              : <button type="button" onClick={loadOlderMessages} className="cursor-pointer hover:underline">위로 스크롤하거나 눌러서 이전 대화를 불러오세요.</button>}
           </div>}
 
           {!loading && !hasOlderMessages && <article className="border-b border-border/70 py-7 sm:py-9">

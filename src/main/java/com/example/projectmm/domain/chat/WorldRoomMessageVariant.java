@@ -42,13 +42,16 @@ public class WorldRoomMessageVariant {
 
     private LocalDateTime afterSimulatedAt;
 
-    @Column(columnDefinition = "TEXT")
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(columnDefinition = "LONGTEXT")
     private String beforePlayerStateJson;
 
-    @Column(columnDefinition = "TEXT")
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(columnDefinition = "LONGTEXT")
     private String afterPlayerStateJson;
 
-    @Column(columnDefinition = "TEXT")
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(columnDefinition = "LONGTEXT")
     private String userSceneSetupJson;
 
     @Column(columnDefinition = "LONGTEXT")
@@ -57,9 +60,11 @@ public class WorldRoomMessageVariant {
     @Column(columnDefinition = "LONGTEXT")
     private String testDiagnosticsJson;
 
+    @Convert(converter = EncryptedTextConverter.class)
     @Column(columnDefinition = "LONGTEXT")
     private String beforeSceneFactsJson;
 
+    @Convert(converter = EncryptedTextConverter.class)
     @Column(columnDefinition = "LONGTEXT")
     private String afterSceneFactsJson;
 

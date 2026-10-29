@@ -23,7 +23,7 @@ import java.util.List;
         "server.servlet.session.cookie.name=POCKET_QA_UI_PREVIEW","app.private-test.enabled=false",
         "spring.datasource.url=jdbc:h2:mem:pocket-qa-ui-browser;MODE=MySQL;DB_CLOSE_DELAY=-1",
         "spring.datasource.driver-class-name=org.h2.Driver","spring.datasource.username=sa","spring.datasource.password=",
-        "spring.jpa.hibernate.ddl-auto=create-drop","gemini.api-key=","openai.api-key=","app.qa-ui.api-key=",
+        "spring.jpa.hibernate.ddl-auto=create-drop","pocketmm.encryption.required=false","gemini.api-key=","openai.api-key=","app.qa-ui.api-key=",
         "app.qa-ui.enabled=true","app.qa-ui.workspace=.","app.qa-ui.prices-file=tools/qa-ui-prices.example.json",
         "management.health.mail.enabled=false","management.health.redis.enabled=false","pocket.background.enabled=false"})
 class ExperienceUiApplicationSmokeTest {

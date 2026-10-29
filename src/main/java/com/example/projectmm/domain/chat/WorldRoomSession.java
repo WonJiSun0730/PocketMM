@@ -1,5 +1,7 @@
 package com.example.projectmm.domain.chat;
 
+import com.example.projectmm.infrastructure.security.EncryptedTextConverter;
+import jakarta.persistence.Convert;
 import com.example.projectmm.domain.member.Member;
 import com.example.projectmm.domain.player.PlayerProfile;
 import jakarta.persistence.*;
@@ -46,25 +48,30 @@ public class WorldRoomSession {
     private Boolean initialTimeConfigured;
     private Boolean initialSceneResolved;
 
-    @Column(length = 100)
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(columnDefinition = "LONGTEXT")
     private String introTitleSnapshot;
 
-    @Column(columnDefinition = "TEXT")
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(columnDefinition = "LONGTEXT")
     private String introContentSnapshot;
 
-    @Column(length = 200)
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(columnDefinition = "LONGTEXT")
     private String initialLocation;
 
     @ElementCollection
     @CollectionTable(name = "world_room_session_initial_conditions", joinColumns = @JoinColumn(name = "session_id"))
     @OrderColumn(name = "sort_order")
-    @Column(name = "condition_text", length = 300)
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(name = "condition_text", columnDefinition = "LONGTEXT")
     private java.util.List<String> initialConditions = new java.util.ArrayList<>();
 
     @ElementCollection
     @CollectionTable(name = "world_room_session_initial_inventory", joinColumns = @JoinColumn(name = "session_id"))
     @OrderColumn(name = "sort_order")
-    @Column(name = "item_text", length = 300)
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(name = "item_text", columnDefinition = "LONGTEXT")
     private java.util.List<String> initialInventory = new java.util.ArrayList<>();
 
     private LocalDateTime lastPresenceAt;
@@ -110,10 +117,12 @@ public class WorldRoomSession {
         this.castRosterCaptured = true;
     }
 
-    @Column(columnDefinition = "TEXT")
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(columnDefinition = "LONGTEXT")
     private String userNote;
 
-    @Column(columnDefinition = "TEXT")
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(columnDefinition = "LONGTEXT")
     private String pocketPlayGuide;
 
     @Column(nullable = false)

@@ -1,5 +1,7 @@
 package com.example.projectmm.domain.chat;
 
+import com.example.projectmm.infrastructure.security.EncryptedTextConverter;
+import jakarta.persistence.Convert;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -22,19 +24,22 @@ public class WorldRoomPlayerState {
     @JoinColumn(name = "session_id", nullable = false, unique = true)
     private WorldRoomSession session;
 
-    @Column(length = 200)
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(columnDefinition = "LONGTEXT")
     private String location;
 
     @ElementCollection
     @CollectionTable(name = "world_room_player_conditions", joinColumns = @JoinColumn(name = "player_state_id"))
     @OrderColumn(name = "sort_order")
-    @Column(name = "condition_text", nullable = false, length = 300)
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(name = "condition_text", nullable = false, columnDefinition = "LONGTEXT")
     private List<String> conditions = new ArrayList<>();
 
     @ElementCollection
     @CollectionTable(name = "world_room_player_inventory", joinColumns = @JoinColumn(name = "player_state_id"))
     @OrderColumn(name = "sort_order")
-    @Column(name = "item_text", nullable = false, length = 300)
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(name = "item_text", nullable = false, columnDefinition = "LONGTEXT")
     private List<String> inventory = new ArrayList<>();
 
     public WorldRoomPlayerState(WorldRoomSession session) {

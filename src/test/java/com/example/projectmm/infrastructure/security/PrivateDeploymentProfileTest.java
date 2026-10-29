@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest(properties = {
         "PROD_DB_URL=jdbc:h2:mem:privateprod;DB_CLOSE_DELAY=-1", "PROD_DB_USERNAME=sa", "PROD_DB_PASSWORD=",
         "spring.datasource.driver-class-name=org.h2.Driver", "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.jpa.show-sql=false"
+        "spring.jpa.show-sql=false", "pocketmm.encryption.required=false"
 })
 @ActiveProfiles("prod")
 class PrivateDeploymentProfileTest {

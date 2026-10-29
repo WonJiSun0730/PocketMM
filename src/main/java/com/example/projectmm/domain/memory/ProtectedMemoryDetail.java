@@ -1,18 +1,21 @@
 package com.example.projectmm.domain.memory;
 
+import com.example.projectmm.infrastructure.security.EncryptedTextConverter;
+import jakarta.persistence.Convert;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
+@EntityListeners(com.example.projectmm.infrastructure.security.ProtectedDetailFingerprintListener.class)
 @Table(
         name = "protected_memory_detail",
         uniqueConstraints = @UniqueConstraint(
                 name = "uk_protected_memory_detail",
                 columnNames = {
                         "memory_id",
-                        "detail_text"
+                        "detail_hash"
                 }
         )
 )
@@ -34,12 +37,15 @@ public class ProtectedMemoryDetail {
     )
     private Memory memory;
 
-    @Column(
-            name = "detail_text",
-            nullable = false,
-            length = 300
-    )
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(name = "detail_text",
+            nullable = false, columnDefinition = "LONGTEXT")
     private String detailText;
+
+    @Column(name = "detail_hash", length = 64, nullable = false)
+    private String detailHash;
+
+    public void assignDetailFingerprint(String fingerprint) { this.detailHash = fingerprint; }
 
     @Enumerated(EnumType.STRING)
     @Column(

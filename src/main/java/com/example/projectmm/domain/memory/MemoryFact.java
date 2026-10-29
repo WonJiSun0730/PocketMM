@@ -1,5 +1,7 @@
 package com.example.projectmm.domain.memory;
 
+import com.example.projectmm.infrastructure.security.EncryptedTextConverter;
+import jakarta.persistence.Convert;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -15,11 +17,14 @@ public class MemoryFact {
     @Enumerated(EnumType.STRING)
     @Column(name = "fact_kind", length = 32)
     private Kind kind;
-    @Column(name = "fact_subject", length = 120)
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(name = "fact_subject", columnDefinition = "LONGTEXT")
     private String subject;
-    @Column(name = "fact_relation", length = 120)
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(name = "fact_relation", columnDefinition = "LONGTEXT")
     private String relation;
-    @Column(name = "fact_value", length = 400)
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(name = "fact_value", columnDefinition = "LONGTEXT")
     private String value;
 
     public MemoryFact(Kind kind, String subject, String relation, String value) {

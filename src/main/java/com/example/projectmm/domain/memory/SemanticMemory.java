@@ -1,5 +1,7 @@
 package com.example.projectmm.domain.memory;
 
+import com.example.projectmm.infrastructure.security.EncryptedTextConverter;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.EnumType;
@@ -46,13 +48,16 @@ public class SemanticMemory {
     @Column(name = "semantic_type", length = 32)
     private Type type;
 
-    @Column(name = "semantic_subject", length = 120)
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(name = "semantic_subject", columnDefinition = "LONGTEXT")
     private String subject;
 
-    @Column(name = "semantic_relation", length = 120)
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(name = "semantic_relation", columnDefinition = "LONGTEXT")
     private String relation;
 
-    @Column(name = "semantic_object", length = 400)
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(name = "semantic_object", columnDefinition = "LONGTEXT")
     private String object;
 
     @Enumerated(EnumType.STRING)

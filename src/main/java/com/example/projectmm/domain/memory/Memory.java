@@ -1,5 +1,7 @@
 package com.example.projectmm.domain.memory;
 
+import com.example.projectmm.infrastructure.security.EncryptedTextConverter;
+import jakarta.persistence.Convert;
 import com.example.projectmm.domain.character.Character;
 import com.example.projectmm.domain.event.Event;
 import com.example.projectmm.domain.chat.ChatMessage;
@@ -57,7 +59,8 @@ public class Memory {
     private String chatFingerprint;
 
     // 기존 행과 세계 사건 기억은 null을 유지한다. summary 압축과 별도로 원문 근거를 보존한다.
-    @Column(length = 400)
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(columnDefinition = "LONGTEXT")
     private String evidenceQuote;
 
     @Embedded
@@ -66,7 +69,8 @@ public class Memory {
     @Embedded
     private SemanticMemory semanticMemory;
 
-    @Column(nullable = false, length = 500)
+    @Convert(converter = EncryptedTextConverter.class)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String summary;
 
     @Column(nullable = false)
